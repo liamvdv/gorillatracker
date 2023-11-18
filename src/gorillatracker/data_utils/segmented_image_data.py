@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
+
 import numpy as np
+
 
 @dataclass
 class SegmentedImageData:
-    filename: str
+    path: str
     width: int
     height: int
     segments: Dict[str, List[Tuple[np.ndarray, Tuple[int, int, int, int]]]] = field(default_factory=dict)
@@ -13,3 +15,5 @@ class SegmentedImageData:
         if class_label not in self.segments:
             self.segments[class_label] = []
         self.segments[class_label].append((mask, box))
+
+    
