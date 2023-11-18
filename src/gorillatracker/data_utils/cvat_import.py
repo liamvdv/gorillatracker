@@ -1,8 +1,12 @@
+from typing import List
+
 import numpy as np
 import xml.etree.ElementTree as ET
 
+from data_utils.segmented_image_data import SegmentedImageData
+
 # taken from https://github.com/opencv/cvat/issues/5828
-def rle2Mask(rle: list[int], width: int, height:int)->np.ndarray:
+def _rle2Mask(rle: list[int], width: int, height:int)->np.ndarray:
     decoded = [0] * (width * height) # create bitmap container
     decoded_idx = 0
     value = 0
@@ -14,20 +18,24 @@ def rle2Mask(rle: list[int], width: int, height:int)->np.ndarray:
 
     decoded = np.array(decoded, dtype=np.uint8)
     decoded = decoded.reshape((height, width)) # reshape to image size
-
     return decoded
 
-def extract_segment_from_mask(mask_element, box_width, box_height)->np.ndarray:
+def _extract_segment_from_mask_element(mask_element, box_width, box_height)->np.ndarray:
     label = mask_element.get('label')
     assert(label == 'gorilla')
     rle = mask_element.get('rle')
     rle = list(map(int, rle.split(', ')))
     assert(sum(rle) == box_width * box_height)
-    mask = rle2Mask(rle, box_width, box_height)
+    mask = _rle2Mask(rle, box_width, box_height)
     return mask
 
+def _expand_segment_to_img_mask(segment, img_width, img_height, box_x_min, box_y_min):
+    mask = np.zeros((img_height, img_width), dtype=bool)
+    y_max, x_max = box_y_min + segment.shape[0], box_x_min + segment.shape[1]
+    mask[box_y_min:y_max, box_x_min:x_max] = segment.astype(bool)
+    return mask
 
-def extract_boxes_from_mask(mask_element):
+def _extract_boxes_from_mask(mask_element):
     left = int(mask_element.get('left'))
     top = int(mask_element.get('top'))
     width = int(mask_element.get('width'))
@@ -40,16 +48,17 @@ def extract_boxes_from_mask(mask_element):
     
     return x_min, y_min, x_max, y_max
 
-def cvat_import(xml_file):
+def cvat_import(xml_file, skip_no_mask=True)-> List[SegmentedImageData]:
     """
-    returns a dictionary of the form:
-    {filename: {'boxes': [box1, box2, ...], 'segments': [segment1, segment2, ...], 'width': img_width, 'height': img_height}}
-    where box1 = (x_min, y_min, x_max, y_max) and segment1 = np.ndarray(type=np.uint8) 0/1 mask
+    xml_file: path to xml file
+    skip_no_mask: if True, skip images with no mask
     """
     tree = ET.parse(xml_file)
     root = tree.getroot()
     
     import_dict = {}
+    
+    segmented_images = []
 
     for image in root.findall('.//image'):
         img_width = int(image.get('width'))
@@ -57,14 +66,16 @@ def cvat_import(xml_file):
         img_name = image.get('name')
         filename = img_name.split('.')[0]
 
-        boxes = []
-        segments = []
+        segmented_image = SegmentedImageData(filename=filename, width=img_width, height=img_height)
+        
         for mask in image.findall('.//mask'):
-            box = extract_boxes_from_mask(mask)
-            boxes.append(box)
-            segments.append(extract_segment_from_mask(mask, box[2] - box[0], box[3] - box[1]))
+            label = mask.get('label')
+            box = _extract_boxes_from_mask(mask)
+            box_mask = _extract_segment_from_mask_element(mask, box[2] - box[0], box[3] - box[1])
+            img_mask = _expand_segment_to_img_mask(box_mask, img_width, img_height, box[0], box[1])
+            segmented_image.add_segment(label, img_mask, box)
             
-        if boxes and segments:
-            import_dict[filename] = {'boxes': boxes, 'segments': segments, 'width': img_width, 'height': img_height}
+        if segmented_image.segments or not skip_no_mask:
+            segmented_images.append(segmented_image)
             
     return import_dict
