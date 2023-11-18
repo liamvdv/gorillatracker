@@ -41,6 +41,11 @@ def extract_boxes_from_mask(mask_element):
     return x_min, y_min, x_max, y_max
 
 def cvat_import(xml_file):
+    """
+    returns a dictionary of the form:
+    {filename: {'boxes': [box1, box2, ...], 'segments': [segment1, segment2, ...], 'width': img_width, 'height': img_height}}
+    where box1 = (x_min, y_min, x_max, y_max) and segment1 = np.ndarray(type=np.uint8) 0/1 mask
+    """
     tree = ET.parse(xml_file)
     root = tree.getroot()
     
