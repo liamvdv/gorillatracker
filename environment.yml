@@ -38,6 +38,7 @@ dependencies:
   - zstandard
   - debugpy
   - tqdm
+  - ipykernel
 
   # Dev dependencies
   - black
@@ -53,6 +54,7 @@ dependencies:
       - simple_parsing
       - print-on-steroids[exceptions]
       - opencv-python-headless
+      - git+https://github.com/facebookresearch/segment-anything.git
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:
