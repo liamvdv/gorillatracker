@@ -149,3 +149,4 @@ yolov8n.pt
 .ruff_cache
 datasets/
 mnist/
+.gitconfig

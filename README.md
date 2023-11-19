@@ -23,3 +23,14 @@ You can now use the data module exposed in `gorillatracker.data_module_<name>.py
 ground_truth/ 
   cxl/ contains 952 images of 120 individuals  
 ```
+
+
+#### Development Setup
+You can prevent readding your git name and email after devcontainer rebuild by 
+placing them in a `.gitconfig`. It will not be commited to remote.
+
+```
+[user]
+    name = Your Name
+    email = some.body@student.hpi.de
+``` 
