@@ -2,23 +2,18 @@ import xml.etree.ElementTree as ET
 from typing import List
 
 import numpy as np
+
 from gorillatracker.data_utils.segmented_image_data import SegmentedImageData
 
 
-# taken from https://github.com/opencv/cvat/issues/5828
+# taken from https://github.com/opencv/cvat/issues/5828 and modified
 def _rle2Mask(rle: list[int], width: int, height: int) -> np.ndarray:
-    decoded = [0] * (width * height)  # create bitmap container
-    decoded_idx = 0
-    value = 0
-
-    for v in rle:
-        decoded[decoded_idx : decoded_idx + v] = [value] * v
-        decoded_idx += v
-        value = 1 - value  # alternate 1/0 for decoding
-
-    decoded = np.array(decoded, dtype=np.uint8)
-    decoded = decoded.reshape((height, width))  # reshape to image size
-    return decoded
+    decoded = np.zeros(width * height, dtype=np.uint8)
+    pos = 0
+    for i, val in enumerate(rle):
+        decoded[pos : pos + val] = i % 2
+        pos += val
+    return decoded.reshape((height, width))
 
 
 def _extract_segment_from_mask_element(mask_element, box_width, box_height) -> np.ndarray:
@@ -61,8 +56,6 @@ def cvat_import(xml_file: str, img_path: str, skip_no_mask=True) -> List[Segment
     tree = ET.parse(xml_file)
     root = tree.getroot()
 
-    import_dict = {}
-
     segmented_images = []
 
     for image in root.findall(".//image"):
@@ -71,7 +64,7 @@ def cvat_import(xml_file: str, img_path: str, skip_no_mask=True) -> List[Segment
         img_name = image.get("name")
         path = img_path + "/" + img_name
 
-        segmented_image = SegmentedImageData(path=path, height=img_height)
+        segmented_image = SegmentedImageData(path=path)
 
         for mask in image.findall(".//mask"):
             label = mask.get("label")
@@ -83,4 +76,4 @@ def cvat_import(xml_file: str, img_path: str, skip_no_mask=True) -> List[Segment
         if segmented_image.segments or not skip_no_mask:
             segmented_images.append(segmented_image)
 
-    return import_dict
+    return segmented_images
