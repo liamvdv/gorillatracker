@@ -3,9 +3,10 @@ from typing import List
 import cv2
 import pytorch_lightning as pl
 import torch
-from gorillatracker.data_utils.segmented_image_data import SegmentedImageData
 from segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader, Dataset
+
+from gorillatracker.data_utils.segmented_image_data import SegmentedImageData
 
 # baseline https://encord.com/blog/learn-how-to-fine-tune-the-segment-anything-model-sam/
 
@@ -17,18 +18,18 @@ class SegmentationDataset(Dataset):
     def _preprocess_data(self, segmented_images, sam_model, device):
         data = []
         transform = ResizeLongestSide(sam_model.image_encoder.img_size)
-        
+
         for img in segmented_images:
             input_image, input_size, original_image_size = self._preprocess_image(
                 img.path, sam_model, device, transform
             )
-                
+
             image_embedding = self._embed_image(input_image, sam_model)
             for box, mask in zip(img.boxes, img.masks):
                 sparse_embeddings, dense_embeddings = self._embed_prompt(
                     box, original_image_size, sam_model, device, transform
                 )
-                
+
                 data.append(
                     [
                         image_embedding,
@@ -39,7 +40,7 @@ class SegmentationDataset(Dataset):
                         mask,
                     ]
                 )
-                
+
     def _preprocess_image(self, img_path, sam_model, device, transform):
         image = cv2.imread(img_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
