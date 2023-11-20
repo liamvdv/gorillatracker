@@ -13,4 +13,4 @@ lint:
 
 .PHONY: mypy
 mypy:
-	mypy $(sources) --disable-recursive-aliases
+	mypy $(sources) 
