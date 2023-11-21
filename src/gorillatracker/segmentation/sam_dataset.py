@@ -6,7 +6,7 @@ import torch
 from segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader, Dataset
 
-from gorillatracker.data_utils.segmented_image_data import SegmentedImageData
+from gorillatracker.cvat_import import SegmentedImageData
 
 # baseline https://encord.com/blog/learn-how-to-fine-tune-the-segment-anything-model-sam/
 
