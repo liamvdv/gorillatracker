@@ -19,12 +19,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Literal
 
-import datasets
 import jsonlines
-from datasets import load_dataset
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import field, parse
 from tqdm import tqdm
+
+import datasets
+from datasets import load_dataset
 
 
 @dataclass

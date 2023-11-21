@@ -1,6 +1,6 @@
 # Device Arguments
 
-accelerator: cuda                # Device accelerator (e.g., "cuda" for GPU)
+accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
@@ -30,7 +30,7 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "offline"
+loss_mode: "online/soft"
 
 learning_rate: 1e-2            # Learning rate
 lr_schedule: "linear"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
@@ -52,3 +52,4 @@ embedding_save_interval: 2      # Embedding save interval
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
 data_dir: "./mnist"
+data_module: "gorillatracker.data_modules.mnist"

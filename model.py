@@ -6,6 +6,7 @@ import torch
 from print_on_steroids import logger
 from torch.optim import Adam
 from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
+
 from gorillatracker.triplet_loss import get_triplet_loss
 
 

@@ -24,8 +24,11 @@
     // Specify which GPU device you want to use (e.g "device=0")
     "runArgs": [
         "--ipc=host",
+        // UNSAFE. Use with caution. Changes propagate to host.
+        // "--pid=host",
+        // DO NOT COMMIT THIS ENABLED TO REMOTE.
         // "--gpus",
-        // "device=",
+        // "device=0",
         "-u",
         "0"
     ],
@@ -46,7 +49,8 @@
         // GorillaTracker specific mounts.
         "source=/scratch1/wildlife_conservation/data/gorilla_experiment_splits/train_test_distinct/cxl-bristol_0_75,target=/workspaces/gorillatracker/datasets/old/cxl-bristol_0_75,type=bind,ro",
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.
-        "source=/scratch2/gorillatracker/data/ground_truth/,target=/workspaces/gorillatracker/data/ground_truth,type=bind,ro",
+        "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind,ro",
+        "source=/scratch2/gorillatracker/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
         // NOTE(liamvdv): Allow write.
         "source=/scratch2/gorillatracker/models/,target=/workspaces/gorillatracker/models,type=bind"
     ],

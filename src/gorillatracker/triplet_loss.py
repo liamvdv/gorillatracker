@@ -246,7 +246,8 @@ class TripletLossOnline(nn.Module):
         triplet_loss = triplet_loss.sum() / (num_losses + eps)
 
         # TODO(rob2u): implement positive and negative distance means
-        return triplet_loss, -1, -1
+        todo = torch.tensor(-1, dtype=torch.float32, device=triplet_loss.device)
+        return triplet_loss, todo, todo
 
     def get_mask(self, distance_matrix, anchor_positive_dists, anchor_negative_dists, labels):
         mask = get_triplet_mask(labels)
