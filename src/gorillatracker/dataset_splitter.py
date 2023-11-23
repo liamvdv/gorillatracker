@@ -70,8 +70,14 @@ def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
     return entries
 
 
-def read_ground_truth_bristol() -> List[Entry]:
-    raise NotImplementedError()
+def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
+    entries = []
+    for filename in os.listdir(full_images_dirpath):
+        if filename.endswith(".jpg"):
+            label = filename.split("-", maxsplit=1)[0]
+            entry = Entry(Path(full_images_dirpath, filename), label, {})
+            entries.append(entry)
+    return entries
 
 
 # Business Logic
@@ -133,7 +139,7 @@ def compute_split(samples: int, train: int, val: int, test: int):
     return train_count, val_count, test_count
 
 
-TEST = True
+TEST = False
 
 
 def copy(src: Path, dst: Path):
@@ -245,7 +251,13 @@ def generate_split(
         reid_factors = f"-reid-val-{reid_factor_val}-test-{reid_factor_test}"
     name = f"splits/{dataset.replace('/', '-')}-{mode}{reid_factors}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
     outdir = Path(f"data/{name}")
-    images = read_ground_truth_cxl(f"data/{dataset}/full_images")
+
+    
+    # NOTE hacky workaround
+    if "cxl" in dataset:
+        images = read_ground_truth_cxl(f"data/{dataset}")
+    else:
+        images = read_ground_truth_bristol(f"data/{dataset}")
     train, val, test = splitter(
         images,
         mode=mode,
@@ -265,5 +277,6 @@ def generate_split(
 
 
 if __name__ == "__main__":
-    dir = generate_split(dataset="ground_truth/cxl", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10)
-    dir = generate_split(dataset="ground_truth/cxl", mode="closedset", seed=42)
+
+    dir = generate_split(dataset="ground_truth/bristol/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10)
+    # dir = generate_split(dataset="ground_truth/bristol/full_images", mode="closedset", seed=42)

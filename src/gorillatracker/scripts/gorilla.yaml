@@ -1,0 +1,6 @@
+path: /workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15/
+train: 'train/'
+val: 'val/'
+
+names: 
+  0: 'gorilla'

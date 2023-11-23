@@ -1,5 +1,0 @@
-train: /workspaces/gorillavision/datasets/face_detection/data/train/
-val: /workspaces/gorillavision/datasets/face_detection/data/val/
-test: /workspaces/gorillavision/datasets/face_detection/data/test/
-names: 
-  0: 'gorilla'
