@@ -3,7 +3,7 @@
 
 import cv2
 
-import gorillatracker.data_utils.cvat_import as cvat_import
+import gorillatracker.cvat_import as cvat_import
 
 
 def _convert_to_yolo_format(box, img_width, img_height):
@@ -20,7 +20,7 @@ def _convert_to_yolo_format(box, img_width, img_height):
 
 
 # NOTE(memben): for now we are only storing the body bbox
-# TODO(memben): generalize the export to c
+# TODO(memben): generalize the export to segments
 def export_cvat_to_yolo(segmented_images, target_dir, full_images_dir):
     segmented_images = cvat_import.cvat_import(xml_file, full_images_dir)
 

@@ -14,23 +14,15 @@ from simple_parsing import parse
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
-from gorillatracker.data_modules.data_modules import QuadletDataModule, TripletDataModule
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
-from model import get_model_cls
+from gorillatracker.segmentation.sam_model import SAMDecoderFineTuner
+from gorillatracker.segmentation.sam_dataset import SegmentationDataModule
 
-WANDB_PROJECT = "MNIST-EfficientNetV2"
+
+
+WANDB_PROJECT = "CXL-SAM"
 WANDB_ENTITY = "gorillas"
-
-def get_data_module_class(module: str, online: bool = True):
-    parent = QuadletDataModule if online else TripletDataModule
-    mod = importlib.import_module(module)
-    for symbol_name in dir(mod):
-        v = getattr(mod, symbol_name)
-        # Check if the symbol is a subclass of the given class
-        if issubclass(v, parent) and v is not parent:
-            print(f"Selected DataModule: {v}")
-            return v
 
 def main(args: TrainingArgs):
     ########### CUDA checks ###########
@@ -101,10 +93,9 @@ def main(args: TrainingArgs):
         warmup_epochs=args.warmup_epochs,
         lr_decay=args.lr_decay,
         lr_decay_interval=args.lr_decay_interval,
-        margin=args.margin,
-        loss_mode=args.loss_mode,
+        model_type="vit_h", # TODO figure out why this line is needed
     )
-    model_cls = get_model_cls(args.model_name_or_path)
+    model_cls = SAMDecoderFineTuner
 
     if args.saved_checkpoint_path is None:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
@@ -133,8 +124,10 @@ def main(args: TrainingArgs):
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    dm_cls = get_data_module_class(args.data_module, online=args.loss_mode.startswith("online"))
-    dm = dm_cls.from_training_args(args)
+    # dm_cls = SegmentationDataModule
+    # dm = dm_cls.from_training_args(args)
+    dm = SegmentationDataModule()
+    
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -196,13 +189,14 @@ def main(args: TrainingArgs):
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info(f"Rank {current_process_rank} | Validation before training...")
-        val_result = trainer.validate(model, dm)
+        val_result = trainer.validate(model, dm.val_dataloader())
         print(val_result)
         if args.only_val:
             exit(0)
 
     logger.info(f"Rank {current_process_rank} | Starting training...")
-    trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
+    # TODO figure out why needing to call train_dataloader()
+    trainer.fit(model, dm.train_dataloader(), ckpt_path=args.saved_checkpoint_path if args.resume else None)
 
     if trainer.interrupted:
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")
