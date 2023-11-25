@@ -60,7 +60,7 @@ def crop_cxl(image_path, bbox_path, output_dir):
     bbo_max_confidence_idx, bbox_max_confidence = max(enumerate(bbox_data_lines), key=lambda x: x[1][-1], default=(-1, -1)) # get the shortest line in the file
                     
     if bbo_max_confidence_idx != -1: # when there is a bounding box
-        _, x, y, w, h, _ = bbox_max_confidence
+        index , x, y, w, h, _ = bbox_max_confidence
         output_path = os.path.join(output_dir, os.path.basename(image_path))
         crop_and_save_image(image_path, x, y, w, h, output_path)
         

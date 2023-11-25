@@ -1,4 +1,5 @@
 import os
+import shutil
 from ultralytics import YOLO
 
 # Receive arguments from command line
@@ -23,12 +24,7 @@ def train_yolo(model_name, epochs, batch_size):
     return model,result
 
 
-def build_yolo_dataset(base_dir, annotation_dir, file_extension=".jpg"):
-    train_dir = os.path.join(base_dir, "train")
-    val_dir = os.path.join(base_dir, "val")
-    test_dir = os.path.join(base_dir, "test")
-    
-
+def build_yolo_dataset(base_dir, annotation_dir, dest_dir, file_extension=".jpg", undo=False):
     def load_annotation(annotation_dir, destination_dir):
         for image_file in os.listdir(destination_dir):
             annotation_filename = image_file.replace(file_extension, ".txt")
@@ -46,10 +42,25 @@ def build_yolo_dataset(base_dir, annotation_dir, file_extension=".jpg"):
                 new_annotation = os.path.join(destination_dir, annotation_filename)
                 with open(new_annotation, 'w') as new_annotation_file:
                     new_annotation_file.write("\n".join(new_lines))
-        
-    load_annotation(annotation_dir, train_dir)
-    load_annotation(annotation_dir, val_dir)
-    load_annotation(annotation_dir, test_dir)
+    
+    def undo_annotation(annotation_dir, destination_dir):
+        for image_file in os.listdir(destination_dir):
+            annotation_filename = image_file.replace(file_extension, ".txt")
+            
+            shutil.copyfile(os.path.join(annotation_dir, annotation_filename), os.path.join(destination_dir, annotation_filename))
+                  
+    train_dir = os.path.join(dest_dir, "train")
+    val_dir = os.path.join(dest_dir, "val")
+    test_dir = os.path.join(dest_dir, "test")
+    
+    if undo:
+        undo_annotation(annotation_dir, train_dir)
+        undo_annotation(annotation_dir, val_dir)
+        undo_annotation(annotation_dir, test_dir)
+    else:
+        load_annotation(annotation_dir, train_dir)
+        load_annotation(annotation_dir, val_dir)
+        load_annotation(annotation_dir, test_dir)
 
 
 def detect_gorillafaces_cxl(model, dir):

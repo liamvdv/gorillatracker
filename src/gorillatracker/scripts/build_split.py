@@ -2,7 +2,7 @@ import os
 import shutil
 import sys
 import ultralytics
-from gorillatracker.scripts.dataset_splitter import generate_split
+from gorillatracker.dataset_splitter import generate_split
 from gorillatracker.scripts.ensure_integrity_openset import ensure_integrity
 from gorillatracker.scripts.train_yolo import build_yolo_dataset, train_yolo, detect_gorillafaces_cxl
 from gorillatracker.scripts.crop_dataset import crop_images
@@ -32,7 +32,8 @@ if __name__ == "__main__":
     # batch_size = 32
     
     # # build yolo dataset 
-    build_yolo_dataset(bristol_dir, bbox_dir)
+    # replace all annotation labels with 0 to train yolo
+    build_yolo_dataset(bristol_dir, bbox_dir, bristol_dir)
     
     # train_yolo(model_name, epochs, batch_size)
     
@@ -42,6 +43,9 @@ if __name__ == "__main__":
     detect_gorillafaces_cxl(model, os.path.join(cxl_dir, "test"))
     detect_gorillafaces_cxl(model, os.path.join(cxl_dir, "val"))
     detect_gorillafaces_cxl(model, os.path.join(cxl_dir, "train"))
+    
+    # undo the replace of the annotation labels with 0
+    build_yolo_dataset(bristol_dir, bbox_dir, bristol_dir, undo=True) 
     
     # 5. join into one dataset (openset) and  6. crop the images (openset)
     joined_base_dir = "/workspaces/gorillatracker/data/joined_splits"

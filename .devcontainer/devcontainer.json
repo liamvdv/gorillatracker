@@ -24,8 +24,8 @@
     // Specify which GPU device you want to use (e.g "device=0")
     "runArgs": [
         "--ipc=host",
-        // "--gpus",
-        // "device=",
+        "--gpus",
+        "device=0",
         "-u",
         "0"
     ],
