@@ -12,12 +12,13 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import datasets
 import numpy as np
-from datasets import load_dataset
 from simple_parsing import field, parse
 from tqdm import tqdm
 from transformers import AutoTokenizer
+
+import datasets
+from datasets import load_dataset
 
 
 def get_cache_dir(source_dir: Path, tokenizer_path: Path) -> Path:

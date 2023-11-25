@@ -150,6 +150,7 @@ def copy(src: Path, dst: Path):
 
 
 def write_entries(entries: List[Entry], outdir: Path):
+    os.makedirs(outdir, exist_ok=True)
     for entry in entries:
         assert isinstance(entry.value, Value)
         newpath = outdir / entry.value.name
@@ -233,7 +234,7 @@ def stats_and_confirm(name, full, train, val, test):
 
 
 def generate_split(
-    dataset="ground_truth/cxl",
+    dataset="ground_truth/cxl/full_images",
     mode: Literal["openset", "closedset"] = "closedset",
     seed=42,
     train=70,

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Literal, List
+from typing import List, Literal, Union
 
 from simple_parsing import field, list_field
 
@@ -47,7 +47,7 @@ class TrainingArgs:
     lr_decay: float = field(default=0.97)
     lr_decay_interval: int = field(default=3)
     margin: float = field(default=0.5)
-    loss_mode: Literal["offline", "online/soft", "online/hard", "online/semi-hard"] = field(default="semi-hard")
+    loss_mode: Literal["offline", "online/soft", "online/hard", "online/semi-hard"] = field(default="offline")
 
     batch_size: int = field(default=8)
     grad_clip: float = field(default=1.0)

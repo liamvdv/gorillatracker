@@ -8,6 +8,7 @@ import torch
 import torchmetrics as tm
 import wandb
 from sklearn.manifold import TSNE
+from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 
 
@@ -62,10 +63,10 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             # log metrics to wandb
             evaluate_embeddings(
                 data=embeddings_table,
-                embedding_name="run_{0}_embedding_metrics".format(self.run.name),
+                embedding_name="val/embeddings",
                 metrics={"knn": knn, "pca": pca, "tsne": tsne, "fc_layer": fc_layer},  # "flda": flda_metric,
             )
-            wandb.log({"epoch": current_epoch})
+            # wandb.log({"epoch": current_epoch})
             # for visibility also log the
         # clear the table where the embeddings are stored
         pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
@@ -86,9 +87,14 @@ def load_embeddings_from_wandb(embedding_name, run):
     return data
 
 
+
 def evaluate_embeddings(data, embedding_name, metrics={}):  # data is DataFrame with columns: label and embedding
     embeddings = np.asarray([embedding for embedding in data["embedding"]], dtype=np.float32)
-    labels = np.asarray([label for label in data["label"]], dtype=np.int32)
+    # convert labels to numpy array
+    le = LabelEncoder()
+    labels = le.fit_transform(data["label"])
+    
+    # labels = np.asarray([label for label in data["label"]], dtype=np.int32)
 
     results = {}
     for metric_name, metric in metrics.items():
@@ -107,7 +113,8 @@ def evaluate_embeddings(data, embedding_name, metrics={}):  # data is DataFrame 
     return results
 
 
-def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42, num_classes=10):
+def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42):
+    num_classes = len(np.unique(labels))
     torch.manual_seed(seed)
     model = torch.nn.Sequential(
         torch.nn.Linear(embeddings.shape[1], 100),
@@ -167,7 +174,8 @@ def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42, num_classes
 
 
 # Vincents code
-def knn(embeddings, labels, k=5, num_classes=10):
+def knn(embeddings, labels, k=5):
+    num_classes = len(np.unique(labels))
     # convert embeddings and labels to tensors
     embeddings = torch.tensor(embeddings)
     labels = torch.tensor(labels)
@@ -207,7 +215,8 @@ def knn(embeddings, labels, k=5, num_classes=10):
     return {"accuracy": accuracy, "accuracy_top5": accuracy_top5, "auroc": auroc, "f1": f1}
 
 
-def pca(embeddings, labels, num_classes=10):  # generate a 2D plot of the embeddings
+def pca(embeddings, labels):  # generate a 2D plot of the embeddings
+    num_classes = len(np.unique(labels))
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
     embeddings = pca.transform(embeddings)
@@ -229,7 +238,8 @@ def pca(embeddings, labels, num_classes=10):  # generate a 2D plot of the embedd
     return plot
 
 
-def tsne(embeddings, labels, pca=False, count=1000, num_classes=10):  # generate a 2D plot of the embeddings
+def tsne(embeddings, labels, pca=False, count=1000):  # generate a 2D plot of the embeddings
+    num_classes = len(np.unique(labels))
     # downsample the embeddings and also the labels to 1000 samples
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
@@ -264,7 +274,8 @@ def tsne(embeddings, labels, pca=False, count=1000, num_classes=10):  # generate
     return plot
 
 
-def flda_metric(embeddings, labels, num_classes=10):  # TODO: test
+def flda_metric(embeddings, labels):  # TODO: test
+    num_classes = len(np.unique(labels))
     # (m_1 - m_2)^2/(s_1^2 + s_2^2)
     mean_var_map = {label: [0.0, 0.0] for label in np.unique(labels)}
     ratio_sum = 0.0

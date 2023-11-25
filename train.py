@@ -1,25 +1,22 @@
 import dataclasses
+import importlib
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
 import torch
 import wandb
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
-import importlib
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
+from gorillatracker.data_modules.data_modules import QuadletDataModule, TripletDataModule
+from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
-from gorillatracker.data_modules import TripletDataModule, QuadletDataModule
-from gorillatracker.helpers import (
-    check_checkpoint_path_for_wandb,
-    check_for_wandb_checkpoint_and_download_if_necessary,
-)
 from model import get_model_cls
 
 WANDB_PROJECT = "MNIST-EfficientNetV2"
@@ -106,6 +103,7 @@ def main(args: TrainingArgs):
         lr_decay_interval=args.lr_decay_interval,
         margin=args.margin,
         loss_mode=args.loss_mode,
+        embedding_size=args.embedding_size,
     )
     model_cls = get_model_cls(args.model_name_or_path)
 

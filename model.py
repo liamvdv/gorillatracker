@@ -6,6 +6,7 @@ import torch
 from print_on_steroids import logger
 from torch.optim import Adam
 from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
+
 from gorillatracker.triplet_loss import get_triplet_loss
 
 
@@ -69,7 +70,7 @@ class BaseModule(L.LightningModule):
         images, labels = batch # embeddings either (ap, a, an, n) oder (a, p, n)
         vec = torch.cat(images, dim=0)
         embeddings = self.forward(vec)
-        labels = torch.cat(labels, dim=0)
+        labels = torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]
         loss, pos_dist, neg_dist = self.triplet_loss(embeddings, labels)
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
@@ -85,7 +86,7 @@ class BaseModule(L.LightningModule):
 
         assert len(self.embeddings_table_columns) == 2
         data = {
-            self.embeddings_table_columns[0]: anchor_labels.tolist(),
+            self.embeddings_table_columns[0]: anchor_labels.tolist() if torch.is_tensor(anchor_labels) else anchor_labels,
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
         }
 
@@ -97,7 +98,7 @@ class BaseModule(L.LightningModule):
         images, labels = batch # embeddings either (ap, a, an, n) oder (a, p, n)
         n_achors = len(images[0])
         vec = torch.cat(images, dim=0)
-        labels = torch.cat(labels, dim=0)
+        labels = torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]
         embeddings = self.forward(vec)
         
         self.add_validation_embeddings(embeddings[:n_achors], labels[:n_achors])

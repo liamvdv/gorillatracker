@@ -147,6 +147,7 @@ yolov8n.pt
 /checkpoints
 /gorillavision
 .ruff_cache
+
 datasets/
 mnist/
 .gitconfig
