@@ -17,7 +17,15 @@ from gorillatracker.cvat_import import SegmentedImageData
 class SAMCXLDataset(Dataset):
     def __init__(self, segmented_images: List[SegmentedImageData], partition: Literal["train", "val", "test"], sam_model: Sam):
         """
-        Deterministic but random split into 70% train, 15% val, 15% test
+        Dataset of the segmented cxl images, with embeddings precomputed with SAM on GPU.
+        The dataset should be used to fine-tune the SAM decoder.
+        Deterministic but random split of segmented_images into 70% train, 15% val, 15% test. 
+        
+        Args:
+        segmented_images (List[SegmentedImageData]): A list of segmented image data.
+        partition (Literal["train", "val", "test"]): The dataset partition to be used; one of "train", "val", or "test".
+        sam_model (Sam): An instance of the SAM model used for processing the images.
+
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
