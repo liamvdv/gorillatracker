@@ -25,7 +25,8 @@ class Singleton(metaclass=SingletonMeta):
 
 def worker_function(i):
     singleton = Singleton()
-    body, face = singleton.get_yolo(i) 
+    videoPath = i
+    
     
 
 if __name__ == "__main__":
@@ -35,7 +36,9 @@ if __name__ == "__main__":
     if os.path.exists("./mTrack/tmp"):
         os.system("rm -rf ./mTrack/tmp")
     os.mkdir("./mTrack/tmp")
+    videoDir = "/workspaces/gorillatracker/data/spac_gorillas_converted"
+    videoPaths = [os.path.join(videoDir, x) for x in os.listdir(videoDir)]
     pool = multiprocessing.Pool(3)
-    pool.map(worker_function, range(10))
+    pool.map(worker_function, videoPaths)
     pool.close()
     pool.join()
