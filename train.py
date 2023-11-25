@@ -19,7 +19,7 @@ from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wa
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from model import get_model_cls
 
-WANDB_PROJECT = "MNIST-EfficientNetV2"
+WANDB_PROJECT = "EfficientNetV2-Baseline"
 WANDB_ENTITY = "gorillas"
 
 def get_data_module_class(module: str, online: bool = True):

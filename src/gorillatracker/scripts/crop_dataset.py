@@ -38,7 +38,7 @@ def read_bbox_data(bbox_path):
     
     bbox_data_lines = []
     with open(bbox_path, 'r') as bbox_file:
-        bbox_data_lines = bbox_file.read().strip().split("\n")[:-1]
+        bbox_data_lines = bbox_file.read().strip().split("\n")
     
     bbox_data_lines = [list(map(float, bbox_data_line.strip().split(" "))) for bbox_data_line in bbox_data_lines]
     
@@ -95,4 +95,7 @@ if __name__ == "__main__":
     bbox_folder = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox"
     output_folder = "/workspaces/gorillatracker/data/ground_truth/bristol/cropped_images_face"
 
-    crop_images(full_images_folder, bbox_folder, output_folder)
+    # crop_images(full_images_folder, bbox_folder, output_folder)
+    test_bbox = "/workspaces/gorillatracker/data/joined_splits/combined/train/afia-1-img-0.txt"
+    data = read_bbox_data(test_bbox)
+    print(data)

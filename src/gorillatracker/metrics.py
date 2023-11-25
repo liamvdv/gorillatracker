@@ -211,12 +211,27 @@ def knn(embeddings, labels, k=5):
     f1 = tm.functional.f1_score(
         classification_matrix, labels, task="multiclass", num_classes=num_classes, average="weighted"
     ).item()
+    
     print("knn done")
     return {"accuracy": accuracy, "accuracy_top5": accuracy_top5, "auroc": auroc, "f1": f1}
 
 
+def filter_uncommen_classes(embeddings, labels, min_count=10):
+    # filter out classes with less than min_count samples
+    unique_labels, counts = np.unique(labels, return_counts=True)
+    common_labels = unique_labels[counts >= min_count]
+    # filter out embeddings and labels
+    mask = np.isin(labels, common_labels)
+    embeddings = embeddings[mask]
+    labels = labels[mask]
+    return embeddings, labels
+
+
 def pca(embeddings, labels):  # generate a 2D plot of the embeddings
+    
+    embeddings, labels = filter_uncommen_classes(embeddings, labels)
     num_classes = len(np.unique(labels))
+    
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
     embeddings = pca.transform(embeddings)
@@ -239,6 +254,7 @@ def pca(embeddings, labels):  # generate a 2D plot of the embeddings
 
 
 def tsne(embeddings, labels, pca=False, count=1000):  # generate a 2D plot of the embeddings
+    embeddings, labels = filter_uncommen_classes(embeddings, labels)
     num_classes = len(np.unique(labels))
     # downsample the embeddings and also the labels to 1000 samples
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)

@@ -11,18 +11,18 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-run_name: "test-code"          # Name for this training run
-wandb_tags: ["test"]            # WandB tags for experiment tracking
+run_name: "EfficientNetV2Large-rohanlukas-ds-semi-hard"          # Name for this training run
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: None     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: True             # Enable fast development run
+fast_dev_run: False             # Enable fast development run
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 3      # Early stopping patience (number of epochs)
+early_stopping_patience: 10      # Early stopping patience (number of epochs)
 embedding_size: 256
 
 weight_decay: 0.2              # Weight decay
@@ -41,7 +41,7 @@ lr_decay_interval: 1           # Learning rate decay interval (for the learning 
 batch_size: 8                # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 10               # Training goal (large number)
+max_epochs: 30               # Training goal (large number)
 val_before_training: False      # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -51,5 +51,5 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "data/joined_splits/combined_cropped"
+data_dir: "data/joined_splits/cxl-bristol_face-openset=True_0" # 
 data_module: "gorillatracker.data_modules.cxl"
