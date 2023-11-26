@@ -5,8 +5,6 @@ from print_on_steroids import logger
 
 from dlib.frameworks.pytorch import get_rank
 
-
-# TODO(memben): fix in train.py as well
 def check_for_wandb_checkpoint_and_download_if_necessary(
     checkpoint_path: str,
     wandb_run_instance,
