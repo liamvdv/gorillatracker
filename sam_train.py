@@ -1,5 +1,4 @@
 import dataclasses
-import importlib
 import os
 import time
 from pathlib import Path
@@ -15,11 +14,8 @@ from simple_parsing import parse
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
-from gorillatracker.metrics import LogEmbeddingsToWandbCallback
-from gorillatracker.segmentation.sam_model import SAMDecoderFineTuner
-from gorillatracker.segmentation.sam_dataset import SegmentationDataModule
-
-
+from gorillatracker.sam_model import SamDecoderFineTuner
+from gorillatracker.data_modules.sam_cxl import SAMCXLDataModule
 
 WANDB_PROJECT = "CXL-SAM"
 WANDB_ENTITY = "gorillas"
@@ -93,9 +89,9 @@ def main(args: TrainingArgs):
         warmup_epochs=args.warmup_epochs,
         lr_decay=args.lr_decay,
         lr_decay_interval=args.lr_decay_interval,
-        model_type="vit_h", # TODO figure out why this line is needed
     )
-    model_cls = SAMDecoderFineTuner
+    
+    model_cls = SamDecoderFineTuner
 
     if args.saved_checkpoint_path is None:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
@@ -124,16 +120,9 @@ def main(args: TrainingArgs):
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    # dm_cls = SegmentationDataModule
-    # dm = dm_cls.from_training_args(args)
-    dm = SegmentationDataModule()
-    
+    dm = SAMCXLDataModule(batch_size=args.batch_size, sam_model=model.sam_model)
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
-    embeddings_logger_callback = LogEmbeddingsToWandbCallback(
-        every_n_val_epochs=args.embedding_save_interval,
-        wandb_run=wandb_logger.experiment,
-    )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
         cleanup_local=True, cleanup_online=False, size_limit=20
@@ -157,7 +146,6 @@ def main(args: TrainingArgs):
         wandb_disk_cleanup_callback,
         lr_monitor,
         early_stopping,
-        embeddings_logger_callback,
     ]
     if args.accelerator == "cuda":
         callbacks.append(CUDAMetricsCallback())
@@ -189,14 +177,13 @@ def main(args: TrainingArgs):
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info(f"Rank {current_process_rank} | Validation before training...")
-        val_result = trainer.validate(model, dm.val_dataloader())
+        val_result = trainer.validate(model, dm)
         print(val_result)
         if args.only_val:
             exit(0)
 
     logger.info(f"Rank {current_process_rank} | Starting training...")
-    # TODO figure out why needing to call train_dataloader()
-    trainer.fit(model, dm.train_dataloader(), ckpt_path=args.saved_checkpoint_path if args.resume else None)
+    trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
 
     if trainer.interrupted:
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")

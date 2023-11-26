@@ -15,12 +15,14 @@ from gorillatracker.cvat_import import SegmentedImageData
 
 
 class SAMCXLDataset(Dataset):
-    def __init__(self, segmented_images: List[SegmentedImageData], partition: Literal["train", "val", "test"], sam_model: Sam):
+    def __init__(
+        self, segmented_images: List[SegmentedImageData], partition: Literal["train", "val", "test"], sam_model: Sam
+    ):
         """
         Dataset of the segmented cxl images, with embeddings precomputed with SAM on GPU.
         The dataset should be used to fine-tune the SAM decoder.
-        Deterministic but random split of segmented_images into 70% train, 15% val, 15% test. 
-        
+        Deterministic but random split of segmented_images into 70% train, 15% val, 15% test.
+
         Args:
         segmented_images (List[SegmentedImageData]): A list of segmented image data.
         partition (Literal["train", "val", "test"]): The dataset partition to be used; one of "train", "val", or "test".
@@ -28,24 +30,22 @@ class SAMCXLDataset(Dataset):
 
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         sam_model.to(self.device)
-        
+
         train, temp = train_test_split(segmented_images, test_size=0.3, random_state=42)
         val, test = train_test_split(temp, test_size=0.5, random_state=42)
-        
+
         partition_mapping = {"train": train, "val": val, "test": test}
         if partition not in partition_mapping:
             raise ValueError(f"partition must be one of ['train', 'val', 'test'], got {partition}")
-        
+
         self.data = self._preprocess_data(partition_mapping[partition], sam_model)
 
     def _preprocess_data(self, segmented_images: List[SegmentedImageData], sam_model: Sam):
         transform = ResizeLongestSide(sam_model.image_encoder.img_size)
         return [
-            data_item
-            for img in segmented_images
-            for data_item in self._process_single_image(img, sam_model, transform)
+            data_item for img in segmented_images for data_item in self._process_single_image(img, sam_model, transform)
         ]
 
     def _process_single_image(self, img: SegmentedImageData, sam_model: Sam, transform):
@@ -58,12 +58,12 @@ class SAMCXLDataset(Dataset):
                 input_size,
                 original_image_size,
                 *self._embed_prompt(np.array(box), original_image_size, sam_model, transform),
-                mask
+                mask,
             ]
             for class_label, segment_list in img.segments.items()
             for mask, box in segment_list
         ]
-        
+
     def _preprocess_image(self, img_path: str, sam_model: Sam, transform):
         image = cv2.imread(img_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -98,5 +98,3 @@ class SAMCXLDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.data[idx]
-
-

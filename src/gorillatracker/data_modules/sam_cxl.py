@@ -1,4 +1,4 @@
-import pytorch_lightning as pl
+import lightning as L
 from segment_anything import sam_model_registry
 from segment_anything.modeling.sam import Sam
 from torch.utils.data import DataLoader
@@ -7,16 +7,19 @@ from gorillatracker.cvat_import import cvat_import
 from gorillatracker.datasets.sam_cxl import SAMCXLDataset
 
 
-class SegmentationDataModule(pl.LightningDataModule):
-    def __init__(self, cvat_path: str, img_path: str, batch_size: int, sam_model: Sam):
+class SAMCXLDataModule(L.LightningDataModule):
+    def __init__(self, batch_size: int, sam_model: Sam):
         super().__init__()
-        self.cvat_path = cvat_path
-        self.img_path = img_path
+        base_path = "/workspaces/gorillatracker/data/ground_truth/cxl"
+        self.cvat_path = f"{base_path}/full_images_body_instance_segmentation/cvat_export.xml"
+        self.img_path = f"{base_path}/full_images/"
         self.batch_size = batch_size
         self.sam_model = sam_model
 
     def setup(self, stage: str):
         segmented_gorilla_images = cvat_import(self.cvat_path, self.img_path)
+        # TODO remove
+        segmented_gorilla_images = segmented_gorilla_images[:10]
         if stage == "fit":
             self.train = SAMCXLDataset(segmented_gorilla_images, "train", self.sam_model)
             self.val = SAMCXLDataset(segmented_gorilla_images, "val", self.sam_model)
@@ -42,14 +45,11 @@ class SegmentationDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    base_path = "/workspaces/gorillatracker/data/ground_truth/cxl"
-    cvat_path = f"{base_path}/full_images_body_instance_segmentation/cvat_export.xml"
-    img_path = f"{base_path}/full_images/"
     model_type = "vit_h"
     checkpoint_path = "/workspaces/gorillatracker/models/sam_vit_h_4b8939.pth"
     sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
     batch_size = 32
-    dm = SegmentationDataModule(cvat_path, img_path, batch_size, sam_model)
+    dm = SAMCXLDataModule(batch_size, sam_model)
     dm.setup("test")
     for batch in dm.test_dataloader():
         print(batch)
