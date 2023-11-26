@@ -18,8 +18,6 @@ class SAMCXLDataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
         segmented_gorilla_images = cvat_import(self.cvat_path, self.img_path)
-        # TODO remove
-        segmented_gorilla_images = segmented_gorilla_images[:10]
         if stage == "fit":
             self.train = SAMCXLDataset(segmented_gorilla_images, "train", self.sam_model)
             self.val = SAMCXLDataset(segmented_gorilla_images, "val", self.sam_model)
