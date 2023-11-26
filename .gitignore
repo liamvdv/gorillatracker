@@ -148,6 +148,7 @@ yolov8n.pt
 /gorillavision
 .ruff_cache
 
-datasets/
+/datasets/
+/models/
 mnist/
 .gitconfig
