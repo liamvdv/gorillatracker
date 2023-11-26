@@ -1,12 +1,10 @@
-import numpy as np
 from torchvision.transforms.functional import pad
 
 
 class SquarePad:
     def __call__(self, image):
-        w, h = image.size
-        max_wh = np.max([w, h])
-        hp = int((max_wh - w) / 2)
-        vp = int((max_wh - h) / 2)
-        padding = (hp, vp, hp, vp)
+        max_wh = max(image.size)
+        p_left, p_top = [(max_wh - s) // 2 for s in image.size]
+        p_right, p_bottom = [max_wh - (s+pad) for s, pad in zip(image.size, [p_left, p_top])]
+        padding = (p_left, p_top, p_right, p_bottom)
         return pad(image, padding, 0, "constant")

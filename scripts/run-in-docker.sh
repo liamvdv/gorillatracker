@@ -10,9 +10,9 @@
 # We automatically detect W&B login credentials in the ~/.netrc file and pass them to the docker container. To store them, do wandb login once on the host machine.
 
 # Default values
-image="rob2u/bp_devcontainer:1.0.2"
-command="python train.py"
-gpus="1"
+image="liamvdv/gorillatracker-ubuntu-dev"
+command="bash"
+gpus="none"
 
 # set e <- why is this here? -> https://stackoverflow.com/questions/3474526/stop-on-first-error
 set -e
@@ -52,6 +52,9 @@ parse_arguments() {
         esac
         shift
     done
+
+    command="pip install -e . && ${command}"
+    
 }
 
 # Call the function to parse arguments
@@ -88,12 +91,15 @@ fi
 
 # --user $(id -u):$(id -g) \ # use root user instead
 
-docker run --rm -d --ipc=host \
-    -v "$(pwd)":/workspace -w /workspace \
-    -v "/scratch1/wildlife_conservation/data/gorilla_experiment_splits/train_test_distinct/cxl-bristol_0_75":"/workspaces/gorillavision/datasets/cxl-bristol_0_75" \
+docker run --rm -it --ipc=host \
+    -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
+    -v "/scratch2/gorillatracker/data:/workspaces/gorillatracker/data:ro" \
+    -v "/scratch2/gorillatracker/data/splits:/workspaces/gorillatracker/data/splits" \
+    -v "/scratch2/gorillatracker/models:/workspaces/gorillatracker/models" \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
-    --gpus=\"device=${gpus}\" $image $command
+    --gpus=\"device=${gpus}\" \
+    $image /bin/bash -c "${command}"
 
 # print done to console
 echo 'Done'
