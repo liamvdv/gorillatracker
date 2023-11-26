@@ -5,16 +5,14 @@ from print_on_steroids import logger
 
 from dlib.frameworks.pytorch import get_rank
 
-
+# TODO(memben): fix in train.py as well
 def check_for_wandb_checkpoint_and_download_if_necessary(
     checkpoint_path: str,
     wandb_run_instance,
-    wandb_entity=None,
-    wandb_project=None,
+    wandb_entity,
+    wandb_project,
     suffix="/model.ckpt",
 ) -> str:
-    from train import WANDB_ENTITY, WANDB_PROJECT
-
     """
     Checks the provided checkpoint_path for the wandb regex r\"wandb:.*\".
     If matched, download the W&B artifact indicated by the id in the provided string and return its path.
@@ -37,7 +35,7 @@ def check_for_wandb_checkpoint_and_download_if_necessary(
             checkpoint_path = os.environ[f"MY_WANDB_ARTIFACT_PATH_{wandb_model_id}_{model_tag}"]
         else:
             artifact = wandb_run_instance.use_artifact(
-                f"{wandb_entity or WANDB_ENTITY}/{wandb_project or WANDB_PROJECT}/model-{wandb_model_id}:{model_tag}"
+                f"{wandb_entity}/{wandb_project}/model-{wandb_model_id}:{model_tag}"
             )
             checkpoint_path = artifact.download() + suffix
             logger.info(f"Path of downloaded W&B artifact: {checkpoint_path}")
