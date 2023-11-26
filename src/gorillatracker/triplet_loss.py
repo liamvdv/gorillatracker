@@ -2,8 +2,8 @@ from typing import Literal
 
 import torch
 import torch.nn.functional as F
-from torch import nn
 from sklearn.preprocessing import LabelEncoder
+from torch import nn
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -41,7 +41,7 @@ def get_triplet_mask(labels):
         `labels[i] == labels[j] and labels[i] != labels[k]`
         and `i`, `j`, `k` are different.
     """
-   # step 1 - get a mask for distinct indices
+    # step 1 - get a mask for distinct indices
 
     # shape: (batch_size, batch_size)
     labels = convert_labels_to_tensor(labels)
@@ -74,7 +74,7 @@ def get_triplet_mask(labels):
     valid_indices = torch.logical_and(i_equal_j, torch.logical_not(i_equal_k))
 
     # step 3 - combine two masks
-    
+
     mask = torch.logical_and(distinct_indices, valid_indices)
 
     return mask
@@ -131,7 +131,9 @@ def get_semi_hard_mask(
     labels = labels.to(labels)
     batch_size = labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=device)
-    indices_not_equal = torch.logical_not(indices_equal, )
+    indices_not_equal = torch.logical_not(
+        indices_equal,
+    )
     labels_equal = (labels.unsqueeze(0) == labels.unsqueeze(1)).to(device)
     labels_not_equal = torch.logical_not(labels_equal)
 
@@ -139,15 +141,20 @@ def get_semi_hard_mask(
     distance_matrix_neg = distance_matrix * torch.logical_and(labels_not_equal, indices_not_equal).float()
 
     # filter out all points where the distance to a negative is smaller than the max distance to a positive
-    distance_difference = distance_matrix_neg.unsqueeze(1).repeat(1, batch_size, 1) - distance_matrix_pos.unsqueeze(2).repeat(1, 1, batch_size) # shape: (anchor: batch_size,positive: batch_size, negative: batch_size)
+    distance_difference = distance_matrix_neg.unsqueeze(1).repeat(1, batch_size, 1) - distance_matrix_pos.unsqueeze(
+        2
+    ).repeat(
+        1, 1, batch_size
+    )  # shape: (anchor: batch_size,positive: batch_size, negative: batch_size)
 
     # filter out all points where the distance to a negative is smaller than distance to a positive
-      # now only the triplets where dist_pos < dist_neg are left
+    # now only the triplets where dist_pos < dist_neg are left
     mask = get_triplet_mask(labels)
     semi_hard_mask = distance_difference > 0.0
     semi_hard_mask = semi_hard_mask.to(mask.device)
 
     return torch.logical_and(mask, semi_hard_mask)
+
 
 def euclidean_distance_matrix(embeddings):
     """Efficient computation of Euclidean distance matrix
@@ -258,11 +265,11 @@ class TripletLossOnline(nn.Module):
             neg_mask = get_distance_mask(labels, valid="neg")  # get all valid negatives
 
             # for each anchor compute the min distance to a negative
-            masked_anchor_negative_dists = anchor_negative_dists.squeeze(1).masked_fill(neg_mask == 0, float("inf")) # fill all invalid negatives with inf so they are not considered in the min
-            _, neg_min_indices = torch.min(
-                masked_anchor_negative_dists, dim=1
-            )
-            
+            masked_anchor_negative_dists = anchor_negative_dists.squeeze(1).masked_fill(
+                neg_mask == 0, float("inf")
+            )  # fill all invalid negatives with inf so they are not considered in the min
+            _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1)
+
             hard_mask = torch.zeros(len(labels), len(labels), len(labels))
             hard_mask[torch.arange(len(labels)), :, neg_min_indices] = 1
             hard_mask = hard_mask.to(mask.device)
@@ -342,7 +349,7 @@ if __name__ == "__main__":
         - torch.linalg.vector_norm(embeddings[0] - embeddings[2])
         + margin
     )
-    
+
     loss_103 = torch.relu(  # anchor 0.5 positive 1.0 negative 0.0
         torch.linalg.vector_norm(embeddings[1] - embeddings[0])
         - torch.linalg.vector_norm(embeddings[1] - embeddings[3])
@@ -353,7 +360,7 @@ if __name__ == "__main__":
         - torch.linalg.vector_norm(embeddings[1] - embeddings[2])
         + margin
     )
-    
+
     loss_231 = torch.relu(  # anchor -1.0 positive 0.0 negative 0.5
         torch.linalg.vector_norm(embeddings[2] - embeddings[3])
         - torch.linalg.vector_norm(embeddings[2] - embeddings[1])
@@ -364,15 +371,13 @@ if __name__ == "__main__":
         - torch.linalg.vector_norm(embeddings[2] - embeddings[0])
         + margin
     )
-    
+
     loss_321 = torch.relu(  # anchor 0.0 positive -1.0 negative 0.5
         torch.linalg.vector_norm(embeddings[3] - embeddings[2])
         - torch.linalg.vector_norm(embeddings[3] - embeddings[1])
         + margin
     )
-    
-    
-    
+
     loss_manual = (loss_013 + loss_103 + loss_231 + loss_321) / 4
     loss = triplet_loss(embeddings, labels)
     loss_semi = triplet_loss_semi_hard(embeddings, labels)

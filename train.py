@@ -109,7 +109,7 @@ def main(args: TrainingArgs):
 
     if args.saved_checkpoint_path is None:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
-            args.saved_checkpoint_path, wandb_logger.experiment
+            args.saved_checkpoint_path, wandb_logger.experiment, WANDB_ENTITY, WANDB_PROJECT
         )
 
         if args.resume:  # load weights, optimizer states, scheduler state, ...\

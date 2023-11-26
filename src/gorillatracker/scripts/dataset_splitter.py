@@ -266,5 +266,7 @@ def generate_split(
 
 
 if __name__ == "__main__":
-    dir = generate_split(dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10)
+    dir = generate_split(
+        dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+    )
     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)

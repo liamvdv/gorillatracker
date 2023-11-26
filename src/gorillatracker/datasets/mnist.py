@@ -1,7 +1,6 @@
 from typing import Literal
-from torch.utils.data import random_split
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, random_split
 from torchvision.datasets import MNIST
 
 
@@ -19,7 +18,9 @@ class MNISTDataset(Dataset):
         """
         self.partition = partition
         if partition in ("train", "val"):
-            self.train, self.val = random_split(MNIST(data_dir, train=True, download=True, transform=transform), [0.8, 0.2])
+            self.train, self.val = random_split(
+                MNIST(data_dir, train=True, download=True, transform=transform), [0.8, 0.2]
+            )
         elif partition == "test":
             self.test = MNIST(data_dir, train=False, download=True, trainsform=transform)
         else:
