@@ -1,7 +1,6 @@
 from typing import Literal
-from torch.utils.data import random_split
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, random_split
 from torchvision.datasets import MNIST
 
 

@@ -30,7 +30,9 @@ class NletDataModule(L.LightningDataModule):
         raise Exception("logic error, ask liamvdv")
 
     def setup(self, stage: str):
-        logger.info(f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}")
+        logger.info(
+            f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}"
+        )
 
         if stage == "fit":
             self.train = self.dataset_class(self.data_dir, partition="train", transform=self.transforms)
