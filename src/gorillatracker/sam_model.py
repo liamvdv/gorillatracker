@@ -63,7 +63,6 @@ class SamDecoderFineTuner(L.LightningModule):
         # TODO(memben) Which loss does make sense here
         self.loss = torch.nn.BCELoss()
 
-
     def forward(self, batch):
         binary_masks = []
         for i, (image_embedding, sparse_embedding, dense_embedding) in enumerate(
@@ -120,24 +119,31 @@ class SamDecoderFineTuner(L.LightningModule):
         return loss
 
     def on_validation_epoch_end(self):
-        val_samples = random.choices(self.val_data, k=3)
-        plots = []
-        # TODO(memben) use WANDB for segmentation https://docs.wandb.ai/guides/track/log/media
+        val_samples = random.choices(self.val_data, k=16)
+    
+        class_labels = {
+            1: "gorilla",
+        }
+
+        mask_imgs = []
         for val_sample in val_samples:
             path, mask, predicted_binary_mask, box = val_sample
+            # plt.figure(figsize=(10, 10))
+            # img = plt.imread(path)
+            # plt.imshow(img)
+            # plt.axis("off")
+            # show_sam_box(box, plt.gca())
+            mask_img = wandb.Image(
+                path,
+                masks={
+                    "predictions": {"mask_data": predicted_binary_mask.squeeze(0).cpu().numpy(), "class_labels": class_labels},
+                    "ground_truth": {"mask_data": mask.cpu().numpy(), "class_labels": class_labels},
+                },
+            )
+            mask_imgs.append(mask_img)
+            # plt.close()
 
-            plt.figure(figsize=(10, 10))
-            img = plt.imread(path)
-            plt.imshow(img)
-            plt.axis("off")
-            show_sam_box(box, plt.gca())
-            show_sam_mask(mask.cpu().numpy(), plt.gca(), color=np.array([0, 0, 1, 0.6]))
-            show_sam_mask(predicted_binary_mask.cpu().numpy(), plt.gca(), color=np.array([1, 0, 0, 0.6]))
-            plots.append(plt.gcf())
-            plt.close("all")
-
-        wandb.log({"val/samples": [wandb.Image(plot) for plot in plots]})
-
+        wandb.log({"val/samples": mask_imgs})
         self.val_data.clear()
 
     def configure_optimizers(self):
