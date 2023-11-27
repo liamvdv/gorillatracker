@@ -60,9 +60,9 @@ class SamDecoderFineTuner(L.LightningModule):
         # infer model_type from model_name_or_path
         model_type = "_".join(model_name_or_path.split("/")[-1].split("_")[1:3])
         self.sam_model = sam_model_registry[model_type](checkpoint=model_name_or_path)
-        # TODO Which loss does make sense here
-        loss = torch.nn.BCELoss()
-        self.sam_model.loss = loss
+        # TODO(memben) Which loss does make sense here
+        self.loss = torch.nn.BCELoss()
+
 
     def forward(self, batch):
         binary_masks = []
@@ -103,7 +103,7 @@ class SamDecoderFineTuner(L.LightningModule):
         binary_mask = binary_mask.squeeze(2)
         ground_truth_mask = batch.mask
         gt_binary_mask = self._convert_to_binary_mask(ground_truth_mask)
-        loss = self.sam_model.loss(binary_mask, gt_binary_mask)
+        loss = self.loss(binary_mask, gt_binary_mask)
         return loss, binary_mask
 
     def training_step(self, batch, batch_idx):
@@ -134,6 +134,7 @@ class SamDecoderFineTuner(L.LightningModule):
             show_sam_mask(mask.cpu().numpy(), plt.gca(), color=np.array([0, 0, 1, 0.6]))
             show_sam_mask(predicted_binary_mask.cpu().numpy(), plt.gca(), color=np.array([1, 0, 0, 0.6]))
             plots.append(plt.gcf())
+            plt.close("all")
 
         wandb.log({"val/samples": [wandb.Image(plot) for plot in plots]})
 
