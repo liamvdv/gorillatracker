@@ -18,7 +18,9 @@ class MNISTDataset(Dataset):
         """
         self.partition = partition
         if partition in ("train", "val"):
-            self.train, self.val = random_split(MNIST(data_dir, train=True, download=True, transform=transform), [0.8, 0.2])
+            self.train, self.val = random_split(
+                MNIST(data_dir, train=True, download=True, transform=transform), [0.8, 0.2]
+            )
         elif partition == "test":
             self.test = MNIST(data_dir, train=False, download=True, trainsform=transform)
         else:
