@@ -1,0 +1,64 @@
+name: Format & Lint
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format-lint:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+          cache-dependency-path: "environment.yml"
+
+      - name: Format with black and isort
+        run: |
+            make format
+      - name: Check for modified files
+        id: git-check
+        run: echo "modified=$(if git diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+      - name: Push changes
+        if: steps.git-check.outputs.modified == 'true'
+        run: |
+          git config --global user.name 'BananaPealer'
+          git config --global user.email 'liamvdv@users.noreply.github.com'
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git commit -am "Automated changes"
+      - name: Lint
+        run: |
+            make lint
+      - name: Push changes
+        if: steps.git-check.outputs.modified == 'true'
+        run: |
+          git push
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Micromamba
+        # https://github.com/mamba-org/setup-micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: environment.yml
+          environment-name: research
+          cache-environment: true
+          init-shell: >-
+            bash
+      - name: Install gorillatracker
+        run: pip install .
+        shell: micromamba-shell {0}
+      - name: Run tests
+        run: |
+            make tests
+        shell: micromamba-shell {0}
