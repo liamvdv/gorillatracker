@@ -132,7 +132,8 @@ def compute_split(samples: int, train: int, val: int, test: int):
     assert train_count >= 1
     return train_count, val_count, test_count
 
-
+# You must ensure this is set to True when pushed. Do not keep a TEST = False 
+# version on main.
 TEST = True
 
 
@@ -161,7 +162,6 @@ def sample_and_remove(arr, samples: int, mask=None):
     remaining = [e for e in arr if e not in sampled]
     return sampled, remaining
 
-
 def splitter(
     images: List[Entry],
     mode: Literal["openset", "openset"],
@@ -187,7 +187,10 @@ def splitter(
     if mode == "closedset":
         train_count, val_count, test_count = compute_split(len(images), train, val, test)
         for individum in individums:
+            n = len(individum.value)
             selection, individum.value = individum.value[:min_train_count], individum.value[min_train_count:]
+            if len(selection) != min_train_count:
+                print(f"WARN: individual {individum.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it.")
             train_bucket.extend(selection)
         rest = ungroup(individums)
         val_bucket, rest = rest[:val_count], rest[val_count:]
@@ -213,6 +216,11 @@ def splitter(
         assert len(reid_samples) == reid_count_test + reid_count_val, "sanity check"
         val_bucket += reid_samples[:reid_count_val]
         test_bucket += reid_samples[reid_count_val:]
+        
+        for individual in group(train_bucket):
+            n = len(individual.value)
+            if n < min_train_count:
+                print(f"WARN: train set: individual {individual.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it.")
     return train_bucket, val_bucket, test_bucket
 
 
