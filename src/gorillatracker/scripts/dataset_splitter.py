@@ -133,6 +133,8 @@ def compute_split(samples: int, train: int, val: int, test: int):
     return train_count, val_count, test_count
 
 
+# You must ensure this is set to True when pushed. Do not keep a TEST = False
+# version on main.
 TEST = True
 
 
@@ -187,7 +189,12 @@ def splitter(
     if mode == "closedset":
         train_count, val_count, test_count = compute_split(len(images), train, val, test)
         for individum in individums:
+            n = len(individum.value)
             selection, individum.value = individum.value[:min_train_count], individum.value[min_train_count:]
+            if len(selection) != min_train_count:
+                print(
+                    f"WARN: individual {individum.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
+                )
             train_bucket.extend(selection)
         rest = ungroup(individums)
         val_bucket, rest = rest[:val_count], rest[val_count:]
@@ -213,6 +220,13 @@ def splitter(
         assert len(reid_samples) == reid_count_test + reid_count_val, "sanity check"
         val_bucket += reid_samples[:reid_count_val]
         test_bucket += reid_samples[reid_count_val:]
+
+        for individual in group(train_bucket):
+            n = len(individual.value)
+            if n < min_train_count:
+                print(
+                    f"WARN: train set: individual {individual.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
+                )
     return train_bucket, val_bucket, test_bucket
 
 
@@ -265,8 +279,13 @@ def generate_split(
     return outdir
 
 
-if __name__ == "__main__":
-    dir = generate_split(
-        dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-    )
-    dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+# if __name__ == "__main__":
+#     dir = generate_split(
+#         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+#     )
+#     dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
+
+#     dir = generate_split(
+#         dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+#     )
+#     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
