@@ -1,12 +1,12 @@
-name: Format, Lint & Test
+name: Lint & Test
 
 on:
   pull_request:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
+# permissions:
+#   contents: write
 
 jobs:
   format-lint:
@@ -25,30 +25,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install black isort ruff mypy
 
-      - name: Format with black and isort
-        run: |
-          make format
+      # - name: Format with black and isort
+      #   run: |
+      #     make format
 
-      - name: Check for modified files
-        id: git-check
-        run: echo "modified=$(if git diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
-
-      - name: Push changes
-        if: steps.git-check.outputs.modified == 'true'
-        run: |
-          git config --global user.name 'BananaPealer'
-          git config --global user.email 'liamvdv@users.noreply.github.com'
-          git commit -am "Automated changes"
-
+      # fail if lint fails
       - name: Lint
         run: |
           make lint
 
-      - name: Push changes
-        if: steps.git-check.outputs.modified == 'true'
-        run: |
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git push
+      # else commit the autoformatted code fixes
+      # - name: Check for modified files
+      #   id: git-check
+      #   run: echo "modified=$(if git diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+
+      # # NOTE(liamvdv): don't autofix here.
+      # - name: Push changes
+      #   if: steps.git-check.outputs.modified == 'true'
+      #   run: |
+      #     BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/})
+      #     git checkout $BRANCH_NAME
+      #     git config --global user.name 'BananaPealer'
+      #     git config --global user.email 'liamvdv@users.noreply.github.com'
+      #     git commit -am "Automated changes"
+      #     # git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+      #     git push origin $BRANCH_NAME
 
   test:
     runs-on: ubuntu-latest
