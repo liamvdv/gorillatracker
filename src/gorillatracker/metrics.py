@@ -87,13 +87,12 @@ def load_embeddings_from_wandb(embedding_name, run):
     return data
 
 
-
 def evaluate_embeddings(data, embedding_name, metrics={}):  # data is DataFrame with columns: label and embedding
     embeddings = np.asarray([embedding for embedding in data["embedding"]], dtype=np.float32)
     # convert labels to numpy array
     le = LabelEncoder()
     labels = le.fit_transform(data["label"])
-    
+
     # labels = np.asarray([label for label in data["label"]], dtype=np.int32)
 
     results = {}
@@ -275,7 +274,7 @@ def tsne(embeddings, labels, pca=False, count=1000):  # generate a 2D plot of th
 
 
 def flda_metric(embeddings, labels):  # TODO: test
-    num_classes = len(np.unique(labels))
+    # num_classes = len(np.unique(labels))
     # (m_1 - m_2)^2/(s_1^2 + s_2^2)
     mean_var_map = {label: [0.0, 0.0] for label in np.unique(labels)}
     ratio_sum = 0.0
