@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import List, Literal
 
 import cv2
@@ -8,13 +9,16 @@ from segment_anything.utils.transforms import ResizeLongestSide
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 
-# test
 from gorillatracker.cvat_import import SegmentedImageData
 
+
 # baseline https://encord.com/blog/learn-how-to-fine-tune-the-segment-anything-model-sam/
+class SamCXLDataset(Dataset):
+    SamCXLData = namedtuple(
+        "SamCXLData",
+        ["embedding", "input_size", "original_size", "sparse_embedding", "dense_embedding", "mask", "box", "path"],
+    )
 
-
-class SAMCXLDataset(Dataset):
     def __init__(
         self, segmented_images: List[SegmentedImageData], partition: Literal["train", "val", "test"], sam_model: Sam
     ):
@@ -53,13 +57,15 @@ class SAMCXLDataset(Dataset):
         image_embedding = self._embed_image(input_image, sam_model)
 
         return [
-            [
+            SamCXLDataset.SamCXLData(
                 image_embedding,
                 input_size,
                 original_image_size,
                 *self._embed_prompt(np.array(box), original_image_size, sam_model, transform),
                 mask,
-            ]
+                box,
+                img.path,
+            )
             for class_label, segment_list in img.segments.items()
             for mask, box in segment_list
         ]

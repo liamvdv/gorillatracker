@@ -11,7 +11,7 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-run_name: "sam-test-run"          # Name for this training run
+run_name: "sam-image-logging-test-run"          # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "/workspaces/gorillatracker/models/sam_vit_h_4b8939.pth" # Model name or path 
 saved_checkpoint_path: None     # Path to a saved model checkpoint (if resuming)
@@ -35,7 +35,7 @@ warmup_epochs: 1                # Number of warmup epochs (for the learning rate
 lr_decay: 0.9                  # Learning rate decay (for the learning rate schedule -> reduce_on_plateau)
 lr_decay_interval: 1           # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
 
-batch_size: 4                # Training batch size
+batch_size: 32                # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 40               # Training goal (large number)

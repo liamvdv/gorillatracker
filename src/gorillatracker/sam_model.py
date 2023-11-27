@@ -1,11 +1,30 @@
+import random
+
 import lightning as L
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
+import wandb
 from print_on_steroids import logger
 from segment_anything import sam_model_registry
 from torch.nn.functional import normalize, threshold
 from torch.optim import AdamW
 
 
+# Helper functions provided in https://github.com/facebookresearch/segment-anything/blob/9e8f1309c94f1128a6e5c047a10fdcb02fc8d651/notebooks/predictor_example.ipynb
+def show_sam_mask(mask, ax, color=np.array([30 / 255, 144 / 255, 255 / 255, 0.6])):
+    h, w = mask.shape[-2:]
+    mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+    ax.imshow(mask_image)
+
+
+def show_sam_box(box, ax):
+    x0, y0 = box[0], box[1]
+    w, h = box[2] - box[0], box[3] - box[1]
+    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor="red", facecolor=(0, 0, 0, 0), lw=2))
+
+
+# baseline https://encord.com/blog/learn-how-to-fine-tune-the-segment-anything-model-sam/
 class SamDecoderFineTuner(L.LightningModule):
     def __init__(
         self,
@@ -36,6 +55,8 @@ class SamDecoderFineTuner(L.LightningModule):
         self.lr_decay_interval = lr_decay_interval
         self.epsilon = epsilon
 
+        self.val_data = []
+
         # infer model_type from model_name_or_path
         model_type = "_".join(model_name_or_path.split("/")[-1].split("_")[1:3])
         self.sam_model = sam_model_registry[model_type](checkpoint=model_name_or_path)
@@ -44,23 +65,21 @@ class SamDecoderFineTuner(L.LightningModule):
         self.sam_model.loss = loss
 
     def forward(self, batch):
-        image_embeddings, input_sizes, original_image_sizes, sparse_embeddings, dense_embeddings, _ = batch
-
         binary_masks = []
         for i, (image_embedding, sparse_embedding, dense_embedding) in enumerate(
-            zip(image_embeddings, sparse_embeddings, dense_embeddings)
+            zip(batch.embedding, batch.sparse_embedding, batch.dense_embedding)
         ):
-            input_size = [t[i] for t in input_sizes]
-            original_image_size = [t[i] for t in original_image_sizes]
+            input_size = [t[i] for t in batch.input_size]
+            original_size = [t[i] for t in batch.original_size]
 
             binary_mask = self._process_image(
-                image_embedding, input_size, original_image_size, sparse_embedding, dense_embedding
+                image_embedding, input_size, original_size, sparse_embedding, dense_embedding
             )
             binary_masks.append(binary_mask)
 
         return torch.stack(binary_masks)
 
-    def _process_image(self, image_embedding, input_size, original_image_size, sparse_embedding, dense_embedding):
+    def _process_image(self, image_embedding, input_size, original_size, sparse_embedding, dense_embedding):
         low_res_masks, iou_predictions = self.sam_model.mask_decoder(
             image_embeddings=image_embedding,
             image_pe=self.sam_model.prompt_encoder.get_dense_pe(),
@@ -68,7 +87,7 @@ class SamDecoderFineTuner(L.LightningModule):
             dense_prompt_embeddings=dense_embedding,
             multimask_output=False,
         )
-        upscaled_masks = self.sam_model.postprocess_masks(low_res_masks, input_size, original_image_size)
+        upscaled_masks = self.sam_model.postprocess_masks(low_res_masks, input_size, original_size)
         return normalize(threshold(upscaled_masks, 0.0, 0))
 
     def _convert_to_binary_mask(self, ground_truth_mask):
@@ -79,23 +98,46 @@ class SamDecoderFineTuner(L.LightningModule):
         gt_binary_mask = torch.as_tensor(gt_mask_resized > 0, dtype=torch.float32)
         return gt_binary_mask
 
-    def _calculate_batch_loss(self, batch):
+    def _compute_loss_and_mask(self, batch):
         binary_mask = self.forward(batch)
         binary_mask = binary_mask.squeeze(2)
-        ground_truth_mask = batch[-1]
+        ground_truth_mask = batch.mask
         gt_binary_mask = self._convert_to_binary_mask(ground_truth_mask)
         loss = self.sam_model.loss(binary_mask, gt_binary_mask)
-        return loss
+        return loss, binary_mask
 
     def training_step(self, batch, batch_idx):
-        loss = self._calculate_batch_loss(batch)
+        loss, _ = self._compute_loss_and_mask(batch)
         self.log("train/loss", loss, on_step=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss = self._calculate_batch_loss(batch)
+        loss, predicted_binary_mask = self._compute_loss_and_mask(batch)
+        boxes = torch.stack(batch.box, dim=1).cpu().numpy()
+        for path, mask, pred_mask, box in zip(batch.path, batch.mask, predicted_binary_mask, boxes):
+            self.val_data.append((path, mask, pred_mask, box))
         self.log("val/loss", loss, on_step=True)
         return loss
+
+    def on_validation_epoch_end(self):
+        val_samples = random.choices(self.val_data, k=3)
+        plots = []
+        # TODO(memben) use WANDB for segmentation https://docs.wandb.ai/guides/track/log/media
+        for val_sample in val_samples:
+            path, mask, predicted_binary_mask, box = val_sample
+
+            plt.figure(figsize=(10, 10))
+            img = plt.imread(path)
+            plt.imshow(img)
+            plt.axis("off")
+            show_sam_box(box, plt.gca())
+            show_sam_mask(mask.cpu().numpy(), plt.gca(), color=np.array([0, 0, 1, 0.6]))
+            show_sam_mask(predicted_binary_mask.cpu().numpy(), plt.gca(), color=np.array([1, 0, 0, 0.6]))
+            plots.append(plt.gcf())
+
+        wandb.log({"val/samples": [wandb.Image(plot) for plot in plots]})
+
+        self.val_data.clear()
 
     def configure_optimizers(self):
         if self.global_rank == 0:

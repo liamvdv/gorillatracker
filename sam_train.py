@@ -15,7 +15,7 @@ from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.sam_model import SamDecoderFineTuner
-from gorillatracker.data_modules.sam_cxl import SAMCXLDataModule
+from gorillatracker.data_modules.sam_cxl import SamCXLDataModule
 
 WANDB_PROJECT = "CXL-SAM"
 WANDB_ENTITY = "gorillas"
@@ -120,7 +120,7 @@ def main(args: TrainingArgs):
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    dm = SAMCXLDataModule(batch_size=args.batch_size, sam_model=model.sam_model)
+    dm = SamCXLDataModule(batch_size=args.batch_size, sam_model=model.sam_model)
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
 

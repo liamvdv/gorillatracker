@@ -4,10 +4,10 @@ from segment_anything.modeling.sam import Sam
 from torch.utils.data import DataLoader
 
 from gorillatracker.cvat_import import cvat_import
-from gorillatracker.datasets.sam_cxl import SAMCXLDataset
+from gorillatracker.datasets.sam_cxl import SamCXLDataset
 
 
-class SAMCXLDataModule(L.LightningDataModule):
+class SamCXLDataModule(L.LightningDataModule):
     def __init__(self, batch_size: int, sam_model: Sam):
         super().__init__()
         base_path = "/workspaces/gorillatracker/data/ground_truth/cxl"
@@ -19,12 +19,12 @@ class SAMCXLDataModule(L.LightningDataModule):
     def setup(self, stage: str):
         segmented_gorilla_images = cvat_import(self.cvat_path, self.img_path)
         if stage == "fit":
-            self.train = SAMCXLDataset(segmented_gorilla_images, "train", self.sam_model)
-            self.val = SAMCXLDataset(segmented_gorilla_images, "val", self.sam_model)
+            self.train = SamCXLDataset(segmented_gorilla_images, "train", self.sam_model)
+            self.val = SamCXLDataset(segmented_gorilla_images, "val", self.sam_model)
         elif stage == "test":
-            self.test = SAMCXLDataset(segmented_gorilla_images, "test", self.sam_model)
+            self.test = SamCXLDataset(segmented_gorilla_images, "test", self.sam_model)
         elif stage == "validate":
-            self.val = SAMCXLDataset(segmented_gorilla_images, "val", self.sam_model)
+            self.val = SamCXLDataset(segmented_gorilla_images, "val", self.sam_model)
         elif stage == "predict":
             # TODO(memben): implement this
             self.predict = None
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     checkpoint_path = "/workspaces/gorillatracker/models/sam_vit_h_4b8939.pth"
     sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
     batch_size = 32
-    dm = SAMCXLDataModule(batch_size, sam_model)
+    dm = SamCXLDataModule(batch_size, sam_model)
     dm.setup("test")
     for batch in dm.test_dataloader():
         print(batch)
