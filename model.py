@@ -181,7 +181,7 @@ class EfficientNetV2Wrapper(BaseModule):
         return self.classifier(self.model(x))
     
     def get_tensor_transforms():
-        return transforms.Resize((224, 224))
+        return transforms.Resize((224, 224), antialias=True)
         
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {"EfficientNetV2_Large": EfficientNetV2Wrapper}
