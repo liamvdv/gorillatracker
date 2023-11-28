@@ -60,6 +60,15 @@ class Entry:
 # Importers of images, Path is unique identifier.
 
 
+def read_files(dirpath: str) -> List[Entry]:
+    entries = []
+    for filename in os.listdir(dirpath):
+        filepath = Path(dirpath, filename)
+        entry = Entry(filepath, filename, {})
+        entries.append(entry)
+    return entries
+
+
 def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
@@ -279,7 +288,29 @@ def generate_split(
     return outdir
 
 
-# if __name__ == "__main__":
+def generate_simple_split(
+    dataset="ground_truth/cxl/full_images",
+    seed=42,
+    train=70,
+    val=15,
+    test=15,
+):
+    name = f"splits/{dataset.replace('/', '-')}-seed-{seed}-train-{train}-val-{val}-test-{test}"
+    files = read_files(f"data/{dataset}")
+    files = consistent_random_permutation(files, lambda x: x.value, seed)
+    outdir = Path(f"data/{name}")
+    train_count, val_count, test_count = compute_split(len(files), train, val, test)
+    train_set = files[:train_count]
+    val_set = files[train_count : train_count + val_count]
+    test_set = files[train_count + val_count :]
+    stats_and_confirm(name, files, train_set, val_set, test_set)
+    write_entries(train_set, outdir / "train")
+    write_entries(val_set, outdir / "val")
+    write_entries(test_set, outdir / "test")
+
+
+if __name__ == "__main__":
+    dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
 #     dir = generate_split(
 #         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
 #     )
