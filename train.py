@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import torch
+from torchvision.transforms import Compose, ToTensor
 import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
@@ -14,23 +15,41 @@ from simple_parsing import parse
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
-from gorillatracker.data_modules.data_modules import QuadletDataModule, TripletDataModule
+from gorillatracker.data_modules import QuadletDataModule, TripletDataModule
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from model import get_model_cls
 
-WANDB_PROJECT = "MNIST-EfficientNetV2"
+WANDB_PROJECT = "" # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
 
-def get_data_module_class(module: str, online: bool = True):
-    parent = QuadletDataModule if online else TripletDataModule
-    mod = importlib.import_module(module)
-    for symbol_name in dir(mod):
-        v = getattr(mod, symbol_name)
-        # Check if the symbol is a subclass of the given class
-        if issubclass(v, parent) and v is not parent:
-            print(f"Selected DataModule: {v}")
-            return v
+def get_dataset_class(pypath: str):
+    parent = torch.utils.data.Dataset
+    modpath, clsname = pypath.rsplit(".", 1)
+    mod = importlib.import_module(modpath)
+    cls = getattr(mod, clsname)
+    assert issubclass(cls, parent), f"{cls} is not a subclass of {parent}"
+    return cls
+
+
+def _assert_tensor(x):
+    assert isinstance(
+        x, torch.Tensor
+    ), f"GorillaTrackerDataset.get_transforms must contain ToTensor. Transformed result is {type(x)}"
+    return x
+
+def get_data_module(model, args: TrainingArgs):
+    base = QuadletDataModule if args.loss_mode.startswith("online") else TripletDataModule
+    dataset_class = get_dataset_class(args.dataset_class)
+    transforms = Compose(
+        [
+            dataset_class.get_transforms() if hasattr(dataset_class, "get_transforms") else ToTensor(),
+            _assert_tensor,
+            model.get_tensor_transforms(),
+        ]
+    )
+    return base(args.data_dir, args.batch_size, dataset_class, transforms=transforms)
+
 
 def main(args: TrainingArgs):
     ########### CUDA checks ###########
@@ -134,8 +153,7 @@ def main(args: TrainingArgs):
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    dm_cls = get_data_module_class(args.data_module, online=args.loss_mode.startswith("online"))
-    dm = dm_cls.from_training_args(args)
+    dm = get_data_module(model, args)
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -185,6 +203,7 @@ def main(args: TrainingArgs):
         fast_dev_run=args.fast_dev_run,
         profiler=args.profiler,
         inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+        # reload_dataloaders_every_n_epochs=1,
     )
 
     if current_process_rank == 0:

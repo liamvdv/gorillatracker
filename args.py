@@ -60,7 +60,7 @@ class TrainingArgs:
     embedding_save_interval: int = field(default=1)
 
     # Config and Data Arguments
-    data_module: str = field(default="gorillatracker.data_module_mnist")
+    dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default="./mnist")
     # Add any additional fields as needed.
 
