@@ -8,10 +8,6 @@ from torch.optim import Adam
 from torchvision.models import (
     EfficientNet_V2_L_Weights,
     efficientnet_v2_l,
-    resnet18,
-    ResNet18_Weights,
-    resnet152,
-    ResNet152_Weights,
 )
 from torchvision import transforms
 from gorillatracker.triplet_loss import get_triplet_loss
@@ -194,15 +190,7 @@ class EfficientNetV2Wrapper(BaseModule):
     def get_tensor_transforms(cls):
         return transforms.Resize((224, 224), antialias=True)
 
-        return transforms.Resize((224, 224), antialias=True)
 
-
-    def forward(self, x):
-        return self.classifier(self.model(x))
-
-    def get_tensor_transforms():
-        return transforms.Resize((224, 224), antialias=True)
-        
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {"EfficientNetV2_Large": EfficientNetV2Wrapper}
 

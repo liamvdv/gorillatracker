@@ -23,7 +23,6 @@ from model import get_model_cls
 WANDB_PROJECT = "" # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
 
-
 def get_dataset_class(pypath: str):
     parent = torch.utils.data.Dataset
     modpath, clsname = pypath.rsplit(".", 1)
@@ -39,11 +38,9 @@ def _assert_tensor(x):
     ), f"GorillaTrackerDataset.get_transforms must contain ToTensor. Transformed result is {type(x)}"
     return x
 
-
 def get_data_module(model, args: TrainingArgs):
     base = QuadletDataModule if args.loss_mode.startswith("online") else TripletDataModule
     dataset_class = get_dataset_class(args.dataset_class)
-
     transforms = Compose(
         [
             dataset_class.get_transforms() if hasattr(dataset_class, "get_transforms") else ToTensor(),
