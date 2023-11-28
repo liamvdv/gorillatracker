@@ -23,7 +23,7 @@ for triplet generation is ready build.
 
 ### Where to transforms go? `dataset_class.get_transforms()` vs  `model_class.get_tensor_transforms()`
 The model class should many apply a Resize to it's expected size and if needed enforce number of channels needed.
-The dataset class should specify all other ransforms and MUST at least transform `torchvision.transforms.ToTensor`.
+The dataset class should specify all other transforms and MUST at least transform `torchvision.transforms.ToTensor`.
 
 
 # Statistcs

@@ -178,15 +178,21 @@ class EfficientNetV2Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         is_from_scratch = kwargs.get("from_scratch", False)
-        self.model = resnet18() if is_from_scratch else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
         self.model = (
-            efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
-            if kwargs.get("from_scratch", False)
-            else efficientnet_v2_l()
+            efficientnet_v2_l()
+            if is_from_scratch
+            else efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
         )
         self.model.classifier = torch.nn.Sequential(
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         )
+
+    def forward(self, x):
+        return self.model(x)
+
+    def get_tensor_transforms():
+        return transforms.Resize((224, 224), antialias=True)
+
 
     def forward(self, x):
         return self.classifier(self.model(x))
