@@ -23,7 +23,7 @@ class SegmentedImageData:
 
     @property
     def filename(self) -> str:
-        return os.path.basename(self.path).split(".")[0]
+        return os.path.splitext(os.path.basename(self.path))[0]
 
 
 # taken from https://github.com/opencv/cvat/issues/5828 and modified
