@@ -5,8 +5,15 @@ import pandas as pd
 import torch
 from print_on_steroids import logger
 from torch.optim import Adam
-from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
-
+from torchvision.models import (
+    EfficientNet_V2_L_Weights,
+    efficientnet_v2_l,
+    resnet18,
+    ResNet18_Weights,
+    resnet152,
+    ResNet152_Weights,
+)
+from torchvision import transforms
 from gorillatracker.triplet_loss import get_triplet_loss
 
 
@@ -14,6 +21,7 @@ class BaseModule(L.LightningModule):
     """
     must be subclassed and set self.model = ...
     """
+
     def __init__(
         self,
         model_name_or_path: str,
@@ -67,40 +75,44 @@ class BaseModule(L.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        images, labels = batch # embeddings either (ap, a, an, n) oder (a, p, n)
+        images, labels = batch  # embeddings either (ap, a, an, n) oder (a, p, n)
         vec = torch.cat(images, dim=0)
         embeddings = self.forward(vec)
-        labels = torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]
+        labels = (
+            torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]
+        )
         loss, pos_dist, neg_dist = self.triplet_loss(embeddings, labels)
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
         return loss
-    
+
     def add_validation_embeddings(self, anchor_embeddings, anchor_labels):
         # save anchor embeddings of validation step for later analysis in W&B
-        embeddings = torch.reshape(
-            anchor_embeddings, (-1, self.embedding_size)
-        )
+        embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
         embeddings = embeddings.cpu()
 
         assert len(self.embeddings_table_columns) == 2
         data = {
-            self.embeddings_table_columns[0]: anchor_labels.tolist() if torch.is_tensor(anchor_labels) else anchor_labels,
+            self.embeddings_table_columns[0]: anchor_labels.tolist()
+            if torch.is_tensor(anchor_labels)
+            else anchor_labels,
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
         }
 
         data = pd.DataFrame(data)
         self.embeddings_table = pd.concat([data, self.embeddings_table], ignore_index=True)
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
-        
+
     def validation_step(self, batch, batch_idx):
-        images, labels = batch # embeddings either (ap, a, an, n) oder (a, p, n)
+        images, labels = batch  # embeddings either (ap, a, an, n) oder (a, p, n)
         n_achors = len(images[0])
         vec = torch.cat(images, dim=0)
-        labels = torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]
+        labels = (
+            torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]
+        )
         embeddings = self.forward(vec)
-        
+
         self.add_validation_embeddings(embeddings[:n_achors], labels[:n_achors])
         loss, pos_dist, neg_dist = self.triplet_loss(embeddings, labels)
         self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
@@ -154,7 +166,10 @@ class BaseModule(L.LightningModule):
 
     @staticmethod
     def get_tensor_transforms():
-        raise NotImplementedError("Please implement this method in your subclass: resizes, normalizations, etc. To apply nothing, return the identity function `lambda x: x`")
+        raise NotImplementedError(
+            "Please implement this method in your subclass: resizes, normalizations, etc. To apply nothing, return the identity function `lambda x: x`"
+        )
+
 
 class EfficientNetV2Wrapper(BaseModule):
     def __init__(
@@ -163,11 +178,7 @@ class EfficientNetV2Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         is_from_scratch = kwargs.get("from_scratch", False)
-        self.model = (
-            resnet18()
-            if is_from_scratch
-            else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-        )
+        self.model = resnet18() if is_from_scratch else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
         self.model = (
             efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
             if kwargs.get("from_scratch", False)
@@ -179,7 +190,7 @@ class EfficientNetV2Wrapper(BaseModule):
 
     def forward(self, x):
         return self.classifier(self.model(x))
-    
+
     def get_tensor_transforms():
         return transforms.Resize((224, 224), antialias=True)
         
