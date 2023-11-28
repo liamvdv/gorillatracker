@@ -49,16 +49,16 @@ class NletDataModule(L.LightningDataModule):
             raise ValueError(f"unknown stage '{stage}'")
 
     def train_dataloader(self):
-        return self.get_dataloader()(self.train, batch_size=self.batch_size)
+        return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self):
-        return self.get_dataloader()(self.val, batch_size=self.batch_size)
+        return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
 
     def test_dataloader(self):
-        return self.get_dataloader()(self.test, batch_size=self.batch_size)
+        return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False)
 
     def predict_dataloader(self):
-        return self.get_dataloader()(self.predict, batch_size=self.batch_size)
+        return self.get_dataloader()(self.predict, batch_size=self.batch_size, shuffle=False)
 
     def teardown(self, stage: str):
         # NOTE(liamvdv): used to clean-up when the run is finished
