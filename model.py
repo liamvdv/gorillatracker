@@ -190,7 +190,10 @@ class EfficientNetV2Wrapper(BaseModule):
     def forward(self, x):
         return self.model(x)
 
-    def get_tensor_transforms():
+    @classmethod
+    def get_tensor_transforms(cls):
+        return transforms.Resize((224, 224), antialias=True)
+
         return transforms.Resize((224, 224), antialias=True)
 
 
