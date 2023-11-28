@@ -9,22 +9,16 @@ logger = logging.getLogger(__name__)
 
 
 class NletDataModule(L.LightningDataModule):
+    """
+    Base class for triplet/quadlet data modules, implementing shared functionality.
+    """
+
     def __init__(self, data_dir: str, batch_size: int = 32, dataset_class=None, transforms=None):
         super().__init__()
-        self.transforms = transforms or self.get_transforms()
-        self.dataset_class = dataset_class or self.get_dataset_class()
+        self.transforms = transforms
+        self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
-
-    @classmethod
-    def from_training_args(cls, args):
-        return cls(data_dir=args.data_dir, batch_size=args.batch_size)
-
-    def get_transforms(self):
-        return None
-
-    def get_dataset_class(self):
-        raise Exception("must provide a dataset_cls argument or subclass")
 
     def get_dataloader(self):
         raise Exception("logic error, ask liamvdv")

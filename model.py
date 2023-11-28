@@ -152,6 +152,9 @@ class BaseModule(L.LightningModule):
             "lr_scheduler": {"scheduler": scheduler, "interval": "epoch", "frequency": self.lr_decay_interval},
         }
 
+    @staticmethod
+    def get_tensor_transforms():
+        raise NotImplementedError("Please implement this method in your subclass: resizes, normalizations, etc. To apply nothing, return the identity function `lambda x: x`")
 
 class EfficientNetV2Wrapper(BaseModule):
     def __init__(
@@ -159,6 +162,12 @@ class EfficientNetV2Wrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
+        is_from_scratch = kwargs.get("from_scratch", False)
+        self.model = (
+            resnet18()
+            if is_from_scratch
+            else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        )
         self.model = (
             efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
             if kwargs.get("from_scratch", False)
@@ -168,6 +177,12 @@ class EfficientNetV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         )
 
+    def forward(self, x):
+        return self.classifier(self.model(x))
+    
+    def get_tensor_transforms():
+        return transforms.Resize((224, 224))
+        
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {"EfficientNetV2_Large": EfficientNetV2Wrapper}
 
