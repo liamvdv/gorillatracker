@@ -53,7 +53,7 @@ def get_data_module(model, args: TrainingArgs):
     return base(args.data_dir, args.batch_size, dataset_class, transforms=transforms)
 
 
-def main(args: TrainingArgs):
+def main(args: TrainingArgs):  # noqa: C901
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -149,7 +149,7 @@ def main(args: TrainingArgs):
     if args.compile:
         if not hasattr(torch, "compile"):
             raise RuntimeError(
-                f"The current torch version ({torch.__version__}) does not have support for compile."  # noqa: E501
+                f"The current torch version ({torch.__version__}) does not have support for compile."
                 "Please install torch >= 2.0 or disable compile."
             )
         model = torch.compile(model)
