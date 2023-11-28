@@ -114,7 +114,6 @@ def evaluate_embeddings(data, embedding_name, metrics={}):  # data is DataFrame 
 
 def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42):
     num_classes = len(np.unique(labels))
-    torch.manual_seed(seed)
     model = torch.nn.Sequential(
         torch.nn.Linear(embeddings.shape[1], 100),
         torch.nn.Sigmoid(),
