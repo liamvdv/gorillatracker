@@ -44,8 +44,8 @@ def iter_index_permutations_generator(n: int):
 
 def index_permuation_generator(n: int):
     """
-    returns a completly random index permutation. Does not ensure all permuations are seen.
-    Reproducable via torch.seed.
+    returns a generator that returns a random index permutation. Does not ensure
+    all permuations are seen. Reproducable via torch.seed.
     """
     while True:
         yield torch.randperm(n).tolist()
@@ -93,7 +93,7 @@ class ToNthDataset:
 
 
 class TripletSampler(Sampler):
-    """Do not use shuffle=True with TripletSampler, control shuffling via shuffled_indices_generator."""
+    """Do not use DataLoader(..., shuffle=True) with TripletSampler."""
 
     def __init__(self, sorted_dataset, shuffled_indices_generator=index_permuation_generator):
         self.dataset = sorted_dataset
@@ -123,7 +123,7 @@ class TripletSampler(Sampler):
 
 
 class QuadletSampler(TripletSampler):
-    """Do not use shuffle=True with QuadletSampler, control shuffling via shuffled_indices_generator."""
+    """Do not use DataLoader(..., shuffle=True) with QuadletSampler."""
 
     def __iter__(self):
         anchor_shuffle = next(self.shuffled_indices_generator)
@@ -139,23 +139,50 @@ class QuadletSampler(TripletSampler):
             yield anchor_positive, positive, anchor_negative, negative
 
 
-def TripletDataLoader(dataset, batch_size):
+class FreezeSampler(Sampler):
+    """
+    FreezeSampler is a wrapper around a Sampler that freezes the indices returned by
+    the first iteration of the sampler and returns those in every subsequent iteration.
+    """
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+        self.cache = None
+
+    def __len__(self):
+        return len(self.sampler)
+
+    def __iter__(self):
+        if self.cache is None:
+            self.cache = list(self.sampler)
+        return iter(self.cache)
+
+
+def TripletDataLoader(dataset, batch_size, shuffle=True):
     """
     TripletDataLoader will take any Dataset that returns a single sample in the form of
     (value, label) on __getitem__ and transform it into an efficient Triplet DataLoader.
+    If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
+    dataset will be shuffled once at the start and not after that.
     """
     label_sorted_dataset = sorted(dataset, key=lambda t: t[1])
     sampler = TripletSampler(label_sorted_dataset)
+    if not shuffle:
+        sampler = FreezeSampler(sampler)
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
 
 
-def QuadletDataLoader(dataset, batch_size):
+def QuadletDataLoader(dataset, batch_size, shuffle=True):
     """
     QuadletDataLoader will take any Dataset that returns a single sample in the form of
     (value, label) on __getitem__ and transform it into an efficient Quadlet DataLoader.
+    If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
+    dataset will be shuffled once at the start and not after that.
     """
     label_sorted_dataset = sorted(dataset, key=lambda t: t[1])
     sampler = QuadletSampler(label_sorted_dataset)
+    if not shuffle:
+        sampler = FreezeSampler(sampler)
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
