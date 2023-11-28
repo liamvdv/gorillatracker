@@ -309,8 +309,26 @@ def generate_simple_split(
     write_entries(test_set, outdir / "test")
 
 
+def copy_corresponding_images(data_dir: str, img_dir="ground_truth/cxl/full_images"):
+    """
+    Copy each image from img_dir to data_dir if a file with a corresponding name exists in data_dir.
+    """
+    data_dir_path = Path(f"data/{data_dir}")
+    img_dir_path = Path(f"data/{img_dir}")
+
+    for data_file in os.listdir(data_dir_path):
+        base_name = Path(data_file).stem
+        corresponding_img_file = img_dir_path / (base_name + ".png")
+        assert corresponding_img_file.exists()
+        copy(corresponding_img_file, data_dir_path / (base_name + ".png"))
+
+    
+
+
 if __name__ == "__main__":
-    dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+    copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+#     dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+    
 #     dir = generate_split(
 #         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
 #     )
