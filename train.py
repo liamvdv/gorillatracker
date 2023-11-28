@@ -5,13 +5,13 @@ import time
 from pathlib import Path
 
 import torch
-from torchvision.transforms import Compose, ToTensor
 import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
+from torchvision.transforms import Compose, ToTensor
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
@@ -20,8 +20,9 @@ from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wa
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 
-WANDB_PROJECT = "" # NOTE(liamvdv): must be changed based on your task.
+WANDB_PROJECT = ""  # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
+
 
 def get_dataset_class(pypath: str):
     parent = torch.utils.data.Dataset
@@ -37,6 +38,7 @@ def _assert_tensor(x):
         x, torch.Tensor
     ), f"GorillaTrackerDataset.get_transforms must contain ToTensor. Transformed result is {type(x)}"
     return x
+
 
 def get_data_module(model, args: TrainingArgs):
     base = QuadletDataModule if args.loss_mode.startswith("online") else TripletDataModule
