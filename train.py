@@ -18,7 +18,7 @@ from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get
 from gorillatracker.data_modules import QuadletDataModule, TripletDataModule
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
-from model import get_model_cls
+from gorillatracker.model import get_model_cls
 
 WANDB_PROJECT = "" # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
