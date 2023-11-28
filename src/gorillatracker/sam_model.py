@@ -120,7 +120,7 @@ class SamDecoderFineTuner(L.LightningModule):
 
     def on_validation_epoch_end(self):
         val_samples = random.choices(self.val_data, k=16)
-    
+
         class_labels = {
             1: "gorilla",
         }
@@ -128,6 +128,7 @@ class SamDecoderFineTuner(L.LightningModule):
         mask_imgs = []
         for val_sample in val_samples:
             path, mask, predicted_binary_mask, box = val_sample
+            # NOTE(memben): To get bounding box using show_sam_box and show_sam_mask + plt
             # plt.figure(figsize=(10, 10))
             # img = plt.imread(path)
             # plt.imshow(img)
@@ -136,7 +137,10 @@ class SamDecoderFineTuner(L.LightningModule):
             mask_img = wandb.Image(
                 path,
                 masks={
-                    "predictions": {"mask_data": predicted_binary_mask.squeeze(0).cpu().numpy(), "class_labels": class_labels},
+                    "predictions": {
+                        "mask_data": predicted_binary_mask.squeeze(0).cpu().numpy(),
+                        "class_labels": class_labels,
+                    },
                     "ground_truth": {"mask_data": mask.cpu().numpy(), "class_labels": class_labels},
                 },
             )

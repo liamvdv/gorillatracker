@@ -17,7 +17,7 @@ from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wa
 from gorillatracker.sam_model import SamDecoderFineTuner
 from gorillatracker.data_modules.sam_cxl import SamCXLDataModule
 
-WANDB_PROJECT = "CXL-SAM"
+WANDB_PROJECT = "Segmentation-Sam-CXL"
 WANDB_ENTITY = "gorillas"
 
 def main(args: TrainingArgs):
