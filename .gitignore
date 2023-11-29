@@ -151,6 +151,5 @@ yolov8n.pt
 /datasets/
 /models/
 mnist/
-Detection-YOLOv8-Bristol-OpenSet/
 .gitconfig
 *.pt
