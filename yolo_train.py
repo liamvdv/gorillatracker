@@ -19,6 +19,6 @@ def train(model_name, training_name, data="./gorilla.yaml",  epochs=100, batch_s
     model.train(project=WANDB_PROJECT, name=training_name, data=data, epochs=epochs, batch=batch_size, patience=patience)
     shutil.move(WANDB_PROJECT, f"logs/{WANDB_PROJECT}-{training_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}")
 
-if __name__ == "__main__":
-    train("yolov8x", "#36-max-power-test", epochs=200, patience=50)
+# if __name__ == "__main__":
+#     train("yolov8x", "#36-max-power-test", epochs=200, patience=50)
     
