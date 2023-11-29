@@ -80,13 +80,13 @@ def test_tripletloss_online_hard():
 
 def test_tripletloss_online_semi_hard():
     a, ap, n, np = torch.tensor([0.3]), torch.tensor([1.0]), torch.tensor([0.25]), torch.tensor([0.5])
-    loss102, d_p102, d_p102 = calc_loss_and_distance_of_triplet(ap, a, n, margin=1.0)
+    loss102, d_p102, d_n102 = calc_loss_and_distance_of_triplet(ap, a, n, margin=1.0)
     loss231, d_p231, d_n231 = calc_loss_and_distance_of_triplet(n, np, ap, margin=1.0)
     loss321, d_p321, d_n321 = calc_loss_and_distance_of_triplet(np, n, ap, margin=1.0)
     
     loss_manual = (loss102 + loss231 + loss321) / 3
     distance_positive_manual = (d_p102 + d_p231 + d_p321) / 3
-    distance_negative_manual = (d_p102 + d_n231 + d_n321) / 3
+    distance_negative_manual = (d_n102 + d_n231 + d_n321) / 3
     
     loss_online_semi_hard, distance_positive_online_semi_hard, distance_negative_online_semi_hard  = TripletLossOnline(margin=1.0, mode="semi-hard")(torch.stack([a, ap, n, np]), torch.tensor([0, 0, 1, 1]))
     
