@@ -8,7 +8,7 @@ format:
 .PHONY: lint
 lint:
 	ruff $(sources)
-	isort $(sources) --check-only --df --settings-path pyproject.toml
+	isort $(sources) --check-only --df
 	black $(sources) --check --diff
 
 .PHONY: mypy
