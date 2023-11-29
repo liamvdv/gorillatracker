@@ -8,7 +8,7 @@ format:
 .PHONY: lint
 lint:
 	ruff $(sources)
-	isort $(sources) --check-only --df
+	isort $(sources) --check-only --df --settings-path gorillatracker/pyproject.toml
 	black $(sources) --check --diff
 
 .PHONY: mypy
