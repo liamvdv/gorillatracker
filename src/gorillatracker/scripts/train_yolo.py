@@ -1,3 +1,5 @@
+"""This file contains short scripts to train a yolo model using the bristol dataset and detect gorilla faces in the CXL dataset."""
+
 import os
 import shutil
 from datetime import datetime
@@ -13,8 +15,20 @@ model_paths = {
 }
 
 
-def train_yolo(model_name, epochs, batch_size, dataset_yml, wandb_project, wandb_run_name):
-    """Train a YOLO model with the given parameters."""
+def train_yolo(model_name, epochs, batch_size, dataset_yml, wandb_project):
+    """Train a YOLO model with the given parameters.
+
+    Args:
+        model_name (str): Name of the yolo model to train.
+        epochs (int): Number of epochs to train.
+        batch_size (int): Batch size to use.
+        dataset_yml (str): Path to the dataset yml file.
+        wandb_project (str): Name of the wandb project to use.
+
+    Returns:
+        ultralytics.YOLO: Trained yolo model.
+        dict: Training result. See ultralytics docs for details.
+    """
 
     model = YOLO(model_paths[model_name])
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -80,7 +94,9 @@ def join_annotations_and_imgs(image_dir, annotation_dir, output_dir, file_extens
             shutil.copyfile(os.path.join(image_dir, image_file), os.path.join(output_dir, image_file))
 
 
-def remove_annotations_from_dir(annotation_dir, file_extension=".txt"):
+def remove_files_from_dir_with_extension(annotation_dir, file_extension=".txt"):
+    """Remove all files ending with the given file extension from the given directory."""
+
     for annotation_file in os.listdir(annotation_dir):
         if annotation_file.endswith(file_extension):
             os.remove(os.path.join(annotation_dir, annotation_file))
@@ -111,7 +127,9 @@ if __name__ == "__main__":
     image_folder = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15"
 
     # build_yolo_dataset(image_folder, annotation_folder)
-    model, result = train_yolo(model_name, epochs, batch_size)
+    dataset_yml = ""
+    wandb_project = ""
+    model, result = train_yolo(model_name, epochs, batch_size, dataset_yml, wandb_project)
     # save model
     model.export()  # should be saved somehow (somehow because ultralytics docs are trash)
 

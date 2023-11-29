@@ -1,3 +1,5 @@
+"""Scripts to crop the images in the bristol dataset using the bounding boxes provided by the dataset."""
+
 import os
 
 from PIL import Image

@@ -1,3 +1,17 @@
+"""Ensure that the given train, val and test sets are valid.
+
+This means that the train set does not contain any images that by accident contain a subject that for testing/validation purposes should be considered as unknown (as it should be test/val proprietary).
+The exact same applies to the val set.
+
+This is an issue because the bristol dataset names images with the subject that is (probably) most visible in the image. 
+The problem is that there are images containing multiple subjects. So the name of the image does not ensure that only this particular subject is visible in the image.
+So we have to check the annotation files and move images that contain a subject that should be considered as unknown to the test/val set.
+
+Another issue is that the bristol dataset contains images where subject encoded in the name is not part of the annotations for this image.
+As it cannot be verified which label is correct, these images are removed from the dataset.
+"""
+
+
 import os
 import shutil
 

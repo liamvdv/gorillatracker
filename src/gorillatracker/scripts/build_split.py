@@ -1,3 +1,5 @@
+"""Builds the different splits for the bristol dataset and the cxl dataset. If specified also trains a yolo model on the bristol dataset."""
+
 import json
 import os
 import shutil
@@ -10,7 +12,7 @@ from gorillatracker.scripts.ensure_integrity_openset import ensure_integrity
 from gorillatracker.scripts.train_yolo import (
     detect_gorillafaces_cxl,
     join_annotations_and_imgs,
-    remove_annotations_from_dir,
+    remove_files_from_dir_with_extension,
     set_annotation_class_0,
 )
 
@@ -59,6 +61,7 @@ def merge_split2_into_train_set_of_split1(split1_dir, split2_dir, output_dir):
 
 
 def save_dict_json(dict, file_path):
+    """Saves the given dictionary to the given file path as json."""
     with open(file_path, "w") as file:
         json.dump(dict, file)
 
@@ -110,11 +113,11 @@ if __name__ == "__main__":
         os.path.join(bristol_split_dir, "test"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "test")
     )
 
-    # train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet", wandb_run_name="yolov8x")
+    # train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet")
 
     # 3c remove annotations from the bristol split
     for split in ["train", "val", "test"]:
-        remove_annotations_from_dir(os.path.join(bristol_split_dir, split))
+        remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
 
     # 4. predict on the cxl dataset -> save to directory xy -> set model_path
     cxl_dir = "/workspaces/gorillatracker/data/ground_truth/cxl"
