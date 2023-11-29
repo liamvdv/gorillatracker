@@ -5,11 +5,9 @@ import pandas as pd
 import torch
 from print_on_steroids import logger
 from torch.optim import Adam
-from torchvision.models import (
-    EfficientNet_V2_L_Weights,
-    efficientnet_v2_l,
-)
 from torchvision import transforms
+from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
+
 from gorillatracker.triplet_loss import get_triplet_loss
 
 
@@ -193,6 +191,7 @@ class EfficientNetV2Wrapper(BaseModule):
 
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {"EfficientNetV2_Large": EfficientNetV2Wrapper}
+
 
 def get_model_cls(model_name: str):
     model_cls = custom_model_cls.get(model_name, None)
