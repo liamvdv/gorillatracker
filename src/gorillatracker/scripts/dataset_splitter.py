@@ -63,7 +63,8 @@ class Entry:
 def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
-        assert filename.endswith(".png")
+        if not filename.endswith(".png"):
+            continue
         label, rest = re.split(r"[_\s]", filename, maxsplit=1)
         entry = Entry(Path(full_images_dirpath, filename), label, {})
         entries.append(entry)

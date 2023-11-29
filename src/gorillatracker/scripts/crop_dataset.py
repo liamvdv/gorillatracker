@@ -13,6 +13,16 @@ index_to_name = {
 }
 
 def crop_and_save_image(image_path, x, y, w, h, output_path):
+    """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
+    
+    Args:
+        image_path (str): Path to the image to crop.
+        x (float): Relative x coordinate of the center of the bounding box.
+        y (float): Relative y coordinate of the center of the bounding box.
+        w (float): Relative width of the bounding box.
+        h (float): Relative height of the bounding box.
+        output_path (str): Path to save the cropped image to.
+    """
     # Open the image
     img = Image.open(image_path)
 
@@ -31,6 +41,13 @@ def crop_and_save_image(image_path, x, y, w, h, output_path):
    
    
 def read_bbox_data(bbox_path):
+    """Read the bounding box data from the given file.
+    
+    Args:
+        bbox_path (str): Path to the bounding box file.
+        
+    Returns:
+        list: List of bounding box data lines."""
     # check if the file exists
     if not os.path.exists(bbox_path):
         print("warning: no bounding box found for image with path " + bbox_path)
@@ -45,7 +62,8 @@ def read_bbox_data(bbox_path):
     return bbox_data_lines
     
     
-def crop_bristol(image_path, bbox_path, output_dir): 
+def crop_bristol(image_path, bbox_path, output_dir):
+    """Crops a single image from the bristol dataset."""
     bbox_data_lines = read_bbox_data(bbox_path)
     
     for index, x, y, w, h in bbox_data_lines:
@@ -55,7 +73,9 @@ def crop_bristol(image_path, bbox_path, output_dir):
         crop_and_save_image(image_path, x, y, w, h, output_path)
 
 
-def crop_cxl(image_path, bbox_path, output_dir):    
+def crop_cxl(image_path, bbox_path, output_dir):
+    """Crops a single image from the cxl dataset. 
+    NOTE: There is only one bounding box per image. Therefore, only the bounding box with the highest confidence score is used."""
     bbox_data_lines = read_bbox_data(bbox_path)
     bbo_max_confidence_idx, bbox_max_confidence = max(enumerate(bbox_data_lines), key=lambda x: x[1][-1], default=(-1, -1)) # get the shortest line in the file
                     
@@ -63,13 +83,22 @@ def crop_cxl(image_path, bbox_path, output_dir):
         index , x, y, w, h, _ = bbox_max_confidence
         output_path = os.path.join(output_dir, os.path.basename(image_path))
         crop_and_save_image(image_path, x, y, w, h, output_path)
-        
 
-# TODO: only keep the bounding box with the highest confidence score (if there are multiple)
-def crop_images(image_dir, bbox_dir, output_dir, file_extension='.jpg', is_bristol = True):
+
+def crop_images(image_dir, bbox_dir, output_dir, file_extension=".jpg", is_bristol = True):
+    """Crop all images in the given directory using the bounding boxes in the given directory and save them to the given output directory.
+    
+    Args:
+        image_dir (str): Directory containing the images.
+        bbox_dir (str): Directory containing the bounding box files.
+        output_dir (str): Directory to save the cropped images to.
+        file_extension (str, optional): File extension of the images. Defaults to ".jpg".
+        is_bristol (bool, optional): Whether the images are from the bristol dataset. Defaults to True."""
+    
     # Ensure output folder exists
     os.makedirs(output_dir, exist_ok=True)
-
+    
+    imgs_without_bbox = []
     # Get list of image files
     image_files = [f for f in os.listdir(image_dir) if f.endswith(file_extension)]
 
@@ -79,14 +108,15 @@ def crop_images(image_dir, bbox_dir, output_dir, file_extension='.jpg', is_brist
 
         if not os.path.exists(bbox_path):
             print("warning: no bounding box found for image " + image_file)
+            imgs_without_bbox.append(image_file)
             continue
         
         if is_bristol:
             crop_bristol(image_path, bbox_path, output_dir)
         else:
             crop_cxl(image_path, bbox_path, output_dir)
-        
-
+    
+    return imgs_without_bbox
 
      
 if __name__ == "__main__":

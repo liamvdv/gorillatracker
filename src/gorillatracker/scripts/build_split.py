@@ -1,111 +1,137 @@
 import os
 import shutil
 import sys
+import json
 import ultralytics
 from gorillatracker.scripts.dataset_splitter import generate_split
 from gorillatracker.scripts.ensure_integrity_openset import ensure_integrity
-from gorillatracker.scripts.train_yolo import build_yolo_dataset, train_yolo, detect_gorillafaces_cxl
+from gorillatracker.scripts.train_yolo import set_annotation_class_0, train_yolo, detect_gorillafaces_cxl, join_annotations_and_imgs, remove_annotations_from_dir
 from gorillatracker.scripts.crop_dataset import crop_images
 
 import os
 from collections import defaultdict
 
-def collect_statistics(dataset_path):
-    label_counts = defaultdict(int)
-    set_label_counts = {'train': defaultdict(int), 'test': defaultdict(int), 'val': defaultdict(int)}
+def merge_every_single_set_of_splits(split1_dir, split2_dir, output_dir):
+    """Merges two splits into a new split.
+    
+    Args:
+        split1_dir (str): Directory of the first split.
+        split2_dir (str): Directory of the second split.
+        output_dir (str): Directory to save the merged split to.
+    """
+    
+    # Ensure output folder exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Copy train, val and test folders from split1 to output_dir
+    shutil.copytree(os.path.join(split1_dir, "train"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "val"), os.path.join(output_dir, "val"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "test"), os.path.join(output_dir, "test"), dirs_exist_ok=True)
+    # Copy train, val and test folders from split2 to output_dir
+    shutil.copytree(os.path.join(split2_dir, "train"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "val"), os.path.join(output_dir, "val"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "test"), dirs_exist_ok=True)
 
-    for set_name in ['train', 'test', 'val']:
-        set_path = os.path.join(dataset_path, set_name)
-        for filename in os.listdir(set_path):
-            if filename.endswith('.jpg') or filename.endswith('.png'):
-                label = filename.split('_')[0]
-                label_counts[label] += 1
-                set_label_counts[set_name][label] += 1
 
-    return label_counts, set_label_counts
+def merge_split2_into_train_set_of_split1(split1_dir, split2_dir, output_dir):
+    """Merges all sets of split2 into the train set of split1.
+    
+    Args:
+        split1_dir (str): Directory of the first split.
+        split2_dir (str): Directory of the second split.
+        output_dir (str): Directory to save the merged split to.
+    """
+    # Ensure output folder exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Copy train, val and test folders from split1 to output_dir
+    shutil.copytree(os.path.join(split1_dir, "train"), os.path.join(output_dir, "train"),dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "val"), os.path.join(output_dir, "val"),dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "test"), os.path.join(output_dir, "test"),dirs_exist_ok=True)
+    # Copy train, val and test folders from split2 to output_dir
+    shutil.copytree(os.path.join(split2_dir, "train"), os.path.join(output_dir, "train"),dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "val"), os.path.join(output_dir, "train"),dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
 
-def print_statistics(label_counts, set_label_counts):
-    print("Total images per label:")
-    for label, count in label_counts.items():
-        print(f"{label}: {count} images")
 
-    print("\nDistribution of labels per set:")
-    for set_name, labels in set_label_counts.items():
-        print(f"\n{set_name} set:")
-        for label, count in labels.items():
-            print(f"{label}: {count} images")
+def save_dict_json(dict, file_path):
+    with open(file_path, "w") as file:
+        json.dump(dict, file)
 
 
 if __name__ == "__main__":
-    # # build an openset split
+    # 1. split the bristol dataset into train, val and test
+    bristol_dir = "/workspaces/gorillatracker/data/ground_truth/bristol"
+    relative_path_to_bristol = "ground_truth/bristol"
+    bristol_split_dir = generate_split(dataset=os.path.join(relative_path_to_bristol, "full_images"), mode="openset", seed=42, reid_factor_test=10, reid_factor_val=10)
     
-    # # 1. split the dataset into train, val and test 
-    # # bristol_dir = generate_split(dataset="ground_truth/bristol/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10)
-    # # print("Created bristol split")
-    # # cxl_dir = generate_split(dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10)
-    # # print("Created cxl split")
+    # 2. ensure integrity of the bristol split (only necessary for openset)
+    # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15"
+    bristol_split_train_dir = os.path.join(bristol_split_dir, "train")
+    bristol_split_val_dir = os.path.join(bristol_split_dir, "val")
+    bristol_split_test_dir = os.path.join(bristol_split_dir, "test")
+    bristol_split_bbox_dir = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox"
     
-    # # 2. ensure integrity of the split
-    # bristol_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15"
-    # cxl_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15"
-    # train_dir = os.path.join(bristol_dir, "train")
-    # val_dir = os.path.join(bristol_dir, "val")
-    # test_dir = os.path.join(bristol_dir, "test")
-    # bbox_dir = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox"
+    ensure_integrity(bristol_split_train_dir, bristol_split_val_dir, bristol_split_test_dir, bristol_split_bbox_dir)
     
-    # ensure_integrity(train_dir, val_dir, test_dir, bbox_dir)
+    # # 3. train yolo model on the bristol dataset split (openset)
+    model_name = "yolov8x"
+    epochs = 2
+    batch_size = 16
     
-    # # # 3. train yolo model on the bristol dataset split (openset)
-    # # model_name = "yolov8x"
-    # # epochs = 30
-    # # batch_size = 32
+    # 3a build dataset for yolo
+    bristol_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox")
+    bristol_yolo_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox_class0")
+    set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
     
-    # # # build yolo dataset 
-    # # replace all annotation labels with 0 to train yolo
-    # build_yolo_dataset(bristol_dir, bbox_dir, bristol_dir)
+    # 3b then train yolo (note that you have to set the path to the different sets in the yml file)
+    gorilla_yml_path = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml"
     
-    # # train_yolo(model_name, epochs, batch_size)
+    # take a split of the bristol dataset
+    # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15"
+    # YOLO needs the images and annotations in the same folder 
+    join_annotations_and_imgs(os.path.join(bristol_split_dir, "train"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "train"))
+    join_annotations_and_imgs(os.path.join(bristol_split_dir, "val"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "val"))
+    join_annotations_and_imgs(os.path.join(bristol_split_dir, "test"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "test")) 
     
-    # # # 4. predict on the cxl dataset split (openset)
-    # model_path = "/workspaces/gorillatracker/runs/detect/yolov8x-e30-b16/weights/best.pt"
-    # model = ultralytics.YOLO(model_path)
-    # detect_gorillafaces_cxl(model, os.path.join(cxl_dir, "test"))
-    # detect_gorillafaces_cxl(model, os.path.join(cxl_dir, "val"))
-    # detect_gorillafaces_cxl(model, os.path.join(cxl_dir, "train"))
+    # train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet", wandb_run_name="yolov8x")
     
-    # # undo the replace of the annotation labels with 0
-    # build_yolo_dataset(bristol_dir, bbox_dir, bristol_dir, undo=True) 
+    # 3c remove annotations from the bristol split
+    for split in ["train", "val", "test"]:
+        remove_annotations_from_dir(os.path.join(bristol_split_dir, split))
     
-    # # 5. join into one dataset (openset) and  6. crop the images (openset)
+    # 4. predict on the cxl dataset -> save to directory xy -> set model_path
+    cxl_dir = "/workspaces/gorillatracker/data/ground_truth/cxl"
+    cxl_imgs_dir = os.path.join(cxl_dir, "full_images")
+    cxl_annotation_dir = "/workspaces/gorillatracker/data/derived_data/cxl_annotations_yolov8x-e30-b163"
+    model_path = "/workspaces/gorillatracker/Detection-YOLOv8-Bristol-OpenSet/yolov8x-e30-b163/weights/best.pt"
+    model = ultralytics.YOLO(model_path)
+    detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
+    
+    # 5. crop cxl images  according to predicted bounding boxes
+    crop_cxl_imgs_dir = "/workspaces/gorillatracker/data/derived_data/cxl_faces_cropped_yolov8x-e30-b163" 
+    imgs_without_bbox = crop_images(cxl_imgs_dir, cxl_annotation_dir, crop_cxl_imgs_dir, is_bristol=False, file_extension=".png")
+    
+    # 5b save information for the cropped images to file metadata.json (in the cxl only and the joined split as well)
+    meta_data = {
+        "yolo-model": str(model_name),
+        "yolo-path": str(model_path),
+        "bristol-split": str(bristol_split_dir),
+        "imgs-without-bbox": imgs_without_bbox,
+        "cxl-annotation-dir": str(cxl_annotation_dir),
+    }
+    save_dict_json(meta_data, os.path.join(crop_cxl_imgs_dir, "metadata.json"))
+    
+    # 5b create split for cxl dataset
+    cxl_cropped_split_path = generate_split(dataset="derived_data/cxl_faces_cropped_yolov8x-e30-b163", mode="openset", seed=42, reid_factor_test=10, reid_factor_val=10)
+    save_dict_json(meta_data, os.path.join(cxl_cropped_split_path, "metadata.json"))
+    
+    bristol_cropped_path = os.path.join(relative_path_to_bristol, "cropped_images_face") # NOTE generate_split wants relative path and returns absolute path
+    bristol_cropped_split_path = generate_split(dataset=bristol_cropped_path, mode="openset", seed=42, reid_factor_test=10, reid_factor_val=10)
+    
+    # 6. merge bristol and cxl dataset if wanted
     joined_base_dir = "/workspaces/gorillatracker/data/joined_splits"
-    # # TODO(rob2u): find nice path for this
-    # # joined_dir = os.path.join(joined_base_dir, cxl_dir.split("/")[-1] + "_combined_" + bristol_dir.split("/")[-1]) 
-    joined_dir = os.path.join(joined_base_dir, "combined")
     
-    
-    # for split in ["train", "val", "test"]:
-    #     os.makedirs(os.path.join(joined_dir, split), exist_ok=True)
-
-    #     # copy the files
-    #     for file in os.listdir(os.path.join(bristol_dir, split)):
-    #         shutil.copyfile(os.path.join(bristol_dir, split, file), os.path.join(joined_dir, split, file))
-    #     print(f"Copied bristol files to {split}")
-        
-    #     for file in os.listdir(os.path.join(cxl_dir, split)):
-    #         shutil.copyfile(os.path.join(cxl_dir, split, file), os.path.join(joined_dir, split, file)) 
-    #     print(f"Copied cxl files to {split}")  
-        
-    #     os.makedirs(os.path.join(joined_dir + "_cropped", split), exist_ok=True) 
-    #     crop_images(os.path.join(joined_dir, split),  os.path.join(joined_dir, split), os.path.join(joined_dir + "_cropped", split), file_extension='.jpg')
-    #     crop_images(os.path.join(joined_dir, split), os.path.join(joined_dir, split), os.path.join(joined_dir + "_cropped", split), file_extension='.png', is_bristol=False)
-             
-    
-    # 7. enjoy
-    # ground_truth-cxl-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15_combined_ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15
-    # ground_truth-cxl-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15_combined_ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-43-train-70-val-15-test-15_cropped
-    
-    # 8. some statistics
-    
-    label_counts, set_label_counts = collect_statistics(joined_dir + "_cropped")
-    print_statistics(label_counts, set_label_counts)
-    
+    merge_dir = os.path.join(joined_base_dir, "faces_cropped_bristol_cxl_cropped_yolov8x-e30-b163")
+    merge_every_single_set_of_splits(bristol_cropped_split_path, cxl_cropped_split_path, merge_dir)
+    merge_split2_into_train_set_of_split1(cxl_cropped_split_path, bristol_cropped_split_path, merge_dir + "_bristol_trainonly")

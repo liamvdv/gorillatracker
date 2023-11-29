@@ -1,10 +1,5 @@
-# TODO: test this script
-
 import os
 import shutil
-
-# data/ground_truth/bristol/full_images_face_bbox/jock-trial-frame400%20(2).txt
-# data/ground_truth/bristol/full_images_face_bbox/jock-trial-frame400%20(2).txt
 
 index_to_name = {
     0: "afia",
@@ -18,7 +13,18 @@ index_to_name = {
 name_to_index = {value: key for key, value in index_to_name.items()}
 
 
-def move_images_of_proprietary_subjects(image_folder, bbox_folder, output_folder, subjects_indicies):
+def move_images_of_subjects(image_folder, bbox_folder, output_folder, subjects_indicies):
+    """Move all images from the image folder to the output folder that contain bounding boxes of the given subjects.
+    
+    Args:
+        image_folder (str): Folder containing the images.
+        bbox_folder (str): Folder containing the bounding box files.
+        output_folder (str): Folder to move the images to.
+        subjects_indicies (list): List of subject indicies to move.
+        
+    Returns:
+        int: Number of images moved.
+    """
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
     
@@ -53,6 +59,8 @@ def move_images_of_proprietary_subjects(image_folder, bbox_folder, output_folder
 
 
 def filter_images(image_folder, bbox_folder):
+    """Remove all images from the image folder that do not contain a bounding box of the actual subject."""
+    
     # Get list of image files
     image_files = [f for f in os.listdir(image_folder) if f.endswith('.jpg')]
 
@@ -87,6 +95,7 @@ def filter_images(image_folder, bbox_folder):
 
 
 def get_subjects_in_directory(test_folder):
+    """Get all subjects in the given directory. Subjects are identified by the prefix of the image file name."""
     # Get list of image files
     image_files = [f for f in os.listdir(test_folder) if f.endswith('.jpg')]
     print(f"Found {len(image_files)} images in folder '{test_folder}'")
@@ -97,6 +106,8 @@ def get_subjects_in_directory(test_folder):
 
 
 def ensure_integrity(train_set_path, val_set_path, test_set_path, bbox_folder):
+    """Ensure that the given train, val and test sets are valid. 
+    This means that the train set does not contain any images that by accident contain the subject of the val or test set."""
     test_subjects = get_subjects_in_directory(test_set_path)
     val_subjects = get_subjects_in_directory(val_set_path)
     train_subjects = get_subjects_in_directory(train_set_path)
@@ -120,13 +131,13 @@ def ensure_integrity(train_set_path, val_set_path, test_set_path, bbox_folder):
     print(f"Removed {remove_count} images")
     
     # filter out images in train and val that contain test_proprietary_subjects
-    move_count_train_to_test = move_images_of_proprietary_subjects(train_set_path, bbox_folder, test_set_path, test_proprietary_subjects)
+    move_count_train_to_test = move_images_of_subjects(train_set_path, bbox_folder, test_set_path, test_proprietary_subjects)
     print(f"Moved {move_count_train_to_test} images from train to test")
-    move_count_val_to_test = move_images_of_proprietary_subjects(val_set_path, bbox_folder, test_set_path, test_proprietary_subjects)
+    move_count_val_to_test = move_images_of_subjects(val_set_path, bbox_folder, test_set_path, test_proprietary_subjects)
     print(f"Moved {move_count_val_to_test} images from val to test")
     
     # filter out images in train and test that contain val_proprietary_subjects
-    move_count_train_to_val = move_images_of_proprietary_subjects(train_set_path, bbox_folder, val_set_path, val_proprietary_subjects)
+    move_count_train_to_val = move_images_of_subjects(train_set_path, bbox_folder, val_set_path, val_proprietary_subjects)
     print(f"Moved {move_count_train_to_val} images from train to val")
 
 
