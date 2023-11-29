@@ -254,7 +254,6 @@ def generate_split(
     name = f"splits/{dataset.replace('/', '-')}-{mode}{reid_factors}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
     outdir = Path(f"data/{name}")
 
-    
     # NOTE hacky workaround
     if "cxl" in dataset:
         images = read_ground_truth_cxl(f"data/{dataset}")
@@ -279,6 +278,7 @@ def generate_split(
 
 
 if __name__ == "__main__":
-
-    dir = generate_split(dataset="ground_truth/bristol/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10)
+    dir = generate_split(
+        dataset="ground_truth/bristol/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+    )
     # dir = generate_split(dataset="ground_truth/bristol/full_images", mode="closedset", seed=42)
