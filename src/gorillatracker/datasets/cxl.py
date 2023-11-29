@@ -18,9 +18,7 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, Label]]:
 
     """
     samples = []
-    # quickfix for now
-    image_paths = [img_path for img_path in dirpath.glob("*.png")]
-    image_paths = image_paths + [img_path for img_path in dirpath.glob("*.jpg")]
+    image_paths = dirpath.glob("*.png")
     for image_path in image_paths:
         label = image_path.name.split("_")[0]
         samples.append((image_path, label))
