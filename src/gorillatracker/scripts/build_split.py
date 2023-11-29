@@ -123,7 +123,7 @@ if __name__ == "__main__":
     cxl_dir = "/workspaces/gorillatracker/data/ground_truth/cxl"
     cxl_imgs_dir = os.path.join(cxl_dir, "full_images")
     cxl_annotation_dir = "/workspaces/gorillatracker/data/derived_data/cxl_annotations_yolov8x-e30-b163"
-    model_path = "/workspaces/gorillatracker/Detection-YOLOv8-Bristol-OpenSet/yolov8x-e30-b163/weights/best.pt"
+    model_path = "/workspaces/gorillatracker/models/yolov8x-e30-b163/weights/best.pt"
     model = ultralytics.YOLO(model_path)
     detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
 
