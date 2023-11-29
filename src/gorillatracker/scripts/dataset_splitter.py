@@ -322,19 +322,17 @@ def copy_corresponding_images(data_dir: str, img_dir="ground_truth/cxl/full_imag
         corresponding_img_file = img_dir_path / (base_name + ".png")
         assert corresponding_img_file.exists()
         to_copy.append(corresponding_img_file)
-    
+
     assert len(to_copy) == len(os.listdir(data_dir_path))
-    
+
     for img_file in to_copy:
         copy(img_file, data_dir_path / img_file.name)
-
-    
 
 
 # if __name__ == "__main__":
 #     dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
 #     copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
-    
+
 #     dir = generate_split(
 #         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
 #     )
