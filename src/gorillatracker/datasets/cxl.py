@@ -3,6 +3,9 @@ from typing import List, Literal, Tuple, Union
 
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms
+
+from gorillatracker.transform_utils import SquarePad
 
 Label = Union[int, str]
 
@@ -47,6 +50,15 @@ class CXLDataset(Dataset):
         if self.transform:
             img = self.transform(img)
         return img, label
+
+    @classmethod
+    def get_transforms(cls):
+        return transforms.Compose(
+            [
+                SquarePad(),
+                transforms.ToTensor(),
+            ]
+        )
 
 
 if __name__ == "__main__":

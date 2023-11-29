@@ -1,6 +1,7 @@
 from typing import Literal
 
 from torch.utils.data import Dataset, random_split
+from torchvision import transforms
 from torchvision.datasets import MNIST
 
 
@@ -31,3 +32,12 @@ class MNISTDataset(Dataset):
 
     def __getitem__(self, idx):
         return getattr(self, self.partition)[idx]
+
+    @classmethod
+    def get_transforms(cls):
+        return transforms.Compose(
+            [
+                transforms.Grayscale(num_output_channels=3),
+                transforms.ToTensor(),
+            ]
+        )
