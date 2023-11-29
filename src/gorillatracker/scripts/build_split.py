@@ -1,8 +1,6 @@
 import json
 import os
 import shutil
-import sys
-from collections import defaultdict
 
 import ultralytics
 
@@ -14,7 +12,6 @@ from gorillatracker.scripts.train_yolo import (
     join_annotations_and_imgs,
     remove_annotations_from_dir,
     set_annotation_class_0,
-    train_yolo,
 )
 
 
