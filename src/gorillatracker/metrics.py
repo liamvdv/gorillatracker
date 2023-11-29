@@ -12,7 +12,6 @@ from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 
 
-
 def log_as_wandb_table(embeddings_table, run):
     tmp = embeddings_table.apply(
         lambda row: pd.concat([pd.Series([row["label"]]), pd.Series(row["embedding"])]), axis=1
