@@ -44,7 +44,8 @@ dependencies:
   - black
   - ruff
   - isort
-  - mypy 
+  - mypy
+  - pytest
 
   # pip dependencies
   - pip

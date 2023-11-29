@@ -27,6 +27,7 @@ class TrainingArgs:
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
     fast_dev_run: bool = field(default=True)
+    profiler: Literal["simple", "advanced", "pytorch", None] = field(default=None)
     offline: bool = field(default=True)
     data_preprocessing_only: bool = field(default=False)
     seed: Union[int, None] = field(default=42)
@@ -59,7 +60,7 @@ class TrainingArgs:
     embedding_save_interval: int = field(default=1)
 
     # Config and Data Arguments
-    data_module: str = field(default="gorillatracker.data_module_mnist")
+    dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default="./mnist")
     # Add any additional fields as needed.
 

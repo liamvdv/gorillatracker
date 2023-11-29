@@ -1,4 +1,4 @@
-sources = src
+sources = src tests
 
 .PHONY: format
 format:
@@ -14,3 +14,7 @@ lint:
 .PHONY: mypy
 mypy:
 	mypy $(sources) --disable-recursive-aliases
+
+.PHONY: test
+test:
+	pytest tests
