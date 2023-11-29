@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from datetime import datetime
+import time
 
 from ultralytics import YOLO
 
@@ -31,7 +31,7 @@ def train_yolo(model_name, epochs, batch_size, dataset_yml, wandb_project):
     """
 
     model = YOLO(model_paths[model_name])
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = time.strftime("%Y-%m-%d-%H-%M-%S")
     training_name = f"{model_name}-e{epochs}-b{batch_size}-{timestamp}"
 
     print(f"Training model {model_name} with {epochs} epochs and batch size of {batch_size}")
@@ -41,6 +41,7 @@ def train_yolo(model_name, epochs, batch_size, dataset_yml, wandb_project):
     )
 
     print(f"Training finished for {training_name}")
+    shutil.move(wandb_project, f"logs/{wandb_project}-{training_name}")
     return model, result
 
 
