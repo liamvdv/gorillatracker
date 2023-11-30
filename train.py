@@ -1,5 +1,4 @@
 import dataclasses
-import importlib
 import os
 import time
 from pathlib import Path
@@ -19,7 +18,7 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.train_utils import get_data_module
 
-WANDB_PROJECT = "ItWillWork"  # NOTE(liamvdv): must be changed based on your task.
+WANDB_PROJECT = ""  # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
 
 
