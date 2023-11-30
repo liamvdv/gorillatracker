@@ -1,5 +1,4 @@
 import dataclasses
-import importlib
 import os
 import time
 from pathlib import Path
@@ -11,46 +10,16 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
-from torchvision.transforms import Compose, ToTensor
 
-from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
-from gorillatracker.data_modules import QuadletDataModule, TripletDataModule
+from gorillatracker.args import TrainingArgs
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
+from gorillatracker.train_utils import get_data_module
 
 WANDB_PROJECT = ""  # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
-
-
-def get_dataset_class(pypath: str):
-    parent = torch.utils.data.Dataset
-    modpath, clsname = pypath.rsplit(".", 1)
-    mod = importlib.import_module(modpath)
-    cls = getattr(mod, clsname)
-    assert issubclass(cls, parent), f"{cls} is not a subclass of {parent}"
-    return cls
-
-
-def _assert_tensor(x):
-    assert isinstance(
-        x, torch.Tensor
-    ), f"GorillaTrackerDataset.get_transforms must contain ToTensor. Transformed result is {type(x)}"
-    return x
-
-
-def get_data_module(model, args: TrainingArgs):
-    base = QuadletDataModule if args.loss_mode.startswith("online") else TripletDataModule
-    dataset_class = get_dataset_class(args.dataset_class)
-    transforms = Compose(
-        [
-            dataset_class.get_transforms() if hasattr(dataset_class, "get_transforms") else ToTensor(),
-            _assert_tensor,
-            model.get_tensor_transforms(),
-        ]
-    )
-    return base(args.data_dir, args.batch_size, dataset_class, transforms=transforms)
 
 
 def main(args: TrainingArgs):  # noqa: C901
@@ -155,7 +124,9 @@ def main(args: TrainingArgs):  # noqa: C901
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    dm = get_data_module(model, args)
+    dm = get_data_module(
+        args.dataset_class, args.data_dir, args.batch_size, args.loss_mode, model.get_tensor_transforms()
+    )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
