@@ -1,5 +1,4 @@
 # Device Arguments
-
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
@@ -10,7 +9,6 @@ workers: 4                      # Number of workers for data loading
 
 
 # Model and Training Arguments
-
 run_name: "test-code"           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 

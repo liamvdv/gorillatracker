@@ -56,6 +56,8 @@ class CXLDataset(Dataset):
         return transforms.Compose(
             [
                 SquarePad(),
+                # Uniform input, you may choose higher/lower sizes.
+                transforms.Resize(224),
                 transforms.ToTensor(),
             ]
         )
