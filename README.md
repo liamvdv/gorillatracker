@@ -103,3 +103,21 @@ placing them in a `.gitconfig`. It will not be commited to remote.
     email = some.body@student.hpi.de
 ``` 
 
+
+#### How to access the Grafana Dashboard?
+1. Forward the remote port 3000 to your machine on e. g. port 8000.
+To forward the remote Grafana Dashboard, which runs on port 3000 to your laptop port 8000, run
+```
+ssh -L 8000:localhost:3000 gpuserver2
+```
+
+Note that `gpuserver2` is my ssh host alias for the remote host, change it to 
+whatever you have named it.
+
+2. Login 
+The credentials are not currently known and will be added as soon as they are provided.
+
+
+
+
+
