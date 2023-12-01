@@ -2,9 +2,9 @@ import dataclasses
 import os
 import time
 from pathlib import Path
-import wandb
 
 import torch
+import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
