@@ -5,23 +5,24 @@ import time
 from pathlib import Path
 
 import torch
-from torchvision.transforms import Compose, ToTensor
 import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
+from torchvision.transforms import Compose, ToTensor
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
 from gorillatracker.data_modules import QuadletDataModule, TripletDataModule
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
-from model import get_model_cls
+from gorillatracker.model import get_model_cls
 
-WANDB_PROJECT = "" # NOTE(liamvdv): must be changed based on your task.
+WANDB_PROJECT = ""  # NOTE(liamvdv): must be changed based on your task.
 WANDB_ENTITY = "gorillas"
+
 
 def get_dataset_class(pypath: str):
     parent = torch.utils.data.Dataset
@@ -38,6 +39,7 @@ def _assert_tensor(x):
     ), f"GorillaTrackerDataset.get_transforms must contain ToTensor. Transformed result is {type(x)}"
     return x
 
+
 def get_data_module(model, args: TrainingArgs):
     base = QuadletDataModule if args.loss_mode.startswith("online") else TripletDataModule
     dataset_class = get_dataset_class(args.dataset_class)
@@ -51,7 +53,7 @@ def get_data_module(model, args: TrainingArgs):
     return base(args.data_dir, args.batch_size, dataset_class, transforms=transforms)
 
 
-def main(args: TrainingArgs):
+def main(args: TrainingArgs):  # noqa: C901
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -147,7 +149,7 @@ def main(args: TrainingArgs):
     if args.compile:
         if not hasattr(torch, "compile"):
             raise RuntimeError(
-                f"The current torch version ({torch.__version__}) does not have support for compile."  # noqa: E501
+                f"The current torch version ({torch.__version__}) does not have support for compile."
                 "Please install torch >= 2.0 or disable compile."
             )
         model = torch.compile(model)
