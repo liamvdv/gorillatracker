@@ -163,7 +163,8 @@ def get_flops_available(device: torch.device, precision: str) -> Optional[float]
             return int(TPU_AVAILABLE_FLOPS[device_name])
         except KeyError:
             raise KeyError(
-                f"flop count not found for {device_name} with precision: {precision}; " "MFU cannot be calculated and reported."
+                f"flop count not found for {device_name} with precision: {precision}; "
+                "MFU cannot be calculated and reported."
             )
 
     return None
@@ -297,7 +298,9 @@ class SpeedMonitor:
                         }
                     )
                     if self.hardware_flops_per_sec_promised:
-                        metrics["throughput-e2e/device/mfu"] = achieved_flops_per_sec_e2e / self.hardware_flops_per_sec_promised
+                        metrics["throughput-e2e/device/mfu"] = (
+                            achieved_flops_per_sec_e2e / self.hardware_flops_per_sec_promised
+                        )
 
         metrics.update(
             {

@@ -9,28 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 class NletDataModule(L.LightningDataModule):
+    """
+    Base class for triplet/quadlet data modules, implementing shared functionality.
+    """
+
     def __init__(self, data_dir: str, batch_size: int = 32, dataset_class=None, transforms=None):
         super().__init__()
-        self.transforms = transforms or self.get_transforms()
-        self.dataset_class = dataset_class or self.get_dataset_class()
+        self.transforms = transforms
+        self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
-
-    @classmethod
-    def from_training_args(cls, args):
-        return cls(data_dir=args.data_dir, batch_size=args.batch_size)
-
-    def get_transforms(self):
-        return None
-
-    def get_dataset_class(self):
-        raise Exception("must provide a dataset_cls argument or subclass")
 
     def get_dataloader(self):
         raise Exception("logic error, ask liamvdv")
 
     def setup(self, stage: str):
-        logger.info(f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}")
+        logger.info(
+            f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}"
+        )
 
         if stage == "fit":
             self.train = self.dataset_class(self.data_dir, partition="train", transform=self.transforms)
@@ -47,16 +43,16 @@ class NletDataModule(L.LightningDataModule):
             raise ValueError(f"unknown stage '{stage}'")
 
     def train_dataloader(self):
-        return self.get_dataloader()(self.train, batch_size=self.batch_size)
+        return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self):
-        return self.get_dataloader()(self.val, batch_size=self.batch_size)
+        return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
 
     def test_dataloader(self):
-        return self.get_dataloader()(self.test, batch_size=self.batch_size)
+        return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False)
 
     def predict_dataloader(self):
-        return self.get_dataloader()(self.predict, batch_size=self.batch_size)
+        return self.get_dataloader()(self.predict, batch_size=self.batch_size, shuffle=False)
 
     def teardown(self, stage: str):
         # NOTE(liamvdv): used to clean-up when the run is finished

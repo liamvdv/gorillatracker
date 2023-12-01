@@ -16,7 +16,6 @@ def load_datasets(
     sanity_tokenizer: Path | None = None,
     use_clipped_val: bool = False,
 ):
-
     with open(data_dir / "metadata.json", "r") as f:
         metadata = json.load(f)
 
@@ -174,7 +173,9 @@ class VeryCoolDataset(TorchDataset):
         self.data_dtype = data_dtype  # needs to address all token_ids in the vocab
         self.doc_offset_dtype = doc_offset_dtype  # needs to address all tokens in the dataset
         # output_dtype needs to represent data_dtype losslessly
-        self.output_dtype = output_dtype  # needs to fit the entire vocab range. torch.from_numpy wants intXX, not uintXX
+        self.output_dtype = (
+            output_dtype  # needs to fit the entire vocab range. torch.from_numpy wants intXX, not uintXX
+        )
 
         self.data = np.memmap(self.data_file, dtype=self.data_dtype, mode="r")
         self.doc_offsets = np.memmap(self.index_file, dtype=self.doc_offset_dtype, mode="r")
@@ -204,7 +205,9 @@ class VeryCoolDataset(TorchDataset):
         cache_path = self.data_file.with_suffix(f".shuffled_idx_w_seed_{seed}_n_{self.num_samples}.npy")
 
         if not cache_path.exists():
-            sample_idx_dtype = np.uint32  # needs to address number of *samples (documents)* in the dataset, which is < 2**32
+            sample_idx_dtype = (
+                np.uint32
+            )  # needs to address number of *samples (documents)* in the dataset, which is < 2**32
             training_order = np.arange(start=0, stop=self.num_samples, step=1, dtype=sample_idx_dtype)
             rng = np.random.default_rng(seed=seed)
             rng.shuffle(training_order)

@@ -1,38 +1,21 @@
-import dataclasses
-import importlib
-import os
-import time
 from pathlib import Path
 
 import torch
 import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
-from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
 
-from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
-from gorillatracker.data_modules.data_modules import QuadletDataModule, TripletDataModule
-from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
+from gorillatracker.args import TrainingArgs
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
-from model import get_model_cls
+from gorillatracker.model import get_model_cls
+from gorillatracker.train_utils import get_data_module
+from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
-WANDB_PROJECT = "MNIST-EfficientNetV2"
-WANDB_ENTITY = "gorillas"
 
-def get_data_module_class(module: str, online: bool = True):
-    parent = QuadletDataModule if online else TripletDataModule
-    mod = importlib.import_module(module)
-    for symbol_name in dir(mod):
-        v = getattr(mod, symbol_name)
-        # Check if the symbol is a subclass of the given class
-        if issubclass(v, parent) and v is not parent:
-            print(f"Selected DataModule: {v}")
-            return v
-
-def main(args: TrainingArgs):
+def main(args: TrainingArgs):  # noqa: C901
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -52,39 +35,8 @@ def main(args: TrainingArgs):
     args.seed = seed_everything(workers=True, seed=args.seed)
 
     ############# Construct W&B Logger ##############
-    if args.offline or args.fast_dev_run or args.data_preprocessing_only:
-        os.environ["WANDB_MODE"] = "dryrun"
-
-    wandb_extra_args = dict(name=args.run_name)
-
-    if args.saved_checkpoint_path and args.resume and check_checkpoint_path_for_wandb(args.saved_checkpoint_path):
-        logger.info("Resuming training from W&B")
-        wandb_extra_args = dict(
-            id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must"
-        )  # resume W&B run
-
-    wandb_logger = WandbLogger(
-        project=WANDB_PROJECT,
-        entity=WANDB_ENTITY,
-        log_model="all",
-        tags=args.wandb_tags,
-        save_dir="logs/",
-        **wandb_extra_args,
-    )
-    wandb_logger.log_hyperparams(dataclasses.asdict(args))
-    # wandb_logger.experiment.log_code(".")  # log code to wandb to be able to reproduce the run
-
-    if current_process_rank == 0:
-        logger.info(args)
-    if current_process_rank == 0 and not args.resume and not args.offline:
-        if args.run_name is None:
-            logger.warning("No run name specified with `--run_name`. Using W&B default (randomly generated name).")
-        else:
-            assert wandb_logger.version is not None
-            # wandb_logger.experiment.name = (
-            #     args.run_name + "-" + wandb_logger.version
-            # )  # Append id to name for easier recognition in W&B UI
-            wandb_logger.experiment.name = args.run_name + "-" + time.strftime("%Y-%m-%d-%H-%M-%S")
+    wandb_logging_module = WandbLoggingModule(args)
+    wandb_logger = wandb_logging_module.construct_logger()
 
     ################# Construct model ##############
 
@@ -108,7 +60,7 @@ def main(args: TrainingArgs):
     model_cls = get_model_cls(args.model_name_or_path)
 
     if args.saved_checkpoint_path is None:
-        args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
+        args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
             args.saved_checkpoint_path, wandb_logger.experiment
         )
 
@@ -128,14 +80,15 @@ def main(args: TrainingArgs):
     if args.compile:
         if not hasattr(torch, "compile"):
             raise RuntimeError(
-                f"The current torch version ({torch.__version__}) does not have support for compile."  # noqa: E501
+                f"The current torch version ({torch.__version__}) does not have support for compile."
                 "Please install torch >= 2.0 or disable compile."
             )
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    dm_cls = get_data_module_class(args.data_module, online=args.loss_mode.startswith("online"))
-    dm = dm_cls.from_training_args(args)
+    dm = get_data_module(
+        args.dataset_class, args.data_dir, args.batch_size, args.loss_mode, model.get_tensor_transforms()
+    )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -183,7 +136,9 @@ def main(args: TrainingArgs):
         gradient_clip_val=args.grad_clip,
         # accumulate_grad_batches=args.gradient_accumulation_steps,
         fast_dev_run=args.fast_dev_run,
+        profiler=args.profiler,
         inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+        # reload_dataloaders_every_n_epochs=1,
     )
 
     if current_process_rank == 0:
@@ -230,8 +185,8 @@ def main(args: TrainingArgs):
 if __name__ == "__main__":
     print("Starting training script...")
     config_path = "./cfgs/config.yml"
-    print("Parsing config from {}...")
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
+
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()

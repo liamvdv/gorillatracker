@@ -24,7 +24,8 @@ dependencies:
   - sentencepiece
   - ultralytics=8.0.186
   - torchvision
-  - faiss-cpu # maybe necessary to switch to faiss-cuda
+  - faiss-cpu
+  - timm  # maybe necessary to switch to faiss-cuda
 
   # Good to have
   - numpy
@@ -44,7 +45,8 @@ dependencies:
   - black
   - ruff
   - isort
-  - mypy 
+  - mypy
+  - pytest
 
   # pip dependencies
   - pip

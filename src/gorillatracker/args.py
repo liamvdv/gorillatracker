@@ -21,12 +21,14 @@ class TrainingArgs:
     workers: int = field(default=4)
 
     # Model and Training Arguments
-    run_name: str = field(default="template-test")
+    project_name: str = field(default="")
+    run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
     model_name_or_path: str = field(default="EfficientNetV2")
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
     fast_dev_run: bool = field(default=True)
+    profiler: Literal["simple", "advanced", "pytorch", None] = field(default=None)
     offline: bool = field(default=True)
     data_preprocessing_only: bool = field(default=False)
     seed: Union[int, None] = field(default=42)
@@ -47,7 +49,9 @@ class TrainingArgs:
     lr_decay: float = field(default=0.97)
     lr_decay_interval: int = field(default=3)
     margin: float = field(default=0.5)
-    loss_mode: Literal["offline", "online/soft", "online/hard", "online/semi-hard"] = field(default="semi-hard")
+    loss_mode: Literal["offline", "offline/native", "online/soft", "online/hard", "online/semi-hard"] = field(
+        default="offline"
+    )
 
     batch_size: int = field(default=8)
     grad_clip: float = field(default=1.0)
@@ -59,7 +63,7 @@ class TrainingArgs:
     embedding_save_interval: int = field(default=1)
 
     # Config and Data Arguments
-    data_module: str = field(default="gorillatracker.data_module_mnist")
+    dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default="./mnist")
     # Add any additional fields as needed.
 

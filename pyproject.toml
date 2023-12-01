@@ -79,3 +79,4 @@ disallow_untyped_calls = true
 
 # for strict mypy
 disallow_untyped_defs = true
+

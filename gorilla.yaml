@@ -1,5 +1,6 @@
-train: /workspaces/gorillavision/datasets/face_detection/data/train/
-val: /workspaces/gorillavision/datasets/face_detection/data/val/
-test: /workspaces/gorillavision/datasets/face_detection/data/test/
+path: /workspaces/gorillatracker/data/splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15
+train: train
+val: val
+test: test
 names: 
   0: 'gorilla'

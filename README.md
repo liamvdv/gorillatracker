@@ -16,10 +16,19 @@ Our data setup `/scratch2/gorillatracker` as base.\
 
 # Architecture
 ### Adding a Dataset
-1. create a Dataset that supports __getitem__(self, idx: int) (read: single element access) in `gorillatracker.dataset_<name>.py`. 
-2. create a subclass from `gorillatracker.data_modules.TripletDataModule` and `gorillatracker.data_modules.QuadletDataModule` in `gorillatracker.data_module_<name>.py`, implement `get_dataset_class` and `get_transforms`.
 
-You can now use the data module exposed in `gorillatracker.data_module_<name>.py` for online and offline triplet loss. All the sampling for triplet generation is ready build. 
+1. Create a Dataset that supports __getitem__(self, idx: int) (read: single element access) in `gorillatracker.datasets.<name>.py`.  
+If you need to do custom transformations (except resizing), you can also declare a classmethod `get_transforms(cls)`.
+
+2. Select the dataset from your cfgs/<yourconfigname>.yml `dataset_class`.
+
+You can now use the dataset for online and offline triplet loss. All the sampling 
+for triplet generation is ready build. 
+
+### Where to transforms go? `dataset_class.get_transforms()` vs  `model_class.get_tensor_transforms()`
+The model class should many apply a Resize to it's expected size and if needed enforce number of channels needed.
+The dataset class should specify all other transforms and MUST at least transform `torchvision.transforms.ToTensor`.
+
 
 # Statistcs
 
@@ -97,3 +106,22 @@ placing them in a `.gitconfig`. It will not be commited to remote.
     name = Your Name
     email = some.body@student.hpi.de
 ``` 
+
+
+#### How to access the Grafana Dashboard?
+1. Forward the remote port 3000 to your machine on e. g. port 8000.
+To forward the remote Grafana Dashboard, which runs on port 3000 to your laptop port 8000, run
+```
+ssh -L 8000:localhost:3000 gpuserver2
+```
+
+Note that `gpuserver2` is my ssh host alias for the remote host, change it to 
+whatever you have named it.
+
+2. Login 
+The credentials are not currently known and will be added as soon as they are provided.
+
+
+
+
+
