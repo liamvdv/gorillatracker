@@ -2,6 +2,7 @@ import dataclasses
 import os
 import time
 from pathlib import Path
+import wandb
 
 import torch
 from lightning import Trainer, seed_everything
@@ -10,7 +11,6 @@ from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
 
-import wandb
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
 from gorillatracker.args import TrainingArgs
 from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
