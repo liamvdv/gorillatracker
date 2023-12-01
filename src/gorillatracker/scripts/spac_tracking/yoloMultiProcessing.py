@@ -17,9 +17,9 @@ class SingletonMeta(type):
 
 class Singleton(metaclass=SingletonMeta):
     def __init__(self):
-        bodyModel = YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt")
+        bodyModel = YOLO("/workspaces/gorillatracker/models/body_s_Ben.pt")
         faceModel = YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt")
-        self.value = (bodyModel, faceModel)
+        self.value = [bodyModel, faceModel]
 
     def get_yolo(self): 
         return self.value
@@ -27,25 +27,17 @@ class Singleton(metaclass=SingletonMeta):
 def worker_function(i):
     singleton = Singleton()
     videoPath = i
-    bodyModel, faceModel = singleton.get_yolo()
-    createLabels(videoPath, bodyModel, faceModel)
+    createLabels(videoPath, singleton.get_yolo(), overwrite_json = True)
     
     
 
 if __name__ == "__main__":
-    if not os.path.exists("./mTrack"):
-        os.mkdir("./mTrack")
-        os.mkdir("./mTrack/output")
-    if os.path.exists("./mTrack/tmp"):
-        os.system("rm -rf ./mTrack/tmp")
-    else:
-        os.mkdir("./mTrack/tmp")
     videoDir = "/workspaces/gorillatracker/spac_gorillas_converted"
-    print(os.listdir(videoDir))
     videoPaths = [os.path.join(videoDir, x) for x in os.listdir(videoDir)]
     debugVideoPaths = videoPaths[:100]
     debugVideoPaths2 = videoPaths[100:200]
-    pool = multiprocessing.Pool(6)
-    pool.map(worker_function, debugVideoPaths2)
+    debugVideoPaths3 = [f"{videoDir}/Trc099_20220705_115.mp4"]
+    pool = multiprocessing.Pool(1)
+    pool.map(worker_function, debugVideoPaths3)
     pool.close()
-    pool.join()
+    pool.join() 

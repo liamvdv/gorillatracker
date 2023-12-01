@@ -1,67 +1,41 @@
 from ultralytics import YOLO
 import os
-import subprocess
 import json
-
-
-
-def compress_video(input_path, output_path):
-    # Run FFmpeg command to compress the video
-    command = f"ffmpeg -i {input_path} -vcodec libx264 -crf 28 {output_path}"
-    subprocess.call(command, shell=True)
     
 
                   
-def createLabels(input_path, bodyModel, faceModel, json_folder = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels"):
+def createLabels(input_path, models, json_folder = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels", overwrite_json = False):
     fileName = input_path.split("/")[-1]
     fileName = fileName.split(".")[:-1]
-    fileName = ".".join(fileName) # remove file extension
+    fileName = ".".join(fileName)
     json_path = f"{json_folder}/{fileName}.json"
-    if os.path.exists(json_path):
+    if os.path.exists(json_path) and not overwrite_json:
         return
-    tmpPath = f"./mTrack/tmp/{fileName}"
-    bodyResult = bodyModel.track(input_path, save_txt = True, save_conf = True, project = tmpPath, name = "body", stream = True)
-    faceResult = faceModel.track(input_path, save_txt = True, save_conf = True, project = tmpPath, name = "face", stream = True)
-    labelFrames = []
-    for f, b in zip(faceResult, bodyResult):
-        labelFrame = []
-        fBoxes = f.boxes.xywhn.tolist()
-        bBoxes = b.boxes.xywhn.tolist()
-        fConf = f.boxes.conf.tolist()
-        bConf = b.boxes.conf.tolist()
-        for fb, fc in zip(fBoxes, fConf):
-            fx, fy, fw, fh = fb
-            box = {
-                "class": 0,
-                "center_x": fx,
-                "center_y": fy,
-                "w": fw,
-                "h": fh,
-                "conf": fc
-            }
-            labelFrame.append(box)
-        for bb, bc in zip(bBoxes, bConf):
-            bx, by, bw, bh = bb
-            box = {
-                "class": 1,
-                "center_x": bx,
-                "center_y": by,
-                "w": bw,
-                "h": bh,
-                "conf": bc
-            }
-            labelFrame.append(box)
-        labelFrames.append(labelFrame)
+    results = []
+    for model in models:
+        results.append(model.predict(input_path, stream = True))
+    labelFrames = [[] for f in results[0]]
+    for resultIndex in range(len(results)):
+        result = results[resultIndex]
+        frameIndex = 0
+        for frame in result:
+            boxes = frame.boxes.xywhn.tolist()
+            confs = frame.boxes.conf.tolist()
+            for box, conf in zip(boxes, confs):
+                x, y, w, h = box
+                box = {
+                    "class": resultIndex,
+                    "center_x": x,
+                    "center_y": y,
+                    "w": w,
+                    "h": h,
+                    "conf": conf
+                }
+                labelFrames[frameIndex].append(box)
+            frameIndex += 1
+    print(f"Saving to {json_path}", end="\r")
     json.dump({"labels": labelFrames}, open(json_path, "w"), indent=4)
-    os.system(f"rm -rf {tmpPath}")
-    
-    
+    print(f"Saved to {json_path}   ")
 
-if __name__ == "__main__":
-    if not os.path.exists("./mTrack"):
-        os.mkdir("./mTrack")
-    if os.path.exists("./mTrack/tmp"):
-        os.system("rm -rf ./mTrack/tmp")
-    os.mkdir("./mTrack/tmp")
     
 # yolo label structure: [class, center_x, center_y, w, h, conf], all values are ratios of the image size
