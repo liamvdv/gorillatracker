@@ -318,12 +318,33 @@ class TripletLossOffline(nn.Module):
         return losses.mean(), distance_positive.mean(), distance_negative.mean()
 
 
+class TripletLossOfflineNative(nn.Module):
+    """
+    TripletLossOfflineNative is the native torch triplet loss implementation. It
+    does not support positive, negative distance computation and fallbacks to -1.
+    Use to validate custom implementation that exposes more metrics.
+    """
+
+    def __init__(self, margin: float = 1.0):
+        super().__init__()
+        self.margin = margin
+        self.loss = nn.TripletMarginLoss(margin=margin)
+
+    def forward(self, embeddings, labels):
+        # Offline has 3 chunks, anchors, postives and negatives.
+        third = embeddings.size()[0] // 3
+        anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
+        NO_VALUE = torch.tensor([-1], dtype=torch.float32)
+        return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
+
+
 def get_triplet_loss(loss_mode: str, margin: float):
     loss_modes = {
         "online/hard": TripletLossOnline(margin=margin, mode="hard"),
         "online/semi-hard": TripletLossOnline(margin=margin, mode="semi-hard"),
         "online/soft": TripletLossOnline(margin=margin, mode="soft"),
         "offline": TripletLossOffline(margin=margin),
+        "offline/native": TripletLossOfflineNative(margin=margin),
     }
     return loss_modes[loss_mode]
 
