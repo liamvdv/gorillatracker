@@ -6,10 +6,11 @@ import seaborn as sns
 import sklearn
 import torch
 import torchmetrics as tm
-import wandb
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
+
+import wandb
 
 
 def log_as_wandb_table(embeddings_table, run):
