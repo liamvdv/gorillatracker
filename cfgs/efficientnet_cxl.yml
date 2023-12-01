@@ -9,6 +9,7 @@ workers: 4                      # Number of workers for data loading
 
 
 # Model and Training Arguments
+project_name: "research-template" # WandB project name
 run_name: "test-code"           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 

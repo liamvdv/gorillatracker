@@ -3,7 +3,7 @@
 
 import cv2
 
-import gorillatracker.cvat_import as cvat_import
+import gorillatracker.utils.cvat_import as cvat_import
 
 
 def _convert_to_yolo_format(box, img_width, img_height):

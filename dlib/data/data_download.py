@@ -221,7 +221,9 @@ def main(args: Args):
         # Careful here, this does not truly shuffle ALL the data by default, only samples within a buffer
         # You might have to adjust the buffer_size here depending on memory limits of your machine
         # Then take care of true shuffling in the Dataloader
-        args.stream_shuffle_buffer_size = None if args.stream_shuffle_buffer_size == -1 else args.stream_shuffle_buffer_size
+        args.stream_shuffle_buffer_size = (
+            None if args.stream_shuffle_buffer_size == -1 else args.stream_shuffle_buffer_size
+        )
         logger.debug(f"Shuffling with buffer size {args.stream_shuffle_buffer_size}")
         dataset = dataset.shuffle(seed=42, buffer_size=args.stream_shuffle_buffer_size)
 
@@ -279,19 +281,25 @@ def main(args: Args):
     if args.format == "jsonl":
         train_fp = io.open(str(output_dir / "train.jsonl"), "wt", buffering=PERFORMANT_BUFFER_SIZE_BYTES)
         with jsonlines.Writer(train_fp, compact=True) as writer:
-            writer.write_all(({"text": t["processed_text"]} for t in tqdm(train_paragraphs, desc="Writing train data...")))
+            writer.write_all(
+                ({"text": t["processed_text"]} for t in tqdm(train_paragraphs, desc="Writing train data..."))
+            )
         train_fp.close()
 
         if args.dev_size:
             dev_fp = io.open(str(output_dir / "dev.jsonl"), "wt", buffering=PERFORMANT_BUFFER_SIZE_BYTES)
             with jsonlines.Writer(dev_fp, compact=True) as writer:
-                writer.write_all(({"text": t["processed_text"]} for t in tqdm(dev_paragraphs, desc="Writing dev data...")))
+                writer.write_all(
+                    ({"text": t["processed_text"]} for t in tqdm(dev_paragraphs, desc="Writing dev data..."))
+                )
             dev_fp.close()
 
         if args.test_size:
             test_fp = io.open(str(output_dir / "test.jsonl"), "wt", buffering=PERFORMANT_BUFFER_SIZE_BYTES)
             with jsonlines.Writer(test_fp, compact=True) as writer:
-                writer.write_all(({"text": t["processed_text"]} for t in tqdm(test_paragraphs, desc="Writing test data...")))
+                writer.write_all(
+                    ({"text": t["processed_text"]} for t in tqdm(test_paragraphs, desc="Writing test data..."))
+                )
             test_fp.close()
 
     # Legacy, not preferred anymore. Doesn't handle newlines in documents well.

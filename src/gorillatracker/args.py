@@ -21,7 +21,8 @@ class TrainingArgs:
     workers: int = field(default=4)
 
     # Model and Training Arguments
-    run_name: str = field(default="template-test")
+    project_name: str = field(default="")
+    run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
     model_name_or_path: str = field(default="EfficientNetV2")
     saved_checkpoint_path: Union[str, None] = field(default=None)

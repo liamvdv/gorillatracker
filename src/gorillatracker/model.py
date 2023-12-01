@@ -2,7 +2,9 @@ import importlib
 
 import lightning as L
 import pandas as pd
+import timm
 import torch
+import torchvision.transforms as transforms
 from print_on_steroids import logger
 from torch.optim import AdamW
 from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
@@ -170,8 +172,32 @@ class EfficientNetV2Wrapper(BaseModule):
         return lambda x: x
 
 
+class SwinV2BaseWrapper(BaseModule):
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        swin_model = "swinv2_base_window12_192.ms_in22k"
+        self.model = (
+            timm.create_model(swin_model, pretrained=False)
+            if kwargs.get("from_scratch", False)
+            else timm.create_model(swin_model, pretrained=True)
+        )
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+    @classmethod
+    def get_tensor_transforms(cls):
+        return transforms.Resize((192), antialias=True)
+
+
 # NOTE(liamvdv): Register custom model backbones here.
-custom_model_cls = {"EfficientNetV2_Large": EfficientNetV2Wrapper}
+custom_model_cls = {"EfficientNetV2_Large": EfficientNetV2Wrapper, "SwinV2Base": SwinV2BaseWrapper}
 
 
 def get_model_cls(model_name: str):
