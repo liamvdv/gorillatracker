@@ -1,9 +1,4 @@
-# !!!
-# NOTE: DO NOT EDIT THIS YAML FILE. INSTEAD, COPY IT TO A NEW FILE AND EDIT THAT FILE.
-# !!!
-
 # Device Arguments
-
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
@@ -14,7 +9,6 @@ workers: 4                      # Number of workers for data loading
 
 
 # Model and Training Arguments
-
 project_name: "research-template" # WandB project name
 run_name: "test-code"           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
@@ -46,11 +40,11 @@ lr_decay: 0.9                   # Learning rate decay (for the learning rate sch
 lr_decay_interval: 1            # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
 # )
 
-batch_size: 512                 # Training batch size
+batch_size: 12                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 5                   # Training goal (large number)
-val_before_training: False      # Perform validation before training
+max_epochs: 10                  # Training goal (large number)
+val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
@@ -59,5 +53,5 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: ""
-dataset_class: ""
+data_dir: "data/splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"

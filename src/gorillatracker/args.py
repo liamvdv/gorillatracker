@@ -21,7 +21,8 @@ class TrainingArgs:
     workers: int = field(default=4)
 
     # Model and Training Arguments
-    run_name: str = field(default="template-test")
+    project_name: str = field(default="")
+    run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
     model_name_or_path: str = field(default="EfficientNetV2")
     saved_checkpoint_path: Union[str, None] = field(default=None)
@@ -48,7 +49,9 @@ class TrainingArgs:
     lr_decay: float = field(default=0.97)
     lr_decay_interval: int = field(default=3)
     margin: float = field(default=0.5)
-    loss_mode: Literal["offline", "online/soft", "online/hard", "online/semi-hard"] = field(default="offline")
+    loss_mode: Literal["offline", "offline/native", "online/soft", "online/hard", "online/semi-hard"] = field(
+        default="offline"
+    )
 
     batch_size: int = field(default=8)
     grad_clip: float = field(default=1.0)

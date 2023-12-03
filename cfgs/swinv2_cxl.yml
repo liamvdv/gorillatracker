@@ -1,7 +1,3 @@
-# !!!
-# NOTE: DO NOT EDIT THIS YAML FILE. INSTEAD, COPY IT TO A NEW FILE AND EDIT THAT FILE.
-# !!!
-
 # Device Arguments
 
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
@@ -15,20 +11,20 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "research-template" # WandB project name
-run_name: "test-code"           # Name for this training run
-wandb_tags: ["test"]            # WandB tags for experiment tracking
-model_name_or_path: "EfficientNetV2_Large" # Model name or path 
-saved_checkpoint_path: None     # Path to a saved model checkpoint (if resuming)
-resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: False             # Enable fast development run
-profiler: None                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
-offline: False                  # Enable offline mode for WandB
-data_preprocessing_only: False  # Run only data preprocessing
-seed: 42                        # Random seed for reproducibility
-debug: False                    # Enable debug mode
-from_scratch: False             # Train the model from scratch
-early_stopping_patience: 3      # Early stopping patience (number of epochs)
+project_name: "Embedding-SwinV2-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "6-baseline-using-default-config"             # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["test"]              # WandB tags for experiment tracking
+model_name_or_path: "SwinV2Base"  # Model name or path 
+saved_checkpoint_path: None       # Path to a saved model checkpoint (if resuming)
+resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
+fast_dev_run: False               # Enable fast development run
+profiler: None                    # Profiler to use (e.g., "simple", "advanced", "pytorch")
+offline: False                    # Enable offline mode for WandB
+data_preprocessing_only: False    # Run only data preprocessing
+seed: 42                          # Random seed for reproducibility
+debug: False                      # Enable debug mode
+from_scratch: False               # Train the model from scratch
+early_stopping_patience: 3        # Early stopping patience (number of epochs)
 embedding_size: 128
 
 weight_decay: 0.2               # Weight decay
@@ -38,7 +34,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
 loss_mode: "offline/native"
 
-learning_rate: 1e-4             # Learning rate
+learning_rate: 1e-5             # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
 lr_schedule: "linear"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_epochs: 1                # Number of warmup epochs (for the learning rate schedule -> linearly increasing learning rate)
@@ -46,11 +42,11 @@ lr_decay: 0.9                   # Learning rate decay (for the learning rate sch
 lr_decay_interval: 1            # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
 # )
 
-batch_size: 512                 # Training batch size
+batch_size: 12                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 5                   # Training goal (large number)
-val_before_training: False      # Perform validation before training
+max_epochs: 10                  # Training goal (large number)
+val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
@@ -59,5 +55,5 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: ""
-dataset_class: ""
+data_dir: "data/splits/use_for_baseline_cxl_face-openset_origin_robert"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"

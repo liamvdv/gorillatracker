@@ -1,7 +1,3 @@
-# !!!
-# NOTE: DO NOT EDIT THIS YAML FILE. INSTEAD, COPY IT TO A NEW FILE AND EDIT THAT FILE.
-# !!!
-
 # Device Arguments
 
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
@@ -59,5 +55,5 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: ""
-dataset_class: ""
+data_dir: "./mnist"
+dataset_class: "gorillatracker.datasets.mnist.MNISTDataset"
