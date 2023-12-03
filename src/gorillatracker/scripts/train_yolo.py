@@ -1,12 +1,12 @@
 """This file contains short scripts to train a yolo model using the bristol dataset and detect gorilla faces in the CXL dataset."""
 
+import logging
 import os
 import shutil
 import time
-import logging
+from typing import Any, Literal, Tuple
 
 from ultralytics import YOLO
-from typing import Tuple, Any, Literal
 
 model_paths = {
     "yolov8n": "/workspaces/gorillatracker/yolov8n.pt",
@@ -17,10 +17,19 @@ model_paths = {
 logger = logging.getLogger(__name__)
 
 
-def build_dataset_train_remove(bristol_annotation_dir: str, bristol_yolo_annotation_dir: str, bristol_split_dir: str, model_name: str, epochs: int, batch_size: int, gorilla_yml_path: str, wandb_project: str) -> YOLO:
+def build_dataset_train_remove(
+    bristol_annotation_dir: str,
+    bristol_yolo_annotation_dir: str,
+    bristol_split_dir: str,
+    model_name: str,
+    epochs: int,
+    batch_size: int,
+    gorilla_yml_path: str,
+    wandb_project: str,
+) -> YOLO:
     """Build a dataset for yolo using the bristol dataset and train a yolo model on it.
     NOTE: The paths to the bristol dataset has to be inside the gorilla_yml_path file.
-    
+
     Args:
         bristol_annotation_dir (str): Directory containing the bristol annotations.
         bristol_yolo_annotation_dir (str): Directory to save the annotations for yolo.
@@ -30,10 +39,10 @@ def build_dataset_train_remove(bristol_annotation_dir: str, bristol_yolo_annotat
         batch_size (int): Batch size to use.
         gorilla_yml_path (str): Path to the gorilla yml file.
         wandb_project (str): Name of the wandb project to use.
-        
+
     Returns:
         ultralytics.YOLO: Trained yolo model."""
-    
+
     # build dataset for yolo
     set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
 
@@ -43,7 +52,9 @@ def build_dataset_train_remove(bristol_annotation_dir: str, bristol_yolo_annotat
             os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
         )
 
-    model = train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet")
+    model = train_yolo(
+        model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet"
+    )
 
     # remove annotations from the bristol split
     for split in ["train", "val", "test"]:
@@ -52,7 +63,13 @@ def build_dataset_train_remove(bristol_annotation_dir: str, bristol_yolo_annotat
     return model
 
 
-def train_yolo(model_name: Literal["yolov8n", "yolov8m", "yolov8x"], epochs: int, batch_size: int, dataset_yml: str, wandb_project: str) -> Tuple[YOLO, Any]:
+def train_yolo(
+    model_name: Literal["yolov8n", "yolov8m", "yolov8x"],
+    epochs: int,
+    batch_size: int,
+    dataset_yml: str,
+    wandb_project: str,
+) -> Tuple[YOLO, Any]:
     """Train a YOLO model with the given parameters.
 
     Args:
@@ -77,7 +94,6 @@ def train_yolo(model_name: Literal["yolov8n", "yolov8m", "yolov8x"], epochs: int
         name=training_name, data=dataset_yml, epochs=epochs, batch=batch_size, patience=10, project=wandb_project
     )
 
-    
     shutil.move(wandb_project, f"logs/{wandb_project}-{training_name}")
     logger.info("Training finished for %s. Results in logs/%s-%s", training_name, wandb_project, training_name)
     return model, result
@@ -99,7 +115,9 @@ def set_annotation_class_0(annotation_dir: str, dest_dir: str) -> None:
             new_annotation_file.write("\n".join(new_lines))
 
 
-def join_annotations_and_imgs(image_dir: str, annotation_dir: str, output_dir: str, file_extension: str =".jpg") -> None:
+def join_annotations_and_imgs(
+    image_dir: str, annotation_dir: str, output_dir: str, file_extension: str = ".jpg"
+) -> None:
     """Build a dataset for yolo using the given image and annotation directories.
 
     Args:
@@ -114,7 +132,7 @@ def join_annotations_and_imgs(image_dir: str, annotation_dir: str, output_dir: s
     for image_file in image_files:
         annotation_file = image_file.replace(file_extension, ".txt")
         annotation_path = os.path.join(annotation_dir, annotation_file)
-        
+
         assert os.path.exists(annotation_path), f"Annotation file {annotation_path} does not exist"
 
         shutil.copyfile(annotation_path, os.path.join(output_dir, annotation_file))

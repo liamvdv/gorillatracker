@@ -1,10 +1,10 @@
 """Scripts to crop the images in the bristol dataset using the bounding boxes provided by the dataset."""
 
-import os
 import logging
+import os
+from typing import List, Literal, Tuple
 
 from PIL import Image
-from typing import List, Literal, Tuple
 
 index_to_name = {0: "afia", 1: "ayana", 2: "jock", 3: "kala", 4: "kera", 5: "kukuena", 6: "touni"}
 logger = logging.getLogger(__name__)
@@ -67,7 +67,9 @@ def crop_ground_truth(image_path: str, bbox_path: str, output_dir: str) -> None:
         crop_and_save_image(image_path, x, y, w, h, output_path)
 
 
-def crop_max_confidence(image_path: str, bbox_path: str, output_dir: str) -> Literal["bbox","no_bbox","low_confidence"]:
+def crop_max_confidence(
+    image_path: str, bbox_path: str, output_dir: str
+) -> Literal["bbox", "no_bbox", "low_confidence"]:
     """Crops a single image from the cxl dataset.
     NOTE: There is only one bounding box per image. Therefore, only the bounding box with the highest confidence score is used.
     NOTE: The confidence score should additionally be at least 0.5.
@@ -81,13 +83,15 @@ def crop_max_confidence(image_path: str, bbox_path: str, output_dir: str) -> Lit
         _, x, y, w, h, _ = bbox_max_confidence
         output_path = os.path.join(output_dir, os.path.basename(image_path))
         crop_and_save_image(image_path, x, y, w, h, output_path)
-    elif bbox_max_confidence[0] > 0.0: 
+    elif bbox_max_confidence[0] > 0.0:
         logger.warning("bounding box with confidence score %f is too low for image %s", bbox_max_confidence, image_path)
     else:
         logger.warning("no bounding box found for image %s predicted", image_path)
 
 
-def crop_images(image_dir: str, bbox_dir: str, output_dir: str, file_extension: str =".jpg", is_bristol: bool = True) -> Tuple[List[str], List[str], List[str]]:
+def crop_images(
+    image_dir: str, bbox_dir: str, output_dir: str, file_extension: str = ".jpg", is_bristol: bool = True
+) -> Tuple[List[str], List[str], List[str]]:
     """Crop all images in the given directory using the bounding boxes in the given directory and save them to the given output directory.
 
     Args:
@@ -96,7 +100,7 @@ def crop_images(image_dir: str, bbox_dir: str, output_dir: str, file_extension: 
         output_dir (str): Directory to save the cropped images to.
         file_extension (str, optional): File extension of the images. Defaults to ".jpg".
         is_bristol (bool, optional): Whether the images are from the bristol dataset. Defaults to True.
-        
+
     Returns:
         tuple: Tuple containing the following lists:
             - List of images without a bounding box annotation

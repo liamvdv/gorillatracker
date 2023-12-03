@@ -3,21 +3,14 @@
 import json
 import os
 import shutil
+from typing import Any, Dict
 
 import ultralytics
 
-from typing import Dict, Any
-
 from gorillatracker.scripts.crop_dataset import crop_images
 from gorillatracker.scripts.dataset_splitter import generate_split
-from gorillatracker.scripts.ensure_integrity_openset import (
-    ensure_integrity,
-    get_subjects_in_directory,
-)
-from gorillatracker.scripts.train_yolo import (
-    detect_gorillafaces_cxl,
-    build_dataset_train_remove,
-)
+from gorillatracker.scripts.ensure_integrity_openset import ensure_integrity, get_subjects_in_directory
+from gorillatracker.scripts.train_yolo import build_dataset_train_remove, detect_gorillafaces_cxl
 
 
 def merge_every_single_set_of_splits(split1_dir: str, split2_dir: str, output_dir: str) -> None:
@@ -63,7 +56,7 @@ def merge_split2_into_train_set_of_split1(split1_dir: str, split2_dir: str, outp
     shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
 
 
-def save_dict_json(dict: Dict[Any, Any] , file_path: str) -> None:
+def save_dict_json(dict: Dict[Any, Any], file_path: str) -> None:
     """Saves the given dictionary to the given file path as json."""
     with open(file_path, "w") as file:
         json.dump(dict, file, indent=4, sort_keys=True)
@@ -75,18 +68,18 @@ if __name__ == "__main__":
     relative_path_to_bristol = "ground_truth/bristol"
     bristol_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox")
     bristol_yolo_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox_class0")
-    
+
     gorilla_yml_path = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml"
-    
+
     cxl_dir = "/workspaces/gorillatracker/data/ground_truth/cxl"
     cxl_imgs_dir = os.path.join(cxl_dir, "full_images")
     cxl_annotation_dir = "/workspaces/gorillatracker/data/derived_data/cxl_annotations_yolov8x-e30-b163"
     crop_cxl_imgs_dir = "/workspaces/gorillatracker/data/derived_data/cxl_faces_cropped_yolov8x-e30-b163"
-    
+
     model_path = "/workspaces/gorillatracker/models/yolov8x-e30-b163/weights/best.pt"
-    
+
     # 1. split the bristol dataset into train, val and test
-    
+
     bristol_split_dir = generate_split(
         dataset=os.path.join(relative_path_to_bristol, "full_images"),
         mode="openset",
@@ -94,12 +87,11 @@ if __name__ == "__main__":
         reid_factor_test=10,
         reid_factor_val=10,
     )
-    
+
     bristol_split_train_dir = os.path.join(bristol_split_dir, "train")
     bristol_split_val_dir = os.path.join(bristol_split_dir, "val")
     bristol_split_test_dir = os.path.join(bristol_split_dir, "test")
     bristol_split_bbox_dir = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox"
-    
 
     # 2. ensure integrity of the bristol split (only necessary for openset)
     ensure_integrity(bristol_split_train_dir, bristol_split_val_dir, bristol_split_test_dir, bristol_split_bbox_dir)
@@ -118,7 +110,6 @@ if __name__ == "__main__":
         gorilla_yml_path,
         wandb_project="Detection-YOLOv8-Bristol-OpenSet",
     )
-
 
     # 4. predict on the cxl dataset -> save to directory xy -> set model_path
     model = ultralytics.YOLO(model_path)
@@ -149,15 +140,21 @@ if __name__ == "__main__":
         reid_factor_test=10,
         reid_factor_val=10,
     )
-    
+
     # information on subjects in different split sets
-    val_subjects = get_subjects_in_directory(os.path.join(cxl_cropped_split_path, "val"), file_extension=".png", name_delimiter="_")
-    train_subjects = get_subjects_in_directory(os.path.join(cxl_cropped_split_path, "train"), file_extension=".png", name_delimiter="_")
-    test_subjects = get_subjects_in_directory(os.path.join(cxl_cropped_split_path, "test"), file_extension=".png", name_delimiter="_")
+    val_subjects = get_subjects_in_directory(
+        os.path.join(cxl_cropped_split_path, "val"), file_extension=".png", name_delimiter="_"
+    )
+    train_subjects = get_subjects_in_directory(
+        os.path.join(cxl_cropped_split_path, "train"), file_extension=".png", name_delimiter="_"
+    )
+    test_subjects = get_subjects_in_directory(
+        os.path.join(cxl_cropped_split_path, "test"), file_extension=".png", name_delimiter="_"
+    )
     meta_data.update([("subjects_val", list(val_subjects))])
     meta_data.update([("subjects_train", list(train_subjects))])
     meta_data.update([("subjects_test", list(test_subjects))])
-    
+
     save_dict_json(meta_data, os.path.join(cxl_cropped_split_path, "metadata.json"))
 
     bristol_cropped_path = os.path.join(

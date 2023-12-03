@@ -5,11 +5,10 @@ The exact same applies to the val set.
 """
 
 
+import logging
 import os
 import shutil
-import logging
-
-from typing import Set, List, Literal
+from typing import List, Literal, Set
 
 from gorillatracker.scripts.crop_dataset import read_bbox_data
 
@@ -19,7 +18,7 @@ bristol_name_to_index = {value: key for key, value in bristol_index_to_name.item
 logger = logging.getLogger(__name__)
 
 
-def move_image(image_path:str, bbox_path: str, output_dir: str, subjects_indicies: List[int]) -> int:
+def move_image(image_path: str, bbox_path: str, output_dir: str, subjects_indicies: List[int]) -> int:
     """Move the given image to the given output directory if it contains a bounding box of the actual subject.
 
     Args:
@@ -33,9 +32,11 @@ def move_image(image_path:str, bbox_path: str, output_dir: str, subjects_indicie
     bbox_lines = read_bbox_data(bbox_path)
     subjects_in_image = [int(bbox_line[0]) for bbox_line in bbox_lines]
 
-    if any([subject_index in subjects_in_image for subject_index in subjects_indicies]) and not os.path.exists(os.path.join(output_dir, os.path.basename(image_path))):
+    if any([subject_index in subjects_in_image for subject_index in subjects_indicies]) and not os.path.exists(
+        os.path.join(output_dir, os.path.basename(image_path))
+    ):
         shutil.move(image_path, output_dir)
-        logger.info("Moved image %s to %s", image_path , output_dir)
+        logger.info("Moved image %s to %s", image_path, output_dir)
         return 1
     else:
         return 0
@@ -65,7 +66,7 @@ def move_images_of_subjects(image_dir: str, bbox_dir: str, output_dir: str, subj
         bbox_path = os.path.join(bbox_dir, image_file.replace(".jpg", ".txt"))
 
         assert os.path.exists(bbox_path), f"Bounding box file '{bbox_path}' does not exist for image '{image_file}'"
-        
+
         move_count += move_image(image_path, bbox_path, output_dir, subjects_indicies)
 
     return move_count
@@ -83,7 +84,7 @@ def filter_images_bristol(image_dir: str, bbox_dir: str) -> int:
         bbox_path = os.path.join(bbox_dir, image_file.replace(".jpg", ".txt"))
 
         assert os.path.exists(bbox_path), f"Bounding box file '{bbox_path}' does not exist for image '{image_file}'"
-        
+
         # Read bounding box coordinates from the text file
         bbox_data = []
 
@@ -107,7 +108,9 @@ def filter_images_bristol(image_dir: str, bbox_dir: str) -> int:
     return remove_count
 
 
-def get_subjects_in_directory(test_dir: str, file_extension: Literal[".jpg", ".png"] = ".jpg", name_delimiter: Literal["_", "-"] = "-") -> Set[str]:
+def get_subjects_in_directory(
+    test_dir: str, file_extension: Literal[".jpg", ".png"] = ".jpg", name_delimiter: Literal["_", "-"] = "-"
+) -> Set[str]:
     """Get all subjects in the given directory. Subjects are identified by the prefix of the image file name."""
     # Get list of image files
     image_files = [f for f in os.listdir(test_dir) if f.endswith(file_extension)]
@@ -145,17 +148,11 @@ def ensure_integrity(train_set_dir: str, val_set_dir: str, test_set_dir: str, bb
     logger.info("Removed %d images", remove_count)
 
     # filter out images in train and val that contain test_proprietary_subjects
-    move_count_train_to_test = move_images_of_subjects(
-        train_set_dir, bbox_dir, test_set_dir, test_proprietary_subjects
-    )
+    move_count_train_to_test = move_images_of_subjects(train_set_dir, bbox_dir, test_set_dir, test_proprietary_subjects)
     logger.info("Moved %d images from train to test", move_count_train_to_test)
-    move_count_val_to_test = move_images_of_subjects(
-        val_set_dir, bbox_dir, test_set_dir, test_proprietary_subjects
-    )
+    move_count_val_to_test = move_images_of_subjects(val_set_dir, bbox_dir, test_set_dir, test_proprietary_subjects)
     logger.info("Moved %d images from val to test", move_count_val_to_test)
 
     # filter out images in train and test that contain val_proprietary_subjects
-    move_count_train_to_val = move_images_of_subjects(
-        train_set_dir, bbox_dir, val_set_dir, val_proprietary_subjects
-    )
+    move_count_train_to_val = move_images_of_subjects(train_set_dir, bbox_dir, val_set_dir, val_proprietary_subjects)
     logger.info("Moved %d images from train to val", move_count_train_to_val)
