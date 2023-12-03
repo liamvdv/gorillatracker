@@ -151,7 +151,7 @@ def compute_split(samples: int, train: int, val: int, test: int):
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = True
+TEST = False
 
 
 def copy(src: Path, dst: Path):
@@ -192,7 +192,8 @@ def splitter(
     reid_factor_test: int = None,
 ):
     assert train + val + test == 100, "train, val, test must sum to 100."
-    random.seed = seed
+    # random.seed = seed nice error though
+    random.seed(seed)
     # This shuffe is preserved throughout groups and ungroups.
     # because python dicts are ordered by insertion.
     # We can now simply pop from the start / end to get random images.
@@ -280,8 +281,10 @@ def generate_split(
     # NOTE hacky workaround
     if "cxl" in dataset:
         images = read_ground_truth_cxl(f"data/{dataset}")
-    else:
+    elif "bristol" in dataset:
         images = read_ground_truth_bristol(f"data/{dataset}")
+    else:
+        raise ValueError(f"unknown dataset {dataset}")
     train, val, test = splitter(
         images,
         mode=mode,

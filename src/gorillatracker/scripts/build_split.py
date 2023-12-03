@@ -6,6 +6,8 @@ import shutil
 
 import ultralytics
 
+from typing import Dict, Any
+
 from gorillatracker.scripts.crop_dataset import crop_images
 from gorillatracker.scripts.dataset_splitter import generate_split
 from gorillatracker.scripts.ensure_integrity_openset import ensure_integrity
@@ -14,10 +16,11 @@ from gorillatracker.scripts.train_yolo import (
     join_annotations_and_imgs,
     remove_files_from_dir_with_extension,
     set_annotation_class_0,
+    train_yolo,
 )
 
 
-def merge_every_single_set_of_splits(split1_dir, split2_dir, output_dir):
+def merge_every_single_set_of_splits(split1_dir: str, split2_dir: str, output_dir: str) -> None:
     """Merges two splits into a new split.
 
     Args:
@@ -39,7 +42,7 @@ def merge_every_single_set_of_splits(split1_dir, split2_dir, output_dir):
     shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "test"), dirs_exist_ok=True)
 
 
-def merge_split2_into_train_set_of_split1(split1_dir, split2_dir, output_dir):
+def merge_split2_into_train_set_of_split1(split1_dir: str, split2_dir: str, output_dir: str) -> None:
     """Merges all sets of split2 into the train set of split1.
 
     Args:
@@ -60,58 +63,64 @@ def merge_split2_into_train_set_of_split1(split1_dir, split2_dir, output_dir):
     shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
 
 
-def save_dict_json(dict, file_path):
+def save_dict_json(dict: Dict[Any, Any] , file_path: str) -> None:
     """Saves the given dictionary to the given file path as json."""
     with open(file_path, "w") as file:
-        json.dump(dict, file)
+        json.dump(dict, file, indent=4, sort_keys=True)
 
 
-if __name__ == "__main__":
-    # 1. split the bristol dataset into train, val and test
+if __name__ == "__main__": # TODO: test + make more compact
+    # Define all needed paths
     bristol_dir = "/workspaces/gorillatracker/data/ground_truth/bristol"
     relative_path_to_bristol = "ground_truth/bristol"
+    bristol_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox")
+    bristol_yolo_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox_class0")
+    
+    gorilla_yml_path = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml"
+    
+    cxl_dir = "/workspaces/gorillatracker/data/ground_truth/cxl"
+    cxl_imgs_dir = os.path.join(cxl_dir, "full_images")
+    cxl_annotation_dir = "/workspaces/gorillatracker/data/derived_data/cxl_annotations_yolov8x-e30-b163"
+    crop_cxl_imgs_dir = "/workspaces/gorillatracker/data/derived_data/cxl_faces_cropped_yolov8x-e30-b163"
+    
+    model_path = "/workspaces/gorillatracker/models/yolov8x-e30-b163/weights/best.pt"
+    
+    # 1. split the bristol dataset into train, val and test
+    
     bristol_split_dir = generate_split(
         dataset=os.path.join(relative_path_to_bristol, "full_images"),
         mode="openset",
-        seed=42,
+        seed=69,
         reid_factor_test=10,
         reid_factor_val=10,
     )
-
-    # 2. ensure integrity of the bristol split (only necessary for openset)
-    # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15"
+    
     bristol_split_train_dir = os.path.join(bristol_split_dir, "train")
     bristol_split_val_dir = os.path.join(bristol_split_dir, "val")
     bristol_split_test_dir = os.path.join(bristol_split_dir, "test")
     bristol_split_bbox_dir = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox"
+    
 
+    # 2. ensure integrity of the bristol split (only necessary for openset)
     ensure_integrity(bristol_split_train_dir, bristol_split_val_dir, bristol_split_test_dir, bristol_split_bbox_dir)
 
-    # # 3. train yolo model on the bristol dataset split (openset)
+    # 3. train yolo model on the bristol dataset split (openset)
     model_name = "yolov8x"
     epochs = 2
     batch_size = 16
 
     # 3a build dataset for yolo
-    bristol_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox")
-    bristol_yolo_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox_class0")
     set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
 
-    # 3b then train yolo (note that you have to set the path to the different sets in the yml file)
-    gorilla_yml_path = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml"
+    # 3b then train yolo (NOTE: you have to set the path to the different sets in the yml file)
 
     # take a split of the bristol dataset
     # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15"
     # YOLO needs the images and annotations in the same folder
-    join_annotations_and_imgs(
-        os.path.join(bristol_split_dir, "train"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "train")
-    )
-    join_annotations_and_imgs(
-        os.path.join(bristol_split_dir, "val"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "val")
-    )
-    join_annotations_and_imgs(
-        os.path.join(bristol_split_dir, "test"), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, "test")
-    )
+    for split in ["train", "val", "test"]:
+        join_annotations_and_imgs(
+            os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
+        )
 
     # train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet")
 
@@ -120,16 +129,11 @@ if __name__ == "__main__":
         remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
 
     # 4. predict on the cxl dataset -> save to directory xy -> set model_path
-    cxl_dir = "/workspaces/gorillatracker/data/ground_truth/cxl"
-    cxl_imgs_dir = os.path.join(cxl_dir, "full_images")
-    cxl_annotation_dir = "/workspaces/gorillatracker/data/derived_data/cxl_annotations_yolov8x-e30-b163"
-    model_path = "/workspaces/gorillatracker/models/yolov8x-e30-b163/weights/best.pt"
     model = ultralytics.YOLO(model_path)
     detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
 
     # 5. crop cxl images  according to predicted bounding boxes
-    crop_cxl_imgs_dir = "/workspaces/gorillatracker/data/derived_data/cxl_faces_cropped_yolov8x-e30-b163"
-    imgs_without_bbox = crop_images(
+    imgs_without_bbox, imgs_with_no_bbox_prediction, imgs_with_low_confidence = crop_images(
         cxl_imgs_dir, cxl_annotation_dir, crop_cxl_imgs_dir, is_bristol=False, file_extension=".png"
     )
 
@@ -139,15 +143,17 @@ if __name__ == "__main__":
         "yolo-path": str(model_path),
         "bristol-split": str(bristol_split_dir),
         "imgs-without-bbox": imgs_without_bbox,
+        "imgs-with-no-bbox-prediction": imgs_with_no_bbox_prediction,
+        "imgs-with-low-confidence": imgs_with_low_confidence,
         "cxl-annotation-dir": str(cxl_annotation_dir),
     }
     save_dict_json(meta_data, os.path.join(crop_cxl_imgs_dir, "metadata.json"))
 
-    # 5b create split for cxl dataset
+    # 5c create split for cxl dataset
     cxl_cropped_split_path = generate_split(
         dataset="derived_data/cxl_faces_cropped_yolov8x-e30-b163",
         mode="openset",
-        seed=42,
+        seed=69,
         reid_factor_test=10,
         reid_factor_val=10,
     )
@@ -157,7 +163,7 @@ if __name__ == "__main__":
         relative_path_to_bristol, "cropped_images_face"
     )  # NOTE generate_split wants relative path and returns absolute path
     bristol_cropped_split_path = generate_split(
-        dataset=bristol_cropped_path, mode="openset", seed=42, reid_factor_test=10, reid_factor_val=10
+        dataset=bristol_cropped_path, mode="openset", seed=69, reid_factor_test=10, reid_factor_val=10
     )
 
     # 6. merge bristol and cxl dataset if wanted
