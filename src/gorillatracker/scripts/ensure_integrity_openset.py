@@ -2,13 +2,6 @@
 
 This means that the train set does not contain any images that by accident contain a subject that for testing/validation purposes should be considered as unknown (as it should be test/val proprietary).
 The exact same applies to the val set.
-
-This is an issue because the bristol dataset names images with the subject that is (probably) most visible in the image. 
-The problem is that there are images containing multiple subjects. So the name of the image does not ensure that only this particular subject is visible in the image.
-So we have to check the annotation files and move images that contain a subject that should be considered as unknown to the test/val set.
-
-Another issue is that the bristol dataset contains images where subject encoded in the name is not part of the annotations for this image.
-As it cannot be verified which label is correct, these images are removed from the dataset.
 """
 
 
@@ -16,7 +9,9 @@ import os
 import shutil
 import logging
 
-from typing import Set, List
+from typing import Set, List, Literal
+
+from gorillatracker.scripts.crop_dataset import read_bbox_data
 
 bristol_index_to_name = {0: "afia", 1: "ayana", 2: "jock", 3: "kala", 4: "kera", 5: "kukuena", 6: "touni"}
 bristol_name_to_index = {value: key for key, value in bristol_index_to_name.items()}
@@ -24,7 +19,29 @@ bristol_name_to_index = {value: key for key, value in bristol_index_to_name.item
 logger = logging.getLogger(__name__)
 
 
-def move_images_of_subjects(image_dir: str, bbox_dir: str, output_dir: str, subjects_indicies: List[int]) -> int: # TODO(rob2u): make more compact
+def move_image(image_path:str, bbox_path: str, output_dir: str, subjects_indicies: List[int]) -> int:
+    """Move the given image to the given output directory if it contains a bounding box of the actual subject.
+
+    Args:
+        image_path (str): Path to the image to move.
+        bbox_path (str): Path to the bounding box file.
+        output_dir (str): Directory to move the image to.
+
+    Returns:
+        int: 1 if the image was moved, 0 otherwise.
+    """
+    bbox_lines = read_bbox_data(bbox_path)
+    subjects_in_image = [int(bbox_line[0]) for bbox_line in bbox_lines]
+
+    if any([subject_index in subjects_in_image for subject_index in subjects_indicies]) and not os.path.exists(os.path.join(output_dir, os.path.basename(image_path))):
+        shutil.move(image_path, output_dir)
+        logger.info("Moved image %s to %s", image_path , output_dir)
+        return 1
+    else:
+        return 0
+
+
+def move_images_of_subjects(image_dir: str, bbox_dir: str, output_dir: str, subjects_indicies: List[int]) -> int:
     """Move all images from the image folder to the output folder that contain bounding boxes of the given subjects.
 
     Args:
@@ -49,27 +66,12 @@ def move_images_of_subjects(image_dir: str, bbox_dir: str, output_dir: str, subj
 
         assert os.path.exists(bbox_path), f"Bounding box file '{bbox_path}' does not exist for image '{image_file}'"
         
-        # Read bounding box coordinates from the text file
-        bbox_data = []
-        with open(bbox_path, "r") as bbox_file:
-            bbox_data = bbox_file.read().strip().split()
-
-        assert len(bbox_data) % 5 == 0, f"Bounding box file '{bbox_path}' has invalid format"
-
-        for i in range(0, len(bbox_data), 5):
-            index, x, y, w, h = map(
-                float, bbox_data[i : (i + 5)]
-            )  # x,y is the center of the bbox and w,h are the width and height
-
-            if index in subjects_indicies:
-                shutil.move(image_path, output_dir)
-                logger.info("Moved image %s to %s", image_file, output_dir)
-                move_count += 1
+        move_count += move_image(image_path, bbox_path, output_dir, subjects_indicies)
 
     return move_count
 
 
-def filter_images_bristol(image_dir: str, bbox_dir: str) -> int: # TODO(rob2u): make more compact
+def filter_images_bristol(image_dir: str, bbox_dir: str) -> int:
     """Remove all images from the image folder that do not contain a bounding box of the actual subject."""
 
     # Get list of image files
@@ -105,14 +107,14 @@ def filter_images_bristol(image_dir: str, bbox_dir: str) -> int: # TODO(rob2u): 
     return remove_count
 
 
-def get_subjects_in_directory(test_dir: str) -> Set[str]:
+def get_subjects_in_directory(test_dir: str, file_extension: Literal[".jpg", ".png"] = ".jpg", name_delimiter: Literal["_", "-"] = "-") -> Set[str]:
     """Get all subjects in the given directory. Subjects are identified by the prefix of the image file name."""
     # Get list of image files
-    image_files = [f for f in os.listdir(test_dir) if f.endswith(".jpg")]
+    image_files = [f for f in os.listdir(test_dir) if f.endswith(file_extension)]
     logger.info("Found %d images in folder %s", len(image_files), test_dir)
     test_subjects = set()
     for image_file in image_files:
-        test_subjects.add(image_file.split("-")[0])
+        test_subjects.add(image_file.split(name_delimiter)[0])
     return test_subjects
 
 

@@ -10,13 +10,13 @@ from typing import Dict, Any
 
 from gorillatracker.scripts.crop_dataset import crop_images
 from gorillatracker.scripts.dataset_splitter import generate_split
-from gorillatracker.scripts.ensure_integrity_openset import ensure_integrity
+from gorillatracker.scripts.ensure_integrity_openset import (
+    ensure_integrity,
+    get_subjects_in_directory,
+)
 from gorillatracker.scripts.train_yolo import (
     detect_gorillafaces_cxl,
-    join_annotations_and_imgs,
-    remove_files_from_dir_with_extension,
-    set_annotation_class_0,
-    train_yolo,
+    build_dataset_train_remove,
 )
 
 
@@ -69,7 +69,7 @@ def save_dict_json(dict: Dict[Any, Any] , file_path: str) -> None:
         json.dump(dict, file, indent=4, sort_keys=True)
 
 
-if __name__ == "__main__": # TODO: test + make more compact
+if __name__ == "__main__":
     # Define all needed paths
     bristol_dir = "/workspaces/gorillatracker/data/ground_truth/bristol"
     relative_path_to_bristol = "ground_truth/bristol"
@@ -108,31 +108,23 @@ if __name__ == "__main__": # TODO: test + make more compact
     model_name = "yolov8x"
     epochs = 2
     batch_size = 16
+    model = build_dataset_train_remove(
+        bristol_annotation_dir,
+        bristol_yolo_annotation_dir,
+        bristol_split_dir,
+        model_name,
+        epochs,
+        batch_size,
+        gorilla_yml_path,
+        wandb_project="Detection-YOLOv8-Bristol-OpenSet",
+    )
 
-    # 3a build dataset for yolo
-    set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
-
-    # 3b then train yolo (NOTE: you have to set the path to the different sets in the yml file)
-
-    # take a split of the bristol dataset
-    # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15"
-    # YOLO needs the images and annotations in the same folder
-    for split in ["train", "val", "test"]:
-        join_annotations_and_imgs(
-            os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
-        )
-
-    # train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet")
-
-    # 3c remove annotations from the bristol split
-    for split in ["train", "val", "test"]:
-        remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
 
     # 4. predict on the cxl dataset -> save to directory xy -> set model_path
     model = ultralytics.YOLO(model_path)
     detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
 
-    # 5. crop cxl images  according to predicted bounding boxes
+    # 5a crop cxl images  according to predicted bounding boxes
     imgs_without_bbox, imgs_with_no_bbox_prediction, imgs_with_low_confidence = crop_images(
         cxl_imgs_dir, cxl_annotation_dir, crop_cxl_imgs_dir, is_bristol=False, file_extension=".png"
     )
@@ -157,6 +149,15 @@ if __name__ == "__main__": # TODO: test + make more compact
         reid_factor_test=10,
         reid_factor_val=10,
     )
+    
+    # information on subjects in different split sets
+    val_subjects = get_subjects_in_directory(os.path.join(cxl_cropped_split_path, "val"), file_extension=".png", name_delimiter="_")
+    train_subjects = get_subjects_in_directory(os.path.join(cxl_cropped_split_path, "train"), file_extension=".png", name_delimiter="_")
+    test_subjects = get_subjects_in_directory(os.path.join(cxl_cropped_split_path, "test"), file_extension=".png", name_delimiter="_")
+    meta_data.update([("subjects_val", list(val_subjects))])
+    meta_data.update([("subjects_train", list(train_subjects))])
+    meta_data.update([("subjects_test", list(test_subjects))])
+    
     save_dict_json(meta_data, os.path.join(cxl_cropped_split_path, "metadata.json"))
 
     bristol_cropped_path = os.path.join(

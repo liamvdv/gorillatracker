@@ -192,7 +192,6 @@ def splitter(
     reid_factor_test: int = None,
 ):
     assert train + val + test == 100, "train, val, test must sum to 100."
-    # random.seed = seed nice error though
     random.seed(seed)
     # This shuffe is preserved throughout groups and ungroups.
     # because python dicts are ordered by insertion.

@@ -17,6 +17,41 @@ model_paths = {
 logger = logging.getLogger(__name__)
 
 
+def build_dataset_train_remove(bristol_annotation_dir: str, bristol_yolo_annotation_dir: str, bristol_split_dir: str, model_name: str, epochs: int, batch_size: int, gorilla_yml_path: str, wandb_project: str) -> YOLO:
+    """Build a dataset for yolo using the bristol dataset and train a yolo model on it.
+    NOTE: The paths to the bristol dataset has to be inside the gorilla_yml_path file.
+    
+    Args:
+        bristol_annotation_dir (str): Directory containing the bristol annotations.
+        bristol_yolo_annotation_dir (str): Directory to save the annotations for yolo.
+        bristol_split_dir (str): Directory containing the bristol split.
+        model_name (str): Name of the yolo model to train.
+        epochs (int): Number of epochs to train.
+        batch_size (int): Batch size to use.
+        gorilla_yml_path (str): Path to the gorilla yml file.
+        wandb_project (str): Name of the wandb project to use.
+        
+    Returns:
+        ultralytics.YOLO: Trained yolo model."""
+    
+    # build dataset for yolo
+    set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
+
+    # YOLO needs the images and annotations in the same folder
+    for split in ["train", "val", "test"]:
+        join_annotations_and_imgs(
+            os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
+        )
+
+    model = train_yolo(model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet")
+
+    # remove annotations from the bristol split
+    for split in ["train", "val", "test"]:
+        remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
+
+    return model
+
+
 def train_yolo(model_name: Literal["yolov8n", "yolov8m", "yolov8x"], epochs: int, batch_size: int, dataset_yml: str, wandb_project: str) -> Tuple[YOLO, Any]:
     """Train a YOLO model with the given parameters.
 

@@ -34,7 +34,7 @@ def crop_and_save_image(image_path: str, x: float, y: float, w: float, h: float,
     cropped_img.save(output_path)
 
 
-def read_bbox_data(bbox_path: str) -> List[List[float]]: # TODO: use logging
+def read_bbox_data(bbox_path: str) -> List[List[float]]:
     """Read the bounding box data from the given file.
 
     Args:
@@ -87,7 +87,7 @@ def crop_max_confidence(image_path: str, bbox_path: str, output_dir: str) -> Lit
         logger.warning("no bounding box found for image %s predicted", image_path)
 
 
-def crop_images(image_dir: str, bbox_dir: str, output_dir: str, file_extension: str =".jpg", is_bristol: bool = True) -> Tuple[List[str], List[str], List[str]]: # TODO: make more compact
+def crop_images(image_dir: str, bbox_dir: str, output_dir: str, file_extension: str =".jpg", is_bristol: bool = True) -> Tuple[List[str], List[str], List[str]]:
     """Crop all images in the given directory using the bounding boxes in the given directory and save them to the given output directory.
 
     Args:
