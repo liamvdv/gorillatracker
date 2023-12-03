@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import os
 import json
 import multiprocessing
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Optional
 
 
 config = {}
@@ -11,12 +11,22 @@ def predict_video(
     input_path: str, 
     models: List[YOLO],
     ):
+    """
+    Predicts labels for objects in a video using multiple YOLO models.
+
+    Parameters:
+    - input_path (str): The path to the input video file.
+    - models (List[YOLO]): A list of YOLO models to use for prediction.
+    Returns:
+        None
+    """
+    
     global config
     
     assert config != {}, "config must be set before calling predict_video"
     assert len(models) > 0, "models must be a list of at least one model"
     assert os.path.exists(input_path), f"input_path {input_path} does not exist"
-    
+        
     json_folder = config["json_folder"]
     save_json = config["save_json"]
     overwrite_json = config["overwrite_json"]
@@ -71,31 +81,57 @@ class SingletonMeta(type):
         return cls._instances[multiprocessing.current_process().pid]
 
 class Singleton(metaclass=SingletonMeta):
-    def __init__(self, models):
+    def __init__(self, models: List[YOLO]):
         self.value = models
 
     def get_models(self): 
         return self.value
 
-def worker_function(i):
+def worker_function(input_path: str):
+    
+    """
+    Process the given input video file.
+
+    Parameters:
+    - input_path (str): The path of the input video file.
+    Returns:
+        None
+    """
+    
     global config
     singleton = Singleton(config["models"])
-    print(f"Processing {i}")
-    predict_video(i, singleton.get_models())
+    print(f"Processing {input_path}")
+    predict_video(input_path, singleton.get_models())
     
 def predict_video_multiprocessing(
-    models = [
+    models: List[YOLO] = [
         YOLO("/workspaces/gorillatracker/models/body_s_Ben.pt"),
         YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt")
         ], 
-    json_folder = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels", 
-    save_json = True,
-    overwrite_json = False, 
-    post_process_function = None,
-    yolo_args = {"verbose":False},
-    pool_size = 4,
+    json_folder: str = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels", 
+    save_json: bool = True,
+    overwrite_json: bool = False, 
+    post_process_function: Callable[[List[List[Dict]]], None] = None,
+    yolo_args: Dict = {"verbose":False},
+    pool_size: int = 4,
     **kwargs
     ):
+    
+    """
+    Perform video prediction using multiple YOLO models in parallel using multiprocessing.
+    
+    Parameters:
+    - models (List[YOLO]): List of YOLO models to use for prediction.
+    - json_folder (str): Path to the folder where the predicted JSON files will be saved.
+    - save_json (bool): Flag indicating whether to save the predicted JSON files.
+    - overwrite_json (bool): Flag indicating whether to overwrite existing JSON files.
+    - post_process_function (Callable[[List[List[Dict]]], None]): Function to apply post-processing to the predicted results.
+    - yolo_args (Dict): Additional arguments to pass to the YOLO models.
+    - pool_size (int): Number of processes to use for parallel prediction.
+    - **kwargs: Additional keyword arguments. Either "video_dir" or "video_paths" must be specified.
+    Returns:
+    None
+    """
     
     global config
     config = {
