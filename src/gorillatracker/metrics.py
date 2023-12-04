@@ -1,3 +1,5 @@
+from functools import partial
+
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
@@ -64,7 +66,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
-                metrics={"knn": knn, "pca": pca, "tsne": tsne, "fc_layer": fc_layer},  # "flda": flda_metric,
+                metrics={
+                    "knn": knn,
+                    "knn5": partial(knn, k=5),
+                    "pca": pca,
+                    "tsne": tsne,
+                    "fc_layer": fc_layer,
+                },  # "flda": flda_metric,
             )
             # wandb.log({"epoch": current_epoch})
             # for visibility also log the
@@ -174,6 +182,10 @@ def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42):
 # Vincents code
 def knn(embeddings, labels, k=5):
     num_classes = len(np.unique(labels))
+    if num_classes < k:
+        print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
+        k = num_classes
+
     # convert embeddings and labels to tensors
     embeddings = torch.tensor(embeddings)
     labels = torch.tensor(labels)
