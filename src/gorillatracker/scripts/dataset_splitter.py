@@ -103,7 +103,7 @@ def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
         if filename.endswith(".jpg"):
-            label = filename.split("-", maxsplit=1)[0]
+            label = re.split(r"[_\s-]", filename, maxsplit=1)[0]
             entry = Entry(Path(full_images_dirpath, filename), label, {})
             entries.append(entry)
     return entries
