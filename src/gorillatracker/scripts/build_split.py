@@ -150,11 +150,11 @@ if __name__ == "__main__":
     test_subjects = get_subjects_in_directory(
         os.path.join(cxl_cropped_split_path, "test"), file_extension=".png", name_delimiter="_"
     )
-    
+
     test_proprietary_subjects = test_subjects - train_subjects - val_subjects
     val_proprietary_subjects = val_subjects - train_subjects - test_subjects
     train_proprietary_subjects = train_subjects - val_subjects - test_subjects
-    
+
     meta_data.update([("subjects_train", list(train_subjects))])
     meta_data.update([("subjects_val", list(val_subjects))])
     meta_data.update([("subjects_test", list(test_subjects))])
@@ -168,19 +168,20 @@ if __name__ == "__main__":
     bristol_cropped_path = os.path.join(bristol_dir, "cropped_images_face")
     bristol_img_dir = os.path.join(bristol_dir, "full_images")
     bristol_annotation_dir = os.path.join(bristol_dir, "full_images_face_bbox")
-    crop_images(
-        bristol_img_dir, bristol_annotation_dir, bristol_cropped_path, is_bristol=True, file_extension=".jpg"
-    )
-
+    crop_images(bristol_img_dir, bristol_annotation_dir, bristol_cropped_path, is_bristol=True, file_extension=".jpg")
 
     bristol_cropped_path_relative = os.path.join(
         relative_path_to_bristol, "cropped_images_face"
     )  # NOTE generate_split wants relative path and returns absolute path
     bristol_cropped_split_path = generate_split(
-        dataset=bristol_cropped_path_relative, mode="openset-strict-half-known", seed=69, reid_factor_test=10, reid_factor_val=10
+        dataset=bristol_cropped_path_relative,
+        mode="openset-strict-half-known",
+        seed=69,
+        reid_factor_test=10,
+        reid_factor_val=10,
     )
 
-    # 6. merge bristol and cxl dataset if wanted    
+    # 6. merge bristol and cxl dataset if wanted
     joined_base_dir = "/workspaces/gorillatracker/data/joined_splits"
 
     merge_dir = os.path.join(joined_base_dir, "faces_cropped_bristol_cxl_cropped_yolov8x-e30-b163_seed=69")

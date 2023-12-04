@@ -270,11 +270,17 @@ def splitter(
         )
         val_bucket = ungroup(individums[train_count : train_count + val_count])
         test_bucket = ungroup(individums[train_count + val_count :])
-    
-        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set(), "sanity check"
-        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
-        assert set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
-        
+
+        assert (
+            set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set()
+        ), "sanity check"
+        assert (
+            set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set()
+        ), "sanity check"
+        assert (
+            set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set()
+        ), "sanity check"
+
     elif mode == "openset-strict-half-known":
         # test, val and eval are disjoint.
         train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
@@ -283,14 +289,20 @@ def splitter(
         )
         val_bucket = ungroup(individums[train_count : train_count + val_count])
         test_bucket = ungroup(individums[train_count + val_count :])
-    
-        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set(), "sanity check"
-        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
-        assert set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
+
+        assert (
+            set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set()
+        ), "sanity check"
+        assert (
+            set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set()
+        ), "sanity check"
+        assert (
+            set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set()
+        ), "sanity check"
         # now also add half of the images of the individuals in val and test that are not in train
         val_bucket = val_bucket + random.choices(train_bucket, k=len(val_bucket))
         test_bucket = test_bucket + random.choices(train_bucket, k=len(test_bucket))
-        
+
     return train_bucket, val_bucket, test_bucket
 
 

@@ -50,9 +50,9 @@ def read_bbox_data(bbox_path: str) -> List[List[float]]:
     bbox_data_lines = []
     with open(bbox_path, "r") as bbox_file:
         bbox_data_lines = bbox_file.read().strip().split("\n")
-    
+
     bbox_data_lines = [line for line in bbox_data_lines if line != ""]
-    
+
     bbox_data_lines_split = [list(map(float, bbox_data_line.strip().split(" "))) for bbox_data_line in bbox_data_lines]
 
     return bbox_data_lines_split
