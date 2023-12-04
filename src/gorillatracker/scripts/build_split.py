@@ -99,20 +99,20 @@ if __name__ == "__main__":
     model_name = "yolov8x"
     epochs = 2
     batch_size = 16
-    # model = build_dataset_train_remove(
-    #     bristol_annotation_dir,
-    #     bristol_yolo_annotation_dir,
-    #     bristol_split_dir,
-    #     model_name,
-    #     epochs,
-    #     batch_size,
-    #     gorilla_yml_path,
-    #     wandb_project="Detection-YOLOv8-Bristol-OpenSet",
-    # )
+    model = build_dataset_train_remove(
+        bristol_annotation_dir,
+        bristol_yolo_annotation_dir,
+        bristol_split_dir,
+        model_name,
+        epochs,
+        batch_size,
+        gorilla_yml_path,
+        wandb_project="Detection-YOLOv8-Bristol-OpenSet",
+    )
 
     # 4. predict on the cxl dataset -> save to directory xy -> set model_path
     model = ultralytics.YOLO(model_path)
-    # detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
+    detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
 
     # 5a crop cxl images  according to predicted bounding boxes
     imgs_without_bbox, imgs_with_no_bbox_prediction, imgs_with_low_confidence = crop_images(
