@@ -117,6 +117,7 @@ def get_subjects_in_directory(
     logger.info("Found %d images in folder %s", len(image_files), test_dir)
     test_subjects = set()
     for image_file in image_files:
+        image_file = image_file.replace(" ", name_delimiter).lower()
         test_subjects.add(image_file.split(name_delimiter)[0])
     return test_subjects
 

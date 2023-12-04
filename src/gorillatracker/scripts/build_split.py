@@ -79,10 +79,9 @@ if __name__ == "__main__":
     model_path = "/workspaces/gorillatracker/models/yolov8x-e30-b163/weights/best.pt"
 
     # 1. split the bristol dataset into train, val and test
-
     bristol_split_dir = generate_split(
         dataset=os.path.join(relative_path_to_bristol, "full_images"),
-        mode="openset",
+        mode="openset-strict",
         seed=69,
         reid_factor_test=10,
         reid_factor_val=10,
@@ -100,20 +99,20 @@ if __name__ == "__main__":
     model_name = "yolov8x"
     epochs = 2
     batch_size = 16
-    model = build_dataset_train_remove(
-        bristol_annotation_dir,
-        bristol_yolo_annotation_dir,
-        bristol_split_dir,
-        model_name,
-        epochs,
-        batch_size,
-        gorilla_yml_path,
-        wandb_project="Detection-YOLOv8-Bristol-OpenSet",
-    )
+    # model = build_dataset_train_remove(
+    #     bristol_annotation_dir,
+    #     bristol_yolo_annotation_dir,
+    #     bristol_split_dir,
+    #     model_name,
+    #     epochs,
+    #     batch_size,
+    #     gorilla_yml_path,
+    #     wandb_project="Detection-YOLOv8-Bristol-OpenSet",
+    # )
 
     # 4. predict on the cxl dataset -> save to directory xy -> set model_path
     model = ultralytics.YOLO(model_path)
-    detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
+    # detect_gorillafaces_cxl(model, cxl_imgs_dir, output_dir=cxl_annotation_dir)
 
     # 5a crop cxl images  according to predicted bounding boxes
     imgs_without_bbox, imgs_with_no_bbox_prediction, imgs_with_low_confidence = crop_images(
@@ -135,7 +134,7 @@ if __name__ == "__main__":
     # 5c create split for cxl dataset
     cxl_cropped_split_path = generate_split(
         dataset="derived_data/cxl_faces_cropped_yolov8x-e30-b163",
-        mode="openset",
+        mode="openset-strict-half-known",
         seed=69,
         reid_factor_test=10,
         reid_factor_val=10,
@@ -151,9 +150,17 @@ if __name__ == "__main__":
     test_subjects = get_subjects_in_directory(
         os.path.join(cxl_cropped_split_path, "test"), file_extension=".png", name_delimiter="_"
     )
-    meta_data.update([("subjects_val", list(val_subjects))])
+    
+    test_proprietary_subjects = test_subjects - train_subjects - val_subjects
+    val_proprietary_subjects = val_subjects - train_subjects - test_subjects
+    train_proprietary_subjects = train_subjects - val_subjects - test_subjects
+    
     meta_data.update([("subjects_train", list(train_subjects))])
+    meta_data.update([("subjects_val", list(val_subjects))])
     meta_data.update([("subjects_test", list(test_subjects))])
+    meta_data.update([("subjects_train_proprietary", list(train_proprietary_subjects))])
+    meta_data.update([("subjects_val_proprietary", list(val_proprietary_subjects))])
+    meta_data.update([("subjects_test_proprietary", list(test_proprietary_subjects))])
 
     save_dict_json(meta_data, os.path.join(cxl_cropped_split_path, "metadata.json"))
 
@@ -161,7 +168,7 @@ if __name__ == "__main__":
         relative_path_to_bristol, "cropped_images_face"
     )  # NOTE generate_split wants relative path and returns absolute path
     bristol_cropped_split_path = generate_split(
-        dataset=bristol_cropped_path, mode="openset", seed=69, reid_factor_test=10, reid_factor_val=10
+        dataset=bristol_cropped_path, mode="openset-strict-half-known", seed=69, reid_factor_test=10, reid_factor_val=10
     )
 
     # 6. merge bristol and cxl dataset if wanted

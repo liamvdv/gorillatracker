@@ -14,6 +14,22 @@ openset/
     Splits are done on individual level. This might produce more photos in test/eval
     that by %.
     
+openset-strict/
+    train/
+    eval/
+    test/
+    
+    train, eval and test are disjoint.
+    
+openset-strict-half-known/
+    train/
+    eval/
+    test/
+    
+    train, eval and test are NOT disjoint.
+    - half of eval and train are images of individuals that are not seen in training.
+    - other half of eval and train are images of individuals that are seen in training.
+
 
 closedset/
     train/
@@ -25,6 +41,7 @@ closedset/
     
     Splits are done on a photos.
 """
+import logging
 import os
 import random
 import re
@@ -36,6 +53,8 @@ from pathlib import Path
 from typing import List, Literal, Tuple, Union
 
 import torch
+
+logger = logging.getLogger(__name__)
 
 """
 As of Python 3.7, the insertion order of keys is preserved in all standard dictionary types in Python, including collections.defaultdict. This change was made part of the language specification in Python 3.7, meaning that dictionaries maintain the order in which keys are first inserted.
@@ -243,6 +262,35 @@ def splitter(
                 print(
                     f"WARN: train set: individual {individual.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
                 )
+    elif mode == "openset-strict":
+        # test, val and eval are disjoint.
+        train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
+        train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
+            individums[:train_count], k=min_train_count
+        )
+        val_bucket = ungroup(individums[train_count : train_count + val_count])
+        test_bucket = ungroup(individums[train_count + val_count :])
+    
+        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set(), "sanity check"
+        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
+        assert set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
+        
+    elif mode == "openset-strict-half-known":
+        # test, val and eval are disjoint.
+        train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
+        train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
+            individums[:train_count], k=min_train_count
+        )
+        val_bucket = ungroup(individums[train_count : train_count + val_count])
+        test_bucket = ungroup(individums[train_count + val_count :])
+    
+        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set(), "sanity check"
+        assert set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
+        assert set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set(), "sanity check"
+        # now also add half of the images of the individuals in val and test that are not in train
+        val_bucket = val_bucket + random.choices(train_bucket, k=len(val_bucket))
+        test_bucket = test_bucket + random.choices(train_bucket, k=len(test_bucket))
+        
     return train_bucket, val_bucket, test_bucket
 
 
@@ -280,8 +328,10 @@ def generate_split(
     # NOTE hacky workaround
     if "cxl" in dataset:
         images = read_ground_truth_cxl(f"data/{dataset}")
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     elif "bristol" in dataset:
         images = read_ground_truth_bristol(f"data/{dataset}")
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     else:
         raise ValueError(f"unknown dataset {dataset}")
     train, val, test = splitter(
