@@ -62,6 +62,7 @@ def save_result_to_json(
 def predict_video(
     input_path: str, 
     models: List[YOLO],
+    gpu_id: int = 0,
     ):
     """
     Predicts labels for objects in a video using multiple YOLO models.
@@ -71,6 +72,7 @@ def predict_video(
     Parameters:
     - input_path (str): The path to the input video file.
     - models (List[YOLO]): A list of YOLO models to use for prediction.
+    - gpu_id (int): The ID of the GPU to use for prediction.
     Returns:
         None
     """
@@ -91,7 +93,7 @@ def predict_video(
     
     results = []
     for model in models:
-        results.append(model.predict(input_path, stream = True, **yolo_args))
+        results.append(model.predict(input_path, stream = True, device = gpu_id, **yolo_args))
 
     if post_process_function is not None:
         post_process_function(results = results, file_name = file_name)
@@ -234,7 +236,7 @@ if __name__ == "__main__":
         overwrite=True,
         post_process_function=partial(
             save_result_to_json, 
-            json_folder="/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels",
+            json_folder="/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/jsonTest",
             overwrite=True,
             ),
         checkpoint_path="./checkpoint.txt"
