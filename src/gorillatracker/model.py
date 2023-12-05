@@ -165,18 +165,22 @@ class EfficientNetV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         )
 
+
+class ConvNeXtV2Wrapper(BaseModule):
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = timm.create_model("convnextv2_base", pretrained=not self.from_scratch)
+        self.model.reset_classifier(self.embedding_size)
+
     def forward(self, x):
         return self.model(x)
 
     @classmethod
     def get_tensor_transforms(cls):
-        # NOTE(liamvdv): Efficient net can handle multiple image sizes. Thus we
-        #                don't specify it here. Be aware.
-        #                You would usually use
-        #                transforms.Resize((224, 224), antialias=True)
-        #                but for e. g. MNIST this will drop batch sizes from
-        #                512 to 8.
-        return lambda x: x
+        return transforms.Resize((224), antialias=True)
 
 
 class SwinV2BaseWrapper(BaseModule):
@@ -247,6 +251,7 @@ custom_model_cls = {
     "SwinV2Base": SwinV2BaseWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
+    "ConvNeXtV2_Base": ConvNeXtV2Wrapper,
 }
 
 
