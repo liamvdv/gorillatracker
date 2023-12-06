@@ -48,8 +48,9 @@ assert sys.version_info >= (
 Value = Union[Path, List["Entry"]]
 Label = Union[str, int]
 Metadata = Dict[Any, Any]
-
 T = TypeVar("T")
+
+partitions = ["train", "val", "test"]
 
 
 @dataclass
@@ -58,6 +59,8 @@ class Entry:
     label: Label
     metadata: Metadata
 
+
+Labeler = Callable[[Path], Label]
 
 # Importers of images, Path is unique identifier.
 
@@ -69,6 +72,10 @@ def read_files(dirpath: str) -> List[Entry]:
         entry = Entry(filepath, filename, {})
         entries.append(entry)
     return entries
+
+
+def read_dataset_partition(dirpath: Path, labeler: Labeler) -> List[Entry]:
+    return [Entry(value, labeler(value), {}) for value in dirpath.glob("*")]
 
 
 def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
@@ -149,7 +156,7 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = True
+TEST = False
 
 
 def copy(src: Path, dst: Path) -> None:
@@ -339,6 +346,87 @@ def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/fu
         copy(img_file, data_dir_path / img_file.name)
 
 
+def read_dataset(dirpath: Path, labeler: Labeler) -> Dict[str, List[Entry]]:
+    return {partition: read_dataset_partition(dirpath / partition, labeler) for partition in partitions}
+
+
+def _merge_dataset_splits(target: str, ds1: str, ds2: str, ds1_labeler: Labeler, ds2_labeler: Labeler) -> None:
+    ds1_path = Path("data", ds1)
+    ds2_path = Path("data", ds2)
+    target_path = Path("data", target)
+    ds1_entries = read_dataset(ds1_path, ds1_labeler)
+    ds2_entries = read_dataset(ds2_path, ds2_labeler)
+
+    def process(entry: Entry) -> Entry:
+        assert isinstance(entry.value, Path)
+        value = Path(f"{entry.label}__{entry.value.name}")  # concat file name to preserve information
+        return Entry(value, entry.label, entry.metadata | {"original": entry.value})
+
+    # Logical Merge
+    merged_entries = {
+        partition: list(map(process, ds1_entries[partition] + ds2_entries[partition])) for partition in partitions
+    }
+
+    # Assertions
+    for partition in partitions:
+        # Entry Uniqueness
+        value_set = set([str(entry.value) for entry in merged_entries[partition]])
+        if len(merged_entries[partition]) != len(value_set):
+            raise ValueError(f"WARN: {partition} no longer unique. Merging produces collisions.")
+
+        # Label Uniqueness
+        ds1_label_set = set([entry.label for entry in ds1_entries[partition]])
+        ds2_label_set = set([entry.label for entry in ds2_entries[partition]])
+        intersection = ds1_label_set & ds2_label_set
+        if len(intersection) > 0:
+            raise ValueError(
+                f"WARN: {partition}: Labels {intersection} exist in both datasets. Merging produces collisions."
+            )
+    stats_and_confirm(
+        target,
+        merged_entries["train"] + merged_entries["val"] + merged_entries["test"],
+        merged_entries["train"],
+        merged_entries["val"],
+        merged_entries["test"],
+    )
+    # Physical Merge
+    for partition in partitions:
+        if not TEST:
+            (target_path / partition).mkdir(parents=True, exist_ok=True)  # idempotent
+        for entry in merged_entries[partition]:
+            assert isinstance(entry.value, Path)
+            copy(entry.metadata["original"], target_path / partition / entry.value)
+
+
+def merge_labeler(x: Path) -> str:
+    return x.name.split("__")[0]
+
+
+def common_labeler(x: Path) -> str:
+    return x.name.split("_")[0]
+
+
+def get_labeler_for_dataset(ds: str) -> Labeler:
+    # DO NOT REORDER
+    if "splits/merged" in ds:
+        return merge_labeler
+    elif "bristol" in ds:
+        return common_labeler
+    elif "rohan-cxl" in ds:
+        return common_labeler
+    elif "cxl" in ds:
+        return common_labeler
+    else:
+        raise ValueError(f"Labeler unknown for dataset: {ds}")
+
+
+def merge_dataset_splits(ds1: str, ds2: str) -> None:
+    ds1_labeler = get_labeler_for_dataset(ds1)
+    ds2_labeler = get_labeler_for_dataset(ds2)
+    target = f"splits/merged-{ds1.replace('/', '-')}-{ds2.replace('/', '-')}"
+    _merge_dataset_splits(target, ds1, ds2, ds1_labeler, ds2_labeler)
+
+
 # if __name__ == "__main__":
 #     dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
 #     copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
@@ -352,3 +440,8 @@ def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/fu
 #         dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
 #     )
 #     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+
+#     merge_dataset_splits(
+#         "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+#         "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+#     )
