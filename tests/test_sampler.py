@@ -3,7 +3,7 @@ import string
 from gorillatracker.data_loaders import TripletDataLoader, TripletSampler
 
 
-def test_triplet_sampler():
+def test_triplet_sampler() -> None:
     epochs = 100
     n_individuals = 4
     dataset = sorted(enumerate(string.ascii_lowercase * n_individuals), key=lambda t: t[1])
@@ -24,11 +24,11 @@ def test_triplet_sampler():
                 assert all_different[i] != all_different[j]
 
 
-def test_data_loader():
+def test_data_loader() -> None:
     epochs = 100
     n_individuals = 4
     dataset = list(enumerate(string.ascii_lowercase * n_individuals))
-    dl = TripletDataLoader(dataset, batch_size=1)
+    dl = TripletDataLoader(dataset, batch_size=1)  # type: ignore
     epoch_batches = []
     for _ in range(epochs):
         epoch_batches.append([v for v in dl])

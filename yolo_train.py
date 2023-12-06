@@ -14,7 +14,14 @@ model_paths = {
 }
 
 
-def train(model_name, training_name, data="./gorilla.yaml", epochs=100, batch_size=-1, patience=40):
+def train(
+    model_name: str,
+    training_name: str,
+    data: str = "./gorilla.yaml",
+    epochs: int = 100,
+    batch_size: int = -1,
+    patience: int = 40,
+) -> None:
     model = YOLO(model_paths[model_name])
     training_name = f"{training_name}-{model_name}"
     model.train(

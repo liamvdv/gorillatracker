@@ -1,14 +1,18 @@
-from typing import Literal
+from typing import Callable, Literal, Tuple
 
 import torch
 import torch.nn.functional as F
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
+import gorillatracker.type_helper as gtypes
+
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
+LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
-def convert_labels_to_tensor(labels):
+
+def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
     """Convert labels to tensor
 
     Args:
@@ -20,16 +24,13 @@ def convert_labels_to_tensor(labels):
     if isinstance(labels, torch.Tensor):
         return labels
 
-    if labels is None:
-        return None
-
     le = LabelEncoder()
     labels = le.fit_transform(labels)
 
     return torch.tensor(labels)
 
 
-def get_triplet_mask(labels):
+def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     """Compute a mask for valid triplets
 
     Args:
@@ -80,7 +81,7 @@ def get_triplet_mask(labels):
     return mask
 
 
-def get_distance_mask(labels, valid: Literal["pos", "neg"] = "neg"):
+def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
     """Compute mask for the calculation of the hardest positive and negative distance
 
     Args:
@@ -94,26 +95,26 @@ def get_distance_mask(labels, valid: Literal["pos", "neg"] = "neg"):
         A negative distance is valid if:
         `labels[i] != labels[j] and i != j`
     """
-    labels = convert_labels_to_tensor(labels)
-    batch_size = labels.size()[0]
-    indices_equal = torch.eye(batch_size, dtype=torch.bool, device=labels.device)
+    tensor_labels = convert_labels_to_tensor(labels)
+    batch_size = tensor_labels.size()[0]
+    indices_equal = torch.eye(batch_size, dtype=torch.bool, device=tensor_labels.device)
     indices_not_equal = torch.logical_not(indices_equal)
 
     if valid == "pos":
-        labels_equal = labels.unsqueeze(0) == labels.unsqueeze(1)
+        labels_equal = tensor_labels.unsqueeze(0) == tensor_labels.unsqueeze(1)
         mask = torch.logical_and(labels_equal, indices_not_equal)
     elif valid == "neg":
-        labels_not_equal = labels.unsqueeze(0) != labels.unsqueeze(1)
+        labels_not_equal = tensor_labels.unsqueeze(0) != tensor_labels.unsqueeze(1)
         mask = torch.logical_and(labels_not_equal, indices_not_equal)
 
     return mask
 
 
 def get_semi_hard_mask(
-    labels,
-    distance_matrix,
-    margin=1.0,
-):
+    labels: gtypes.MergedLabels,
+    distance_matrix: torch.Tensor,
+    margin: float = 1.0,
+) -> torch.Tensor:
     """Compute mask for the calculation of the semi-hard triplet loss
 
     Args:
@@ -127,14 +128,14 @@ def get_semi_hard_mask(
     """
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
-    labels = convert_labels_to_tensor(labels)
-    labels = labels.to(labels)
-    batch_size = labels.size()[0]
+    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = tensor_labels.to(device)
+    batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=device)
     indices_not_equal = torch.logical_not(
         indices_equal,
     )
-    labels_equal = (labels.unsqueeze(0) == labels.unsqueeze(1)).to(device)
+    labels_equal = (tensor_labels.unsqueeze(0) == tensor_labels.unsqueeze(1)).to(device)
     labels_not_equal = torch.logical_not(labels_equal)
 
     distance_matrix_pos = distance_matrix * torch.logical_and(labels_equal, indices_not_equal).float()
@@ -156,7 +157,7 @@ def get_semi_hard_mask(
     return torch.logical_and(mask, semi_hard_mask)
 
 
-def euclidean_distance_matrix(embeddings):
+def euclidean_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     """Efficient computation of Euclidean distance matrix
 
     Args:
@@ -185,7 +186,7 @@ def euclidean_distance_matrix(embeddings):
     # handle numerical stability
     # derivative of the square root operation applied to 0 is infinite
     # we need to handle by setting any 0 to eps
-    mask = (distance_matrix == 0.0).float()
+    mask = (distance_matrix == 0.0).float()  # type: ignore # performed on tensors, __eq__ overwritten
 
     # use this mask to set indices with a value of 0 to eps
     distance_matrix_stable = torch.sqrt(distance_matrix + mask * eps) * (1.0 - mask)
@@ -203,12 +204,12 @@ class TripletLossOnline(nn.Module):
       margin: Margin value in the Triplet Loss equation
     """
 
-    def __init__(self, margin=1.0, mode: Literal["hard", "semi-hard", "soft"] = "semi-hard"):
+    def __init__(self, margin: float = 1.0, mode: Literal["hard", "semi-hard", "soft"] = "semi-hard") -> None:
         super().__init__()
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings, labels):
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -256,7 +257,13 @@ class TripletLossOnline(nn.Module):
 
         return triplet_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
 
-    def get_mask(self, distance_matrix, anchor_positive_dists, anchor_negative_dists, labels):
+    def get_mask(
+        self,
+        distance_matrix: torch.Tensor,
+        anchor_positive_dists: torch.Tensor,
+        anchor_negative_dists: torch.Tensor,
+        labels: gtypes.MergedLabels,
+    ) -> torch.Tensor:
         labels = convert_labels_to_tensor(labels)
 
         mask = get_triplet_mask(labels)
@@ -296,7 +303,7 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, embeddings, labels):
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
         """
         Compute loss.
 
@@ -330,7 +337,7 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(self, embeddings, labels):
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
@@ -338,7 +345,7 @@ class TripletLossOfflineNative(nn.Module):
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
 
 
-def get_triplet_loss(loss_mode: str, margin: float):
+def get_triplet_loss(loss_mode: str, margin: float) -> Callable[[torch.Tensor, gtypes.BatchLabel], LossPosNegDist]:
     loss_modes = {
         "online/hard": TripletLossOnline(margin=margin, mode="hard"),
         "online/semi-hard": TripletLossOnline(margin=margin, mode="semi-hard"),
