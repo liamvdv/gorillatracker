@@ -81,7 +81,6 @@ disallow_untyped_calls = true
 # many libraries (torch, torchvision, timm, print_on_stroids) do not support a
 # py.typed marker and thus don't have library stubs. Thus we ignore these warns. 
 ignore_missing_imports = true
-
 # for strict mypy
 disallow_untyped_defs = true
 
