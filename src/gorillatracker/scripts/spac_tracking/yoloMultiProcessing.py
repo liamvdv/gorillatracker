@@ -3,6 +3,8 @@ from functools import partial
 import os
 import json
 import multiprocessing
+import cv2
+import easyocr
 from typing import List, Dict, Callable, Optional
 
 gpu_queue = multiprocessing.Queue()
@@ -13,7 +15,8 @@ config = {}
 def save_result_to_json(
     results: List[List[Dict]], 
     file_name: str, 
-    json_folder: str, 
+    json_folder: str,
+    video_path: str, 
     overwrite: bool = False,
     ):
     """
@@ -23,6 +26,7 @@ def save_result_to_json(
         results (List[List[Dict]]): The results to be saved. (a list of result generators from YOLO.predict)
         file_name (str): The name of the JSON file.
         json_folder (str): The folder path where the JSON file will be saved.
+        video_path (str): The path of the video file.
         overwrite (bool, optional): Whether to overwrite an existing JSON file with the same name. 
             Defaults to False.
 
@@ -53,11 +57,7 @@ def save_result_to_json(
                 }
                 label_frames[frame_index].append(box)
             frame_index += 1
-    json.dump({"labels": label_frames}, open(json_path, "w"), indent=4)
-    
-    
-    
-    
+    json.dump({"timestamp": get_time_stamp(video_path),"labels": label_frames}, open(json_path, "w"), indent=4)    
 
 def predict_video(
     input_path: str, 
@@ -103,7 +103,7 @@ def predict_video(
     # using the generators in the post-processing function
 
     if post_process_function is not None:
-        post_process_function(results = results, file_name = file_name)
+        post_process_function(results = results, video_path = input_path, file_name = file_name)
         
     # updating the checkpoint
     
@@ -240,9 +240,40 @@ def predict_video_multiprocessing(
     pool.close()
     pool.join()
     
+def get_time_stamp(video_path: str) -> str:
+    """
+    Get the timestamp of a video file.
     
+    Parameters:
+    - video_path (str): The path of the video file.
+    Returns:
+    - timestamp (str): The timestamp of the video file.
+    """
+    cap = cv2.VideoCapture(video_path)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) 
+    crop_area = (int(0.61*width), int(0.9*height), int(0.75*width), int(height))
     
+    # Read the first frame
+    frame = cap.read()[1]
+    
+    cropped_frame = frame[crop_area[1]:crop_area[3], crop_area[0]:crop_area[2]]
+    cropped_frame_rgb = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB) # for easyocr
+    reader = easyocr.Reader(["en"])
+    extracted_text = reader.readtext(cropped_frame_rgb)
 
+    # Extracted text is a list of tuples, we'll concatenate the text from each tuple
+    extracted_text = "".join([text[1] for text in extracted_text])
+    extracted_text = extracted_text.replace(" ", "")
+    h = int(extracted_text[:2]) 
+    m = int(extracted_text[3:5])
+    am = True if extracted_text[5:7] == "AM" else False
+    time_stamp = f"{h}:{m} {'AM' if am else 'PM'}"
+    # Release the video capture object
+    cap.release()
+    
+    return time_stamp
+    
 if __name__ == "__main__":
     video_dir = "/workspaces/gorillatracker/spac_gorillas_converted"
     video_paths = [os.path.join(video_dir, x) for x in os.listdir(video_dir)]
