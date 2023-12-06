@@ -76,7 +76,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             # wandb.log({"epoch": current_epoch})
             # for visibility also log the
         # clear the table where the embeddings are stored
-        pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns) # reset embeddings table
+        pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings

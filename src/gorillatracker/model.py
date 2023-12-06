@@ -1,5 +1,5 @@
 import importlib
-from typing import Callable,  Type
+from typing import Callable, Type
 
 import lightning as L
 import pandas as pd
