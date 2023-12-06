@@ -262,46 +262,6 @@ def splitter(
                 print(
                     f"WARN: train set: individual {individual.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
                 )
-    elif mode == "openset-strict":
-        # test, val and eval are disjoint.
-        train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
-        train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
-            individums[:train_count], k=min_train_count
-        )
-        val_bucket = ungroup(individums[train_count : train_count + val_count])
-        test_bucket = ungroup(individums[train_count + val_count :])
-
-        assert (
-            set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set()
-        ), "sanity check"
-        assert (
-            set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set()
-        ), "sanity check"
-        assert (
-            set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set()
-        ), "sanity check"
-
-    elif mode == "openset-strict-half-known":
-        # test, val and eval are disjoint.
-        train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
-        train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
-            individums[:train_count], k=min_train_count
-        )
-        val_bucket = ungroup(individums[train_count : train_count + val_count])
-        test_bucket = ungroup(individums[train_count + val_count :])
-
-        assert (
-            set([e.label for e in train_bucket]).intersection(set([e.label for e in val_bucket])) == set()
-        ), "sanity check"
-        assert (
-            set([e.label for e in train_bucket]).intersection(set([e.label for e in test_bucket])) == set()
-        ), "sanity check"
-        assert (
-            set([e.label for e in val_bucket]).intersection(set([e.label for e in test_bucket])) == set()
-        ), "sanity check"
-        # now also add half of the images of the individuals in val and test that are not in train
-        val_bucket = val_bucket + random.choices(train_bucket, k=len(val_bucket))
-        test_bucket = test_bucket + random.choices(train_bucket, k=len(test_bucket))
 
     return train_bucket, val_bucket, test_bucket
 
@@ -405,16 +365,59 @@ def copy_corresponding_images(data_dir: str, img_dir="ground_truth/cxl/full_imag
         copy(img_file, data_dir_path / img_file.name)
 
 
-# if __name__ == "__main__":
-#     dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
-#     copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+def merge_splits(split1_dir: str, split2_dir: str, output_dir: str) -> None:
+    """Merges two splits into a new split.
 
-#     dir = generate_split(
-#         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-#     )
-#     dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
+    Args:
+        split1_dir (str): Directory of the first split.
+        split2_dir (str): Directory of the second split.
+        output_dir (str): Directory to save the merged split to.
+    """
 
-#     dir = generate_split(
-#         dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-#     )
-#     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+    # Ensure output folder exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Copy train, val and test folders from split1 to output_dir
+    shutil.copytree(os.path.join(split1_dir, "train"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "val"), os.path.join(output_dir, "val"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "test"), os.path.join(output_dir, "test"), dirs_exist_ok=True)
+    # Copy train, val and test folders from split2 to output_dir
+    shutil.copytree(os.path.join(split2_dir, "train"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "val"), os.path.join(output_dir, "val"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "test"), dirs_exist_ok=True)
+
+
+def merge_split2_into_train_set_of_split1(split1_dir: str, split2_dir: str, output_dir: str) -> None:
+    """Merges all sets of split2 into the train set of split1.
+
+    Args:
+        split1_dir (str): Directory of the first split.
+        split2_dir (str): Directory of the second split.
+        output_dir (str): Directory to save the merged split to.
+    """
+    # Ensure output folder exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Copy train, val and test folders from split1 to output_dir
+    shutil.copytree(os.path.join(split1_dir, "train"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "val"), os.path.join(output_dir, "val"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split1_dir, "test"), os.path.join(output_dir, "test"), dirs_exist_ok=True)
+    # Copy train, val and test folders from split2 to output_dir
+    shutil.copytree(os.path.join(split2_dir, "train"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "val"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
+
+
+if __name__ == "__main__":
+    dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+    copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+
+    dir = generate_split(
+        dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+    )
+    dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
+
+    dir = generate_split(
+        dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+    )
+    dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)

@@ -17,31 +17,31 @@ model_paths = {
 logger = logging.getLogger(__name__)
 
 
-def build_dataset_train_remove(
-    bristol_annotation_dir: str,
-    bristol_yolo_annotation_dir: str,
+def modify_dataset_train_yolo(
     bristol_split_dir: str,
-    model_name: str,
+    model_type: str,
     epochs: int,
     batch_size: int,
-    gorilla_yml_path: str,
-    wandb_project: str,
+    wandb_project: str = "Detection-YOLOv8-Bristol-OpenSet",
+    bristol_annotation_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox",
+    bristol_yolo_annotation_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox_class0",
+    gorilla_yml_path: str = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml",
 ) -> YOLO:
-    """Build a dataset for yolo using the bristol dataset and train a yolo model on it.
+    """Build a dataset for yolo using the bristol dataset and train a yolo model on it. When finished undo the changes to the bristol dataset.
     NOTE: The paths to the bristol dataset has to be inside the gorilla_yml_path file.
 
     Args:
-        bristol_annotation_dir (str): Directory containing the bristol annotations.
-        bristol_yolo_annotation_dir (str): Directory to save the annotations for yolo.
-        bristol_split_dir (str): Directory containing the bristol split.
-        model_name (str): Name of the yolo model to train.
-        epochs (int): Number of epochs to train.
-        batch_size (int): Batch size to use.
-        gorilla_yml_path (str): Path to the gorilla yml file.
-        wandb_project (str): Name of the wandb project to use.
+        bristol_split_dir: Directory containing the bristol split.
+        model_type: Name of the yolo model to train.
+        epochs: Number of epochs to train.
+        batch_size: Batch size to use.
+        wandb_project: Name of the wandb project to use.
+        gorilla_yml_path: Path to the gorilla yml file.
+        bristol_annotation_dir: Directory containing the bristol annotations.
+        bristol_yolo_annotation_dir: Directory to save the annotations for yolo.
 
     Returns:
-        ultralytics.YOLO: Trained yolo model."""
+        Trained yolo model."""
 
     # build dataset for yolo
     set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
@@ -52,15 +52,15 @@ def build_dataset_train_remove(
             os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
         )
 
-    model = train_yolo(
-        model_name, epochs, batch_size, gorilla_yml_path, wandb_project="Detection-YOLOv8-Bristol-OpenSet"
+    model, _, model_name = train_yolo(
+        model_type, epochs, batch_size, gorilla_yml_path, wandb_project=wandb_project
     )
 
     # remove annotations from the bristol split
     for split in ["train", "val", "test"]:
         remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
 
-    return model
+    return model, model_name
 
 
 def train_yolo(
@@ -69,19 +69,19 @@ def train_yolo(
     batch_size: int,
     dataset_yml: str,
     wandb_project: str,
-) -> Tuple[YOLO, Any]:
+) -> Tuple[YOLO, Any, str]:
     """Train a YOLO model with the given parameters.
 
     Args:
-        model_name (str): Name of the yolo model to train.
-        epochs (int): Number of epochs to train.
-        batch_size (int): Batch size to use.
-        dataset_yml (str): Path to the dataset yml file.
-        wandb_project (str): Name of the wandb project to use.
+        model_name: Name of the yolo model to train.
+        epochs: Number of epochs to train.
+        batch_size: Batch size to use.
+        dataset_yml: Path to the dataset yml file.
+        wandb_project: Name of the wandb project to use.
 
     Returns:
-        ultralytics.YOLO: Trained yolo model.
-        dict: Training result. See ultralytics docs for details.
+        Trained yolo model.
+        Training result. See ultralytics docs for details.
     """
 
     model = YOLO(model_paths[model_name])
@@ -96,16 +96,16 @@ def train_yolo(
 
     shutil.move(wandb_project, f"logs/{wandb_project}-{training_name}")
     logger.info("Training finished for %s. Results in logs/%s-%s", training_name, wandb_project, training_name)
-    return model, result
+    return model, result, training_name
 
 
 def set_annotation_class_0(annotation_dir: str, dest_dir: str) -> None:
     """Set the class of all annotations to 0 (gorilla face) and save them in the destination directory.
 
     Args:
-        annotation_dir (str): Directory containing the annotation files.
-        dest_dir (str): Directory to save the new annotation files to.
-        file_extension (str, optional): File extension of the images. Defaults to ".jpg".
+        annotation_dir: Directory containing the annotation files.
+        dest_dir: Directory to save the new annotation files to.
+        file_extension: File extension of the images. Defaults to ".jpg".
     """
     for annotation_filename in filter(lambda f: f.endswith(".txt"), os.listdir(annotation_dir)):
         with open(os.path.join(annotation_dir, annotation_filename)) as annotation_file:
@@ -121,10 +121,10 @@ def join_annotations_and_imgs(
     """Build a dataset for yolo using the given image and annotation directories.
 
     Args:
-        image_dir (str): Directory containing the images.
-        annotation_dir (str): Directory containing the annotation files.
-        output_dir (str): Directory to merge the images and annotations into.
-        file_extension (str, optional): File extension of the images. Defaults to ".png".
+        image_dir: Directory containing the images.
+        annotation_dir: Directory containing the annotation files.
+        output_dir: Directory to merge the images and annotations into.
+        file_extension: File extension of the images. Defaults to ".png".
     """
     image_files = os.listdir(image_dir)
     image_files = list(filter(lambda x: x.endswith(file_extension), image_files))
@@ -148,8 +148,11 @@ def remove_files_from_dir_with_extension(annotation_dir: str, file_extension: st
             os.remove(os.path.join(annotation_dir, annotation_file))
 
 
-def detect_gorillafaces_cxl(model: YOLO, image_dir: str, output_dir: str, file_extension: str = ".png") -> None:
+def detect_gorillafaces_cxl(model: YOLO, model_name: str, image_dir: str = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images", file_extension: str = ".png") -> None:
     """Detect gorilla faces in the given directory and save the results in the output directory using the given yolo model."""
+    output_dir = os.path.join("/workspaces/gorillatracker/data/derived_data/cxl", model_name, "face_bbox")
+    os.makedirs(output_dir, exist_ok=True)
+    
     image_files = os.listdir(image_dir)
     image_files = list(filter(lambda x: x.endswith(file_extension), image_files))
 
@@ -161,3 +164,15 @@ def detect_gorillafaces_cxl(model: YOLO, image_dir: str, output_dir: str, file_e
         if os.path.exists(annotation_path):
             os.remove(annotation_path)
         result[0].save_txt(annotation_path, save_conf=True)  # NOTE: simply appends to the .txt file
+
+
+if __name__ == "__main__":
+    bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
+    model, model_name = modify_dataset_train_yolo(
+        bristol_split_dir,
+        model_type = "yolov8x",
+        epochs = 2,
+        batch_size = 16,
+    )
+    
+    detect_gorillafaces_cxl(model, model_name, image_dir="/workspaces/gorillatracker/data/ground_truth/cxl/full_images", file_extension=".png")

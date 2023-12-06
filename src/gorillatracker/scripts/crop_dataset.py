@@ -14,12 +14,12 @@ def crop_and_save_image(image_path: str, x: float, y: float, w: float, h: float,
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
 
     Args:
-        image_path (str): Path to the image to crop.
-        x (float): Relative x coordinate of the center of the bounding box.
-        y (float): Relative y coordinate of the center of the bounding box.
-        w (float): Relative width of the bounding box.
-        h (float): Relative height of the bounding box.
-        output_path (str): Path to save the cropped image to.
+        image_path: Path to the image to crop.
+        x: Relative x coordinate of the center of the bounding box.
+        y: Relative y coordinate of the center of the bounding box.
+        w: Relative width of the bounding box.
+        h: Relative height of the bounding box.
+        output_path: Path to save the cropped image to.
     """
     img = Image.open(image_path)
 
@@ -38,11 +38,10 @@ def read_bbox_data(bbox_path: str) -> List[List[float]]:
     """Read the bounding box data from the given file.
 
     Args:
-        bbox_path (str): Path to the bounding box file.
+        bbox_path: Path to the bounding box file.
 
     Returns:
-        list: List of bounding box data lines."""
-    # check if the file exists
+        List of bounding box data lines."""
     if not os.path.exists(bbox_path):
         logger.warning("no bounding box found for image with path %s", bbox_path)
         return []
@@ -52,7 +51,6 @@ def read_bbox_data(bbox_path: str) -> List[List[float]]:
         bbox_data_lines = bbox_file.read().strip().split("\n")
 
     bbox_data_lines = [line for line in bbox_data_lines if line != ""]
-
     bbox_data_lines_split = [list(map(float, bbox_data_line.strip().split(" "))) for bbox_data_line in bbox_data_lines]
 
     return bbox_data_lines_split
@@ -79,32 +77,35 @@ def crop_max_confidence(
     bbox_data_lines = read_bbox_data(bbox_path)
     bbox_max_confidence = max(
         bbox_data_lines, key=lambda x: x[-1], default=[-1, -1, -1, -1, -1, -1]
-    )  # get the shortest line in the file
+    )  # get the bbox with the highest confidence score
 
-    if bbox_max_confidence[0] >= 0.5:
+    if bbox_max_confidence[5] >= 0.5:
         _, x, y, w, h, _ = bbox_max_confidence
         output_path = os.path.join(output_dir, os.path.basename(image_path))
         crop_and_save_image(image_path, x, y, w, h, output_path)
+        return "bbox"
     elif bbox_max_confidence[0] > 0.0:
         logger.warning("bounding box with confidence score %f is too low for image %s", bbox_max_confidence, image_path)
+        return "low_confidence"
     else:
         logger.warning("no bounding box found for image %s predicted", image_path)
+        return "no_bbox"
 
 
 def crop_images(
     image_dir: str, bbox_dir: str, output_dir: str, file_extension: str = ".jpg", is_bristol: bool = True
-) -> Tuple[List[str], List[str], List[str]]:
+) -> Tuple[List[str], List[str], List[str]]: # TODO(rob2u): split into two functions for bristol and cxl
     """Crop all images in the given directory using the bounding boxes in the given directory and save them to the given output directory.
 
     Args:
-        image_dir (str): Directory containing the images.
-        bbox_dir (str): Directory containing the bounding box files.
-        output_dir (str): Directory to save the cropped images to.
-        file_extension (str, optional): File extension of the images. Defaults to ".jpg".
-        is_bristol (bool, optional): Whether the images are from the bristol dataset. Defaults to True.
+        image_dir: Directory containing the images.
+        bbox_dir: Directory containing the bounding box files.
+        output_dir: Directory to save the cropped images to.
+        file_extension: File extension of the images. Defaults to ".jpg".
+        is_bristol: Whether the images are from the bristol dataset. Defaults to True.
 
     Returns:
-        tuple: Tuple containing the following lists:
+        Tuple containing the following lists:
             - List of images without a bounding box annotation
             - List of images with no bounding box prediction
             - List of images with a low bounding box confidence score
@@ -136,3 +137,21 @@ def crop_images(
                 imgs_with_low_bbox_confidence.append(image_file)
 
     return imgs_without_bbox_annotation, imgs_with_no_bbox_pred, imgs_with_low_bbox_confidence
+
+
+if __name__ == "__main__":
+    # get image where cropped imgs and annotations should be saved from model_name
+    cxl_model_dir = "/workspaces/gorillatracker/data/derived_data/cxl/yolov8x-e30-b163"
+    cxl_imgs_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images"
+    
+    cxl_imgs_crop_dir = os.path.join(cxl_model_dir, "face_crop")
+    cxl_annotation_dir = os.path.join(cxl_model_dir, "face_bbox")
+    
+    assert os.path.exists(cxl_annotation_dir), f"Bounding box directory '{cxl_annotation_dir}' does not exist, run detect_gorillafaces_cxl from train_yolo.py first"
+    
+    os.makedirs(cxl_imgs_crop_dir, exist_ok=True)
+    
+    # crop cxl images according to predicted bounding boxes
+    imgs_without_bbox, imgs_with_no_bbox_prediction, imgs_with_low_confidence = crop_images(
+        cxl_imgs_dir, cxl_annotation_dir, cxl_imgs_crop_dir, is_bristol=False, file_extension=".png"
+    )
