@@ -70,7 +70,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         else:  # load only weights
             model = model_cls(**model_args)  # type: ignore
             torch_load = torch.load(
-                args.saved_checkpoint_path, map_location=torch.device(str(model_args["accelerator"]))
+                args.saved_checkpoint_path, map_location=torch.device(args.accelerator)
             )
             model.load_state_dict(torch_load["state_dict"], strict=False)
     else:
