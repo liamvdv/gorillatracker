@@ -1,14 +1,15 @@
+import torch
 from torchvision.transforms import ToPILImage
 
 from gorillatracker.train_utils import get_data_module
 
 
-def save_image(tensor, path: str):
+def save_image(tensor: torch.Tensor, path: str) -> None:
     img = ToPILImage()(tensor)
     img.save(path)
 
 
-def test_offline_data_module():
+def test_offline_data_module() -> None:
     dm = get_data_module("gorillatracker.datasets.mnist.MNISTDataset", "./mnist", 1, "offline", lambda x: x)
     dm.setup("fit")
     dl = dm.train_dataloader()

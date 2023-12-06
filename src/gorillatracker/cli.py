@@ -16,5 +16,5 @@ GorillaTracker    `--..____..--'      BP GdM
 '''
 
 
-def cli():
+def cli() -> None:
     print(banana)

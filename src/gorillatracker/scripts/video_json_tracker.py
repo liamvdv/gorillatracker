@@ -1,12 +1,18 @@
 import json
 import os
 import subprocess
+from typing import Any, Dict, List, MutableSet, Tuple
 
 import cv2
 
+# TODO: properly type
+Data = Dict[Any, Any]
+# TODO: properly type
+BBox = Dict[Any, Any]
+
 
 class GorillaVideoTracker:
-    def __init__(self, path, out_path="", video_path="", allowed_overlap=0.25):
+    def __init__(self, path: str, out_path: str = "", video_path: str = "", allowed_overlap: float = 0.25):
         """
         initialize tracking of Individuals on videos with bounding boxes in json
         parameter:
@@ -20,7 +26,7 @@ class GorillaVideoTracker:
         self.video_path = self.path if video_path == "" else video_path
         self.allowed_overlap = allowed_overlap
 
-    def track_files(self, log=True, logging_iteration=5):
+    def track_files(self, log: bool = True, logging_iteration: int = 5) -> None:
         """
         track individuals in path
         parameter:
@@ -41,7 +47,7 @@ class GorillaVideoTracker:
         if log is True:
             print(f"{file_count} files successfully tracked")
 
-    def track_file(self, file_path, log=True):
+    def track_file(self, file_path: str, log: bool = True) -> None:
         """
         track individuals in file
         parameter:
@@ -62,7 +68,7 @@ class GorillaVideoTracker:
         if log is True:
             print(f"{file_name}.json successfully tracked and saved as {file_name}_tracked.json")
 
-    def save_videos(self, max_video=0, log=True, compress=True):
+    def save_videos(self, max_video: int = 0, log: bool = True, compress: bool = True) -> None:
         """
         save videos with bounding boxes for all tracked files
         parameter:
@@ -87,7 +93,7 @@ class GorillaVideoTracker:
             print(" " * 80, end="\r")  # clear line
             print(f"{max_video_idx + 1} videos successfully saved to {self.out_path}")
 
-    def save_video(self, video_path, log=True, compress=True):
+    def save_video(self, video_path: str, log: bool = True, compress: bool = True) -> None:
         """
         save video with bounding boxes
         parameter:
@@ -117,7 +123,7 @@ class GorillaVideoTracker:
         if log is True:
             print(f"video {video_name}.mp4 successfully saved to {self.out_path}")
 
-    def _process_video(self, video_path, json_path, video_out_path):
+    def _process_video(self, video_path: str, json_path: str, video_out_path: str) -> None:
         """
         processes the video, drawing bboxes and labels and writing to outputfile
         parameter:
@@ -158,7 +164,7 @@ class GorillaVideoTracker:
         video.release()
         out.release()
 
-    def _compress_video(self, video_path, resolution="1280x720"):
+    def _compress_video(self, video_path: str, resolution: str = "1280x720") -> None:
         """
         compresses video to resolution
         parameter:
@@ -178,7 +184,7 @@ class GorillaVideoTracker:
         open_for_vscode_bugfix = cv2.VideoCapture(video_path)
         open_for_vscode_bugfix.release()
 
-    def _read_from_json(self, path):
+    def _read_from_json(self, path: str) -> Data:
         """
         reads data from json file
         parameter:
@@ -190,7 +196,7 @@ class GorillaVideoTracker:
             data = json.load(file)
         return data
 
-    def _write_to_json(self, path, data, negatives):
+    def _write_to_json(self, path: str, data: Data, negatives: Any) -> None:
         """
         writes bboxes and IDs to json file
         parameter:
@@ -203,7 +209,9 @@ class GorillaVideoTracker:
         with open(path, "w") as file:
             json.dump(data, file, indent=4)
 
-    def _bboxes_overlap(self, bbox1, bbox2, allowed_overlap=0.25, width=1920, height=1080):
+    def _bboxes_overlap(
+        self, bbox1: BBox, bbox2: BBox, allowed_overlap: float = 0.25, width: int = 1920, height: int = 1080
+    ) -> bool:
         """
         check if bboxes overlap
         parameter:
@@ -229,7 +237,7 @@ class GorillaVideoTracker:
         overlap = not (x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
         return overlap
 
-    def _track_ids(self, data, ttl=15):
+    def _track_ids(self, data: Data, ttl: int = 15) -> Tuple[Data, int]:
         """
         track individuals and create IDs; also removes bboxes when they overlap too much
         parameter:
@@ -249,7 +257,7 @@ class GorillaVideoTracker:
         )
 
         id_count = -1
-        openIDs = []
+        openIDs: List[Dict[str, int]] = []
 
         # iterate over frames in video
         for frame_data in data["labels"]:
@@ -302,7 +310,7 @@ class GorillaVideoTracker:
 
         return data, id_count
 
-    def _label_faces(self, data):
+    def _label_faces(self, data: Data) -> Data:
         """
         label the face bboxes according to the already labeled body bboxes
         parameter:
@@ -328,7 +336,7 @@ class GorillaVideoTracker:
 
         return data
 
-    def _get_negatives(self, data, id_count):
+    def _get_negatives(self, data: Data, id_count: int) -> List[MutableSet[str]]:
         """
         creates a list of lists which stores IDs which are possible negatives, because they existed at the same time
         parameter:

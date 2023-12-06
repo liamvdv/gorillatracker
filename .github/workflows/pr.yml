@@ -30,10 +30,10 @@ jobs:
       #     make format
 
       # fail if lint fails
-      - name: Lint
+      - name: Lint 
         run: |
           make lint
-
+          make mypy
       # else commit the autoformatted code fixes
       # - name: Check for modified files
       #   id: git-check

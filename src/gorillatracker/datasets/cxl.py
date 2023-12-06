@@ -1,16 +1,18 @@
 from pathlib import Path
-from typing import List, Literal, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Union
 
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
 
 Label = Union[int, str]
 
 
-def get_samples(dirpath: Path) -> List[Tuple[Path, Label]]:
+def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
     """
     Assumed directory structure:
         dirpath/
@@ -25,8 +27,10 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, Label]]:
     return samples
 
 
-class CXLDataset(Dataset):
-    def __init__(self, data_dir, partition: Literal["train", "val", "test"], transform=None):
+class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
+    def __init__(
+        self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
+    ):
         """
         Assumes directory structure:
             data_dir/
@@ -41,10 +45,10 @@ class CXLDataset(Dataset):
         self.samples = get_samples(dirpath)
         self.transform = transform
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
@@ -52,7 +56,7 @@ class CXLDataset(Dataset):
         return img, label
 
     @classmethod
-    def get_transforms(cls):
+    def get_transforms(cls) -> gtypes.Transform:
         return transforms.Compose(
             [
                 SquarePad(),
@@ -61,10 +65,3 @@ class CXLDataset(Dataset):
                 transforms.ToTensor(),
             ]
         )
-
-
-if __name__ == "__main__":
-    for img, label in CXLDataset(
-        "data/splits/ground_truth-cxl-closedset--mintraincount-3-seed-42-train-70-val-15-test-15"
-    ):
-        print(img, label, img.filename)

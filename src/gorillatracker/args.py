@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 from simple_parsing import field, list_field
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True)  # type: ignore
 class TrainingArgs:
     """
     Argument class for use with simple_parsing that handles the basics of most LLM training scripts. Subclass this to add more arguments. TODO: change this
@@ -54,7 +54,7 @@ class TrainingArgs:
     )
 
     batch_size: int = field(default=8)
-    grad_clip: float = field(default=1.0)
+    grad_clip: Union[float, None] = field(default=1.0)
     gradient_accumulation_steps: int = field(default=1)
     max_epochs: int = field(default=300)
     val_before_training: bool = field(default=False)
@@ -64,13 +64,13 @@ class TrainingArgs:
 
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
-    data_dir: Path = field(default="./mnist")
+    data_dir: Path = field(default=Path("./mnist"))
     # Add any additional fields as needed.
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert self.num_devices > 0
         assert self.batch_size > 0
         assert self.gradient_accumulation_steps > 0
-
+        assert isinstance(self.grad_clip, float), "automatically set to None if < 0"
         if self.grad_clip <= 0:
             self.grad_clip = None
