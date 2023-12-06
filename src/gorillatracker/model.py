@@ -209,7 +209,7 @@ class SwinV2BaseWrapper(BaseModule):
 
 
 class ResNet18Wrapper(BaseModule):
-    def __init__(
+    def __init__( # type: ignore
         self,
         **kwargs,
     ) -> None:
@@ -219,16 +219,13 @@ class ResNet18Wrapper(BaseModule):
         )
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
 
-    def forward(self, x):
-        return self.model(x)
-
     @classmethod
-    def get_tensor_transforms(cls):
+    def get_tensor_transforms(cls) -> gtypes.Transform:
         return transforms.Resize((224), antialias=True)
 
 
 class ResNet152Wrapper(BaseModule):
-    def __init__(
+    def __init__( # type: ignore
         self,
         **kwargs,
     ) -> None:
@@ -238,11 +235,8 @@ class ResNet152Wrapper(BaseModule):
         )
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
 
-    def forward(self, x):
-        return self.model(x)
-
     @classmethod
-    def get_tensor_transforms(cls):
+    def get_tensor_transforms(cls) -> gtypes.Transform:
         return transforms.Resize((224), antialias=True)
 
 
