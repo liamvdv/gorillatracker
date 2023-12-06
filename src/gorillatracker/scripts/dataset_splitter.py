@@ -222,7 +222,10 @@ def splitter(
             reid_factor_test, int
         ), "must pass reid_factor_{val,test} if mode=openset"
         # At least one unseen individuum in test and eval.
-        train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
+        train_count, val_count, test_count = compute_split(len(individums), train, val, test)
+        print(
+            f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={train_count}, Val={val_count}, Test={test_count}"
+        )
         train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
             individums[:train_count], k=min_train_count
         )
@@ -352,3 +355,9 @@ def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/fu
 #         dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
 #     )
 #     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+
+# # NOTE(liamvdv): 55 / 25 / 25 | image distribution is 854 (train=606, val=147, test=101)
+# #                Unique Individuals (Image Count Bias): Total=113, Train=57, Val=28, Test=28
+# dir = generate_split(
+#     dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
+# )
