@@ -418,16 +418,16 @@ def merge_split2_into_train_set_of_split1(split1_dir: str, split2_dir: str, outp
     shutil.copytree(os.path.join(split2_dir, "test"), os.path.join(output_dir, "train"), dirs_exist_ok=True)
 
 
-if __name__ == "__main__":
-    dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
-    copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+# if __name__ == "__main__":
+#     dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+#     copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 
-    dir = generate_split(
-        dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-    )
-    dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
+#     dir = generate_split(
+#         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+#     )
+#     dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
 
-    dir = generate_split(
-        dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-    )
-    dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+#     dir = generate_split(
+#         dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+#     )
+#     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)

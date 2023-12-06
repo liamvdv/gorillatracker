@@ -92,18 +92,18 @@ def generate_split_save_metadata_cxl(
 
     save_dict_json(meta_data, os.path.join(cxl_cropped_split_path, "metadata.json"))
 
-    return cxl_cropped_split_path
+    return str(cxl_cropped_split_path)
 
 
 if __name__ == "__main__":
-    bristol_split_dir = generate_split(
+    bristol_split_dir = str(generate_split(
         dataset="ground_truth/bristol/full_images",
         mode="openset",
         seed=69,
         reid_factor_test=0,
         reid_factor_val=0,
-    )
-    bristol_split_dir = os.path.abspath(bristol_split_dir)
+    ))
+    bristol_split_dir = str(os.path.abspath(bristol_split_dir))
     ensure_integrity_openset(bristol_split_dir)
 
     # NOTE: The path to the bristol dataset split has to be inside the gorilla_yml_path file. Set breakpoint here to check / change it.

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def modify_dataset_train_yolo(
     bristol_split_dir: str,
-    model_type: str,
+    model_type: Literal["yolov8n", "yolov8m", "yolov8x"],
     epochs: int,
     batch_size: int,
     wandb_project: str = "Detection-YOLOv8-Bristol-OpenSet",
