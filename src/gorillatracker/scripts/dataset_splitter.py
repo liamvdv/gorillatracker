@@ -356,8 +356,7 @@ def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/fu
 #     )
 #     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
 
-# # NOTE(liamvdv): 55 / 25 / 25 | image distribution is 854 (train=606, val=147, test=101)
-# #                Unique Individuals (Image Count Bias): Total=113, Train=57, Val=28, Test=28
+# # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
 # dir = generate_split(
 #     dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
 # )
