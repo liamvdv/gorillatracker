@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import lightning as L
@@ -71,7 +72,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
-                metrics={"knn": knn, "pca": pca, "tsne": tsne, "fc_layer": fc_layer},  # "flda": flda_metric,
+                metrics={
+                    "knn5": knn,
+                    "knn": partial(knn, k=1),
+                    "pca": pca,
+                    "tsne": tsne,
+                    "fc_layer": fc_layer,
+                },  # "flda": flda_metric,
             )
             # wandb.log({"epoch": current_epoch})
             # for visibility also log the
@@ -185,6 +192,10 @@ def fc_layer(
 # Vincents code
 def knn(embeddings: torch.Tensor, labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, float]:
     num_classes = len(np.unique(labels))
+    if num_classes < k:
+        print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
+        k = num_classes
+
     # convert embeddings and labels to tensors
     embeddings = torch.tensor(embeddings)
     labels = torch.tensor(labels)
