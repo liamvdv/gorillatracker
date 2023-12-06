@@ -1,4 +1,4 @@
-sources = src tests train.py yolo_train.py init_sweep.py
+sources = src tests *.py
 
 .PHONY: format
 format:
