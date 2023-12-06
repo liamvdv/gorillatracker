@@ -79,9 +79,13 @@ def predict_video(
     
     global config
     
+    # error checking
+    
     assert config != {}, "config must be set before calling predict_video"
     assert len(models) > 0, "models must be a list of at least one model"
     assert os.path.exists(input_path), f"input_path {input_path} does not exist"
+    
+    # grabbing parameters from config
         
     post_process_function = config["post_process_function"]
     yolo_args = config["yolo_args"]
@@ -90,13 +94,19 @@ def predict_video(
     file_name = file_name.split(".")[:-1]
     file_name = ".".join(file_name)
     
+    # getting the generators for each model
     
     results = []
     for model in models:
         results.append(model.predict(input_path, stream = True, device = gpu_id, **yolo_args))
+        
+    # using the generators in the post-processing function
 
     if post_process_function is not None:
         post_process_function(results = results, file_name = file_name)
+        
+    # updating the checkpoint
+    
     if checkpoint_path is not None:
         open(checkpoint_path, "w").write(input_path)
 
@@ -139,7 +149,7 @@ def worker_function(input_path: str):
     singleton = Singleton(config["models"])
     gpu = gpu_queue.get()
     print(f"Processing {input_path} on GPU {gpu}")
-    predict_video(input_path, singleton.get_models())
+    predict_video(input_path, singleton.get_models(), gpu)
     print(f"Finished processing {input_path} on GPU {gpu}")
     gpu_queue.put(gpu)
     
@@ -176,6 +186,8 @@ def predict_video_multiprocessing(
     None
     """
     
+    # setting global variables for other functions to use
+    
     global config
     config = {
         "models": models,
@@ -184,10 +196,14 @@ def predict_video_multiprocessing(
         "checkpoint_path": checkpoint_path
     }
     
+    # creating a queue of gpu ids to be used by the worker function
+    
     global gpu_queue
     for gpu_id in gpu_ids:
         for _ in range(pool_per_gpu):
             gpu_queue.put(gpu_id)
+            
+    # error checking
     
     assert "video_dir" in kwargs or "video_paths" in kwargs, "Either video_dir or video_paths must be specified"
     assert not ("video_dir" in kwargs and "video_paths" in kwargs), "Only one of video_dir or video_paths must be specified"
@@ -197,6 +213,8 @@ def predict_video_multiprocessing(
     if "video_dir" in kwargs:
         video_dir = kwargs["video_dir"]
         video_paths = [os.path.join(video_dir, x) for x in os.listdir(video_dir)]
+        
+    # if a checkpoint file is specified, skip videos that have already been processed (also some error checking)
         
     print(f"Processing {len(video_paths)} videos")
     if checkpoint_path is not None:
@@ -214,6 +232,8 @@ def predict_video_multiprocessing(
         else:
             open(checkpoint_path, "w").close()
             print("Checkpoint file not found, starting from the beginning")
+            
+    # start multiprocessing
     
     pool = multiprocessing.Pool(pool_per_gpu)
     pool.map(worker_function, video_paths)
