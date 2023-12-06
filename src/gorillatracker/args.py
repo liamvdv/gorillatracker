@@ -45,7 +45,6 @@ class TrainingArgs:
 
     lr_schedule: Literal["linear", "cosine", "exponential", "reduce_on_plateau"] = field(default="linear")
     warmup_epochs: int = field(default=1)
-    lr_rate: float = field(default=0.256)
     lr_decay: float = field(default=0.97)
     lr_decay_interval: int = field(default=3)
     margin: float = field(default=0.5)
