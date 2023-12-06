@@ -7,13 +7,13 @@ The exact same applies to the val set.
 
 import logging
 import os
-import regex as re
 import shutil
 from typing import List, Literal, Set, Tuple
 
+import regex as re
+
 from gorillatracker.scripts.crop_dataset import read_bbox_data
 from gorillatracker.scripts.dataset_splitter import generate_split
-
 
 bristol_index_to_name = {0: "afia", 1: "ayana", 2: "jock", 3: "kala", 4: "kera", 5: "kukuena", 6: "touni"}
 bristol_name_to_index = {value: key for key, value in bristol_index_to_name.items()}
@@ -59,7 +59,7 @@ def move_images_of_subjects(image_dir: str, bbox_dir: str, output_dir: str, subj
     """
     os.makedirs(output_dir, exist_ok=True)
     image_files = [f for f in os.listdir(image_dir) if f.endswith(".jpg")]
-    subject_indices  = [bristol_name_to_index[s] for s in subject_names]
+    subject_indices = [bristol_name_to_index[s] for s in subject_names]
 
     move_count = 0
     for image_file in image_files:
@@ -97,9 +97,7 @@ def filter_images_bristol(image_dir: str, bbox_dir: str) -> int:
     return remove_count
 
 
-def get_subjects_in_directory(
-    test_dir: str, file_extension: Literal[".jpg", ".png"] = ".jpg"
-) -> Set[str]:
+def get_subjects_in_directory(test_dir: str, file_extension: Literal[".jpg", ".png"] = ".jpg") -> Set[str]:
     """Get all subjects in the given directory. Subjects are identified by the prefix of the image file name."""
     image_files = [f for f in os.listdir(test_dir) if f.endswith(file_extension)]
     logger.info("Found %d images in folder %s", len(image_files), test_dir)
@@ -111,18 +109,20 @@ def get_subjects_in_directory(
     return test_subjects
 
 
-def get_test_val_train_proprietary_subjects(split_base_dir: str, file_extension: Literal[".png", ".jpg"] = ".png") -> Tuple[List[str], List[str], List[str]]:
+def get_test_val_train_proprietary_subjects(
+    split_base_dir: str, file_extension: Literal[".png", ".jpg"] = ".png"
+) -> Tuple[List[str], List[str], List[str]]:
     """Get the test and val proprietary subjects from the given split."""
     train_set_dir = os.path.join(split_base_dir, "train")
     val_set_dir = os.path.join(split_base_dir, "val")
     test_set_dir = os.path.join(split_base_dir, "test")
-    
+
     test_subjects = get_subjects_in_directory(test_set_dir, file_extension=file_extension)
     val_subjects = get_subjects_in_directory(val_set_dir, file_extension=file_extension)
     train_subjects = get_subjects_in_directory(train_set_dir, file_extension=file_extension)
 
     test_proprietary_subjects = list(test_subjects - val_subjects - train_subjects)
-    val_proprietary_subjects = list(val_subjects - train_subjects  - test_subjects)
+    val_proprietary_subjects = list(val_subjects - train_subjects - test_subjects)
     train_proprietary_subjects = list(train_subjects - val_subjects - test_subjects)
 
     logger.info("Split %s has test proprietary subjects: %d ", test_proprietary_subjects)
@@ -130,20 +130,24 @@ def get_test_val_train_proprietary_subjects(split_base_dir: str, file_extension:
     return test_proprietary_subjects, val_proprietary_subjects, train_proprietary_subjects
 
 
-def ensure_integrity_openset(split_base_dir: str, bbox_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox") -> None:
+def ensure_integrity_openset(
+    split_base_dir: str, bbox_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox"
+) -> None:
     """Ensure that the given train, val and test sets are valid.
     This means that the train set does not contain any images that by accident contain the subject of the val or test set.
     """
-    test_proprietary_subjects, val_proprietary_subjects, _ = get_test_val_train_proprietary_subjects(split_base_dir, file_extension=".jpg")
+    test_proprietary_subjects, val_proprietary_subjects, _ = get_test_val_train_proprietary_subjects(
+        split_base_dir, file_extension=".jpg"
+    )
 
     assert len(test_proprietary_subjects) != 0, f"Test proprietary subjects is empty: {test_proprietary_subjects}"
     assert len(val_proprietary_subjects) != 0, f"Val proprietary subjects is empty: {val_proprietary_subjects}"
 
     # ensure that every image has a bounding box for the actual subject
-    train_set_dir = os.path.join(split_base_dir,"train")
-    val_set_dir = os.path.join(split_base_dir,"val")
-    test_set_dir = os.path.join(split_base_dir,"test")
-    
+    train_set_dir = os.path.join(split_base_dir, "train")
+    val_set_dir = os.path.join(split_base_dir, "val")
+    test_set_dir = os.path.join(split_base_dir, "test")
+
     remove_count = filter_images_bristol(train_set_dir, bbox_dir)
     remove_count += filter_images_bristol(val_set_dir, bbox_dir)
     remove_count += filter_images_bristol(test_set_dir, bbox_dir)

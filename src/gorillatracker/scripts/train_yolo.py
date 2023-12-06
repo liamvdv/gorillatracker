@@ -52,9 +52,7 @@ def modify_dataset_train_yolo(
             os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
         )
 
-    model, _, model_name = train_yolo(
-        model_type, epochs, batch_size, gorilla_yml_path, wandb_project=wandb_project
-    )
+    model, _, model_name = train_yolo(model_type, epochs, batch_size, gorilla_yml_path, wandb_project=wandb_project)
 
     # remove annotations from the bristol split
     for split in ["train", "val", "test"]:
@@ -148,11 +146,16 @@ def remove_files_from_dir_with_extension(annotation_dir: str, file_extension: st
             os.remove(os.path.join(annotation_dir, annotation_file))
 
 
-def detect_gorillafaces_cxl(model: YOLO, model_name: str, image_dir: str = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images", file_extension: str = ".png") -> None:
+def detect_gorillafaces_cxl(
+    model: YOLO,
+    model_name: str,
+    image_dir: str = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images",
+    file_extension: str = ".png",
+) -> None:
     """Detect gorilla faces in the given directory and save the results in the output directory using the given yolo model."""
     output_dir = os.path.join("/workspaces/gorillatracker/data/derived_data/cxl", model_name, "face_bbox")
     os.makedirs(output_dir, exist_ok=True)
-    
+
     image_files = os.listdir(image_dir)
     image_files = list(filter(lambda x: x.endswith(file_extension), image_files))
 
@@ -170,9 +173,14 @@ if __name__ == "__main__":
     bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
     model, model_name = modify_dataset_train_yolo(
         bristol_split_dir,
-        model_type = "yolov8x",
-        epochs = 2,
-        batch_size = 16,
+        model_type="yolov8x",
+        epochs=2,
+        batch_size=16,
     )
-    
-    detect_gorillafaces_cxl(model, model_name, image_dir="/workspaces/gorillatracker/data/ground_truth/cxl/full_images", file_extension=".png")
+
+    detect_gorillafaces_cxl(
+        model,
+        model_name,
+        image_dir="/workspaces/gorillatracker/data/ground_truth/cxl/full_images",
+        file_extension=".png",
+    )

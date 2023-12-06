@@ -94,7 +94,7 @@ def crop_max_confidence(
 
 def crop_images(
     image_dir: str, bbox_dir: str, output_dir: str, file_extension: str = ".jpg", is_bristol: bool = True
-) -> Tuple[List[str], List[str], List[str]]: # TODO(rob2u): split into two functions for bristol and cxl
+) -> Tuple[List[str], List[str], List[str]]:  # TODO(rob2u): split into two functions for bristol and cxl
     """Crop all images in the given directory using the bounding boxes in the given directory and save them to the given output directory.
 
     Args:
@@ -140,17 +140,18 @@ def crop_images(
 
 
 if __name__ == "__main__":
-    # get image where cropped imgs and annotations should be saved from model_name
     cxl_model_dir = "/workspaces/gorillatracker/data/derived_data/cxl/yolov8x-e30-b163"
     cxl_imgs_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images"
-    
+
     cxl_imgs_crop_dir = os.path.join(cxl_model_dir, "face_crop")
     cxl_annotation_dir = os.path.join(cxl_model_dir, "face_bbox")
-    
-    assert os.path.exists(cxl_annotation_dir), f"Bounding box directory '{cxl_annotation_dir}' does not exist, run detect_gorillafaces_cxl from train_yolo.py first"
-    
+
+    assert os.path.exists(
+        cxl_annotation_dir
+    ), f"Bounding box directory '{cxl_annotation_dir}' does not exist, run detect_gorillafaces_cxl from train_yolo.py first"
+
     os.makedirs(cxl_imgs_crop_dir, exist_ok=True)
-    
+
     # crop cxl images according to predicted bounding boxes
     imgs_without_bbox, imgs_with_no_bbox_prediction, imgs_with_low_confidence = crop_images(
         cxl_imgs_dir, cxl_annotation_dir, cxl_imgs_crop_dir, is_bristol=False, file_extension=".png"
