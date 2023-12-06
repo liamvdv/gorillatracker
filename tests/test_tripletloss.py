@@ -1,10 +1,14 @@
+from typing import Tuple, Union
+
 import torch
 from torch.nn import TripletMarginLoss
-from typing import Tuple, Union
 
 from gorillatracker.triplet_loss import TripletLossOffline, TripletLossOnline
 
-def calc_loss_of_triplet(anchor: torch.Tensor, positive: torch.Tensor, negative: torch.Tensor, margin: float) -> torch.Tensor:
+
+def calc_loss_of_triplet(
+    anchor: torch.Tensor, positive: torch.Tensor, negative: torch.Tensor, margin: float
+) -> torch.Tensor:
     loss = torch.relu(
         torch.linalg.vector_norm(anchor - positive) - torch.linalg.vector_norm(anchor - negative) + margin
     )
@@ -13,7 +17,9 @@ def calc_loss_of_triplet(anchor: torch.Tensor, positive: torch.Tensor, negative:
     return loss
 
 
-def calc_loss_and_distance_of_triplet(anchor: torch.Tensor, positive: torch.Tensor, negative: torch.Tensor, margin: float) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def calc_loss_and_distance_of_triplet(
+    anchor: torch.Tensor, positive: torch.Tensor, negative: torch.Tensor, margin: float
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     loss = torch.relu(
         torch.linalg.vector_norm(anchor - positive) - torch.linalg.vector_norm(anchor - negative) + margin
     )
