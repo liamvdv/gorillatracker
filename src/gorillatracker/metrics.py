@@ -67,8 +67,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 data=embeddings_table,
                 embedding_name="val/embeddings",
                 metrics={
-                    "knn": knn,
-                    "knn5": partial(knn, k=5),
+                    "knn5": knn,
+                    "knn": partial(knn, k=1),
                     "pca": pca,
                     "tsne": tsne,
                     "fc_layer": fc_layer,
