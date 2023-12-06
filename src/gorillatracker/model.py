@@ -154,7 +154,7 @@ class BaseModule(L.LightningModule):
         Note that for square resizes we have the `data_resize_transform` argument
         in the `TrainingArgs` class. This is a special case worth supporting
         because it allows easily switching between little image MNIST and large
-        image non-MNIST Datasets. Setting it to `Null` / `None` will give you 
+        image non-MNIST Datasets. Setting it to `Null` / `None` will give you
         full control here.
         """
         return lambda x: x
