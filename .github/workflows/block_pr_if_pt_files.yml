@@ -1,0 +1,31 @@
+name: Block PRs with .pt files
+
+on:
+  pull_request:
+    branches: [main]
+    types:
+      - opened
+      - synchronize
+  workflow_dispatch:
+
+jobs:
+  check-pt-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for .pt files
+        id: check-files
+        run: |
+          if git diff --name-only HEAD..$GITHUB_SHA | grep -qE '\.pt$'; then
+            echo "Found .pt files in the branch. Blocking the pull request."
+            echo "::set-output name=pt_files::true"
+          else
+            echo "No .pt files found in the branch."
+            echo "::set-output name=pt_files::false"
+          fi
+
+      - name: Block PR if .pt files found
+        if: steps.check-files.outputs.pt_files == 'true'
+        run: |
+          echo "Blocking the pull request due to the presence of .pt files."
+          exit 1
