@@ -144,7 +144,7 @@ class GorillaVideoTracker:
         # json
         json_data = self._read_from_json(json_path)
         # iterate over frames, draw bboxes and labels and write to outputfile
-        for bboxes in VideoData(json_data["labels"]): # type: ignore
+        for bboxes in VideoData(json_data["labels"]):  # type: ignore
             ret, frame = video.read()
             if not ret:
                 break
@@ -250,14 +250,18 @@ class GorillaVideoTracker:
         """
         overlap = 0.5  # how much overlap is nessesary between to frames to be considered the same individual
         body_class = 0
-        width_scale = 0.1  # how much the width of a bbox can change in % between frames to be considered the same individual
-        height_scale = 0.05  # how much the height of a bbox can change in % between frames to be considered the same individual
+        width_scale = (
+            0.1  # how much the width of a bbox can change in % between frames to be considered the same individual
+        )
+        height_scale = (
+            0.05  # how much the height of a bbox can change in % between frames to be considered the same individual
+        )
 
         id_count = -1
         openIDs: List[BBox] = []
 
         # iterate over frames in video
-        for frame_data in VideoData(data["labels"]): # type: ignore
+        for frame_data in VideoData(data["labels"]):  # type: ignore
             # iterate over bounding boxes and delete colliding ones
             bboxes = [BBox(bbox) for bbox in frame_data if bbox["class"] == body_class]
             colliding_bboxes = [
@@ -318,7 +322,7 @@ class GorillaVideoTracker:
         body_class = 0
         face_class = 1
 
-        for frame_data in VideoData(data["labels"]): # type: ignore
+        for frame_data in VideoData(data["labels"]):  # type: ignore
             body_bboxes = [bbox for bbox in frame_data if bbox["class"] == body_class]
             face_bboxes = [bbox for bbox in frame_data if bbox["class"] == face_class]
             for face_bbox in face_bboxes:
@@ -342,9 +346,9 @@ class GorillaVideoTracker:
             negatives: list of lists; at negatives[ID] stores a list of IDs which are negatives for ID
         """
         body_class = 0
-        negatives:List[MutableSet[int]] = [set() for i in range(id_count + 1)]
+        negatives: List[MutableSet[int]] = [set() for i in range(id_count + 1)]
 
-        for frame_data in VideoData(data["labels"]): # type: ignore
+        for frame_data in VideoData(data["labels"]):  # type: ignore
             bboxes = [bbox for bbox in frame_data if bbox["class"] == body_class]
             frame_ids = set()
             for bbox in bboxes:
