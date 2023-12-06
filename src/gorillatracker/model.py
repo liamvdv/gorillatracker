@@ -138,8 +138,8 @@ class BaseModule(L.LightningModule):
         )
         return {"optimizer": optimizer}
 
-    @staticmethod
-    def get_tensor_transforms() -> Callable[[torch.Tensor], torch.Tensor]:
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         raise NotImplementedError(
             "Please implement this method in your subclass: resizes, normalizations, etc. To apply nothing, return the identity function `lambda x: x`"
         )
@@ -160,6 +160,10 @@ class EfficientNetV2Wrapper(BaseModule):
         self.model.classifier = torch.nn.Sequential(
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         )
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return lambda x: x
 
 
 class ConvNeXtV2Wrapper(BaseModule):
