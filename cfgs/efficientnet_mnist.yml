@@ -11,7 +11,7 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-Efficientnet-MNIST-Closed" # WandB project name
+project_name: "Test-Test-Test-Test" # WandB project name
 run_name: "test-code"           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
@@ -42,11 +42,11 @@ lr_decay: 0.9                   # Learning rate decay (for the learning rate sch
 lr_decay_interval: 1            # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
 # )
 
-batch_size: 512                 # Training batch size
+batch_size: 128                 # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 5                   # Training goal (large number)
-val_before_training: False      # Perform validation before training
+val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
