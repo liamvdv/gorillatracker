@@ -8,7 +8,14 @@ import torch
 import torchvision.transforms as transforms
 from print_on_steroids import logger
 from torch.optim import AdamW
-from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
+from torchvision.models import (
+    EfficientNet_V2_L_Weights,
+    ResNet18_Weights,
+    ResNet152_Weights,
+    efficientnet_v2_l,
+    resnet18,
+    resnet152,
+)
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.triplet_loss import get_triplet_loss
@@ -201,10 +208,44 @@ class SwinV2BaseWrapper(BaseModule):
         return transforms.Resize((192), antialias=True)
 
 
+class ResNet18Wrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = (
+            resnet18() if kwargs.get("from_scratch", False) else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        )
+        self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> gtypes.Transform:
+        return transforms.Resize((224), antialias=True)
+
+
+class ResNet152Wrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = (
+            resnet152() if kwargs.get("from_scratch", False) else resnet152(weights=ResNet152_Weights.IMAGENET1K_V1)
+        )
+        self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> gtypes.Transform:
+        return transforms.Resize((224), antialias=True)
+
+
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {
     "EfficientNetV2_Large": EfficientNetV2Wrapper,
     "SwinV2Base": SwinV2BaseWrapper,
+    "ResNet18": ResNet18Wrapper,
+    "ResNet152": ResNet152Wrapper,
     "ConvNeXtV2_Base": ConvNeXtV2Wrapper,
 }
 
