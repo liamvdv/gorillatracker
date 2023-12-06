@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
 
-from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
+from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
@@ -15,7 +15,7 @@ from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
-def main(args: TrainingArgs):  # noqa: C901
+def main(args: TrainingArgs) -> None:  # noqa: C901
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -59,7 +59,7 @@ def main(args: TrainingArgs):  # noqa: C901
     )
     model_cls = get_model_cls(args.model_name_or_path)
 
-    if args.saved_checkpoint_path is None:
+    if args.saved_checkpoint_path is not None:
         args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
             args.saved_checkpoint_path, wandb_logger.experiment
         )
@@ -68,11 +68,11 @@ def main(args: TrainingArgs):  # noqa: C901
             model = model_cls.load_from_checkpoint(args.saved_checkpoint_path, save_hyperparameters=False)
             # we will resume via trainer.fit(ckpt_path=...)
         else:  # load only weights
-            model = model_cls(**model_args)
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(model_args["accelerator"]))
+            model = model_cls(**model_args)  # type: ignore
+            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
             model.load_state_dict(torch_load["state_dict"], strict=False)
     else:
-        model = model_cls(**model_args)
+        model = model_cls(**model_args)  # type: ignore
 
     # https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
     torch.set_float32_matmul_precision("high")
@@ -87,7 +87,7 @@ def main(args: TrainingArgs):  # noqa: C901
 
     #################### Construct dataloaders & trainer #################
     dm = get_data_module(
-        args.dataset_class, args.data_dir, args.batch_size, args.loss_mode, model.get_tensor_transforms()
+        args.dataset_class, str(args.data_dir), args.batch_size, args.loss_mode, model.get_tensor_transforms()
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -128,7 +128,7 @@ def main(args: TrainingArgs):  # noqa: C901
         max_epochs=args.max_epochs,
         devices=args.num_devices,
         accelerator=args.accelerator,
-        strategy=args.distributed_strategy,
+        strategy=str(args.distributed_strategy),
         logger=wandb_logger,
         deterministic=args.force_deterministic,
         callbacks=callbacks,
@@ -167,7 +167,7 @@ def main(args: TrainingArgs):  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
-
+        assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
 
