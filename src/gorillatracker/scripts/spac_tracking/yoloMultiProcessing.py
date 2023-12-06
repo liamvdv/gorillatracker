@@ -14,31 +14,37 @@ config = {}
 
 def save_result_to_json(
     results: List[List[Dict]], 
-    file_name: str, 
-    json_folder: str,
-    video_path: str, 
+    json_folder: str, 
     overwrite: bool = False,
+    video_path: str = None,
+    min_conf: float = 0.5
     ):
     """
     Save the results to a JSON file.
 
     Args:
         results (List[List[Dict]]): The results to be saved. (a list of result generators from YOLO.predict)
-        file_name (str): The name of the JSON file.
         json_folder (str): The folder path where the JSON file will be saved.
-        video_path (str): The path of the video file.
         overwrite (bool, optional): Whether to overwrite an existing JSON file with the same name. 
             Defaults to False.
+        video_path (str, optional): The path of the video file.
+        min_conf (float, optional): The minimum confidence of a box to be saved. Defaults to 0.5.
 
     Returns:
         None
     """
     
+    file_name = video_path.split("/")[-1]
+    file_name = file_name.split(".")[:-1]
+    file_name = ".".join(file_name)
+    
     json_path = f"{json_folder}/{file_name}.json"
     if os.path.exists(json_path) and not overwrite:
         return
     
-    label_frames = [[] for f in results[0]]
+    frame_count = os.popen(f"ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 {video_path}").read()
+    label_frames = [[] for _ in range(int(frame_count))]
+    
     for result_index in range(len(results)):
         result = results[result_index]
         frame_index = 0
@@ -46,6 +52,8 @@ def save_result_to_json(
             boxes = frame.boxes.xywhn.tolist()
             confs = frame.boxes.conf.tolist()
             for box, conf in zip(boxes, confs):
+                if conf < min_conf:
+                    continue
                 x, y, w, h = box
                 box = {
                     "class": result_index,
@@ -87,7 +95,7 @@ def predict_video(
     
     # grabbing parameters from config
         
-    post_process_function = config["post_process_function"]
+    post_process_functions = config["post_process_functions"]
     yolo_args = config["yolo_args"]
     checkpoint_path = config["checkpoint_path"]
     file_name = input_path.split("/")[-1]
@@ -102,8 +110,9 @@ def predict_video(
         
     # using the generators in the post-processing function
 
-    if post_process_function is not None:
-        post_process_function(results = results, video_path = input_path, file_name = file_name)
+    if post_process_functions is not None:
+        for post_process_function in post_process_functions:
+            post_process_function(results = results, video_path = input_path)
         
     # updating the checkpoint
     
@@ -159,10 +168,11 @@ def worker_function(input_path: str):
     
 def predict_video_multiprocessing(
     models: List[YOLO] = [
+        YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt"),
         YOLO("/workspaces/gorillatracker/models/body_s_Ben.pt"),
-        YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt")
+        YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/face.pt")
         ], 
-    post_process_function: Callable[[List[List[Dict]], str], None] = None,
+    post_process_functions: List[Callable[[List[List[Dict]], str], None]] = None,
     yolo_args: Dict = {"verbose":False},
     pool_per_gpu: int = 4,
     gpu_ids: List[int] = [0],
@@ -175,7 +185,7 @@ def predict_video_multiprocessing(
     
     Parameters:
     - models (List[YOLO]): List of YOLO models to use for prediction.
-    - post_process_function (Callable[[List[List[Dict]]], None]): Function to apply post-processing to the predicted results. 
+    - post_process_functions (List[Callable[[List[List[Dict]]], None]]): List of function to apply post-processing to the predicted results. 
             The function will get the results passed as the first argument and the file name as the second argument.
             The function shouldn't return anything.
             If you want to pass additional arguments to the function, use functools.partial.
@@ -191,7 +201,7 @@ def predict_video_multiprocessing(
     global config
     config = {
         "models": models,
-        "post_process_function": post_process_function,
+        "post_process_functions": post_process_functions,
         "yolo_args": yolo_args,
         "checkpoint_path": checkpoint_path
     }
@@ -279,16 +289,19 @@ if __name__ == "__main__":
     video_paths = [os.path.join(video_dir, x) for x in os.listdir(video_dir)]
     debug_vid_paths = video_paths[:200]
     debug_vid_paths_2 = video_paths[100:200]
-    debug_vid_paths_3 = [f"{video_dir}/Trc099_20220705_115.mp4"]
+    debug_vid_paths_3 = [f"{video_dir}/M002_20220328_015.mp4"]
     predict_video_multiprocessing(
-        video_paths=debug_vid_paths, 
-        pool_per_gpu=4, 
-        yolo_args={"verbose":False}, 
+        video_paths=debug_vid_paths_3, 
+        pool_per_gpu=1, 
+        yolo_args={"verbose":True}, 
         overwrite=True,
-        post_process_function=partial(
+        post_process_functions=[
+            partial(
             save_result_to_json, 
             json_folder="/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/jsonTest",
             overwrite=True,
-            ),
-        checkpoint_path="./checkpoint.txt"
+            )
+        ],
+        # checkpoint_path="./checkpoint.txt"
         )
+    

@@ -98,5 +98,5 @@
     "postCreateCommand": "pip install -e ."
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": []
-
+    // ,"shutdownAction": "none" //uncomment this if you want to keep the container running after VS Code is closed. REMEMBER TO KILL IT MANUALLY LATER OR IT WILL KEEP RUNNING FOREVER
 }
