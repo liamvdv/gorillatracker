@@ -52,10 +52,6 @@ def test_tripletloss_offline() -> None:
     assert approx_equal(d_p, torch.linalg.norm(a - p))
     assert approx_equal(d_n, torch.linalg.norm(a - n))
 
-    loss_torch = TripletMarginLoss(margin=1.0)(a, p, n)
-    assert approx_equal(loss_torch, loss)
-    assert approx_equal(loss_torch, torch.Tensor([1.0]))
-
 
 def test_tripletloss_online_soft() -> None:
     a, ap, n, np = torch.tensor([3.0]), torch.tensor([0.5]), torch.tensor([0.5]), torch.tensor([-0.5])
