@@ -1,4 +1,4 @@
-sources = *.py src tests
+sources = src tests *.py
 
 .PHONY: format
 format:
@@ -13,7 +13,9 @@ lint:
 
 .PHONY: mypy
 mypy:
-	mypy $(sources) --disable-recursive-aliases
+	# TODO(memben): reinclude cvat_import.py
+	# TODO(joschaSchroff): reinclude video_json_tracker.py
+	mypy $(sources) --exclude ^dlib/ --exclude ^src/gorillatracker/utils/cvat_import.py --exclude ^src/gorillatracker/scripts/video_json_tracker.py
 
 .PHONY: test
 test:

@@ -2,6 +2,7 @@ import dataclasses
 import os
 import re
 import time
+from typing import Any, Optional
 
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
@@ -25,7 +26,7 @@ class WandbLoggingModule:
         if args.offline or args.fast_dev_run or args.data_preprocessing_only:
             os.environ["WANDB_MODE"] = "dryrun"
 
-    def _args_assertions(self, args: TrainingArgs):
+    def _args_assertions(self, args: TrainingArgs) -> None:
         asserations = [
             (args.run_name, "No run name specified with `--run_name`. Please specify a run name."),
             (len(args.run_name.split("-")) >= 2, "Run name must be of the form <Issue Number>-<Purpose>"),
@@ -64,9 +65,9 @@ class WandbLoggingModule:
             and self.check_checkpoint_path_for_wandb(self.args.saved_checkpoint_path)
         ):
             logger.info("Resuming training from W&B")
-            wandb_extra_args = dict(
-                id=self.check_checkpoint_path_for_wandb(self.args.saved_checkpoint_path), resume="must"
-            )  # resume W&B run
+            id = self.check_checkpoint_path_for_wandb(self.args.saved_checkpoint_path)
+            assert id is not None
+            wandb_extra_args = dict(id=id, resume="must")  # resume W&B run
 
         wandb_logger = WandbLogger(
             project=self.project_name,
@@ -74,7 +75,7 @@ class WandbLoggingModule:
             log_model="all",
             tags=self.args.wandb_tags,
             save_dir="logs/",
-            **wandb_extra_args,
+            **wandb_extra_args,  # type: ignore
         )
         wandb_logger.log_hyperparams(dataclasses.asdict(self.args))
 
@@ -90,8 +91,8 @@ class WandbLoggingModule:
     def check_for_wandb_checkpoint_and_download_if_necessary(
         self,
         checkpoint_path: str,
-        wandb_run_instance,
-        suffix="/model.ckpt",
+        wandb_run_instance: Any,
+        suffix: str = "/model.ckpt",
     ) -> str:
         """
         Checks the provided checkpoint_path for the wandb regex r\"wandb:.*\".
@@ -115,14 +116,14 @@ class WandbLoggingModule:
                 checkpoint_path = os.environ[f"MY_WANDB_ARTIFACT_PATH_{wandb_model_id}_{model_tag}"]
             else:
                 artifact = wandb_run_instance.use_artifact(
-                    f"{self.wandb_entity}/{self.wandb_project}/model-{wandb_model_id}:{model_tag}"
+                    f"{self.wandb_entity}/{self.project_name}/model-{wandb_model_id}:{model_tag}"
                 )
                 checkpoint_path = artifact.download() + suffix
                 logger.info(f"Path of downloaded W&B artifact: {checkpoint_path}")
                 os.environ[f"MY_WANDB_ARTIFACT_PATH_{wandb_model_id}_{model_tag}"] = checkpoint_path
         return checkpoint_path
 
-    def check_checkpoint_path_for_wandb(self, checkpoint_path: str):
+    def check_checkpoint_path_for_wandb(self, checkpoint_path: str) -> Optional[str]:
         wandb_model_id_regex = r"wandb:.*"
         if re.search(wandb_model_id_regex, checkpoint_path):
             wandb_model_id = checkpoint_path.split(":")[1]
