@@ -147,9 +147,17 @@ class BaseModule(L.LightningModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        raise NotImplementedError(
-            "Please implement this method in your subclass: resizes, normalizations, etc. To apply nothing, return the identity function `lambda x: x`"
-        )
+        """
+        Please implement this method in your subclass for non-square resizes,
+        normalizations, etc. To apply nothing, return the identity function
+            `lambda x: x`.
+        Note that for square resizes we have the `data_resize_transform` argument
+        in the `TrainingArgs` class. This is a special case worth supporting
+        because it allows easily switching between little image MNIST and large
+        image non-MNIST Datasets. Setting it to `Null` / `None` will give you 
+        full control here.
+        """
+        return lambda x: x
 
 
 class EfficientNetV2Wrapper(BaseModule):
@@ -168,10 +176,6 @@ class EfficientNetV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         )
 
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return lambda x: x
-
 
 class ConvNeXtV2Wrapper(BaseModule):
     def __init__(  # type: ignore
@@ -181,10 +185,6 @@ class ConvNeXtV2Wrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("convnextv2_base", pretrained=not self.from_scratch)
         self.model.reset_classifier(self.embedding_size)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Resize((224), antialias=True)
 
 
 class SwinV2BaseWrapper(BaseModule):
@@ -203,10 +203,6 @@ class SwinV2BaseWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
         )
 
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Resize((192), antialias=True)
-
 
 class ResNet18Wrapper(BaseModule):
     def __init__(  # type: ignore
@@ -219,10 +215,6 @@ class ResNet18Wrapper(BaseModule):
         )
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
 
-    @classmethod
-    def get_tensor_transforms(cls) -> gtypes.Transform:
-        return transforms.Resize((224), antialias=True)
-
 
 class ResNet152Wrapper(BaseModule):
     def __init__(  # type: ignore
@@ -234,10 +226,6 @@ class ResNet152Wrapper(BaseModule):
             resnet152() if kwargs.get("from_scratch", False) else resnet152(weights=ResNet152_Weights.IMAGENET1K_V1)
         )
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> gtypes.Transform:
-        return transforms.Resize((224), antialias=True)
 
 
 # NOTE(liamvdv): Register custom model backbones here.

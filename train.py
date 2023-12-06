@@ -6,6 +6,7 @@ from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
+from torchvision.transforms import Compose, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
@@ -86,8 +87,15 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
+    model_transforms = model.get_tensor_transforms()
+    if args.data_resize_transform is not None:
+        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
     dm = get_data_module(
-        args.dataset_class, str(args.data_dir), args.batch_size, args.loss_mode, model.get_tensor_transforms()
+        args.dataset_class,
+        str(args.data_dir),
+        args.batch_size,
+        args.loss_mode,
+        model_transforms,
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 

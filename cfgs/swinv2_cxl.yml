@@ -57,3 +57,4 @@ embedding_save_interval: 2      # Embedding save interval
 
 data_dir: "data/splits/use_for_baseline_cxl_face-openset_origin_robert"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+data_resize_transform: 192
