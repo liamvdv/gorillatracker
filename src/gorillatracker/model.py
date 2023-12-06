@@ -209,7 +209,7 @@ class SwinV2BaseWrapper(BaseModule):
 
 
 class ResNet18Wrapper(BaseModule):
-    def __init__( # type: ignore
+    def __init__(  # type: ignore
         self,
         **kwargs,
     ) -> None:
@@ -225,7 +225,7 @@ class ResNet18Wrapper(BaseModule):
 
 
 class ResNet152Wrapper(BaseModule):
-    def __init__( # type: ignore
+    def __init__(  # type: ignore
         self,
         **kwargs,
     ) -> None:
