@@ -1,28 +1,21 @@
-import dataclasses
-import os
-import time
 from pathlib import Path
 
 import torch
 import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
-from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
 
-from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger
+from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.helpers import check_checkpoint_path_for_wandb, check_for_wandb_checkpoint_and_download_if_necessary
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.train_utils import get_data_module
-
-WANDB_PROJECT = ""  # NOTE(liamvdv): must be changed based on your task.
-WANDB_ENTITY = "gorillas"
+from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
-def main(args: TrainingArgs):  # noqa: C901
+def main(args: TrainingArgs) -> None:  # noqa: C901
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -42,39 +35,8 @@ def main(args: TrainingArgs):  # noqa: C901
     args.seed = seed_everything(workers=True, seed=args.seed)
 
     ############# Construct W&B Logger ##############
-    if args.offline or args.fast_dev_run or args.data_preprocessing_only:
-        os.environ["WANDB_MODE"] = "dryrun"
-
-    wandb_extra_args = dict(name=args.run_name)
-
-    if args.saved_checkpoint_path and args.resume and check_checkpoint_path_for_wandb(args.saved_checkpoint_path):
-        logger.info("Resuming training from W&B")
-        wandb_extra_args = dict(
-            id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must"
-        )  # resume W&B run
-
-    wandb_logger = WandbLogger(
-        project=WANDB_PROJECT,
-        entity=WANDB_ENTITY,
-        log_model="all",
-        tags=args.wandb_tags,
-        save_dir="logs/",
-        **wandb_extra_args,
-    )
-    wandb_logger.log_hyperparams(dataclasses.asdict(args))
-    # wandb_logger.experiment.log_code(".")  # log code to wandb to be able to reproduce the run
-
-    if current_process_rank == 0:
-        logger.info(args)
-    if current_process_rank == 0 and not args.resume and not args.offline:
-        if args.run_name is None:
-            logger.warning("No run name specified with `--run_name`. Using W&B default (randomly generated name).")
-        else:
-            assert wandb_logger.version is not None
-            # wandb_logger.experiment.name = (
-            #     args.run_name + "-" + wandb_logger.version
-            # )  # Append id to name for easier recognition in W&B UI
-            wandb_logger.experiment.name = args.run_name + "-" + time.strftime("%Y-%m-%d-%H-%M-%S")
+    wandb_logging_module = WandbLoggingModule(args)
+    wandb_logger = wandb_logging_module.construct_logger()
 
     ################# Construct model ##############
 
@@ -97,8 +59,8 @@ def main(args: TrainingArgs):  # noqa: C901
     )
     model_cls = get_model_cls(args.model_name_or_path)
 
-    if args.saved_checkpoint_path is None:
-        args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
+    if args.saved_checkpoint_path is not None:
+        args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
             args.saved_checkpoint_path, wandb_logger.experiment
         )
 
@@ -106,11 +68,11 @@ def main(args: TrainingArgs):  # noqa: C901
             model = model_cls.load_from_checkpoint(args.saved_checkpoint_path, save_hyperparameters=False)
             # we will resume via trainer.fit(ckpt_path=...)
         else:  # load only weights
-            model = model_cls(**model_args)
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(model_args["accelerator"]))
+            model = model_cls(**model_args)  # type: ignore
+            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
             model.load_state_dict(torch_load["state_dict"], strict=False)
     else:
-        model = model_cls(**model_args)
+        model = model_cls(**model_args)  # type: ignore
 
     # https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
     torch.set_float32_matmul_precision("high")
@@ -125,7 +87,7 @@ def main(args: TrainingArgs):  # noqa: C901
 
     #################### Construct dataloaders & trainer #################
     dm = get_data_module(
-        args.dataset_class, args.data_dir, args.batch_size, args.loss_mode, model.get_tensor_transforms()
+        args.dataset_class, str(args.data_dir), args.batch_size, args.loss_mode, model.get_tensor_transforms()
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -166,7 +128,7 @@ def main(args: TrainingArgs):  # noqa: C901
         max_epochs=args.max_epochs,
         devices=args.num_devices,
         accelerator=args.accelerator,
-        strategy=args.distributed_strategy,
+        strategy=str(args.distributed_strategy),
         logger=wandb_logger,
         deterministic=args.force_deterministic,
         callbacks=callbacks,
@@ -205,7 +167,7 @@ def main(args: TrainingArgs):  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
-
+        assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
 
@@ -223,8 +185,8 @@ def main(args: TrainingArgs):  # noqa: C901
 if __name__ == "__main__":
     print("Starting training script...")
     config_path = "./cfgs/config.yml"
-    print("Parsing config from {}...")
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
+
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()

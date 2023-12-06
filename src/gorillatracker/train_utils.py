@@ -1,12 +1,15 @@
 import importlib
+from typing import Any, Tuple, Type, Union
 
 import torch
+from torch.utils.data import Dataset
 from torchvision.transforms import Compose, ToTensor
 
+import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import QuadletDataModule, TripletDataModule
 
 
-def get_dataset_class(pypath: str):
+def get_dataset_class(pypath: str) -> Type[Dataset[Tuple[torch.Tensor, Union[str, int]]]]:
     parent = torch.utils.data.Dataset
     modpath, clsname = pypath.rsplit(".", 1)
     mod = importlib.import_module(modpath)
@@ -15,14 +18,20 @@ def get_dataset_class(pypath: str):
     return cls
 
 
-def _assert_tensor(x):
+def _assert_tensor(x: Any) -> torch.Tensor:
     assert isinstance(
         x, torch.Tensor
     ), f"GorillaTrackerDataset.get_transforms must contain ToTensor. Transformed result is {type(x)}"
     return x
 
 
-def get_data_module(dataset_class_id, data_dir, batch_size, loss_mode: str, model_transforms):
+def get_data_module(
+    dataset_class_id: str,
+    data_dir: str,
+    batch_size: int,
+    loss_mode: str,
+    model_transforms: gtypes.Transform,
+) -> Union[TripletDataModule, QuadletDataModule]:
     base = QuadletDataModule if loss_mode.startswith("online") else TripletDataModule
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
@@ -32,4 +41,4 @@ def get_data_module(dataset_class_id, data_dir, batch_size, loss_mode: str, mode
             model_transforms,
         ]
     )
-    return base(data_dir, batch_size, dataset_class, transforms=transforms)
+    return base(data_dir, batch_size, dataset_class, transforms=transforms)  # type: ignore

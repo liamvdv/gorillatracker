@@ -30,10 +30,9 @@ jobs:
       #     make format
 
       # fail if lint fails
-      - name: Lint
+      - name: Lint 
         run: |
           make lint
-
       # else commit the autoformatted code fixes
       # - name: Check for modified files
       #   id: git-check
@@ -69,6 +68,14 @@ jobs:
       - name: Install gorillatracker
         run: pip install .
         shell: micromamba-shell {0}
+
+      # Mypy produces diffferent results based on installed package context as
+      # it gracefully decays if not all packages are installed. Thus we need to
+      # perform type checking in the conda env.
+      - name: Run Mypy
+        run: make mypy
+        shell: micromamba-shell {0}
+      
 
       - name: Run tests
         run: |

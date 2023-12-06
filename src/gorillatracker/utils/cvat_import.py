@@ -5,6 +5,9 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
+# NOTE(liamvdv): Will exclude from mypy.
+# TODO(memben): MyPy annotate this file, then add back to pyproject.toml [mypy]
+
 
 @dataclass
 class SegmentedImageData:
