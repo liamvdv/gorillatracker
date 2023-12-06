@@ -42,6 +42,8 @@ filterwarnings = [
 line-length = 120
 extend-select = ['Q', 'RUF100', 'C90']
 flake8-quotes = {inline-quotes = 'double', multiline-quotes = 'double'}
+# Explicit line length limit difficult, but McCabe complexity score will help. 
+# Ref: https://dx42.github.io/gmetrics/metrics/CyclomaticComplexityMetric.html
 mccabe = { max-complexity = 14 }
 
 [tool.ruff.per-file-ignores]
@@ -76,7 +78,9 @@ disallow_subclassing_any = true
 disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 disallow_untyped_calls = true
-
+# many libraries (torch, torchvision, timm, print_on_stroids) do not support a
+# py.typed marker and thus don't have library stubs. Thus we ignore these warns. 
+ignore_missing_imports = true
 # for strict mypy
 disallow_untyped_defs = true
 

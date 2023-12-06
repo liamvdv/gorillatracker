@@ -1,7 +1,10 @@
 import logging
+from typing import Any, Callable, Optional, Type
 
 import lightning as L
+from torch.utils.data import Dataset
 
+import gorillatracker.type_helper as gtypes
 from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
@@ -13,57 +16,65 @@ class NletDataModule(L.LightningDataModule):
     Base class for triplet/quadlet data modules, implementing shared functionality.
     """
 
-    def __init__(self, data_dir: str, batch_size: int = 32, dataset_class=None, transforms=None):
+    def __init__(
+        self,
+        data_dir: str,
+        batch_size: int = 32,
+        dataset_class: Optional[Type[Dataset[Any]]] = None,
+        transforms: Optional[gtypes.Transform] = None,
+    ) -> None:
         super().__init__()
         self.transforms = transforms
         self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
 
-    def get_dataloader(self):
+    def get_dataloader(self) -> Any:
         raise Exception("logic error, ask liamvdv")
 
-    def setup(self, stage: str):
+    def setup(self, stage: str) -> None:
+        assert self.dataset_class is not None, "dataset_class must be set before calling setup"
         logger.info(
             f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}"
         )
 
         if stage == "fit":
-            self.train = self.dataset_class(self.data_dir, partition="train", transform=self.transforms)
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)
+            self.train = self.dataset_class(self.data_dir, partition="train", transform=self.transforms)  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
         elif stage == "test":
-            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)
+            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
         elif stage == "validate":
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
-            self.predict = None
+            # self.predict = None
             raise ValueError("stage predict not yet supported by data module.")
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> gtypes.BatchNletDataLoader:
         return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> gtypes.BatchNletDataLoader:
         return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
 
-    def test_dataloader(self):
+    def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False)
 
-    def predict_dataloader(self):
-        return self.get_dataloader()(self.predict, batch_size=self.batch_size, shuffle=False)
+    def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
+        # return self.get_dataloader()(self.predict, batch_size=self.batch_size, shuffle=False)
+        raise NotImplementedError("predict_dataloader not implemented")
 
-    def teardown(self, stage: str):
+    def teardown(self, stage: str) -> None:
         # NOTE(liamvdv): used to clean-up when the run is finished
         pass
 
 
 class TripletDataModule(NletDataModule):
-    def get_dataloader(self):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
 
 
 class QuadletDataModule(NletDataModule):
-    def get_dataloader(self):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
         return QuadletDataLoader
