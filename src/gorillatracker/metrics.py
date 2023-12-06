@@ -1,6 +1,5 @@
-from typing import Any, Dict, List, Optional, Set, Tuple
-
 from functools import partial
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import lightning as L
 import matplotlib.pyplot as plt
