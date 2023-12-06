@@ -33,7 +33,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
 
 import torch
 
@@ -45,9 +45,11 @@ assert sys.version_info >= (
     7,
 ), "code relies on Python 3.7 explicit dict key insertion ordering guarantee for collections.defaultdict"
 
-Value = Path
+Value = Union[Path, List["Entry"]]
 Label = Union[str, int]
-Metadata = dict
+Metadata = Dict[Any, Any]
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -99,7 +101,10 @@ def group(images: List[Entry]) -> List[Entry]:
 
 def ungroup(individuals: List[Entry]) -> List[Entry]:
     """preservers order"""
-    return [img for individual in individuals for img in individual.value]
+    assert all(
+        isinstance(individual.value, list) for individual in individuals
+    ), "Sanity check that is is not called on Paths."
+    return [img for individual in individuals for img in individual.value]  # type: ignore
 
 
 def ungroup_with_must_include_mask(individuals: List[Entry], k: int) -> Tuple[List[Entry], List[bool]]:
@@ -107,13 +112,13 @@ def ungroup_with_must_include_mask(individuals: List[Entry], k: int) -> Tuple[Li
     images = []
     must_include_mask = []
     for individual in individuals:
-        for i, img in enumerate(individual.value):
+        for i, img in enumerate(individual.value):  # type: ignore
             images.append(img)
             must_include_mask.append(i < k)
     return images, must_include_mask
 
 
-def consistent_random_permutation(arr: list, unique_key, seed: int):
+def consistent_random_permutation(arr: List[T], unique_key: Callable[[Any], Any], seed: int) -> List[T]:
     g = torch.Generator()
     g.manual_seed(seed)
     idxs = torch.randperm(len(arr), generator=g).tolist()
@@ -121,7 +126,7 @@ def consistent_random_permutation(arr: list, unique_key, seed: int):
     return [arr[i] for i in idxs]
 
 
-def compute_split(samples: int, train: int, val: int, test: int):
+def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, int, int]:
     if train + val + test != 100:
         raise ValueError("sum of train, val and test must be 100")
 
@@ -147,22 +152,22 @@ def compute_split(samples: int, train: int, val: int, test: int):
 TEST = True
 
 
-def copy(src: Path, dst: Path):
+def copy(src: Path, dst: Path) -> None:
     if TEST:
         print(f"{src} -> {dst}")
     else:
         shutil.copyfile(src, dst)
 
 
-def write_entries(entries: List[Entry], outdir: Path):
+def write_entries(entries: List[Entry], outdir: Path) -> None:
     os.makedirs(outdir, exist_ok=True)
     for entry in entries:
-        assert isinstance(entry.value, Value)
+        assert isinstance(entry.value, Path)
         newpath = outdir / entry.value.name
         copy(entry.value, newpath)
 
 
-def sample_and_remove(arr, samples: int, mask=None):
+def sample_and_remove(arr: List[T], samples: int, mask: Optional[List[bool]] = None) -> Tuple[List[T], List[T]]:
     if mask is None:
         mask = [True] * len(arr)
     assert len(arr) == len(mask)
@@ -175,29 +180,30 @@ def sample_and_remove(arr, samples: int, mask=None):
 
 def splitter(
     images: List[Entry],
-    mode: Literal["openset", "openset"],
+    mode: Literal["openset", "closedset"],
     train: int,
     val: int,
     test: int,
     seed: int,
-    min_train_count=3,
-    reid_factor_val: int = None,
-    reid_factor_test: int = None,
-):
+    min_train_count: int = 3,
+    reid_factor_val: Optional[int] = None,
+    reid_factor_test: Optional[int] = None,
+) -> Tuple[List[Entry], List[Entry], List[Entry]]:
     assert train + val + test == 100, "train, val, test must sum to 100."
-    random.seed = seed
+    random.seed = seed  # type: ignore # ensure deterministic behaviour
     # This shuffe is preserved throughout groups and ungroups.
     # because python dicts are ordered by insertion.
     # We can now simply pop from the start / end to get random images.
     images = consistent_random_permutation(images, lambda x: x.value, seed)
-    train_bucket = []
-    val_bucket = []
-    test_bucket = []
+    train_bucket: List[Entry] = []
+    val_bucket: List[Entry] = []
+    test_bucket: List[Entry] = []
 
     individums = group(images)
     if mode == "closedset":
         train_count, val_count, test_count = compute_split(len(images), train, val, test)
         for individum in individums:
+            assert isinstance(individum.value, list)
             n = len(individum.value)
             selection, individum.value = individum.value[:min_train_count], individum.value[min_train_count:]
             if len(selection) != min_train_count:
@@ -212,6 +218,9 @@ def splitter(
         assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
         train_bucket.extend(rest)
     elif mode == "openset":
+        assert isinstance(reid_factor_val, int) and isinstance(
+            reid_factor_test, int
+        ), "must pass reid_factor_{val,test} if mode=openset"
         # At least one unseen individuum in test and eval.
         train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
         train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
@@ -231,6 +240,7 @@ def splitter(
         test_bucket += reid_samples[reid_count_val:]
 
         for individual in group(train_bucket):
+            assert isinstance(individual.value, list)
             n = len(individual.value)
             if n < min_train_count:
                 print(
@@ -239,7 +249,7 @@ def splitter(
     return train_bucket, val_bucket, test_bucket
 
 
-def stats_and_confirm(name, full, train, val, test):
+def stats_and_confirm(name: str, full: List[Entry], train: List[Entry], val: List[Entry], test: List[Entry]) -> None:
     print(f"Stats for {name}")
     print(f"Distribution over {len(full)} images:")
     print(f"Train: {len(train)}")
@@ -251,16 +261,16 @@ def stats_and_confirm(name, full, train, val, test):
 
 
 def generate_split(
-    dataset="ground_truth/cxl/full_images",
+    dataset: str = "ground_truth/cxl/full_images",
     mode: Literal["openset", "closedset"] = "closedset",
-    seed=42,
-    train=70,
-    val=15,
-    test=15,
-    min_train_count=3,
-    reid_factor_val: int = None,
-    reid_factor_test: int = None,
-):
+    seed: int = 42,
+    train: int = 70,
+    val: int = 15,
+    test: int = 15,
+    min_train_count: int = 3,
+    reid_factor_val: Optional[int] = None,
+    reid_factor_test: Optional[int] = None,
+) -> Path:
     reid_factors = "-"
     if mode == "openset":
         assert isinstance(reid_factor_val, int) and isinstance(
@@ -270,7 +280,7 @@ def generate_split(
     name = f"splits/{dataset.replace('/', '-')}-{mode}{reid_factors}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
     outdir = Path(f"data/{name}")
     images = read_ground_truth_cxl(f"data/{dataset}")
-    train, val, test = splitter(
+    train_bucket, val_bucket, test_bucket = splitter(
         images,
         mode=mode,
         train=train,
@@ -281,20 +291,20 @@ def generate_split(
         reid_factor_test=reid_factor_test,
         reid_factor_val=reid_factor_val,
     )
-    stats_and_confirm(name, images, train, val, test)
-    write_entries(train, outdir / "train")
-    write_entries(val, outdir / "val")
-    write_entries(test, outdir / "test")
+    stats_and_confirm(name, images, train_bucket, val_bucket, test_bucket)
+    write_entries(train_bucket, outdir / "train")
+    write_entries(val_bucket, outdir / "val")
+    write_entries(test_bucket, outdir / "test")
     return outdir
 
 
 def generate_simple_split(
-    dataset="ground_truth/cxl/full_images",
-    seed=42,
-    train=70,
-    val=15,
-    test=15,
-):
+    dataset: str = "ground_truth/cxl/full_images",
+    seed: int = 42,
+    train: int = 70,
+    val: int = 15,
+    test: int = 15,
+) -> None:
     name = f"splits/{dataset.replace('/', '-')}-seed-{seed}-train-{train}-val-{val}-test-{test}"
     files = read_files(f"data/{dataset}")
     files = consistent_random_permutation(files, lambda x: x.value, seed)
@@ -309,7 +319,7 @@ def generate_simple_split(
     write_entries(test_set, outdir / "test")
 
 
-def copy_corresponding_images(data_dir: str, img_dir="ground_truth/cxl/full_images"):
+def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/full_images") -> None:
     """
     Copy each image from img_dir to data_dir if a file with a corresponding name exists in data_dir.
     """

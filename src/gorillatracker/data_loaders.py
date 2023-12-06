@@ -1,14 +1,34 @@
 import itertools
 from collections import defaultdict
-from typing import Any, List, Tuple
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Generator,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import torch
-from torch.utils.data.dataloader import DataLoader, Sampler
+from torch.utils.data import DataLoader, Dataset, Sampler
+
+import gorillatracker.type_helper as gtypes
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+LabelSection = DefaultDict[Union[int, str], Tuple[int, int]]
 
 
-def generate_labelsection(sorted_value_labels: List[Tuple[Any, Any]]):
+def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, str]]]) -> LabelSection:
     n = len(sorted_value_labels)
-    labelsection = defaultdict(lambda: (None, None))
+    labelsection: LabelSection = defaultdict(lambda: (-1, -1))
     prev_label = None
     prev_start = None
     for i, (_, label) in enumerate(sorted_value_labels):
@@ -20,12 +40,13 @@ def generate_labelsection(sorted_value_labels: List[Tuple[Any, Any]]):
             labelsection[prev_label] = (prev_start, i - prev_start)
             prev_label = label
             prev_start = i
+    assert prev_label is not None and prev_start is not None  # make typing happy
     if prev_label:
         labelsection[prev_label] = (prev_start, n - prev_start)
     return labelsection
 
 
-def iter_index_permutations_generator(n: int):
+def iter_index_permutations_generator(n: int) -> Iterator[Tuple[int, ...]]:
     """
     returns all possibel index permutations in a systematic order.
     WARN(liamvdv): the systematic order makes the first indices occure predominantly.
@@ -42,7 +63,7 @@ def iter_index_permutations_generator(n: int):
     return itertools.permutations(list(range(n)))
 
 
-def index_permuation_generator(n: int):
+def index_permuation_generator(n: int) -> Generator[List[int], None, None]:
     """
     returns a generator that returns a random index permutation. Does not ensure
     all permuations are seen. Reproducable via torch.seed.
@@ -66,21 +87,21 @@ def randint_except(start: int, end: int, excluded: int) -> int:
             return idx
 
 
-class ToNthDataset:
+class ToNthDataset(Dataset[Tuple[Tuple[T, ...], Tuple[R, ...]]], Generic[T, R]):
     """
     ToNthDataset allows N index accesses at once on a single index access Dataset.
     """
 
-    def __init__(self, dataset, transform=lambda x: x):
+    def __init__(self, dataset: Dataset[Tuple[T, R]], transform: gtypes.Transform = lambda x: x) -> None:
         self.dataset = dataset
         self.transform = transform
 
-    def __len__(self):
-        return len(self.dataset)
+    def __len__(self) -> int:
+        return len(self.dataset)  # type: ignore
 
-    def __getitem__(self, idxs):
-        if torch.is_tensor(idxs):
-            idxs = idxs.tolist()
+    def __getitem__(self, idxs: Union[List[int], torch.Tensor]) -> Tuple[Tuple[T, ...], Tuple[R, ...]]:
+        if torch.is_tensor(idxs):  # type: ignore
+            idxs = idxs.tolist()  # type: ignore
 
         xs, ys = [], []
         for idx in idxs:
@@ -92,16 +113,20 @@ class ToNthDataset:
         return tuple(xs), tuple(ys)
 
 
-class TripletSampler(Sampler):
+class TripletSampler(Sampler[Tuple[int, int, int]]):
     """Do not use DataLoader(..., shuffle=True) with TripletSampler."""
 
-    def __init__(self, sorted_dataset, shuffled_indices_generator=index_permuation_generator):
+    def __init__(
+        self,
+        sorted_dataset: Sequence[Tuple[Any, gtypes.Label]],
+        shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
+    ):
         self.dataset = sorted_dataset
         self.n = len(self.dataset)
         self.labelsection = generate_labelsection(self.dataset)
         self.shuffled_indices_generator = shuffled_indices_generator(self.n)
 
-    def any_sample_not(self, label) -> int:
+    def any_sample_not(self, label: gtypes.Label) -> int:
         start, length = self.labelsection[label]
         end = start + length
         i = torch.randint(self.n - length, (1,)).item()
@@ -109,10 +134,10 @@ class TripletSampler(Sampler):
             i += length
         return i
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[int, int, int]]:
         anchor_shuffle = next(self.shuffled_indices_generator)
         for anchor in anchor_shuffle:
             anchor_label = self.dataset[anchor][1]
@@ -122,10 +147,31 @@ class TripletSampler(Sampler):
             yield anchor, positive, negative
 
 
-class QuadletSampler(TripletSampler):
+class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
     """Do not use DataLoader(..., shuffle=True) with QuadletSampler."""
 
-    def __iter__(self):
+    def __init__(
+        self,
+        sorted_dataset: Sequence[Tuple[Any, gtypes.Label]],
+        shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
+    ):
+        self.dataset = sorted_dataset
+        self.n = len(self.dataset)
+        self.labelsection = generate_labelsection(self.dataset)
+        self.shuffled_indices_generator = shuffled_indices_generator(self.n)
+
+    def any_sample_not(self, label: gtypes.Label) -> int:
+        start, length = self.labelsection[label]
+        end = start + length
+        i = torch.randint(self.n - length, (1,)).item()
+        if start <= i and i < end:
+            i += length
+        return i
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __iter__(self) -> Iterator[Tuple[int, int, int, int]]:
         anchor_shuffle = next(self.shuffled_indices_generator)
         for anchor_positive in anchor_shuffle:
             anchor_p_label = self.dataset[anchor_positive][1]
@@ -139,50 +185,55 @@ class QuadletSampler(TripletSampler):
             yield anchor_positive, positive, anchor_negative, negative
 
 
-class FreezeSampler(Sampler):
+class FreezeSampler(Sampler[T]):
     """
     FreezeSampler is a wrapper around a Sampler that freezes the indices returned by
     the first iteration of the sampler and returns those in every subsequent iteration.
     """
 
-    def __init__(self, sampler):
+    def __init__(self, sampler: Sampler[T]) -> None:
         self.sampler = sampler
-        self.cache = None
+        self.cache: Optional[List[T]] = None
 
-    def __len__(self):
-        return len(self.sampler)
+    def __len__(self) -> int:
+        return len(self.sampler)  # type: ignore
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         if self.cache is None:
             self.cache = list(self.sampler)
+        assert self.cache is not None
         return iter(self.cache)
 
 
-def TripletDataLoader(dataset, batch_size, shuffle=True):
+def TripletDataLoader(
+    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+) -> gtypes.BatchTripletDataLoader:
     """
     TripletDataLoader will take any Dataset that returns a single sample in the form of
     (value, label) on __getitem__ and transform it into an efficient Triplet DataLoader.
     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
     dataset will be shuffled once at the start and not after that.
     """
-    label_sorted_dataset = sorted(dataset, key=lambda t: t[1])
+    label_sorted_dataset = sorted(dataset, key=lambda t: t[1])  # type: ignore
     sampler = TripletSampler(label_sorted_dataset)
     if not shuffle:
-        sampler = FreezeSampler(sampler)
+        sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
 
 
-def QuadletDataLoader(dataset, batch_size, shuffle=True):
+def QuadletDataLoader(
+    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+) -> gtypes.BatchQuadletDataLoader:
     """
     QuadletDataLoader will take any Dataset that returns a single sample in the form of
     (value, label) on __getitem__ and transform it into an efficient Quadlet DataLoader.
     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
     dataset will be shuffled once at the start and not after that.
     """
-    label_sorted_dataset = sorted(dataset, key=lambda t: t[1])
+    label_sorted_dataset = sorted(dataset, key=lambda t: t[1])  # type: ignore
     sampler = QuadletSampler(label_sorted_dataset)
     if not shuffle:
-        sampler = FreezeSampler(sampler)
+        sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
