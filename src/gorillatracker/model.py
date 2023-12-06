@@ -5,7 +5,6 @@ import lightning as L
 import pandas as pd
 import timm
 import torch
-import torchvision.transforms as transforms
 from print_on_steroids import logger
 from torch.optim import AdamW
 from torchvision.models import (
