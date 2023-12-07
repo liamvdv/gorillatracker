@@ -187,6 +187,20 @@ class ConvNeXtV2Wrapper(BaseModule):
         return transforms.Resize((224), antialias=True)
 
 
+class VisionTransformerWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
+        self.model.reset_classifier(self.embedding_size)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Resize((224), antialias=True)
+
+
 class SwinV2BaseWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -244,6 +258,7 @@ class ResNet152Wrapper(BaseModule):
 custom_model_cls = {
     "EfficientNetV2_Large": EfficientNetV2Wrapper,
     "SwinV2Base": SwinV2BaseWrapper,
+    "ViT_Large": VisionTransformerWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
     "ConvNeXtV2_Base": ConvNeXtV2Wrapper,
