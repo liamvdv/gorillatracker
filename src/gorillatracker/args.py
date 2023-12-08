@@ -35,6 +35,7 @@ class TrainingArgs:
     debug: bool = field(default=False)
     from_scratch: bool = field(default=False)
     early_stopping_patience: int = 3
+    min_delta: float = field(default=0.01)
     embedding_size: int = 256
 
     learning_rate: float = field(default=0.001)
