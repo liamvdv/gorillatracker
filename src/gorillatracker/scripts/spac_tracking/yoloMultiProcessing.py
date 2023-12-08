@@ -1,22 +1,31 @@
+import ultralytics
 from ultralytics import YOLO
 from functools import partial
 import os
 import json
 import multiprocessing
-from typing import List, Dict, Callable, Optional
+from typing import List, Dict, Callable, Optional, Union, cast
 
-gpu_queue = multiprocessing.Queue()
+#setting a type here breaks the queue for some reason - i dont know why, but it makes me want to nuke mypy off the face of the earth
+gpu_queue:multiprocessing.Queue = multiprocessing.Queue() # type: ignore
 
-config = {}
+class Config:
+    def __init__(self)->None:
+        self.models: List[YOLO] = []
+        self.post_process_functions: List[Callable[[List[ultralytics.engine.results.Results], str], None]] = []
+        self.yolo_args: Dict[str, Union[bool, int, str]] = {}
+        self.checkpoint_path:str = ""
+
+config:Config = Config()
 
 
 def save_result_to_json(
-    results: List[List[Dict]], 
-    json_folder: str, 
+    results: List[ultralytics.engine.results.Results], 
+    video_path: str = "",
+    json_folder: str = "", 
     overwrite: bool = False,
-    video_path: str = None,
     min_conf: float = 0.5
-    ):
+    )->None:
     """
     Save the results to a JSON file.
 
@@ -33,15 +42,15 @@ def save_result_to_json(
     """
     
     file_name = video_path.split("/")[-1]
-    file_name = file_name.split(".")[:-1]
-    file_name = ".".join(file_name)
+    file_name_split = file_name.split(".")[:-1]
+    file_name = ".".join(file_name_split)
     
     json_path = f"{json_folder}/{file_name}.json"
     if os.path.exists(json_path) and not overwrite:
         return
     
     frame_count = os.popen(f"ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 {video_path}").read()
-    label_frames = [[] for _ in range(int(frame_count))]
+    label_frames:List[List[Dict[str,float]]] = [[] for _ in range(int(frame_count))]
     
     for result_index in range(len(results)):
         result = results[result_index]
@@ -73,7 +82,7 @@ def predict_video(
     input_path: str, 
     models: List[YOLO],
     gpu_id: int = 0,
-    ):
+    )->None:
     """
     Predicts labels for objects in a video using multiple YOLO models.
     Most of the parameters are passed through the global config variable.
@@ -97,12 +106,12 @@ def predict_video(
     
     # grabbing parameters from config
         
-    post_process_functions = config["post_process_functions"]
-    yolo_args = config["yolo_args"]
-    checkpoint_path = config["checkpoint_path"]
+    post_process_functions:List[Callable[[List[ultralytics.engine.results.Results], str], None]] = config.post_process_functions
+    yolo_args = config.yolo_args
+    checkpoint_path = config.checkpoint_path
     file_name = input_path.split("/")[-1]
-    file_name = file_name.split(".")[:-1]
-    file_name = ".".join(file_name)
+    file_name_split = file_name.split(".")[:-1]
+    file_name = ".".join(file_name_split)
     
     # getting the generators for each model
     
@@ -114,11 +123,11 @@ def predict_video(
 
     if post_process_functions is not None:
         for post_process_function in post_process_functions:
-            post_process_function(results = results, video_path = input_path)
+            post_process_function(results, input_path)
         
     # updating the checkpoint
     
-    if checkpoint_path is not None:
+    if checkpoint_path != "":
         open(checkpoint_path, "w").write(input_path)
 
 
@@ -129,23 +138,26 @@ class SingletonMeta(type):
     """
     This is a thread-safe implementation of Singleton. # TODO UNTESTED
     """
-    _instances = {}
+    _instances:Dict[int, multiprocessing.Process] = {}
 
-    def __call__(cls, *args, **kwargs):
-        if multiprocessing.current_process().pid not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[multiprocessing.current_process().pid] = instance
-        return cls._instances[multiprocessing.current_process().pid]
+    
+    def __call__(cls, *args, **kwargs)->multiprocessing.Process: # type: ignore
+        pid = multiprocessing.current_process().pid
+        if pid not in cls._instances:
+            instance:multiprocessing.Process = super().__call__(*args, **kwargs)
+            pid = cast(int, multiprocessing.current_process().pid)
+            cls._instances[pid] = instance
+        return cls._instances[pid]
 
 class Singleton(metaclass=SingletonMeta):
     def __init__(self, models: List[YOLO]):
         self.value = models
 
-    def get_models(self): 
+    def get_models(self)->List[YOLO]: 
         return self.value
 
 
-def worker_function(input_path: str):
+def worker_function(input_path: str)->None:
     
     """
     Process the given input video file.
@@ -157,7 +169,7 @@ def worker_function(input_path: str):
     """
     
     global config
-    singleton = Singleton(config["models"])
+    singleton = Singleton(config.models)
     gpu = gpu_queue.get()
     print(f"Processing {input_path} on GPU {gpu}")
     predict_video(input_path, singleton.get_models(), gpu)
@@ -169,18 +181,17 @@ def worker_function(input_path: str):
     
     
 def predict_video_multiprocessing(
+    post_process_functions: List[Callable[[List[ultralytics.engine.results.Results], str], None]],
     models: List[YOLO] = [
         YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt"),
-        YOLO("/workspaces/gorillatracker/models/body_s_Ben.pt"),
         YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/face.pt")
         ], 
-    post_process_functions: List[Callable[[List[List[Dict]], str], None]] = None,
-    yolo_args: Dict = {"verbose":False},
+    yolo_args: Dict[str, Union[bool, str, int]] = {"verbose":False},
     pool_per_gpu: int = 4,
     gpu_ids: List[int] = [0],
-    checkpoint_path: Optional[str] = None,
-    **kwargs
-    ):
+    checkpoint_path: str = "",
+    **kwargs: Union[str, List[str], bool]
+    )->None:
     
     """
     Perform video prediction using multiple YOLO models in parallel using multiprocessing.
@@ -188,7 +199,7 @@ def predict_video_multiprocessing(
     Parameters:
     - models (List[YOLO]): List of YOLO models to use for prediction.
     - post_process_functions (List[Callable[[List[List[Dict]]], None]]): List of function to apply post-processing to the predicted results. 
-            The function will get the results passed as the first argument and the file name as the second argument.
+            The function will get the results passed as the first argument and the video path as the second argument.
             The function shouldn't return anything.
             If you want to pass additional arguments to the function, use functools.partial.
     - yolo_args (Dict): Additional arguments to pass to the YOLO models.
@@ -201,12 +212,10 @@ def predict_video_multiprocessing(
     # setting global variables for other functions to use
     
     global config
-    config = {
-        "models": models,
-        "post_process_functions": post_process_functions,
-        "yolo_args": yolo_args,
-        "checkpoint_path": checkpoint_path
-    }
+    config.models = models
+    config.post_process_functions = post_process_functions
+    config.yolo_args = yolo_args
+    config.checkpoint_path = checkpoint_path
     
     # creating a queue of gpu ids to be used by the worker function
     
@@ -220,16 +229,16 @@ def predict_video_multiprocessing(
     assert "video_dir" in kwargs or "video_paths" in kwargs, "Either video_dir or video_paths must be specified"
     assert not ("video_dir" in kwargs and "video_paths" in kwargs), "Only one of video_dir or video_paths must be specified"
     
-    video_paths = kwargs["video_paths"]
+    video_paths = cast(List[str], kwargs["video_paths"])
     
     if "video_dir" in kwargs:
-        video_dir = kwargs["video_dir"]
+        video_dir = cast(str, kwargs["video_dir"])
         video_paths = [os.path.join(video_dir, x) for x in os.listdir(video_dir)]
         
     # if a checkpoint file is specified, skip videos that have already been processed (also some error checking)
         
     print(f"Processing {len(video_paths)} videos")
-    if checkpoint_path is not None:
+    if checkpoint_path != "":
         if os.path.exists(checkpoint_path):
             print("Checkpoint found, resuming from last processed video")
             last_processed_video = open(checkpoint_path, "r").read()
@@ -256,6 +265,7 @@ def predict_video_multiprocessing(
     
 
 if __name__ == "__main__":
+    # example usage, feel free to modify or just import the functions and use them in your own script
     video_dir = "/workspaces/gorillatracker/spac_gorillas_converted"
     video_paths = [os.path.join(video_dir, x) for x in os.listdir(video_dir)]
     debug_vid_paths = video_paths[:200]
@@ -273,5 +283,6 @@ if __name__ == "__main__":
             overwrite=True,
             )
         ],
-        # checkpoint_path="./checkpoint.txt"
+        checkpoint_path="./checkpoint.txt"
         )
+    
