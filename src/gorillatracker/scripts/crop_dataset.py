@@ -6,7 +6,8 @@ from typing import List, Literal, Tuple
 
 from PIL import Image
 
-index_to_name = {0: "afia", 1: "ayana", 2: "jock", 3: "kala", 4: "kera", 5: "kukuena", 6: "touni"}
+from gorillatracker.scripts.ensure_integrity_openset import bristol_index_to_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +62,7 @@ def crop_ground_truth(image_path: str, bbox_path: str, output_dir: str) -> None:
     bbox_data_lines = read_bbox_data(bbox_path)
 
     for index, x, y, w, h in bbox_data_lines:
-        name = index_to_name[int(index)]
+        name = bristol_index_to_name[int(index)]
         file_name = name + "_" + os.path.basename(image_path)
         output_path = os.path.join(output_dir, file_name)
         crop_and_save_image(image_path, x, y, w, h, output_path)
