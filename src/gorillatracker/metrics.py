@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import lightning as L
@@ -48,11 +49,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
         current_epoch = trainer.current_epoch
         assert trainer.max_epochs is not None
-        if (
-            current_epoch % self.every_n_val_epochs == 0
-            and current_epoch not in self.logged_epochs
-            and current_epoch != 0
-        ) or (trainer.max_epochs - 1 == current_epoch):
+        if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
+            trainer.max_epochs - 1 == current_epoch
+        ):
             self.logged_epochs.add(current_epoch)
 
             # Assuming you have an 'embeddings' variable containing your embeddings
@@ -71,7 +70,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
-                metrics={"knn": knn, "pca": pca, "tsne": tsne, "fc_layer": fc_layer},  # "flda": flda_metric,
+                metrics={
+                    "knn5": knn,
+                    "knn": partial(knn, k=1),
+                    "pca": pca,
+                    "tsne": tsne,
+                    "fc_layer": fc_layer,
+                },  # "flda": flda_metric,
             )
             # wandb.log({"epoch": current_epoch})
             # for visibility also log the
@@ -185,6 +190,10 @@ def fc_layer(
 # Vincents code
 def knn(embeddings: torch.Tensor, labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, float]:
     num_classes = len(np.unique(labels))
+    if num_classes < k:
+        print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
+        k = num_classes
+
     # convert embeddings and labels to tensors
     embeddings = torch.tensor(embeddings)
     labels = torch.tensor(labels)

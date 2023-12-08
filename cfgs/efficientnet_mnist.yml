@@ -46,7 +46,7 @@ batch_size: 512                 # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 5                   # Training goal (large number)
-val_before_training: False      # Perform validation before training
+val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
