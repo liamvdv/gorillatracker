@@ -9,14 +9,14 @@ workers: 4                      # Number of workers for data loading
 
 
 # Model and Training Arguments
-project_name: "research-template" # WandB project name
-run_name: "test-code"           # Name for this training run
+project_name: "Embedding-ViT-MNIST"
+run_name: "12-Test_ViT_Large_patch16"           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
-model_name_or_path: "EfficientNetV2_Large" # Model name or path 
-saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
+model_name_or_path: "ViT_Large" # Model name or path 
+saved_checkpoint_path: None     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False             # Enable fast development run
-profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
+profiler: None                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
@@ -30,7 +30,7 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "offline/native"
+loss_mode: "online/soft"
 
 learning_rate: 1e-4             # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
@@ -40,11 +40,11 @@ lr_decay: 0.9                   # Learning rate decay (for the learning rate sch
 lr_decay_interval: 1            # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
 # )
 
-batch_size: 12                  # Training batch size
+batch_size: 8                 # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
-val_before_training: True       # Perform validation before training
+max_epochs: 5                   # Training goal (large number)
+val_before_training: False      # Perform validation before training
 only_val: False                 # Perform only validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
@@ -53,5 +53,5 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "data/splits/use_for_baseline_cxl_face-openset_origin_robert"
-dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+data_dir: "./mnist"
+dataset_class: "gorillatracker.datasets.mnist.MNISTDataset"
