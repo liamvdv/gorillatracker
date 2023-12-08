@@ -1,5 +1,4 @@
-import wandb
-from train import main
+from wandb import agent, sweep
 
 # Set your default config
 config_path = "./cfgs/resnet18_cxl.yml"
@@ -14,18 +13,12 @@ sweep_config = {
         "loss_mode": {"values": ["offline", "offline/native", "online/soft", "online/semi-hard"]},
         # Add other parameters as needed
     },
-    "command": [
-        "${interpreter}",
-        "${program}",
-        "${args}",
-        "--config_path",
-        config_path
-    ]
+    "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
 }
 # Initialize the sweep
 project_name = "test_losses"
 entity = "gorillas"
-sweep_id = wandb.sweep(sweep=sweep_config, project=project_name, entity=entity)
+sweep_id = sweep(sweep=sweep_config, project=project_name, entity=entity)
 # Print the sweep ID directly
 print(f"SWEEP_PATH={entity}/{project_name}/{sweep_id}")
-wandb.agent(sweep_id)
+agent(sweep_id)
