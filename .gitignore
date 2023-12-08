@@ -143,6 +143,7 @@ dmypy.json
 /ultralytics
 yolov8n.pt
 /.vscode
+.devcontainer/
 /runs
 /checkpoints
 /gorillavision

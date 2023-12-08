@@ -1,12 +1,13 @@
 # NOTE: https://github.com/ultralytics/ultralytics/issues/5800
 # also did not work for the bbox export
+from typing import List, Tuple
 
 import cv2
 
 import gorillatracker.utils.cvat_import as cvat_import
 
 
-def _convert_to_yolo_format(box, img_width, img_height):
+def _convert_to_yolo_format(box: Tuple[int, int, int, int], img_width: int, img_height: int) -> List[float]:
     x_min, y_min, x_max, y_max = box
     x_center = (x_min + x_max) / 2 / img_width
     y_center = (y_min + y_max) / 2 / img_height
@@ -21,7 +22,7 @@ def _convert_to_yolo_format(box, img_width, img_height):
 
 # NOTE(memben): for now we are only storing the body bbox
 # TODO(memben): generalize the export to segments
-def export_cvat_to_yolo(segmented_images, target_dir, full_images_dir):
+def export_cvat_to_yolo(xml_file: str, target_dir: str, full_images_dir: str) -> None:
     segmented_images = cvat_import.cvat_import(xml_file, full_images_dir)
 
     unique_labels = sorted({label for img in segmented_images for label in img.segments})

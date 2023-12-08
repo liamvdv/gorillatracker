@@ -1,3 +1,6 @@
+from functools import partial
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,13 +14,18 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 
+import gorillatracker.type_helper as gtypes
 
-def log_as_wandb_table(embeddings_table, run):
+# TODO: What is the wandb run type?
+Runner = Any
+
+
+def log_as_wandb_table(embeddings_table: pd.DataFrame, run: Runner) -> None:
     tmp = embeddings_table.apply(
         lambda row: pd.concat([pd.Series([row["label"]]), pd.Series(row["embedding"])]), axis=1
     )
     tmp.columns = ["label"] + [f"embedding_{i}" for i in range(len(embeddings_table["embedding"].iloc[0]))]
-    run.log({"embeddings": wandb.Table(dataframe=tmp)})
+    run.log({"embeddings": wandb.Table(dataframe=tmp)})  # type: ignore
 
 
 class LogEmbeddingsToWandbCallback(L.Callback):
@@ -29,28 +37,26 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_share: Log embeddings to wandb every n epochs.
     """
 
-    def __init__(self, every_n_val_epochs, wandb_run):
+    def __init__(self, every_n_val_epochs: int, wandb_run: Runner) -> None:
         super().__init__()
+        self.logged_epochs: Set[int] = set()
+        self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
-        self.logged_epochs = set()
-        self.embedding_artifacts = []
         self.run = wandb_run
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
 
         current_epoch = trainer.current_epoch
-
-        if (
-            current_epoch % self.every_n_val_epochs == 0
-            and current_epoch not in self.logged_epochs
-            and current_epoch != 0
-        ) or (trainer.max_epochs - 1 == current_epoch):
+        assert trainer.max_epochs is not None
+        if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
+            trainer.max_epochs - 1 == current_epoch
+        ):
             self.logged_epochs.add(current_epoch)
 
             # Assuming you have an 'embeddings' variable containing your embeddings
 
-            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # TODO
+            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
             artifact = wandb.Artifact(
                 name="run_{0}_epoch_{1}".format(self.run.name, current_epoch),
                 type="embeddings",
@@ -64,7 +70,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
-                metrics={"knn": knn, "pca": pca, "tsne": tsne, "fc_layer": fc_layer},  # "flda": flda_metric,
+                metrics={
+                    "knn5": knn,
+                    "knn": partial(knn, k=1),
+                    "pca": pca,
+                    "tsne": tsne,
+                    "fc_layer": fc_layer,
+                },  # "flda": flda_metric,
             )
             # wandb.log({"epoch": current_epoch})
             # for visibility also log the
@@ -78,7 +90,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 # 3. use some kind of FLDA ({(m_1 - m_2)^2/(s_1^2 + s_2^2)} like metric to evaluate the quality of the embeddings
 # 4. try kNN with different k values to evaluate the quality of the embeddings
 # 5. enjoy
-def load_embeddings_from_wandb(embedding_name, run):
+def load_embeddings_from_wandb(embedding_name: str, run: Runner) -> pd.DataFrame:
     """Load embeddings from wandb Artifact."""
     # Data is a pandas Dataframe with columns: label, embedding_0, embedding_1, ... loaded from wandb from the
     artifact = run.use_artifact(embedding_name, type="embeddings")
@@ -87,7 +99,9 @@ def load_embeddings_from_wandb(embedding_name, run):
     return data
 
 
-def evaluate_embeddings(data, embedding_name, metrics={}):  # data is DataFrame with columns: label and embedding
+def evaluate_embeddings(
+    data: pd.DataFrame, embedding_name: str, metrics: Dict[str, Any]
+) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
     embeddings = np.asarray([embedding for embedding in data["embedding"]], dtype=np.float32)
     # convert labels to numpy array
     le = LabelEncoder()
@@ -112,7 +126,9 @@ def evaluate_embeddings(data, embedding_name, metrics={}):  # data is DataFrame 
     return results
 
 
-def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42):
+def fc_layer(
+    embeddings: torch.Tensor, labels: gtypes.MergedLabels, batch_size: int = 64, epochs: int = 300, seed: int = 42
+) -> Dict[str, float]:
     num_classes = len(np.unique(labels))
     model = torch.nn.Sequential(
         torch.nn.Linear(embeddings.shape[1], 100),
@@ -143,7 +159,7 @@ def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42):
                 loss.requires_grad_(True)
                 loss.backward()
                 # apply gradient clipping
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # type: ignore
                 optimizer.step()
                 loss_sum += loss.item()
 
@@ -160,20 +176,24 @@ def fc_layer(embeddings, labels, batch_size=64, epochs=300, seed=42):
 
     accuracy = tm.functional.accuracy(
         final_outputs, labels, task="multiclass", num_classes=num_classes, average="weighted"
-    ).item()
-    accuracy_top5 = tm.functional.accuracy(
-        final_outputs, labels, task="multiclass", num_classes=num_classes, top_k=5
-    ).item()
-    auroc = tm.functional.auroc(final_outputs, labels, task="multiclass", num_classes=num_classes).item()
-    f1 = tm.functional.f1_score(
-        final_outputs, labels, task="multiclass", num_classes=num_classes, average="weighted"
-    ).item()
-    return {"accuracy": accuracy, "accuracy_top5": accuracy_top5, "auroc": auroc, "f1": f1}
+    )
+    assert accuracy is not None
+    accuracy_top5 = tm.functional.accuracy(final_outputs, labels, task="multiclass", num_classes=num_classes, top_k=5)
+    assert accuracy_top5 is not None
+    auroc = tm.functional.auroc(final_outputs, labels, task="multiclass", num_classes=num_classes)
+    assert auroc is not None
+    f1 = tm.functional.f1_score(final_outputs, labels, task="multiclass", num_classes=num_classes, average="weighted")
+    assert f1 is not None
+    return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
 # Vincents code
-def knn(embeddings, labels, k=5):
+def knn(embeddings: torch.Tensor, labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, float]:
     num_classes = len(np.unique(labels))
+    if num_classes < k:
+        print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
+        k = num_classes
+
     # convert embeddings and labels to tensors
     embeddings = torch.tensor(embeddings)
     labels = torch.tensor(labels)
@@ -201,19 +221,23 @@ def knn(embeddings, labels, k=5):
 
     accuracy = tm.functional.accuracy(
         classification_matrix, labels, task="multiclass", num_classes=num_classes, average="weighted"
-    ).item()
+    )
+    assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
         classification_matrix, labels, task="multiclass", num_classes=num_classes, top_k=5
-    ).item()
-    auroc = tm.functional.auroc(classification_matrix, labels, task="multiclass", num_classes=num_classes).item()
+    )
+    assert accuracy_top5 is not None
+    auroc = tm.functional.auroc(classification_matrix, labels, task="multiclass", num_classes=num_classes)
+    assert auroc is not None
     f1 = tm.functional.f1_score(
         classification_matrix, labels, task="multiclass", num_classes=num_classes, average="weighted"
-    ).item()
+    )
+    assert f1 is not None
     print("knn done")
-    return {"accuracy": accuracy, "accuracy_top5": accuracy_top5, "auroc": auroc, "f1": f1}
+    return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
-def pca(embeddings, labels):  # generate a 2D plot of the embeddings
+def pca(embeddings: torch.Tensor, labels: torch.Tensor) -> wandb.Image:  # generate a 2D plot of the embeddings
     num_classes = len(np.unique(labels))
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
@@ -236,17 +260,18 @@ def pca(embeddings, labels):  # generate a 2D plot of the embeddings
     return plot
 
 
-def tsne(embeddings, labels, pca=False, count=1000):  # generate a 2D plot of the embeddings
+def tsne(
+    embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000
+) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     num_classes = len(np.unique(labels))
     # downsample the embeddings and also the labels to 1000 samples
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]
     if len(labels) < 50:
-        return
-    if pca:
-        pca = sklearn.decomposition.PCA(n_components=50)
-        embeddings = pca.fit_transform(embeddings)
+        return None
+    if with_pca:
+        embeddings = sklearn.decomposition.PCA(n_components=50).fit_transform(embeddings)
 
     # tsne = TSNE(n_components=2, method="exact")
     tsne = TSNE(n_components=2)
@@ -272,7 +297,7 @@ def tsne(embeddings, labels, pca=False, count=1000):  # generate a 2D plot of th
     return plot
 
 
-def flda_metric(embeddings, labels):  # TODO: test
+def flda_metric(embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> float:  # TODO: test
     # num_classes = len(np.unique(labels))
     # (m_1 - m_2)^2/(s_1^2 + s_2^2)
     mean_var_map = {label: [0.0, 0.0] for label in np.unique(labels)}
@@ -293,12 +318,14 @@ def flda_metric(embeddings, labels):  # TODO: test
             # mean and variance are vectors so use euclidean distance
             ratio = np.linalg.norm(mean1 - mean2) / (np.linalg.norm(var1) + np.linalg.norm(var2))
             # ratio = np.(mean1 - mean2) / (var1 + var2)
-            ratio_sum += ratio
+            ratio_sum += ratio  # type: ignore
 
     return ratio_sum / 2  # because we calculate the ratio twice for each pair
 
 
-def kmeans(embeddings, num_clusters=2):  # TODO: log some kind of normalized mutual information score
+def kmeans(
+    embeddings: torch.Tensor, num_clusters: int = 2
+) -> Tuple[Any, Any]:  # TODO: log some kind of normalized mutual information score
     k_means = sklearn.cluster.KMeans(n_clusters=num_clusters)
     outputs = k_means.fit_predict(embeddings)
     return k_means.cluster_centers_, outputs
