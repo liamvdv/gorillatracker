@@ -47,13 +47,7 @@ def save_result_to_json(
     assert video_path != "", "video_path must be specified"
     assert json_folder != "", "json_folder must be specified"
 
-    file_name = video_path.split("/")[-1]
-    file_name_split = file_name.split(".")[:-1]
-    file_name = ".".join(file_name_split)
-    file_name1 = Path(video_path).stem
-    assert (
-        file_name == file_name1
-    ), f"file_name and file_name1 must be the same os.path.basename doesnt do what i thought it did, {file_name} != {file_name1}"
+    file_name = Path(video_path).stem
 
     json_path = f"{json_folder}/{file_name}.json"
     if os.path.exists(json_path) and not overwrite:
