@@ -1,7 +1,6 @@
 data/*
 !data/mock/
 data/mock/tokenized/*
-spac_gorillas_converted/*
 logs/
 # experiment output logs
 wandb/
