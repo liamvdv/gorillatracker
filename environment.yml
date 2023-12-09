@@ -57,6 +57,7 @@ dependencies:
       - print-on-steroids[exceptions]
       - opencv-python-headless
       - git+https://github.com/facebookresearch/segment-anything.git
+      - easyocr
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:
