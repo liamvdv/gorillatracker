@@ -1,6 +1,7 @@
 import cv2
 import easyocr
 
+# consider putting this in an other python file for video detection
 def get_time_stamp(video_path: str) -> str:
     """
     Extracts the time stamp from the video file.
