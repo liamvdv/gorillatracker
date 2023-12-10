@@ -45,7 +45,7 @@ def assert_matching_cutouts(cutout_dir: str, image_dir: str) -> Set[str]:
         if not _is_coutout_in_image(image, cutout):
             outlier_files.add(cutout_file)
             print(f"WARNING: {cutout_file} not in corresponding image")
-            
+
     return outlier_files
 
 
