@@ -21,4 +21,4 @@ entity = "gorillas"
 sweep_id = sweep(sweep=sweep_config, project=project_name, entity=entity)
 # Print the sweep ID directly
 print(f"SWEEP_PATH={entity}/{project_name}/{sweep_id}")
-agent(sweep_id)
+agent(sweep_id)  # type: ignore
