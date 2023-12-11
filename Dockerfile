@@ -93,6 +93,7 @@ RUN apt-get update && apt-get install -y make
 
 # Install bash-completion for tab completion
 RUN apt-get update && apt-get install bash-completion -y
+RUN echo "source /usr/share/bash-completion/bash_completion" >> /root/.bashrc
 
 USER $MAMBA_USER
 
