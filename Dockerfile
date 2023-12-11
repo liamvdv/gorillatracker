@@ -89,7 +89,10 @@ RUN /usr/local/bin/_dockerfile_initialize_user_accounts.sh && \
     /usr/local/bin/_dockerfile_setup_root_prefix.sh
 
 # Install make for Makefile
-RUN apt update && apt install -y make
+RUN apt-get update && apt-get install -y make
+
+# Install bash-completion for tab completion
+RUN apt-get update && apt-get install bash-completion -y
 
 USER $MAMBA_USER
 
