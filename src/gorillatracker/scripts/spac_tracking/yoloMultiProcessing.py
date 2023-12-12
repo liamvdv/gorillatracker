@@ -57,7 +57,7 @@ def save_result_to_json(
     frame_count = os.popen(
         f"ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 {video_path}"
     ).read()
-    labeled_video_frames: List[List[Dict[str, float]]] = [[] for _ in range(int(frame_count))]
+    labeled_video_frames: List[List[Dict[str, float]]] = [[]] * int(frame_count)
 
     for idx, result in enumerate(results):
         frame_index = 0
@@ -176,7 +176,8 @@ def worker_function(input_path: str) -> None:
 def predict_video_multiprocessing(
     post_process_functions: List[Callable[[List[ultralytics.engine.results.Results], str], None]],
     models: List[YOLO] = [
-        YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/yv8n_body.pt"),
+        YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/body.pt"),
+        YOLO("/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/face.pt"),
     ],
     yolo_args: Dict[str, Union[bool, str, int]] = {"verbose": False},
     pool_per_gpu: int = 4,
@@ -272,18 +273,15 @@ if __name__ == "__main__":
     debug_vid_paths = video_paths[:200]
     debug_vid_paths_2 = video_paths[100:200]
     debug_vid_paths_3 = [f"{video_dir}/M002_20220328_015.mp4"]
-
-    largest_200 = sorted(video_paths, key=lambda x: os.path.getsize(x), reverse=True)[:200]
-
     predict_video_multiprocessing(
-        video_paths=largest_200,
-        pool_per_gpu=6,
+        video_paths=debug_vid_paths_3,
+        pool_per_gpu=1,
         yolo_args={"verbose": True},
         overwrite=True,
         post_process_functions=[
             partial(
                 save_result_to_json,
-                json_folder="/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels",
+                json_folder="/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/jsonTest",
                 overwrite=True,
             )
         ],
