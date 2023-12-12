@@ -7,6 +7,7 @@ import timm
 import torch
 from print_on_steroids import logger
 from torch.optim import AdamW
+from torchvision import transforms
 from torchvision.models import (
     EfficientNet_V2_L_Weights,
     ResNet18_Weights,
