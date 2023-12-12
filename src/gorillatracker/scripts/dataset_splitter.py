@@ -156,7 +156,7 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = False
+TEST = True
 
 
 def copy(src: Path, dst: Path) -> None:
