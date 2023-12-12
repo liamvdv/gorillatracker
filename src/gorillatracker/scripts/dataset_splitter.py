@@ -255,7 +255,10 @@ def splitter(
             reid_factor_test, int
         ), "must pass reid_factor_{val,test} if mode=openset"
         # At least one unseen individuum in test and eval.
-        train_count, val_count, test_count = compute_split(len(individums), 70, 15, 15)
+        train_count, val_count, test_count = compute_split(len(individums), train, val, test)
+        print(
+            f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={train_count}, Val={val_count}, Test={test_count}"
+        )
         train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
             individums[:train_count], k=min_train_count
         )
@@ -480,4 +483,9 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 #     merge_dataset_splits(
 #         "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
 #         "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+#     )
+
+#     # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
+#     dir = generate_split(
+#         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
 #     )
