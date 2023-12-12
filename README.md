@@ -2,13 +2,17 @@
 The GorillaTracker BP
 
 
-# Data
-Our data setup `/scratch2/gorillatracker` as base.
-`data/` contains our data.
-    `ground_truth/<dataset>/` only contains , e. g. `bristol`, `cxl` 
-    `derived_dataset/<dataset>`
-    `splits/<split-id>`
+# Data 
+Our data setup `/scratch2/gorillatracker` as base.\
+`data/` contains our data.\
+&nbsp;&nbsp;&nbsp;&nbsp;`ground_truth/<dataset>/` only contains , e. g. `bristol`, `cxl` \
+&nbsp;&nbsp;&nbsp;&nbsp;`derived_dataset/<dataset>`\
+&nbsp;&nbsp;&nbsp;&nbsp;`splits/<split-id>`\
+&nbsp;&nbsp;&nbsp;&nbsp;`derived_data/`\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`spac_gorillas_labels/` contains a v.json for every v.mp4 where the bounding box of frame i can be accessed through v\["labels"\]\[i\]\
 `models/` contains our trained model weights (push them to W&B too though!)
+<!-- sorry for the ugly formatting, I couldn't get it to show up otherwise -->
+
 
 # Architecture
 ### Adding a Dataset

@@ -14,6 +14,22 @@ openset/
     Splits are done on individual level. This might produce more photos in test/eval
     that by %.
     
+openset-strict/
+    train/
+    eval/
+    test/
+    
+    train, eval and test are disjoint.
+    
+openset-strict-half-known/
+    train/
+    eval/
+    test/
+    
+    train, eval and test are NOT disjoint.
+    - half of eval and train are images of individuals that are not seen in training.
+    - other half of eval and train are images of individuals that are seen in training.
+
 
 closedset/
     train/
@@ -25,6 +41,7 @@ closedset/
     
     Splits are done on a photos.
 """
+import logging
 import os
 import random
 import re
@@ -36,6 +53,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
 
 import torch
+
+logger = logging.getLogger(__name__)
 
 """
 As of Python 3.7, the insertion order of keys is preserved in all standard dictionary types in Python, including collections.defaultdict. This change was made part of the language specification in Python 3.7, meaning that dictionaries maintain the order in which keys are first inserted.
@@ -81,15 +100,22 @@ def read_dataset_partition(dirpath: Path, labeler: Labeler) -> List[Entry]:
 def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
-        assert filename.endswith(".png")
+        if not filename.endswith(".png"):
+            continue
         label, rest = re.split(r"[_\s]", filename, maxsplit=1)
         entry = Entry(Path(full_images_dirpath, filename), label, {})
         entries.append(entry)
     return entries
 
 
-def read_ground_truth_bristol() -> List[Entry]:
-    raise NotImplementedError()
+def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
+    entries = []
+    for filename in os.listdir(full_images_dirpath):
+        if filename.endswith(".jpg"):
+            label = re.split(r"[_\s-]", filename, maxsplit=1)[0]
+            entry = Entry(Path(full_images_dirpath, filename), label, {})
+            entries.append(entry)
+    return entries
 
 
 # Business Logic
@@ -197,7 +223,7 @@ def splitter(
     reid_factor_test: Optional[int] = None,
 ) -> Tuple[List[Entry], List[Entry], List[Entry]]:
     assert train + val + test == 100, "train, val, test must sum to 100."
-    random.seed = seed  # type: ignore # ensure deterministic behaviour
+    random.seed(seed)
     # This shuffe is preserved throughout groups and ungroups.
     # because python dicts are ordered by insertion.
     # We can now simply pop from the start / end to get random images.
@@ -253,6 +279,7 @@ def splitter(
                 print(
                     f"WARN: train set: individual {individual.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
                 )
+
     return train_bucket, val_bucket, test_bucket
 
 
@@ -286,7 +313,16 @@ def generate_split(
         reid_factors = f"-reid-val-{reid_factor_val}-test-{reid_factor_test}"
     name = f"splits/{dataset.replace('/', '-')}-{mode}{reid_factors}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
     outdir = Path(f"data/{name}")
-    images = read_ground_truth_cxl(f"data/{dataset}")
+
+    # NOTE hacky workaround
+    if "cxl" in dataset:
+        images = read_ground_truth_cxl(f"data/{dataset}")
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "bristol" in dataset:
+        images = read_ground_truth_bristol(f"data/{dataset}")
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    else:
+        raise ValueError(f"unknown dataset {dataset}")
     train_bucket, val_bucket, test_bucket = splitter(
         images,
         mode=mode,

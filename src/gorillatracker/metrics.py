@@ -49,11 +49,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
         current_epoch = trainer.current_epoch
         assert trainer.max_epochs is not None
-        if (
-            current_epoch % self.every_n_val_epochs == 0
-            and current_epoch not in self.logged_epochs
-            and current_epoch != 0
-        ) or (trainer.max_epochs - 1 == current_epoch):
+        if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
+            trainer.max_epochs - 1 == current_epoch
+        ):
             self.logged_epochs.add(current_epoch)
 
             # Assuming you have an 'embeddings' variable containing your embeddings
