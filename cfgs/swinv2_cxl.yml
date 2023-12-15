@@ -12,8 +12,8 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-SwinV2-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "74-normalize"             # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["normalize"]              # WandB tags for experiment tracking
+run_name: "91-combine-augmentations"             # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["normalize", "random-erasing", "flip"]              # WandB tags for experiment tracking
 model_name_or_path: "SwinV2Base"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -45,7 +45,7 @@ lr_decay_interval: 1            # Learning rate decay interval (for the learning
 batch_size: 12                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
+max_epochs: 20                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -55,6 +55,6 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "data/splits/use_for_baseline_cxl_face-openset_origin_robert"
+data_dir: "data/DO-NOT-USE-PING-BEN-IF-IN-DOUBT-joined_splits/cxl_face-openset=True_0"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 data_resize_transform: 192

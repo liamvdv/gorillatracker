@@ -5,6 +5,7 @@ import lightning as L
 import pandas as pd
 import timm
 import torch
+import torchvision.transforms.v2 as transforms_v2
 from print_on_steroids import logger
 from torch.optim import AdamW
 from torchvision import transforms
@@ -226,13 +227,19 @@ class SwinV2BaseWrapper(BaseModule):
         return transforms.Compose(
             [
                 transforms.Resize((192), antialias=True),
+                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 transforms.CenterCrop((192, 192)),
             ]
         )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return lambda x: x
+        return transforms.Compose(
+            [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+            ]
+        )
 
 
 class ResNet18Wrapper(BaseModule):
