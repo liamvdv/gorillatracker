@@ -5,8 +5,6 @@ from typing import List, Tuple
 import cv2
 from ultralytics import YOLO
 
-
-
 BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
 
 

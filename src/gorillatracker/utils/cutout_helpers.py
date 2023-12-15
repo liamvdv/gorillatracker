@@ -27,10 +27,10 @@ def get_cutout_bbox(full_image: IMAGE, cutout: IMAGE, threshold: float = 0.95) -
     cutout_height, cutout_width, _ = cutout.shape
     top_left = maxLoc
     bottom_right = (top_left[0] + cutout_width, top_left[1] + cutout_height)
-    return [top_left, bottom_right]
+    return (top_left, bottom_right)
 
 
-def cutout_image(full_image_path: str, bbox: BOUNDING_BOX, target_path: str):
+def cutout_image(full_image_path: str, bbox: BOUNDING_BOX, target_path: str) -> None:
     """
     Cut out a section of an image.
 
@@ -42,5 +42,5 @@ def cutout_image(full_image_path: str, bbox: BOUNDING_BOX, target_path: str):
     """
     full_image = cv2.imread(full_image_path)
     top_left, bottom_right = bbox
-    cutout = full_image[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+    cutout = full_image[top_left[1] : bottom_right[1], top_left[0] : bottom_right[0]]
     cv2.imwrite(target_path, cutout)

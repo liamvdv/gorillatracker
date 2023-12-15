@@ -74,7 +74,6 @@ def _label_group(group: str, full_images_group: List[str], src_dir: str, target_
     print(f"Labeling group {group}")
     print("#"*80)
     face_images_group = list(filter(lambda x: x.startswith(group), os.listdir(target_dir)))
-    print(face_images_group)
     to_label = [f for f in full_images_group if f not in face_images_group]
     bbox = _get_labeled_bbox(src_dir, target_dir, face_images_group)
     for image in to_label:    
