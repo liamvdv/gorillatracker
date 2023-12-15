@@ -8,6 +8,8 @@ from typing import Callable, Dict, List, Optional, Union, cast
 import ultralytics
 from ultralytics import YOLO
 
+import gorillatracker.scripts.get_timestamp as gt
+
 # setting a type here breaks the queue for some reason - i dont know why, but it makes me want to nuke mypy off the face of the earth
 gpu_queue: multiprocessing.Queue = multiprocessing.Queue()  # type: ignore
 
@@ -53,7 +55,7 @@ def save_result_to_json(
     if os.path.exists(json_path) and not overwrite:
         print(f"JSON file {json_path} already exists, skipping")
         return
-
+    time_stamp = gt.get_time_stamp(video_path)
     frame_count = os.popen(
         f"ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 {video_path}"
     ).read()
@@ -71,7 +73,7 @@ def save_result_to_json(
                 box = {"class": idx, "center_x": x, "center_y": y, "w": w, "h": h, "conf": conf}
                 labeled_video_frames[frame_index].append(box)
             frame_index += 1
-    json.dump({"labels": labeled_video_frames}, open(json_path, "w"), indent=4)
+    json.dump({"time_stamp": time_stamp, "labels": labeled_video_frames}, open(json_path, "w"), indent=4)
 
 
 def predict_video(
