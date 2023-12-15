@@ -31,6 +31,7 @@ def get_data_module(
     batch_size: int,
     loss_mode: str,
     model_transforms: gtypes.Transform,
+    training_transforms: gtypes.Transform = None,  # type: ignore
 ) -> Union[TripletDataModule, QuadletDataModule]:
     base = QuadletDataModule if loss_mode.startswith("online") else TripletDataModule
     dataset_class = get_dataset_class(dataset_class_id)
@@ -41,4 +42,4 @@ def get_data_module(
             model_transforms,
         ]
     )
-    return base(data_dir, batch_size, dataset_class, transforms=transforms)  # type: ignore
+    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)  # type: ignore
