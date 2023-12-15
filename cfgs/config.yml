@@ -15,8 +15,8 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "IT-DOES-NOT-MATTER"  # WandB project name
-run_name: "test-code"           # Name for this training run
+project_name: ""  # WandB project name
+run_name: ""           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
