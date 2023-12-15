@@ -2,9 +2,6 @@
 # also did not work for the bbox export
 from typing import List, Tuple
 
-import cv2
-from ultralytics import YOLO
-
 BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
 
 

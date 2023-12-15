@@ -1,6 +1,5 @@
 # NOTE: https://github.com/ultralytics/ultralytics/issues/5800
 # also did not work for the bbox export
-from typing import List, Tuple
 
 import cv2
 
