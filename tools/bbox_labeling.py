@@ -20,9 +20,11 @@ def _group_images_by_label(images: List[str]) -> Dict[str, List[str]]:
 def _get_labeled_bbox(src_dir: str, label_dir: str, labeled_images: List[str]) -> Dict[str, cutout_helpers.BOUNDING_BOX]:
     labeled_bbox = {}
     for label in labeled_images:
-        src_image = os.path.join(src_dir, label)
-        label_image = os.path.join(label_dir, label)
-        labeled_bbox[src_image] = cutout_helpers.get_cutout_bbox(src_image, label_image)
+        src_image_path = os.path.join(src_dir, label)
+        label_image_path = os.path.join(label_dir, label)
+        src_image = cv2.imread(src_image_path)
+        label_image = cv2.imread(label_image_path)
+        labeled_bbox[label] = cutout_helpers.get_cutout_bbox(src_image, label_image)
     return labeled_bbox
 
 def _create_reference_plot(full_images: str, src_dir: str, bbox: Dict[str, cutout_helpers.BOUNDING_BOX]) -> None:
@@ -31,7 +33,6 @@ def _create_reference_plot(full_images: str, src_dir: str, bbox: Dict[str, cutou
         image_path = os.path.join(src_dir, image_name)
         image = cv2.imread(image_path)
         if image_name in bbox:
-            print("Drawing bbox")
             visualizer_helpers.draw_bbox(image, bbox[image_name])
         images.append(image)
     visualizer_helpers.create_image_grid(images).savefig("reference_plot.png")
@@ -61,7 +62,8 @@ def _label_image(image_path, model: YOLO) -> Optional[cutout_helpers.BOUNDING_BO
         if box_id in range(len(bbox)):
             break
         elif box_id == -1:
-            raise ValueError(f"No bbox accepted for {image_path}")
+            print(f"No bbox accepted for {image_path}")
+            return None
         else:
             print("Invalid bbox id, enter -1 if no bbox is matching")
     return bbox[box_id]
@@ -71,7 +73,8 @@ def _label_group(group: str, full_images_group: List[str], src_dir: str, target_
     print("#"*80)
     print(f"Labeling group {group}")
     print("#"*80)
-    face_images_group = filter(lambda x: x.startswith(group), os.listdir(target_dir))
+    face_images_group = list(filter(lambda x: x.startswith(group), os.listdir(target_dir)))
+    print(face_images_group)
     to_label = [f for f in full_images_group if f not in face_images_group]
     bbox = _get_labeled_bbox(src_dir, target_dir, face_images_group)
     for image in to_label:    
@@ -106,8 +109,7 @@ def label_dataset(src_dir: str, target_dir: str, model: YOLO) -> None:
         
 if __name__ == "__main__":
     src_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images"
-    # target_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/face_images"
-    target_dir = "/workspaces/gorillatracker/test_labeling"
+    target_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/face_images"
     model_path = "/workspaces/gorillatracker/models/yolov8n_gorillaface_pkmbzis.pt"
     model = YOLO(model_path)
     label_dataset(src_dir, target_dir, model)
