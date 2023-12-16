@@ -15,8 +15,8 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "IT-DOES-NOT-MATTER"  # WandB project name
-run_name: "test-code"           # Name for this training run
+project_name: ""  # WandB project name
+run_name: ""           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
@@ -60,6 +60,6 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: ""
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: ""
 data_resize_transform: Null
