@@ -66,7 +66,7 @@ def segment_images(images: List[npt.NDArray[np.uint8]]) -> List[npt.NDArray[np.u
     return segment_images
 
 
-def segment_dir(image_dir: str, target_dir) -> None:
+def segment_dir(image_dir: str, target_dir: str) -> None:
     """
     Args:
         image_dir: path to directory containing images

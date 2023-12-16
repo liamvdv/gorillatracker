@@ -2,8 +2,6 @@ import os
 from typing import List, Tuple
 
 import cv2
-import numpy as np
-import numpy.typing as npt
 
 import gorillatracker.utils.cutout_helpers as cutout_helpers
 import gorillatracker.utils.yolo_helpers as yolo_helpers
@@ -30,7 +28,7 @@ def calculate_intersection_area(box1: BOUNDING_BOX, box2: BOUNDING_BOX) -> float
 
 
 def find_max_intersection(target_bbox: BOUNDING_BOX, bboxes: List[BOUNDING_BOX]) -> BOUNDING_BOX:
-    max_area = 0
+    max_area = 0.0
     max_bbox = None
 
     for bbox in bboxes:
@@ -46,17 +44,33 @@ def find_max_intersection(target_bbox: BOUNDING_BOX, bboxes: List[BOUNDING_BOX])
     return max_bbox
 
 
-def cutout_with_integrity(full_image_path: str, cutout_path, bbox_file_path: str, target_path: str) -> None:
+def expand_bounding_box(bbox_to_expand: BOUNDING_BOX, bbox_to_include: BOUNDING_BOX) -> BOUNDING_BOX:
+    x_min = min(bbox_to_include[0][0], bbox_to_expand[0][0])
+    y_min = min(bbox_to_include[0][1], bbox_to_expand[0][1])
+    x_max = max(bbox_to_include[1][0], bbox_to_expand[1][0])
+    y_max = max(bbox_to_include[1][1], bbox_to_expand[1][1])
+    return ((x_min, y_min), (x_max, y_max))
+
+
+def cutout_with_integrity(
+    full_image_path: str, cutout_path: str, bbox_file_path: str, target_path: str, force_include: bool
+) -> None:
     full_image = cv2.imread(full_image_path)
     cutout = cv2.imread(cutout_path)
     target_bbox = cutout_helpers.get_cutout_bbox(full_image, cutout)
     bboxes = yolo_helpers.convert_annotation_file(bbox_file_path, full_image.shape[1], full_image.shape[0])
     assert bboxes, f"No bounding boxes found in {bbox_file_path}"
     max_bbox = find_max_intersection(target_bbox, bboxes)
+
+    if force_include:
+        max_bbox = expand_bounding_box(target_bbox, max_bbox)
+
     cutout_helpers.cutout_image(full_image_path, max_bbox, target_path)
 
 
-def cutout_dataset_with_integrity(full_image_dir: str, cutout_dir: str, bbox_dir: str, target_dir: str) -> None:
+def cutout_dataset_with_integrity(
+    full_image_dir: str, cutout_dir: str, bbox_dir: str, target_dir: str, force_include: bool = False
+) -> None:
     os.makedirs(target_dir, exist_ok=True)
     for cutout_file in os.listdir(cutout_dir):
         cutout_path = os.path.join(cutout_dir, cutout_file)
@@ -65,7 +79,7 @@ def cutout_dataset_with_integrity(full_image_dir: str, cutout_dir: str, bbox_dir
         target_path = os.path.join(target_dir, cutout_file)
         assert os.path.exists(full_image_path), f"Full image file {full_image_path} does not exist"
         assert os.path.exists(bbox_path), f"Annotation file {bbox_path} does not exist"
-        cutout_with_integrity(full_image_path, cutout_path, bbox_path, target_path)
+        cutout_with_integrity(full_image_path, cutout_path, bbox_path, target_path, force_include)
 
 
 if __name__ == "__main__":
@@ -74,4 +88,5 @@ if __name__ == "__main__":
         "/workspaces/gorillatracker/data/ground_truth/cxl/face_images",
         "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_bbox",
         "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images",
+        force_include=True,
     )
