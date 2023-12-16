@@ -65,7 +65,7 @@ def cutout_with_integrity(
     if force_include:
         max_bbox = expand_bounding_box(target_bbox, max_bbox)
 
-    cutout_helpers.cutout_image(full_image_path, max_bbox, target_path)
+    cutout_helpers.cutout_image(full_image, max_bbox, target_path)
 
 
 def cutout_dataset_with_integrity(
