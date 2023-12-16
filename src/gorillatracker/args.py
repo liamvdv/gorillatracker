@@ -35,6 +35,7 @@ class TrainingArgs:
     debug: bool = field(default=False)
     from_scratch: bool = field(default=False)
     early_stopping_patience: int = 3
+    min_delta: float = field(default=0.01)
     embedding_size: int = 256
 
     learning_rate: float = field(default=0.001)
@@ -64,6 +65,7 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
+    data_resize_transform: Union[int, None] = field(default=None)
     # Add any additional fields as needed.
 
     def __post_init__(self) -> None:

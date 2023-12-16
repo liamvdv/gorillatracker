@@ -6,13 +6,15 @@ from typing import Dict, List, Tuple
 import numpy as np
 import numpy.typing as npt
 
+BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
+
 
 @dataclass
 class SegmentedImageData:
     path: str
-    segments: Dict[str, List[Tuple[npt.NDArray[np.bool_], Tuple[int, int, int, int]]]] = field(default_factory=dict)
+    segments: Dict[str, List[Tuple[npt.NDArray[np.bool_], BOUNDING_BOX]]] = field(default_factory=dict)
 
-    def add_segment(self, class_label: str, mask: npt.NDArray[np.bool_], box: Tuple[int, int, int, int]) -> None:
+    def add_segment(self, class_label: str, mask: npt.NDArray[np.bool_], box: BOUNDING_BOX) -> None:
         """
         class_label: label of the segment
         mask: binary mask of the segment
@@ -60,7 +62,7 @@ def _expand_segment_to_img_mask(
     return mask
 
 
-def _extract_boxes_from_mask(mask_element: ET.Element) -> Tuple[int, int, int, int]:
+def _extract_boxes_from_mask(mask_element: ET.Element) -> BOUNDING_BOX:
     left_str = mask_element.get("left")
     top_str = mask_element.get("top")
     width_str = mask_element.get("width")
@@ -81,7 +83,7 @@ def _extract_boxes_from_mask(mask_element: ET.Element) -> Tuple[int, int, int, i
     x_max = left + width
     y_max = top + height
 
-    return x_min, y_min, x_max, y_max
+    return ((x_min, y_min), (x_max, y_max))
 
 
 def cvat_import(xml_file: str, img_path: str, skip_no_mask: bool = True) -> List[SegmentedImageData]:
@@ -112,8 +114,10 @@ def cvat_import(xml_file: str, img_path: str, skip_no_mask: bool = True) -> List
             label = mask.get("label")
             assert isinstance(label, str)
             box = _extract_boxes_from_mask(mask)
-            box_mask = _extract_segment_from_mask_element(mask, box[2] - box[0], box[3] - box[1])
-            img_mask = _expand_segment_to_img_mask(box_mask, img_width, img_height, box[0], box[1])
+            x_min, y_min = box[0]
+            x_max, y_max = box[1]
+            box_mask = _extract_segment_from_mask_element(mask, x_max - x_min, y_max - y_min)
+            img_mask = _expand_segment_to_img_mask(box_mask, img_width, img_height, x_min, y_min)
             segmented_image.add_segment(label, img_mask, box)
 
         if segmented_image.segments or not skip_no_mask:
