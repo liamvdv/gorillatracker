@@ -171,27 +171,25 @@ def yolo_detect(
         result[0].save_txt(annotation_path, save_conf=True)  # NOTE: simply appends to the .txt file
 
 
-if __name__ == "__main__":
-    # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
-    # model, model_name = modify_dataset_train_yolo(
-    #     bristol_split_dir,
-    #     model_type="yolov8x",
-    #     epochs=2,
-    #     batch_size=16,
-    # )
+# if __name__ == "__main__":
+# bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
+# model, model_name = modify_dataset_train_yolo(
+#     bristol_split_dir,
+#     model_type="yolov8x",
+#     epochs=2,
+#     batch_size=16,
+# )
 
-    # yolo_detect(
-    #     model,
-    #     model_name,
-    #     output_task="face_bbox",
-    # )
-    
-    model = YOLO("/workspaces/gorillatracker/yolov8n-gorillabody.pt")
-    model_name = "yolov8n-gorillabody"
-    yolo_detect(
-        model,
-        model_name,
-        output_task="body_bbox",
-    )
-     
-    
+# yolo_detect(
+#     model,
+#     model_name,
+#     output_task="face_bbox",
+# )
+
+# model = YOLO("/workspaces/gorillatracker/models/yolov8n_gorillabody_ybyh495y.pt")
+# model_name = "yolov8n_gorillabody_ybyh495y"
+# yolo_detect(
+#     model,
+#     model_name,
+#     output_task="body_bbox",
+# )
