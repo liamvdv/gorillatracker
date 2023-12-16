@@ -1,14 +1,15 @@
 import json
 import os
 import subprocess
-from typing import Any, Dict, List, MutableSet, Tuple
+from typing import Dict, List, MutableSet, Tuple, Union
 
 import cv2
 
-# TODO: properly type
-Data = Dict[Any, Any]
-# TODO: properly type
-BBox = Dict[Any, Any]
+BBox = Dict[str, Union[int, float]]
+FrameData = list[BBox]
+VideoData = list[FrameData]
+IDData = list[Dict[str, Union[int, list[int]]]]
+Data = Dict[str, Union[IDData, VideoData]]
 
 
 class GorillaVideoTracker:
@@ -138,12 +139,12 @@ class GorillaVideoTracker:
         height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(video.get(cv2.CAP_PROP_FPS))
         box_color = (255, 0, 0)
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        fourcc = cv2.VideoWriter.fourcc(*"mp4v")
         out = cv2.VideoWriter(video_out_path, fourcc, fps, (width, height))
         # json
         json_data = self._read_from_json(json_path)
         # iterate over frames, draw bboxes and labels and write to outputfile
-        for frame_number, bboxes in enumerate(json_data["labels"]):
+        for bboxes in VideoData(json_data["labels"]):  # type: ignore
             ret, frame = video.read()
             if not ret:
                 break
@@ -196,7 +197,7 @@ class GorillaVideoTracker:
             data = json.load(file)
         return data
 
-    def _write_to_json(self, path: str, data: Data, negatives: Any) -> None:
+    def _write_to_json(self, path: str, data: Data, negatives: List[MutableSet[int]]) -> None:
         """
         writes bboxes and IDs to json file
         parameter:
@@ -204,7 +205,7 @@ class GorillaVideoTracker:
             data: "labels" part with bboxes including ids for each frame
             negatives: list of IDs for each tracked ID, which can be used as negatives in tripletloss
         """
-        id_data = {"tracked_IDs": [{"id": i, "negatives": list(s)} for i, s in enumerate(negatives)]}
+        id_data = {"tracked_IDs": IDData([{"id": i, "negatives": list(s)} for i, s in enumerate(negatives)])}
         data = {**id_data, **data}
         with open(path, "w") as file:
             json.dump(data, file, indent=4)
@@ -257,12 +258,12 @@ class GorillaVideoTracker:
         )
 
         id_count = -1
-        openIDs: List[Dict[str, int]] = []
+        openIDs: List[BBox] = []
 
         # iterate over frames in video
-        for frame_data in data["labels"]:
+        for frame_data in VideoData(data["labels"]):  # type: ignore
             # iterate over bounding boxes and delete colliding ones
-            bboxes = [bbox for bbox in frame_data if bbox["class"] == body_class]
+            bboxes = [BBox(bbox) for bbox in frame_data if bbox["class"] == body_class]
             colliding_bboxes = [
                 bbox1
                 for bbox1 in bboxes
@@ -321,7 +322,7 @@ class GorillaVideoTracker:
         body_class = 0
         face_class = 1
 
-        for frame_data in data["labels"]:
+        for frame_data in VideoData(data["labels"]):  # type: ignore
             body_bboxes = [bbox for bbox in frame_data if bbox["class"] == body_class]
             face_bboxes = [bbox for bbox in frame_data if bbox["class"] == face_class]
             for face_bbox in face_bboxes:
@@ -336,7 +337,7 @@ class GorillaVideoTracker:
 
         return data
 
-    def _get_negatives(self, data: Data, id_count: int) -> List[MutableSet[str]]:
+    def _get_negatives(self, data: Data, id_count: int) -> List[MutableSet[int]]:
         """
         creates a list of lists which stores IDs which are possible negatives, because they existed at the same time
         parameter:
@@ -345,13 +346,13 @@ class GorillaVideoTracker:
             negatives: list of lists; at negatives[ID] stores a list of IDs which are negatives for ID
         """
         body_class = 0
-        negatives = [set() for i in range(id_count + 1)]
+        negatives: List[MutableSet[int]] = [set() for i in range(id_count + 1)]
 
-        for frame_data in data["labels"]:
+        for frame_data in VideoData(data["labels"]):  # type: ignore
             bboxes = [bbox for bbox in frame_data if bbox["class"] == body_class]
             frame_ids = set()
             for bbox in bboxes:
-                frame_ids.add(bbox["id"])
+                frame_ids.add(int(bbox["id"]))
             for id in frame_ids:
                 for frame_id in frame_ids:
                     if frame_id != id:
