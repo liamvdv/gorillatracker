@@ -2,11 +2,43 @@ import os
 from typing import List, Tuple
 
 import cv2
+import numpy as np
+import numpy.typing as npt
 
 import gorillatracker.utils.cutout_helpers as cutout_helpers
 import gorillatracker.utils.yolo_helpers as yolo_helpers
 
+IMAGE = npt.NDArray[np.uint8]
 BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
+
+
+def _is_coutout_in_image(image: IMAGE, cutout: IMAGE) -> bool:
+    res = cv2.matchTemplate(image, cutout, cv2.TM_CCOEFF_NORMED)
+    threshold = 0.8
+    loc = np.where(res >= threshold)
+    return len(loc[0]) > 0
+
+
+def assert_matching_cutouts(image_dir: str, cutout_dir: str) -> None:
+    cutout_files = os.listdir(cutout_dir)
+    image_files = os.listdir(image_dir)
+
+    assert all([cutout_file.endswith(".png") for cutout_file in cutout_files])
+    assert all([image_file.endswith(".png") for image_file in image_files])
+
+    assert len(set(image_files) - set(cutout_files)) == 0
+
+    for cutout_file in cutout_files:
+        assert cutout_file in image_files, f"{cutout_file} not in image files"
+
+        image_path = os.path.join(image_dir, cutout_file)
+        cutout_path = os.path.join(cutout_dir, cutout_file)
+
+        image = cv2.imread(image_path)
+        cutout = cv2.imread(cutout_path)
+
+        assert cutout.shape < image.shape, f"{cutout_file} has larger shape than corresponding image"
+        assert _is_coutout_in_image(image, cutout), f"{cutout_file} not in corresponding image"
 
 
 def calculate_area(box: BOUNDING_BOX) -> float:
@@ -53,7 +85,7 @@ def expand_bounding_box(bbox_to_expand: BOUNDING_BOX, bbox_to_include: BOUNDING_
 
 
 def cutout_with_integrity(
-    full_image_path: str, cutout_path: str, bbox_file_path: str, target_path: str, force_include: bool
+    full_image_path: str, cutout_path: str, bbox_file_path: str, target_path: str, expand_bbox: bool
 ) -> None:
     full_image = cv2.imread(full_image_path)
     cutout = cv2.imread(cutout_path)
@@ -62,15 +94,26 @@ def cutout_with_integrity(
     assert bboxes, f"No bounding boxes found in {bbox_file_path}"
     max_bbox = find_max_intersection(target_bbox, bboxes)
 
-    if force_include:
+    if expand_bbox:
         max_bbox = expand_bounding_box(target_bbox, max_bbox)
 
     cutout_helpers.cutout_image(full_image, max_bbox, target_path)
 
 
 def cutout_dataset_with_integrity(
-    full_image_dir: str, cutout_dir: str, bbox_dir: str, target_dir: str, force_include: bool = False
+    full_image_dir: str, cutout_dir: str, bbox_dir: str, target_dir: str, expand_bbox: bool = False
 ) -> None:
+    """
+    Given a full_image and a cutout of the full image (e.g. face) and bounding boxes of the full image (e.g. body).
+    Find the bouding box with the highest intersection area with the cutout and cutout the full image with this bounding box.
+
+    Args:
+        full_image_dir: Directory containing the full images.
+        cutout_dir: Directory containing the cutouts.
+        bbox_dir: Directory containing the bounding boxes.
+        target_dir: Directory to save the cutout images to.
+        expand_bbox: Whether to expand the best bounding box to include the cutout.
+    """
     os.makedirs(target_dir, exist_ok=True)
     for cutout_file in os.listdir(cutout_dir):
         cutout_path = os.path.join(cutout_dir, cutout_file)
@@ -79,7 +122,7 @@ def cutout_dataset_with_integrity(
         target_path = os.path.join(target_dir, cutout_file)
         assert os.path.exists(full_image_path), f"Full image file {full_image_path} does not exist"
         assert os.path.exists(bbox_path), f"Annotation file {bbox_path} does not exist"
-        cutout_with_integrity(full_image_path, cutout_path, bbox_path, target_path, force_include)
+        cutout_with_integrity(full_image_path, cutout_path, bbox_path, target_path, expand_bbox)
 
 
 if __name__ == "__main__":
@@ -88,5 +131,9 @@ if __name__ == "__main__":
         "/workspaces/gorillatracker/data/ground_truth/cxl/face_images",
         "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_bbox",
         "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images",
-        force_include=True,
+        expand_bbox=True,
+    )
+    assert_matching_cutouts(
+        "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images",
+        "/workspaces/gorillatracker/data/ground_truth/cxl/face_images",
     )
