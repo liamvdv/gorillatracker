@@ -34,7 +34,7 @@ def cutout_image(full_image: IMAGE, bbox: BOUNDING_BOX, target_path: str) -> Non
     Cut out a section of an image.
 
     Args:
-    full_image_path: path to full image
+    full_image: cv2 image of the full image
     bbox: ((x_top_left, y_top_left), (x_bottom_right, y_bottom_right))
     target_path: path to save cutout image to
 
