@@ -1,23 +1,10 @@
 # NOTE: https://github.com/ultralytics/ultralytics/issues/5800
 # also did not work for the bbox export
-from typing import List, Tuple
 
 import cv2
 
 import gorillatracker.utils.cvat_import as cvat_import
-
-
-def _convert_to_yolo_format(box: Tuple[int, int, int, int], img_width: int, img_height: int) -> List[float]:
-    x_min, y_min, x_max, y_max = box
-    x_center = (x_min + x_max) / 2 / img_width
-    y_center = (y_min + y_max) / 2 / img_height
-    width = (x_max - x_min) / img_width
-    height = (y_max - y_min) / img_height
-    assert 0 <= x_center <= 1
-    assert 0 <= y_center <= 1
-    assert 0 <= width <= 1
-    assert 0 <= height <= 1
-    return [x_center, y_center, width, height]
+import gorillatracker.utils.yolo_helpers as yolo_helpers
 
 
 # NOTE(memben): for now we are only storing the body bbox
@@ -35,7 +22,7 @@ def export_cvat_to_yolo(xml_file: str, target_dir: str, full_images_dir: str) ->
         for class_label, segment_list in segmented_image.segments.items():
             yolo_boxes = []
             for mask, box in segment_list:
-                x, y, w, h = _convert_to_yolo_format(box, img_height, img_width)
+                x, y, w, h = yolo_helpers.convert_to_yolo_format(box, img_height, img_width)
                 yolo_boxes.append(f"{class_labels[class_label]} {x} {y} {w} {h}")
 
             with open(f"{target_dir}/{segmented_image.filename}.txt", "w") as file:

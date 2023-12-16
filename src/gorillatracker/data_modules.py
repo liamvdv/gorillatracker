@@ -2,6 +2,7 @@ import logging
 from typing import Any, Callable, Optional, Type
 
 import lightning as L
+import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
@@ -22,9 +23,11 @@ class NletDataModule(L.LightningDataModule):
         batch_size: int = 32,
         dataset_class: Optional[Type[Dataset[Any]]] = None,
         transforms: Optional[gtypes.Transform] = None,
+        training_transforms: Optional[gtypes.Transform] = None,
     ) -> None:
         super().__init__()
         self.transforms = transforms
+        self.training_transforms = training_transforms
         self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -39,7 +42,7 @@ class NletDataModule(L.LightningDataModule):
         )
 
         if stage == "fit":
-            self.train = self.dataset_class(self.data_dir, partition="train", transform=self.transforms)  # type: ignore
+            self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
         elif stage == "test":
             self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore

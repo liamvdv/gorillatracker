@@ -65,3 +65,13 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
                 transforms.ToTensor(),
             ]
         )
+
+
+if __name__ == "__main__":
+    cxl = CXLDataset(
+        "data/splits/use_for_baseline_cxl_face-openset_origin_robert", "train", CXLDataset.get_transforms()
+    )
+    image = cxl[0][0]
+    image = transforms.GaussianBlur(kernel_size=(7, 13), sigma=(9, 11))(image)
+    pil_image = transforms.ToPILImage()(image)
+    pil_image.save("test.png")
