@@ -467,25 +467,25 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 
 # if __name__ == "__main__":
-#     dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
-#     copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+# dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+# copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 
-#     dir = generate_split(
-#         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-#     )
-#     dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
+# dir = generate_split(
+#     dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+# )
+# dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
 
-#     dir = generate_split(
-#         dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-#     )
-#     dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+# dir = generate_split(
+#     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+# )
+# dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
 
-#     merge_dataset_splits(
-#         "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-#         "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-#     )
+# merge_dataset_splits(
+#     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+#     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+# )
 
-#     # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
-#     dir = generate_split(
-#         dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
-#     )
+# NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
+# dir = generate_split(
+#     dataset="ground_truth/cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
+# )
