@@ -119,6 +119,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     early_stopping = EarlyStopping(
         monitor="val/loss",
         mode="min",
+        min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
 

@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Literal, Optional, Tuple, Union
 
 import torch
+import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -69,9 +70,18 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
 
 if __name__ == "__main__":
     cxl = CXLDataset(
-        "data/splits/use_for_baseline_cxl_face-openset_origin_robert", "train", CXLDataset.get_transforms()
+        "data/DO-NOT-USE-PING-BEN-IF-IN-DOUBT-joined_splits/cxl_face-openset=True_0",
+        "train",
+        CXLDataset.get_transforms(),
     )
     image = cxl[0][0]
-    image = transforms.GaussianBlur(kernel_size=(7, 13), sigma=(9, 11))(image)
+    transformations = transforms.Compose(
+        [
+            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms_v2.RandomHorizontalFlip(p=0.5),
+            transforms.RandomErasing(p=1, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+        ]
+    )
+    image = transformations(image)
     pil_image = transforms.ToPILImage()(image)
     pil_image.save("test.png")
