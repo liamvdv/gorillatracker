@@ -43,11 +43,11 @@
     // "source=/scratch/YOUR_USERNAME/cache,target=/scratch/YOUR_USERNAME/cache,type=bind"
     // ],
     "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,ro", // NOTE(memben): this is to get access to github 
         "source=${localEnv:HOME}/.netrc,target=/home/mamba/.netrc,type=bind", // this is to get WANDB_API_KEY from .netrc
         "source=${localEnv:HOME}/.gitconfig,target=/home/mamba/.gitconfig,type=bind", // this is to get git credentials
         "source=${localEnv:HOME}/.cache,target=/home/mamba/.cache,type=bind", // general cache directory
         // GorillaTracker specific mounts.
-        "source=/scratch1/wildlife_conservation/data/gorilla_experiment_splits/train_test_distinct/cxl-bristol_0_75,target=/workspaces/gorillatracker/datasets/old/cxl-bristol_0_75,type=bind,ro",
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.
         "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind,ro",
         "source=/scratch2/gorillatracker/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
