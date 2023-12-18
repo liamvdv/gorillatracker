@@ -17,12 +17,12 @@ def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_pa
     """
 
     # calculate the bounding box coordinates
-    frame_width, frame_height, _ = frame.shape
+    frame_height, frame_width, _ = frame.shape
     left = int((x - (w / 2)) * frame_width)
     right = int((x + (w / 2)) * frame_width)
     top = int((y - (h / 2)) * frame_height)
     bottom = int((y + (h / 2)) * frame_height)
-
+    
     cropped_frame = frame[top:bottom, left:right]
     cv2.imwrite(output_path, cropped_frame)
     
@@ -34,23 +34,26 @@ def create_dataset_from_videos(video_path: str, json_path: str, output_dir: str)
         video_path: Path to the video.
         output_dir: Path to the directory to save the cropped images to.
     """ 
+    
     images_per_individual = 15
     # create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     id_frames = get_frames_for_ids(json_path)
     # open the video
+    video_name = os.path.splitext(os.path.basename(video_path))[0]
+    print(video_name)
     video = cv2.VideoCapture(video_path)
 
     for id, frames in id_frames.items():
-        if(len(frames) < images_per_individual or id == 0):
+        if(len(frames) < images_per_individual):
             continue
         step_size = len(frames)//images_per_individual
-        frame_list = [frames[i] for i in range(0, len(frames), step_size)]
+        frame_list = [frames[i] for i in range(0, images_per_individual * step_size, step_size)]
         for frame_idx, bbox in frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             frame = video.read()[1]
-            crop_and_save_image(frame, bbox[0], bbox[1], bbox[2], bbox[3], os.path.join(output_dir, f"{frame_idx}.jpg"))
+            crop_and_save_image(frame, bbox[0], bbox[1], bbox[2], bbox[3], os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.jpg"))
     video.release()
     
 
