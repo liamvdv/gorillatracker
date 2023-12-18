@@ -50,8 +50,8 @@ def add_labels_to_json(json_input_path: str, video_name: str, json_output_path: 
         json.dump(out_data, f, indent=4)
     
 
-def create_dataset_from_videos(video_path: str, json_path: str, output_dir: str) -> None:
-    """Create a dataset of cropped images from the video in the given path.
+def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> None:
+    """crop images from the video in the given path and copy negative list to negatives.json
 
     Args:
         video_path: Path to the video.
@@ -79,7 +79,20 @@ def create_dataset_from_videos(video_path: str, json_path: str, output_dir: str)
     video.release()
     
     add_labels_to_json(json_path, video_name, os.path.join(output_dir, "negatives.json"))
-    
+ 
+def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -> None:
+    """Create a dataset of cropped images from the videos in the given directory.
+    args:
+        video_dir: Path to the directory containing the videos.
+        json_dir: Path to the directory containing the tracked JSON files.
+        output_dir: Path to the directory to save the cropped images to.
+    """
+    for video_name in os.listdir(video_dir):
+        video_path = os.path.join(video_dir, video_name)
+        json_path = os.path.join(json_dir, f"{os.path.splitext(video_name)[0]}_tracked.json")
+        if(not os.path.exists(json_path)):
+            continue
+        get_data_from_video(video_path, json_path, output_dir)  
 
 def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, float, float))]]:
     """Get the frames for the given IDs.
@@ -107,6 +120,8 @@ def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, fl
     return id_frames
     
 #get_frames_for_ids("/workspaces/gorillatracker/tmp/R014_20220628_151_tracked.json")
-#tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/videos")
+tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/videos")
 #tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R033_20220707_100.json")
-create_dataset_from_videos("/workspaces/gorillatracker/videos/R033_20220707_100.mp4", "/workspaces/gorillatracker/tmp/R033_20220707_100_tracked.json", "/workspaces/gorillatracker/tmp")   
+#tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R092_20220717_054.json")
+tracker.save_video("/workspaces/gorillatracker/videos/R033_20220707_100.mp4")
+#create_dataset_from_videos("/workspaces/gorillatracker/videos", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/tmp")   
