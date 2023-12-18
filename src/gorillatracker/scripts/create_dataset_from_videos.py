@@ -3,6 +3,8 @@ import os
 import json
 from gorillatracker.scripts.video_json_tracker import GorillaVideoTracker
 from typing import Dict
+import multiprocessing as mp
+
 
 def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_path: str) -> None:
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
@@ -49,7 +51,6 @@ def add_labels_to_json(json_input_path: str, video_name: str, json_output_path: 
     with open(json_output_path, "w") as f:
         json.dump(out_data, f, indent=4)
     
-
 def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> None:
     """crop images from the video in the given path and copy negative list to negatives.json
 
@@ -87,12 +88,18 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         json_dir: Path to the directory containing the tracked JSON files.
         output_dir: Path to the directory to save the cropped images to.
     """
+    video_list = []
     for video_name in os.listdir(video_dir):
         video_path = os.path.join(video_dir, video_name)
         json_path = os.path.join(json_dir, f"{os.path.splitext(video_name)[0]}_tracked.json")
         if(not os.path.exists(json_path)):
             continue
-        get_data_from_video(video_path, json_path, output_dir)  
+        video_list.append((video_path, json_path, output_dir))
+    # multiprocess the video processing
+    pool_size = min(int(mp.cpu_count()//8), len(video_list))
+    pool = mp.Pool(pool_size)
+    pool.starmap(get_data_from_video, video_list)
+    pool.close()
 
 def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, float, float))]]:
     """Get the frames for the given IDs.
@@ -120,8 +127,8 @@ def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, fl
     return id_frames
     
 #get_frames_for_ids("/workspaces/gorillatracker/tmp/R014_20220628_151_tracked.json")
-tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/videos")
+#tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/videos")
 #tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R033_20220707_100.json")
 #tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R092_20220717_054.json")
-tracker.save_video("/workspaces/gorillatracker/videos/R033_20220707_100.mp4")
-#create_dataset_from_videos("/workspaces/gorillatracker/videos", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/tmp")   
+#tracker.save_video("/workspaces/gorillatracker/videos/R033_20220707_100.mp4")
+create_dataset_from_videos("/workspaces/gorillatracker/videos", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/tmp/")   
