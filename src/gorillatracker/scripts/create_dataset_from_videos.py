@@ -25,8 +25,31 @@ def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_pa
     
     cropped_frame = frame[top:bottom, left:right]
     cv2.imwrite(output_path, cropped_frame)
+ 
+def add_labels_to_json(json_input_path: str, video_name: str, json_output_path: str):
+    """Add the labels from one video to the given JSON file.
+
+    Args:
+        json_input_path: Path to the JSON file to read.
+        video_name: Name of the video.
+        json_output_path: Path to the JSON file to write.
+    """
+    # read the JSON file
+    with open(json_input_path, "r") as f:
+        data = json.load(f)
+        
+    if not os.path.exists(json_output_path):
+        with open(json_output_path, "w") as f:
+            json.dump({}, f, indent=4)
+            
+    # add the ids to the JSON file
+    with open(json_output_path, "r") as f:
+        out_data = json.load(f)
+    out_data[video_name] = data["tracked_IDs"]
+    with open(json_output_path, "w") as f:
+        json.dump(out_data, f, indent=4)
     
-    
+
 def create_dataset_from_videos(video_path: str, json_path: str, output_dir: str) -> None:
     """Create a dataset of cropped images from the video in the given path.
 
@@ -42,7 +65,6 @@ def create_dataset_from_videos(video_path: str, json_path: str, output_dir: str)
     id_frames = get_frames_for_ids(json_path)
     # open the video
     video_name = os.path.splitext(os.path.basename(video_path))[0]
-    print(video_name)
     video = cv2.VideoCapture(video_path)
 
     for id, frames in id_frames.items():
@@ -55,6 +77,8 @@ def create_dataset_from_videos(video_path: str, json_path: str, output_dir: str)
             frame = video.read()[1]
             crop_and_save_image(frame, bbox[0], bbox[1], bbox[2], bbox[3], os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.jpg"))
     video.release()
+    
+    add_labels_to_json(json_path, video_name, os.path.join(output_dir, "negatives.json"))
     
 
 def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, float, float))]]:
@@ -83,4 +107,6 @@ def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, fl
     return id_frames
     
 #get_frames_for_ids("/workspaces/gorillatracker/tmp/R014_20220628_151_tracked.json")
-create_dataset_from_videos("/workspaces/gorillatracker/videos/R014_20220628_151.mp4", "/workspaces/gorillatracker/tmp/R014_20220628_151_tracked.json", "/workspaces/gorillatracker/tmp")   
+#tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/videos")
+#tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R033_20220707_100.json")
+create_dataset_from_videos("/workspaces/gorillatracker/videos/R033_20220707_100.mp4", "/workspaces/gorillatracker/tmp/R033_20220707_100_tracked.json", "/workspaces/gorillatracker/tmp")   
