@@ -9,12 +9,12 @@ import seaborn as sns
 import sklearn
 import torch
 import torchmetrics as tm
-import wandb
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 
 import gorillatracker.type_helper as gtypes
+import wandb
 
 # TODO: What is the wandb run type?
 Runner = Any
