@@ -186,6 +186,7 @@ class ConvNeXtV2BaseWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Resize((224), antialias=True)
 
+
 class ConvNeXtV2HugeWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -198,6 +199,7 @@ class ConvNeXtV2HugeWrapper(BaseModule):
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Resize((224), antialias=True)
+
 
 class VisionTransformerWrapper(BaseModule):
     def __init__(  # type: ignore
