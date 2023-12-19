@@ -87,12 +87,11 @@ def segment_dir(image_dir: str, cutout_dir: str, target_dir: str) -> None:
         cutout_helpers.get_cutout_bbox(full_image, cutout_image)
         for full_image, cutout_image in zip(full_images, cutout_images)
     ]
-    
+
     segmented_images = segment_images(full_images, bboxes, image_format="BGR")
 
     for name, segment_image, bbox in zip(cutout_image_names, segmented_images, bboxes):
         cutout_helpers.cutout_image(segment_image, bbox, os.path.join(target_dir, name))
-        
 
 
 if __name__ == "__main__":
