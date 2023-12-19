@@ -80,7 +80,7 @@ def segment_dir(image_dir: str, cutout_dir: str, target_dir: str) -> None:
         target_dir: directory to save segmented cutout images to
 
     """
-    cutout_image_names = os.listdir(cutout_dir)[:3]
+    cutout_image_names = os.listdir(cutout_dir)
     full_images = [cv2.imread(os.path.join(image_dir, image_name)) for image_name in cutout_image_names]
     cutout_images = [cv2.imread(os.path.join(cutout_dir, image_name)) for image_name in cutout_image_names]
     bboxes = [
