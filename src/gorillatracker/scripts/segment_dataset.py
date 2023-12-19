@@ -15,12 +15,14 @@ DEVICE = "cuda"
 BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
 
 
-def _predict_mask(predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArray[np.uint8]:
+def _predict_mask(
+    predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX, image_format: str
+) -> npt.NDArray[np.uint8]:
     x_min, y_min = bbox[0]
     x_max, y_max = bbox[1]
     box = np.array([x_min, y_min, x_max, y_max])
 
-    predictor.set_image(image)
+    predictor.set_image(image, image_format)
     mask, _, _ = predictor.predict(
         point_coords=None,
         point_labels=None,
@@ -47,7 +49,9 @@ def segment_image(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArr
     return segment_images([image], [bbox])[0]
 
 
-def segment_images(images: List[npt.NDArray[np.uint8]], bboxes: List[BOUNDING_BOX]) -> List[npt.NDArray[np.uint8]]:
+def segment_images(
+    images: List[npt.NDArray[np.uint8]], bboxes: List[BOUNDING_BOX], image_format: str = "RGB"
+) -> List[npt.NDArray[np.uint8]]:
     """
     Args:
         images: list of (H, W, 3) RGB images
@@ -60,7 +64,7 @@ def segment_images(images: List[npt.NDArray[np.uint8]], bboxes: List[BOUNDING_BO
 
     segment_images = []
     for image, bbox in zip(images, bboxes):
-        mask = _predict_mask(predictor, image, bbox)
+        mask = _predict_mask(predictor, image, bbox, image_format)
         segment_images.append(_remove_background(image, mask))
     return segment_images
 
@@ -76,18 +80,19 @@ def segment_dir(image_dir: str, cutout_dir: str, target_dir: str) -> None:
         target_dir: directory to save segmented cutout images to
 
     """
-    cutout_image_names = os.listdir(cutout_dir)
+    cutout_image_names = os.listdir(cutout_dir)[:3]
     full_images = [cv2.imread(os.path.join(image_dir, image_name)) for image_name in cutout_image_names]
     cutout_images = [cv2.imread(os.path.join(cutout_dir, image_name)) for image_name in cutout_image_names]
     bboxes = [
         cutout_helpers.get_cutout_bbox(full_image, cutout_image)
         for full_image, cutout_image in zip(full_images, cutout_images)
     ]
-    full_images = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in full_images]
+    
+    segmented_images = segment_images(full_images, bboxes, image_format="BGR")
 
-    segmented_images = segment_images(full_images, bboxes)
     for name, segment_image, bbox in zip(cutout_image_names, segmented_images, bboxes):
         cutout_helpers.cutout_image(segment_image, bbox, os.path.join(target_dir, name))
+        
 
 
 if __name__ == "__main__":
