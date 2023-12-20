@@ -4,61 +4,18 @@ import logging
 import os
 import shutil
 import time
-from typing import Any, Literal, Tuple
+from typing import Any, Literal, Tuple, Callable
 
 from ultralytics import YOLO
+
+TrainFunc = Callable[..., Tuple[YOLO, Any, str]]
 
 model_paths = {
     "yolov8n": "/workspaces/gorillatracker/yolov8n.pt",
     "yolov8m": "/workspaces/gorillatracker/yolov8m.pt",
     "yolov8x": "/workspaces/gorillatracker/yolov8x.pt",
 }
-
 logger = logging.getLogger(__name__)
-
-
-def modify_dataset_train_yolo(
-    bristol_split_dir: str,
-    model_type: Literal["yolov8n", "yolov8m", "yolov8x"],
-    epochs: int,
-    batch_size: int,
-    wandb_project: str = "Detection-YOLOv8-Bristol-OpenSet",
-    bristol_annotation_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox",
-    bristol_yolo_annotation_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox_class0",
-    gorilla_yml_path: str = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml",
-) -> YOLO:
-    """Build a dataset for yolo using the bristol dataset and train a yolo model on it. When finished undo the changes to the bristol dataset.
-    NOTE: The paths to the bristol dataset has to be inside the gorilla_yml_path file.
-
-    Args:
-        bristol_split_dir: Directory containing the bristol split.
-        model_type: Name of the yolo model to train.
-        epochs: Number of epochs to train.
-        batch_size: Batch size to use.
-        wandb_project: Name of the wandb project to use.
-        gorilla_yml_path: Path to the gorilla yml file.
-        bristol_annotation_dir: Directory containing the bristol annotations.
-        bristol_yolo_annotation_dir: Directory to save the annotations for yolo.
-
-    Returns:
-        Trained yolo model."""
-
-    # build dataset for yolo
-    set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
-
-    # YOLO needs the images and annotations in the same folder
-    for split in ["train", "val", "test"]:
-        join_annotations_and_imgs(
-            os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
-        )
-
-    model, _, model_name = train_yolo(model_type, epochs, batch_size, gorilla_yml_path, wandb_project=wandb_project)
-
-    # remove annotations from the bristol split
-    for split in ["train", "val", "test"]:
-        remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
-
-    return model, model_name
 
 
 def train_yolo(
@@ -95,6 +52,84 @@ def train_yolo(
     shutil.move(wandb_project, f"logs/{wandb_project}-{training_name}")
     logger.info("Training finished for %s. Results in logs/%s-%s", training_name, wandb_project, training_name)
     return model, result, training_name
+
+# TODO(rob2u): add documentation
+def sweep_yolo(
+    model_name: Literal["yolov8n", "yolov8m", "yolov8x"],
+    epochs: int,
+    iterations: int,
+    optimizer: Literal["AdamW"],
+    dataset_yml: str,
+    wandb_project: str,
+) -> Tuple[YOLO, Any, str]:
+    
+    model = YOLO(model_paths[model_name])
+    model.metrics = ["loss", "iou"]
+    model.val(data=dataset_yml)
+    
+    timestamp = time.strftime("%Y-%m-%d-%H-%M-%S")
+    training_name = f"{model_name}-e{epochs}-i{iterations}-o{optimizer}-{timestamp}"
+
+    logger.info("Tuning model %s with %d epochs, optimizer %s and %d iterations", model_name, epochs, optimizer, iterations)
+
+    model.tune(
+        data=dataset_yml,
+        epochs=epochs,
+        iterations=iterations,
+        batch=32,
+        optimizer=optimizer,
+        project=wandb_project,
+        plots=True,
+        
+    )
+
+    shutil.move(wandb_project, f"logs/{wandb_project}-{training_name}")
+    logger.info("Training finished for %s. Results in logs/%s-%s", training_name, wandb_project, training_name)
+    return model, None, training_name
+
+# TODO(rob2u): fix documentation
+def modify_dataset_train_yolo(
+    bristol_split_dir: str,
+    
+    bristol_annotation_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox",
+    bristol_yolo_annotation_dir: str = "/workspaces/gorillatracker/data/ground_truth/bristol/full_images_face_bbox_class0",
+    gorilla_yml_path: str = "/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml",
+    
+    train_func: TrainFunc = train_yolo, 
+    **kwargs: dict,
+) -> YOLO:
+    """Build a dataset for yolo using the bristol dataset and train a yolo model on it. When finished undo the changes to the bristol dataset.
+    NOTE: The paths to the bristol dataset has to be inside the gorilla_yml_path file.
+
+    Args:
+        bristol_split_dir: Directory containing the bristol split.
+        model_type: Name of the yolo model to train.
+        epochs: Number of epochs to train.
+        batch_size: Batch size to use.
+        wandb_project: Name of the wandb project to use.
+        gorilla_yml_path: Path to the gorilla yml file.
+        bristol_annotation_dir: Directory containing the bristol annotations.
+        bristol_yolo_annotation_dir: Directory to save the annotations for yolo.
+
+    Returns:
+        Trained yolo model."""
+
+    # build dataset for yolo
+    set_annotation_class_0(bristol_annotation_dir, bristol_yolo_annotation_dir)
+
+    # YOLO needs the images and annotations in the same folder
+    for split in ["train", "val", "test"]:
+        join_annotations_and_imgs(
+            os.path.join(bristol_split_dir, split), bristol_yolo_annotation_dir, os.path.join(bristol_split_dir, split)
+        )
+
+    model, _, model_name = train_func(**kwargs)
+
+    # remove annotations from the bristol split
+    for split in ["train", "val", "test"]:
+        remove_files_from_dir_with_extension(os.path.join(bristol_split_dir, split))
+
+    return model, model_name
 
 
 def set_annotation_class_0(annotation_dir: str, dest_dir: str) -> None:
@@ -170,17 +205,22 @@ def detect_gorillafaces_cxl(
 
 
 if __name__ == "__main__":
-    bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
+    # bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
+    bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-69-train-70-val-15-test-15"
     model, model_name = modify_dataset_train_yolo(
         bristol_split_dir,
-        model_type="yolov8x",
-        epochs=2,
-        batch_size=16,
+        train_func=sweep_yolo,
+        model_name="yolov8n",
+        epochs=50,
+        iterations=5,
+        optimizer="AdamW",
+        wandb_project="FaceDetection-YOLOv8n-Bristol-ClosedSet",
+        dataset_yml="/workspaces/gorillatracker/data/ground_truth/bristol/gorilla.yaml",
     )
 
-    detect_gorillafaces_cxl(
-        model,
-        model_name,
-        image_dir="/workspaces/gorillatracker/data/ground_truth/cxl/full_images",
-        file_extension=".png",
-    )
+    # detect_gorillafaces_cxl(
+    #     model,
+    #     model_name,
+    #     image_dir="/workspaces/gorillatracker/data/ground_truth/cxl/full_images",
+    #     file_extension=".png",
+    # )
