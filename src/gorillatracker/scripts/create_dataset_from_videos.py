@@ -4,6 +4,7 @@ import json
 from gorillatracker.scripts.video_json_tracker import GorillaVideoTracker
 from typing import Dict
 import multiprocessing as mp
+import tqdm
 
 def get_json_data(json_path: str) -> dict:
     """Return the data from the given JSON file and create it if it doesn't exist.
@@ -18,7 +19,7 @@ def get_json_data(json_path: str) -> dict:
         with open(json_path, "w") as f:
             json.dump({}, f)     
     with open(json_path, "r") as f:
-        data = json.load(f)
+        data = json.loads(f.read())
     return data
 
 def add_labels_to_json(id_negatives: dict[list[int]], video_name: str, json_output_path: str):
@@ -145,20 +146,26 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
     """
     video_list = []
     negative_json = os.path.join(output_dir, "negatives.json")
-    video_list = get_json_data(negative_json).keys()
+    video_skip_list = set([id.split("-")[0] for id in get_json_data(negative_json).keys()])
+    print(f"Skipping {len(video_skip_list)} videos.")
         
-    for video_name in os.listdir(video_dir):
-        video_path = os.path.join(video_dir, video_name)
-        json_path = os.path.join(json_dir, f"{os.path.splitext(video_name)[0]}_tracked.json")
-        if(not os.path.exists(json_path)):
+    for video in os.listdir(video_dir):
+        video_name = os.path.splitext(video)[0]
+        video_path = os.path.join(video_dir, video)
+        json_path = os.path.join(json_dir, f"{video_name}_tracked.json")
+        if video_name in video_skip_list or not os.path.exists(json_path):
             continue
-        video_list.append((video_path, json_path, output_dir))
+        get_data_from_video(video_path, json_path, output_dir)
+       # video_list.append((video_path, json_path, output_dir))
+        
     #multiprocess the video processing
-    pool_size = min(4, len(video_list))
-    assert pool_size < mp.cpu_count(), "The pool size should be less than the number of CPU cores."
-    pool = mp.Pool(pool_size)
-    pool.starmap(get_data_from_video, video_list)
-    pool.close()
+    #print(f"Processing {len(video_list)} videos.")
+    #pool_size = min(4, len(video_list))
+    #assert pool_size < mp.cpu_count(), "The pool size should be less than the number of CPU cores."
+    #pool = mp.Pool(pool_size)
+    #pool.starmap(get_data_from_video, video_list)
+    #pool.close()
+        
     
 #get_frames_for_ids("/workspaces/gorillatracker/tmp/R014_20220628_151_tracked.json")
 #tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels", "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked", "/workspaces/gorillatracker/videos")
