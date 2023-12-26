@@ -1,4 +1,5 @@
 import itertools
+import json
 from collections import defaultdict
 from typing import (
     Any,
@@ -19,6 +20,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.datasets.spac_videos import SPACVideosDataset
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -147,6 +149,31 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
             yield anchor, positive, negative
 
 
+class VideoTripletSampler(TripletSampler):
+    """TripletSampler that only samples negatives specified in json file."""
+
+    def __init__(
+        self,
+        sorted_dataset: Sequence[Tuple[Any, gtypes.Label]],
+        shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
+        json_path: str = None,
+    ):
+        super().__init__(sorted_dataset, shuffled_indices_generator)
+        self.json_path = json_path
+
+    def any_sample_not(self, label: gtypes.Label) -> int:
+        # read json file
+        with open(self.json_path) as f:
+            negatives = json.load(f)
+
+        possible_negative_labels = negatives[label]
+        negative_label = possible_negative_labels[torch.randint(len(possible_negative_labels), (1,)).item()]
+
+        negative_start, negative_length = self.labelsection[negative_label]
+        i = torch.randint(negative_start, negative_start + negative_length, (1,)).item()
+        return i
+
+
 class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
     """Do not use DataLoader(..., shuffle=True) with QuadletSampler."""
 
@@ -237,3 +264,37 @@ def QuadletDataLoader(
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+
+
+def VideoTripletDataLoader(
+    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True, json_path: str = None
+) -> gtypes.BatchTripletDataLoader:
+    """
+    VideoTripletDataLoader will take any Dataset that returns a single sample in the form of
+    (value, label) on __getitem__ and transform it into an efficient Triplet DataLoader.
+    If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
+    dataset will be shuffled once at the start and not after that.
+    """
+
+    sampler = VideoTripletSampler(dataset, json_path=json_path)
+    if not shuffle:
+        sampler = FreezeSampler(sampler)  # type: ignore
+    final_dataset = ToNthDataset(dataset)
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+
+
+if __name__ == "__main__":
+    dataset = SPACVideosDataset(
+        "data/derived_data/spac_gorillas_converted_labels_cropped_faces",
+        "train",
+        SPACVideosDataset.get_transforms(),
+    )
+    json_path = "data/derived_data/spac_gorillas_converted_labels_cropped_faces/negatives.json"
+    print("creating DataLoader")
+    dataloader = VideoTripletDataLoader(dataset, 1, shuffle=False, json_path=json_path)
+    print("created DataLoader")
+    # print labels first 10 batches
+    for i, batch in enumerate(dataloader):
+        if i > 10:
+            break
+        print(batch[1])
