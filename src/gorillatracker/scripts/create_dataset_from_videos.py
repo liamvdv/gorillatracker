@@ -147,8 +147,7 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
     video_list = []
     negative_json = os.path.join(output_dir, "negatives.json")
     video_skip_list = set([id.split("-")[0] for id in get_json_data(negative_json).keys()])
-    print(f"Skipping {len(video_skip_list)} videos.")
-        
+    print(f"Skipping {len(video_skip_list)} videos.")   
     for video in os.listdir(video_dir):
         video_name = os.path.splitext(video)[0]
         video_path = os.path.join(video_dir, video)
