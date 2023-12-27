@@ -1,9 +1,11 @@
+import math
 from typing import Callable, Literal, Tuple
 
 import torch
 import torch.nn.functional as F
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
+# import variational prototype learning from insightface
 
 import gorillatracker.type_helper as gtypes
 
@@ -275,7 +277,10 @@ class TripletLossOnline(nn.Module):
             masked_anchor_negative_dists = anchor_negative_dists.squeeze(1).masked_fill(
                 neg_mask == 0, float("inf")
             )  # fill all invalid negatives with inf so they are not considered in the min
-            _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1)
+            _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1) # TODO(rob2u): investigate why the second dimension (dim=1) should be reduced. Why not dim=2?
+            print(neg_min_indices.shape)
+            print(neg_min_indices)
+            
 
             hard_mask = torch.zeros(len(labels), len(labels), len(labels))
             hard_mask[torch.arange(len(labels)), :, neg_min_indices] = 1
@@ -345,13 +350,135 @@ class TripletLossOfflineNative(nn.Module):
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
 
 
-def get_triplet_loss(loss_mode: str, margin: float) -> Callable[[torch.Tensor, gtypes.BatchLabel], LossPosNegDist]:
+class ArcFace(torch.nn.Module): #TODO (rob2u): write test + docs
+    """ ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):
+    """
+    def __init__(self, embedding_size, num_classes, s=64.0, margin=0.5, *args, **kwargs):
+        super(ArcFace, self).__init__(*args, **kwargs)
+        self.s = s
+        self.margin = margin
+        self.cos_m = math.cos(margin)
+        self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
+        torch.nn.init.xavier_uniform_(self.prototypes)
+        self.ce = torch.nn.CrossEntropyLoss()
+
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor):
+        # get cos(theta) for each embedding and prototype
+        cos_theta = torch.nn.functional.linear(torch.nn.functional.normalize(embeddings), torch.nn.functional.normalize(self.prototypes))
+        sine_theta = torch.sqrt(1.0 - torch.pow(cos_theta, 2)).clamp(eps, 1.0 - eps)
+        phi = cos_theta * self.cos_m - sine_theta * self.sin_m # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
+        
+        mask = torch.zeros(cos_theta.size(), device=cos_theta.device) 
+        mask.scatter_(1, labels.view(-1, 1).long(), 1) # mask is one-hot encoded labels
+        
+        output = (mask * phi) + ((1.0 - mask) * cos_theta) #NOTE: sometimes there is an additional penalty term 
+        output *= self.s
+        loss = self.ce(output, labels)
+        
+        return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0]) # dummy values for pos/neg distances
+
+
+class VariationalPrototypeLearning(torch.nn.Module): #TODO (rob2u): write test + docs NOTE: this is not the completely original implementation
+    """ Variational Prototype (https://openaccess.thecvf.com/content/CVPR2021/papers/Deng_Variational_Prototype_Learning_for_Deep_Face_Recognition_CVPR_2021_paper.pdf)
+    """
+
+    def __init__(self, embedding_size, num_classes, batch_size, s=64.0, margin=0.5, delta_t=100, lambda_membank=0.001, *args, **kwargs) -> None:
+        super(VariationalPrototypeLearning, self).__init__(*args, **kwargs)
+        self.s = s
+        self.margin = margin
+        self.cos_m = math.cos(margin)
+        self.delta_t = delta_t
+        self.lambda_membank = lambda_membank
+        self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
+        torch.nn.init.xavier_uniform_(self.prototypes)
+        self.ce = torch.nn.CrossEntropyLoss()
+        self.batch_size = batch_size
+        self.embedding_size = embedding_size
+        self.num_classes = num_classes
+        
+        
+        self.memory_bank_ptr = 0 # pointer to the current memory bank position that will be replaced
+        self.memory_bank = torch.zeros(delta_t * batch_size, embedding_size)
+        self.memory_bank_labels = torch.zeros(delta_t * batch_size, dtype=torch.int32)
+        self.using_memory_bank = False
+    
+    def update_memory_bank(self, embeddings: torch.Tensor, labels: torch.Tensor):
+        self.memory_bank[self.memory_bank_ptr * self.batch_size:(self.memory_bank_ptr + 1) * self.batch_size] = embeddings
+        self.memory_bank_labels[self.memory_bank_ptr * self.batch_size:(self.memory_bank_ptr + 1) * self.batch_size] = labels
+        self.memory_bank_ptr = (self.memory_bank_ptr + 1) % self.delta_t
+    
+    @torch.no_grad()
+    def get_memory_bank_prototypes(self, labels: torch.Tensor):
+        # get the prototypes from the memory bank
+        prototypes = torch.zeros(self.num_classes, self.embedding_size)
+        frequency = torch.zeros(self.num_classes)
+        for i in range(self.num_classes):
+            prototypes[i] = torch.mean(self.memory_bank[self.memory_bank_labels == i], dim=0)
+            frequency[i] = torch.sum(self.memory_bank_labels == i)
+        return prototypes, frequency
+        
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor):
+        if self.using_memory_bank:
+            self.update_memory_bank(embeddings, labels)
+            mem_bank_prototypes, prototype_frequency = self.get_memory_bank_prototypes(labels)
+            relative_frequency = prototype_frequency / torch.sum(prototype_frequency)
+            prototypes = (1 - self.lambda_membank * relative_frequency) * self.prototypes + self.lambda_membank * relative_frequency * mem_bank_prototypes
+        else:
+            prototypes = self.prototypes
+        
+        
+        cos_theta = torch.nn.functional.linear(torch.nn.functional.normalize(embeddings), torch.nn.functional.normalize(prototypes))
+        sine_theta = torch.sqrt(1.0 - torch.pow(cos_theta, 2)).clamp(eps, 1.0 - eps)
+        phi = cos_theta * self.cos_m - sine_theta * self.sin_m # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
+        
+        mask = torch.zeros(cos_theta.size(), device=cos_theta.device) 
+        mask.scatter_(1, labels.view(-1, 1).long(), 1) # mask is one-hot encoded labels
+        
+        output = (mask * phi) + ((1.0 - mask) * cos_theta) #NOTE: sometimes there is an additional penalty term 
+        output *= self.s
+        loss = self.ce(output, labels)
+        
+        return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0]) # dummy values for pos/neg distances
+
+
+class TripletLoss(torch.nn.Module): # alternative implementation for hard triplet loss
+    """https://github.com/ahmedbesbes/whales-classification/blob/solution/losses"""
+    def __init__(self, margin=1.0, sample=True, wd=1e-4):
+        super(TripletLoss, self).__init__()
+        self.margin = margin
+        self.sample = sample
+        self.wd = wd
+
+    def forward(self, inputs, targets):
+        n = inputs.size(0)
+
+        # pairwise distances
+        dist = dist = torch.norm(inputs[:, None] - inputs, dim=2, p=2)
+
+        # find the hardest positive and negative
+        mask_pos = targets.expand(n, n).eq(targets.expand(n, n).t())
+        mask_neg = ~mask_pos
+        mask_pos[torch.eye(n).byte().cuda()] = 0
+        dist_p = torch.max(dist * mask_pos.float(), dim=1)[0]
+        
+        # hard negative
+        ninf = torch.ones_like(dist) * float('inf')
+        nindex = torch.min(torch.where(mask_neg, dist, ninf), dim=1)[1]
+        dist_n = dist.gather(0, nindex.unsqueeze(0))
+
+        # calc loss
+        diff = torch.clamp(dist_p - dist_n + self.margin, min=0.)
+        loss = diff.mean()
+        return loss
+
+
+def get_loss(loss_mode: str, **kw_args) -> Callable[[torch.Tensor, gtypes.BatchLabel], LossPosNegDist]:
     loss_modes = {
-        "online/hard": TripletLossOnline(margin=margin, mode="hard"),
-        "online/semi-hard": TripletLossOnline(margin=margin, mode="semi-hard"),
-        "online/soft": TripletLossOnline(margin=margin, mode="soft"),
-        "offline": TripletLossOffline(margin=margin),
-        "offline/native": TripletLossOfflineNative(margin=margin),
+        "online/hard": TripletLossOnline(mode="hard", **kw_args),
+        "online/semi-hard": TripletLossOnline(mode="semi-hard", **kw_args),
+        "online/soft": TripletLossOnline(mode="soft", **kw_args),
+        "offline": TripletLossOffline(**kw_args),
+        "offline/native": TripletLossOfflineNative(**kw_args),
     }
     return loss_modes[loss_mode]
 
