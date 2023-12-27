@@ -10,6 +10,8 @@ BatchLabel = Tuple[Label]
 BatchTripletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel]
 BatchTripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
+LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+
 BatchQuadletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel, BatchLabel]
 BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 

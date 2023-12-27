@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose, ToTensor
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_modules import QuadletDataModule, TripletDataModule, SimpleDataModule
+from gorillatracker.data_modules import QuadletDataModule, SimpleDataModule, TripletDataModule
 
 
 def get_dataset_class(pypath: str) -> Type[Dataset[Tuple[torch.Tensor, Union[str, int]]]]:
@@ -25,7 +25,7 @@ def _assert_tensor(x: Any) -> torch.Tensor:
     return x
 
 
-def get_data_module( # TODO(rob2u): add simple data module
+def get_data_module(  # TODO(rob2u): add simple data module
     dataset_class_id: str,
     data_dir: str,
     batch_size: int,
