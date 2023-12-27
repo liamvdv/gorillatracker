@@ -277,9 +277,7 @@ class TripletLossOnline(nn.Module):
             masked_anchor_negative_dists = anchor_negative_dists.squeeze(1).masked_fill(
                 neg_mask == 0, float("inf")
             )  # fill all invalid negatives with inf so they are not considered in the min
-            _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1) # TODO(rob2u): investigate why the second dimension (dim=1) should be reduced. Why not dim=2?
-            print(neg_min_indices.shape)
-            print(neg_min_indices)
+            _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1)
             
 
             hard_mask = torch.zeros(len(labels), len(labels), len(labels))
@@ -348,37 +346,6 @@ class TripletLossOfflineNative(nn.Module):
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
         NO_VALUE = torch.tensor([-1], dtype=torch.float32)
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
-
-
-class TripletLossAlternative(torch.nn.Module): # TODO (rob2u):alternative implementation for hard triplet loss
-    """https://github.com/ahmedbesbes/whales-classification/blob/solution/losses"""
-    def __init__(self, margin=1.0, sample=True, wd=1e-4):
-        super(TripletLossAlternative, self).__init__()
-        self.margin = margin
-        self.sample = sample
-        self.wd = wd
-
-    def forward(self, inputs, targets):
-        n = inputs.size(0)
-
-        # pairwise distances
-        dist = dist = torch.norm(inputs[:, None] - inputs, dim=2, p=2)
-
-        # find the hardest positive and negative
-        mask_pos = targets.expand(n, n).eq(targets.expand(n, n).t())
-        mask_neg = ~mask_pos
-        mask_pos[torch.eye(n).byte().cuda()] = 0
-        dist_p = torch.max(dist * mask_pos.float(), dim=1)[0]
-        
-        # hard negative
-        ninf = torch.ones_like(dist) * float('inf')
-        nindex = torch.min(torch.where(mask_neg, dist, ninf), dim=1)[1]
-        dist_n = dist.gather(0, nindex.unsqueeze(0))
-
-        # calc loss
-        diff = torch.clamp(dist_p - dist_n + self.margin, min=0.)
-        loss = diff.mean()
-        return loss
 
 
 def get_loss(loss_mode: str, **kw_args) -> Callable[[torch.Tensor, gtypes.BatchLabel], LossPosNegDist]:
