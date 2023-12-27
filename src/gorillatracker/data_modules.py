@@ -6,7 +6,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader
+from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader, SimpleDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -81,3 +81,7 @@ class TripletDataModule(NletDataModule):
 class QuadletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
         return QuadletDataLoader
+
+class SimpleDataModule(NletDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
+        return SimpleDataLoader

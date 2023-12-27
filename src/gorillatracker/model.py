@@ -19,7 +19,7 @@ from torchvision.models import (
 )
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.triplet_loss import get_triplet_loss
+from gorillatracker.losses.triplet_loss import get_loss
 
 
 class BaseModule(L.LightningModule):
@@ -76,7 +76,7 @@ class BaseModule(L.LightningModule):
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
 
         # TODO(rob2u): rename loss mode
-        self.triplet_loss = get_triplet_loss(loss_mode, margin)
+        self.triplet_loss = get_loss(loss_mode, margin)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)

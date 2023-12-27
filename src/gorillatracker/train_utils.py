@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose, ToTensor
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_modules import QuadletDataModule, TripletDataModule
+from gorillatracker.data_modules import QuadletDataModule, TripletDataModule, SimpleDataModule
 
 
 def get_dataset_class(pypath: str) -> Type[Dataset[Tuple[torch.Tensor, Union[str, int]]]]:
@@ -25,7 +25,7 @@ def _assert_tensor(x: Any) -> torch.Tensor:
     return x
 
 
-def get_data_module(
+def get_data_module( # TODO(rob2u): add simple data module
     dataset_class_id: str,
     data_dir: str,
     batch_size: int,
@@ -33,7 +33,9 @@ def get_data_module(
     model_transforms: gtypes.Transform,
     training_transforms: gtypes.Transform = None,  # type: ignore
 ) -> Union[TripletDataModule, QuadletDataModule]:
-    base = QuadletDataModule if loss_mode.startswith("online") else TripletDataModule
+    base = QuadletDataModule if loss_mode.startswith("online") else None
+    base = TripletDataModule if loss_mode.startswith("offline") else base
+    base = SimpleDataModule if loss_mode.startswith("softmax") else base
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
         [
