@@ -11,14 +11,15 @@ import gorillatracker.type_helper as gtypes
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
 
-class ArcFace(torch.nn.Module):  # TODO (rob2u): test
+class ArcFaceLoss(torch.nn.Module):  # TODO (rob2u): test
     """ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):"""
 
     def __init__(self, embedding_size, num_classes, s=64.0, margin=0.5, *args, **kwargs):
-        super(ArcFace, self).__init__(*args, **kwargs)
+        super(ArcFaceLoss, self).__init__(*args, **kwargs)
         self.s = s
         self.margin = margin
         self.cos_m = math.cos(margin)
+        self.sin_m = math.sin(margin)
         self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
         torch.nn.init.xavier_uniform_(self.prototypes)
         self.ce = torch.nn.CrossEntropyLoss()
@@ -60,7 +61,8 @@ class VariationalPrototypeLearning(
         s=64.0,
         margin=0.5,
         delta_t=100,
-        lambda_membank=0.001,
+        lambda_membank=0.5,
+        mem_bank_start_epoch=2,
         *args,
         **kwargs,
     ) -> None:
@@ -68,10 +70,16 @@ class VariationalPrototypeLearning(
         self.s = s
         self.margin = margin
         self.cos_m = math.cos(margin)
+        self.sin_m = math.sin(margin)
         self.delta_t = delta_t
         self.lambda_membank = lambda_membank
-        self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
+        self.mem_bank_start_epoch = mem_bank_start_epoch
+        if torch.cuda.is_available():
+            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))
+        else:
+            self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
         torch.nn.init.xavier_uniform_(self.prototypes)
+
         self.ce = torch.nn.CrossEntropyLoss()
         self.batch_size = batch_size
         self.embedding_size = embedding_size
@@ -82,8 +90,17 @@ class VariationalPrototypeLearning(
         self.memory_bank_labels = torch.zeros(delta_t * batch_size, dtype=torch.int32)
         self.using_memory_bank = False
 
+    def set_using_memory_bank(self, using_memory_bank: bool) -> bool:
+        """Sets whether or not to use the memory bank"""
+        self.using_memory_bank = using_memory_bank
+        return self.using_memory_bank
+
     def update_memory_bank(self, embeddings: torch.Tensor, labels: torch.Tensor) -> None:
         """Updates the memory bank with the current batch of embeddings and labels"""
+        if self.memory_bank.device != embeddings.device or self.memory_bank_labels.device != embeddings.device:
+            self.memory_bank = self.memory_bank.to(embeddings.device)
+            self.memory_bank_labels = self.memory_bank_labels.to(embeddings.device)
+
         self.memory_bank[
             self.memory_bank_ptr * self.batch_size : (self.memory_bank_ptr + 1) * self.batch_size
         ] = embeddings
@@ -96,29 +113,46 @@ class VariationalPrototypeLearning(
     def get_memory_bank_prototypes(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Returns the prototypes and their frequency in the memory bank"""
 
-        prototypes = torch.zeros(self.num_classes, self.embedding_size)
-        frequency = torch.zeros(self.num_classes)
+        prototypes = torch.zeros(self.num_classes, self.embedding_size, device=self.memory_bank.device)
+        frequency = torch.zeros(self.num_classes, device=self.memory_bank.device)
         for i in range(self.num_classes):
             prototypes[i] = torch.mean(self.memory_bank[self.memory_bank_labels == i], dim=0)
             frequency[i] = torch.sum(self.memory_bank_labels == i)
+
+        # set to zero if frequency is zero
+        prototypes[frequency == 0] = 0.0
+
         return prototypes, frequency
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:  # TODO (rob2u)
         """Forward pass of the Variational Prototype Learning loss function"""
         if self.using_memory_bank:
-            self.update_memory_bank(embeddings, labels)
             mem_bank_prototypes, prototype_frequency = self.get_memory_bank_prototypes()
-            relative_frequency = prototype_frequency / torch.sum(prototype_frequency)
+            mem_bank_prototypes = mem_bank_prototypes.to(embeddings.device)
+            relative_frequency = prototype_frequency / (
+                torch.sum(prototype_frequency) if torch.sum(prototype_frequency) > eps else 1.0
+            )
+            relative_frequency = relative_frequency.unsqueeze(1).repeat(1, self.embedding_size).to(embeddings.device)
+            is_known = (relative_frequency > eps).float().to(embeddings.device)
+
             prototypes = (
-                1 - self.lambda_membank * relative_frequency
-            ) * self.prototypes + self.lambda_membank * relative_frequency * mem_bank_prototypes
+                (1 - self.lambda_membank * is_known) * self.prototypes
+            ) + self.lambda_membank * is_known * mem_bank_prototypes
+
+            self.update_memory_bank(embeddings, labels)
         else:
             prototypes = self.prototypes
 
-        cos_theta = torch.nn.functional.linear(
-            torch.nn.functional.normalize(embeddings), torch.nn.functional.normalize(prototypes)
-        )
-        sine_theta = torch.sqrt(1.0 - torch.pow(cos_theta, 2)).clamp(eps, 1.0 - eps)
+        cos_theta = (
+            torch.nn.functional.normalize(embeddings).unsqueeze(1)
+            * torch.nn.functional.normalize(prototypes).unsqueeze(0)
+        ).sum(
+            dim=2
+        )  # (1, batch_size, embedding_size) * (num_classes, 1, embedding_size) -> (num_classes, batch_size)
+
+        sine_theta = torch.sqrt(
+            torch.maximum(1.0 - torch.pow(cos_theta, 2), torch.tensor([eps], device=cos_theta.device))
+        ).clamp(eps, 1.0 - eps)
         phi = (
             cos_theta * self.cos_m - sine_theta * self.sin_m
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)

@@ -6,9 +6,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
-
-# import variational prototype learning from insightface
-
+from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -348,11 +346,26 @@ class TripletLossOfflineNative(nn.Module):
 
 def get_loss(loss_mode: str, **kw_args) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
     loss_modes = {
-        "online/hard": TripletLossOnline(mode="hard", **kw_args),
-        "online/semi-hard": TripletLossOnline(mode="semi-hard", **kw_args),
-        "online/soft": TripletLossOnline(mode="soft", **kw_args),
-        "offline": TripletLossOffline(**kw_args),
-        "offline/native": TripletLossOfflineNative(**kw_args),
+        "online/hard": TripletLossOnline(mode="hard", margin=kw_args["margin"]),
+        "online/semi-hard": TripletLossOnline(mode="semi-hard", margin=kw_args["margin"]),
+        "online/soft": TripletLossOnline(mode="soft", margin=kw_args["margin"]),
+        "offline": TripletLossOffline(margin=kw_args["margin"]),
+        "offline/native": TripletLossOfflineNative(margin=kw_args["margin"]),
+        "softmax/arcface": ArcFaceLoss(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+        ),  # TODO
+        "softmax/vpl": VariationalPrototypeLearning(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            batch_size=kw_args["batch_size"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+            delta_t=kw_args["delta_t"],
+            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+        ),  # TODO
     }
     return loss_modes[loss_mode]
 

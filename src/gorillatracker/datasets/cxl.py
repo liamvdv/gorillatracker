@@ -67,6 +67,10 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
             ]
         )
 
+    def get_num_classes(self) -> int:
+        labels = [label for _, label in self.samples]
+        return len(set(labels))
+
 
 if __name__ == "__main__":
     cxl = CXLDataset(

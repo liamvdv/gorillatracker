@@ -1,5 +1,5 @@
 import importlib
-from typing import Callable, Type
+from typing import Callable, Tuple, Type
 
 import lightning as L
 import pandas as pd
@@ -19,6 +19,7 @@ from torchvision.models import (
 )
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.losses.arcface_loss import VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import get_loss
 
 
@@ -44,7 +45,13 @@ class BaseModule(L.LightningModule):
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         margin: float = 0.5,
+        s: float = 64.0,
+        delta_t: int = 200,
+        mem_bank_start_epoch: int = 2,
+        lambda_membank: float = 0.5,
         embedding_size: int = 256,
+        batch_size: int = 32,
+        num_classes: Tuple[int, int, int] = (0, 0, 0),
     ) -> None:
         super().__init__()
 
@@ -76,10 +83,39 @@ class BaseModule(L.LightningModule):
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
 
         # TODO(rob2u): rename loss mode
-        self.triplet_loss = get_loss(loss_mode, margin)
+        self.loss_module_train = get_loss(
+            loss_mode,
+            margin=self.margin,
+            embedding_size=self.embedding_size,
+            batch_size=batch_size,
+            delta_t=delta_t,
+            s=s,
+            num_classes=num_classes[0],
+            mem_bank_start_epoch=mem_bank_start_epoch,
+            lambda_membank=lambda_membank,
+        )
+        self.loss_module_val = get_loss(
+            loss_mode,
+            margin=self.margin,
+            embedding_size=self.embedding_size,
+            batch_size=batch_size,
+            delta_t=delta_t,
+            s=s,
+            num_classes=num_classes[1],
+            mem_bank_start_epoch=mem_bank_start_epoch,
+            lambda_membank=lambda_membank,
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
+
+    def on_train_epoch_start(self) -> None:
+        if (
+            isinstance(self.loss_module_train, VariationalPrototypeLearning)
+            and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
+        ):  # TODO
+            self.loss_module_train.set_using_memory_bank(True)
+            logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         images, labels = batch
@@ -88,7 +124,7 @@ class BaseModule(L.LightningModule):
         flat_labels = (
             torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
         )
-        loss, pos_dist, neg_dist = self.triplet_loss(embeddings, flat_labels)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -112,6 +148,7 @@ class BaseModule(L.LightningModule):
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
+        # if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
         images, labels = batch  # embeddings either (ap, a, an, n) oder (a, p, n)
         n_achors = len(images[0])
         vec = torch.cat(images, dim=0)
@@ -121,7 +158,7 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
 
         self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
-        loss, pos_dist, neg_dist = self.triplet_loss(embeddings, flat_labels)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
         self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
         self.log("val/positive_distance", pos_dist, on_step=True)
         self.log("val/negative_distance", neg_dist, on_step=True)

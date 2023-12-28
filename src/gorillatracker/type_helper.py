@@ -17,6 +17,8 @@ BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
 
 BatchTripletDataLoader = torch.utils.data.DataLoader[Tuple[BatchTripletValue, BatchTripletLabel]]
 BatchQuadletDataLoader = torch.utils.data.DataLoader[Tuple[BatchQuadletValue, BatchQuadletLabel]]
+# BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
+BatchSimpleDataLoader = Any
 
 BatchNletDataLoader = Union[BatchTripletDataLoader, BatchQuadletDataLoader]
 

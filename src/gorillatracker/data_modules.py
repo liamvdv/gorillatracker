@@ -72,6 +72,21 @@ class NletDataModule(L.LightningDataModule):
         # NOTE(liamvdv): used to clean-up when the run is finished
         pass
 
+    def get_num_classes(
+        self, mode
+    ) -> int:  # TODO: remove all of this stuff and find elegant solution for num_classes problem
+        if mode == "train":
+            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            return train.get_num_classes()
+        elif mode == "val":
+            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            return val.get_num_classes()
+        elif mode == "test":
+            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            return test.get_num_classes()
+        else:
+            raise ValueError(f"unknown mode '{mode}'")
+
 
 class TripletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:

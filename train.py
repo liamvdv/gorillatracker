@@ -27,9 +27,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
                 f"Requested {args.num_devices} GPUs but {num_available_gpus} are available.",
                 f"Using first {args.num_devices} GPUs. You should set CUDA_VISIBLE_DEVICES or the docker --gpus flag to the desired GPU ids.",
             )
-        if not torch.cuda.is_available():
-            logger.error("CUDA is not available, you should change the accelerator with --accelerator cpu|tpu|mps.")
-            exit(1)
+        # if not torch.cuda.is_available():
+        #     logger.error("CUDA is not available, you should change the accelerator with --accelerator cpu|tpu|mps.")
+        #     exit(1)
     if current_process_rank == 0 and args.debug:
         wait_for_debugger()  # TODO: look into debugger usage
 
@@ -38,6 +38,20 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     ############# Construct W&B Logger ##############
     wandb_logging_module = WandbLoggingModule(args)
     wandb_logger = wandb_logging_module.construct_logger()
+
+    #################### Construct dataloaders #################
+    model_cls = get_model_cls(args.model_name_or_path)
+    model_transforms = model_cls.get_tensor_transforms()
+    if args.data_resize_transform is not None:
+        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    dm = get_data_module(
+        args.dataset_class,
+        str(args.data_dir),
+        args.batch_size,
+        args.loss_mode,
+        model_transforms,
+        model_cls.get_training_transforms(),
+    )
 
     ################# Construct model ##############
 
@@ -57,8 +71,13 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         margin=args.margin,
         loss_mode=args.loss_mode,
         embedding_size=args.embedding_size,
+        batch_size=args.batch_size,
+        s=args.s,
+        delta_t=args.delta_t,
+        mem_bank_start_epoch=args.mem_bank_start_epoch,
+        lambda_membank=args.lambda_membank,
+        num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
     )
-    model_cls = get_model_cls(args.model_name_or_path)
 
     if args.saved_checkpoint_path is not None:
         args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
@@ -86,18 +105,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             )
         model = torch.compile(model)
 
-    #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        model_transforms,
-        model.get_training_transforms(),
-    )
+    #################### Construct trainer #################
+
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -194,7 +203,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/config.yml"
+    config_path = "./cfgs/efficientnet_mnist.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments

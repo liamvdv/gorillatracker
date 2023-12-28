@@ -102,6 +102,8 @@ class ToNthDataset(Dataset[Tuple[Tuple[T, ...], Tuple[R, ...]]], Generic[T, R]):
     def __getitem__(self, idxs: Union[List[int], torch.Tensor]) -> Tuple[Tuple[T, ...], Tuple[R, ...]]:
         if torch.is_tensor(idxs):  # type: ignore
             idxs = idxs.tolist()  # type: ignore
+        if isinstance(idxs, int):
+            idxs = [idxs]
 
         xs, ys = [], []
         for idx in idxs:
