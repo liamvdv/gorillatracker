@@ -50,7 +50,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         args.batch_size,
         args.loss_mode,
         model_transforms,
-        model_cls.get_training_transforms(),
+        model_cls.get_training_transforms(),  # type: ignore
     )
 
     ################# Construct model ##############
@@ -203,7 +203,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/efficientnet_mnist.yml"
+    config_path = "./cfgs/efficientnet_cxl.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments

@@ -1,7 +1,10 @@
 import math
-from typing import Tuple
+from typing import Any, Tuple
 
 import torch
+
+# import Labelencoder
+from sklearn.preprocessing import LabelEncoder
 
 import gorillatracker.type_helper as gtypes
 
@@ -11,10 +14,12 @@ import gorillatracker.type_helper as gtypes
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
 
-class ArcFaceLoss(torch.nn.Module):  # TODO (rob2u): test
+class ArcFaceLoss(torch.nn.Module):
     """ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):"""
 
-    def __init__(self, embedding_size, num_classes, s=64.0, margin=0.5, *args, **kwargs):
+    def __init__(
+        self, embedding_size: int, num_classes: int, s: float = 64.0, margin: float = 0.5, *args: Any, **kwargs: Any
+    ) -> None:
         super(ArcFaceLoss, self).__init__(*args, **kwargs)
         self.s = s
         self.margin = margin
@@ -46,25 +51,23 @@ class ArcFaceLoss(torch.nn.Module):  # TODO (rob2u): test
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
 
 
-class VariationalPrototypeLearning(
-    torch.nn.Module
-):  # TODO (rob2u): test NOTE: this is not the completely original implementation
+class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the completely original implementation
     """Variational Prototype Learning Loss
     See https://openaccess.thecvf.com/content/CVPR2021/papers/Deng_Variational_Prototype_Learning_for_Deep_Face_Recognition_CVPR_2021_paper.pdf
     """
 
     def __init__(
         self,
-        embedding_size,
-        num_classes,
-        batch_size,
-        s=64.0,
-        margin=0.5,
-        delta_t=100,
-        lambda_membank=0.5,
-        mem_bank_start_epoch=2,
-        *args,
-        **kwargs,
+        embedding_size: int,
+        num_classes: int,
+        batch_size: int,
+        s: float = 64.0,
+        margin: float = 0.5,
+        delta_t: int = 100,
+        lambda_membank: float = 0.5,
+        mem_bank_start_epoch: int = 2,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super(VariationalPrototypeLearning, self).__init__(*args, **kwargs)
         self.s = s
@@ -75,7 +78,7 @@ class VariationalPrototypeLearning(
         self.lambda_membank = lambda_membank
         self.mem_bank_start_epoch = mem_bank_start_epoch
         if torch.cuda.is_available():
-            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))
+            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
         torch.nn.init.xavier_uniform_(self.prototypes)
@@ -97,6 +100,17 @@ class VariationalPrototypeLearning(
 
     def update_memory_bank(self, embeddings: torch.Tensor, labels: torch.Tensor) -> None:
         """Updates the memory bank with the current batch of embeddings and labels"""
+
+        if embeddings.shape[0] < self.batch_size:
+            embeddings = torch.cat(
+                (
+                    embeddings,
+                    torch.zeros(self.batch_size - embeddings.shape[0], self.embedding_size, device=embeddings.device),
+                ),
+                dim=0,
+            )
+            labels = torch.cat((labels, torch.zeros(self.batch_size - labels.shape[0], device=embeddings.device) - 1), dim=0)  # type: ignore
+
         if self.memory_bank.device != embeddings.device or self.memory_bank_labels.device != embeddings.device:
             self.memory_bank = self.memory_bank.to(embeddings.device)
             self.memory_bank_labels = self.memory_bank_labels.to(embeddings.device)
@@ -117,14 +131,14 @@ class VariationalPrototypeLearning(
         frequency = torch.zeros(self.num_classes, device=self.memory_bank.device)
         for i in range(self.num_classes):
             prototypes[i] = torch.mean(self.memory_bank[self.memory_bank_labels == i], dim=0)
-            frequency[i] = torch.sum(self.memory_bank_labels == i)
+            frequency[i] = torch.sum(self.memory_bank_labels == i)  # type: ignore
 
         # set to zero if frequency is zero
         prototypes[frequency == 0] = 0.0
 
         return prototypes, frequency
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:  # TODO (rob2u)
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the Variational Prototype Learning loss function"""
         if self.using_memory_bank:
             mem_bank_prototypes, prototype_frequency = self.get_memory_bank_prototypes()

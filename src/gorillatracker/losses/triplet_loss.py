@@ -1,4 +1,4 @@
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 import torch
 import torch.nn.functional as F
@@ -344,7 +344,7 @@ class TripletLossOfflineNative(nn.Module):
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
 
 
-def get_loss(loss_mode: str, **kw_args) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
+def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
     loss_modes = {
         "online/hard": TripletLossOnline(mode="hard", margin=kw_args["margin"]),
         "online/semi-hard": TripletLossOnline(mode="semi-hard", margin=kw_args["margin"]),

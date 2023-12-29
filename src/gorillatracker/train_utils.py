@@ -32,10 +32,10 @@ def get_data_module(  # TODO(rob2u): add simple data module
     loss_mode: str,
     model_transforms: gtypes.Transform,
     training_transforms: gtypes.Transform = None,  # type: ignore
-) -> Union[TripletDataModule, QuadletDataModule]:
+) -> Union[TripletDataModule, QuadletDataModule, SimpleDataModule]:
     base = QuadletDataModule if loss_mode.startswith("online") else None
-    base = TripletDataModule if loss_mode.startswith("offline") else base
-    base = SimpleDataModule if loss_mode.startswith("softmax") else base
+    base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
+    base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
         [

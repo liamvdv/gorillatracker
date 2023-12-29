@@ -28,7 +28,8 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
         samples.append((image_path, label))
     return samples
 
-def cast_label_to_int(labels: List[Label]) -> int:
+
+def cast_label_to_int(labels: List[str]) -> List[int]:
     le = LabelEncoder()
     le.fit(labels)
     return le.transform(labels)
@@ -49,19 +50,19 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
                     ...
         """
         dirpath = data_dir / Path(partition)
-        self.samples = get_samples(dirpath)
-        
+        samples = get_samples(dirpath)
+
         # new
-        labels = [label for _, label in self.samples]
-        labels = cast_label_to_int(labels)
-        self.samples = list(zip([path for path, _ in self.samples], labels))
-        
+        labels_string = [label for _, label in samples]
+        labels_int = cast_label_to_int(labels_string)
+        self.samples = list(zip([path for path, _ in samples], labels_int))
+
         self.transform = transform
 
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
