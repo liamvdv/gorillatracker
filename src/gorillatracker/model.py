@@ -19,7 +19,7 @@ from torchvision.models import (
 )
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import VariationalPrototypeLearning
+from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import get_loss
 
 
@@ -148,7 +148,6 @@ class BaseModule(L.LightningModule):
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        # if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
         images, labels = batch  # embeddings either (ap, a, an, n) oder (a, p, n)
         n_achors = len(images[0])
         vec = torch.cat(images, dim=0)
@@ -158,11 +157,41 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
 
         self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
-        loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-        self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
-        self.log("val/positive_distance", pos_dist, on_step=True)
-        self.log("val/negative_distance", neg_dist, on_step=True)
-        return loss
+        if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
+            self.log("val/loss", loss, on_epoch=True, sync_dist=True, prog_bar=True)
+            self.log("val/positive_distance", pos_dist, on_epoch=True)
+            self.log("val/negative_distance", neg_dist, on_epoch=True)
+            return loss
+        else:
+            return torch.tensor(0.0)
+        
+    def on_validation_epoch_end(self) -> None: # TODO (rob2u): test + refactor
+            # calculate loss after all embeddings have been processed
+        if isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+            
+            logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
+            
+            # get weights for all classes by averaging over all embeddings
+            class_weights = torch.zeros(self.loss_module_val.num_classes, self.embedding_size).to(self.device)
+            for label in range(self.loss_module_val.num_classes):
+                class_weights[label] = torch.tensor(self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()).mean(dim=0)
+                if torch.isnan(class_weights[label]).any():
+                    class_weights[label] = 0.0
+                
+            # calculate loss for all embeddings
+            self.loss_module_val.set_weights(class_weights)
+
+            losses = []
+            for _, row in self.embeddings_table.iterrows():
+                loss, _, _ = self.loss_module_val(torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0))
+                losses.append(loss)
+            loss = torch.tensor(losses).mean()
+            self.log("val/loss", loss, sync_dist=True)
+            
+        # clear the table where the embeddings are stored
+        self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)  # reset embeddings table
+            
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         # TODO(all): add lr_scheduler based on

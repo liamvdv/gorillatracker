@@ -94,6 +94,15 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         """Sets whether or not to use the memory bank"""
         self.using_memory_bank = using_memory_bank
         return self.using_memory_bank
+    
+    def set_weights(self, weights: torch.Tensor) -> None:
+        """Sets the weights of the prototypes"""
+        assert weights.shape == self.prototypes.shape
+        
+        if torch.cuda.is_available() and self.prototypes.device != weights.device:
+            weights = weights.cuda()
+        
+        self.prototypes = torch.nn.Parameter(weights)
 
     def update_memory_bank(self, embeddings: torch.Tensor, labels: torch.Tensor) -> None:
         """Updates the memory bank with the current batch of embeddings and labels"""
@@ -153,6 +162,9 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
             self.update_memory_bank(embeddings, labels)
         else:
             prototypes = self.prototypes
+        
+        if prototypes.device != embeddings.device:
+            prototypes = prototypes.to(embeddings.device)
 
         cos_theta = (
             torch.nn.functional.normalize(embeddings).unsqueeze(1)
