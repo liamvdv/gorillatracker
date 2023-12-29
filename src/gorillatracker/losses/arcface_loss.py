@@ -3,9 +3,6 @@ from typing import Any, Tuple
 
 import torch
 
-# import Labelencoder
-from sklearn.preprocessing import LabelEncoder
-
 import gorillatracker.type_helper as gtypes
 
 # import variational prototype learning from insightface
