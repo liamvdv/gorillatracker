@@ -136,7 +136,8 @@ class BaseModule(L.LightningModule):
             logger.info(
                 f"Using lr: {self.learning_rate}, weight decay: {self.weight_decay} and warmup epochs: {self.warmup_epochs}"
             )
-
+            
+        
         optimizer = AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
@@ -144,7 +145,15 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay,
         )
-        return {"optimizer": optimizer}
+        
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer=optimizer,
+            lr_lambda=lambda epoch: self.lr_decay ** (epoch // self.lr_decay_interval), # NOTE(rob2u) no usage of warmup_epochs
+        )
+        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau() #TODO(rob2u) implement ReduceLROnPlateau
+        
+        
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
