@@ -5,8 +5,6 @@ from typing import Dict
 
 import cv2
 
-from gorillatracker.scripts.video_json_tracker import GorillaVideoTracker
-
 
 def get_json_data(json_path: str) -> dict:
     """Return the data from the given JSON file and create it if it doesn't exist.
@@ -140,13 +138,13 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
         frame_list = [frames[i] for i in range(0, images_per_individual * step_size, step_size)]
         for frame_idx, bbox in frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-            frame = video.read()[1] # read the frame. read() returns a tuple of (success, frame)
+            frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
             crop_and_save_image(
                 frame,
-                bbox[0], #x
-                bbox[1], #y
-                bbox[2], #w
-                bbox[3], #h
+                bbox[0],  # x
+                bbox[1],  # y
+                bbox[2],  # w
+                bbox[3],  # h
                 os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.jpg"),
             )
     video.release()
@@ -161,7 +159,6 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         json_dir: Path to the directory containing the tracked JSON files.
         output_dir: Path to the directory to save the cropped images to.
     """
-    # video_list = []
     negative_json = os.path.join(output_dir, "negatives.json")
     video_skip_list = set([id.split("-")[0] for id in get_json_data(negative_json).keys()])
     print(f"Skipping {len(video_skip_list)} videos.")
@@ -172,26 +169,10 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         if video_name in video_skip_list or not os.path.exists(json_path):
             continue
         get_data_from_video(video_path, json_path, output_dir)
-    # video_list.append((video_path, json_path, output_dir))
-
-    # multiprocess the video processing
-    # print(f"Processing {len(video_list)} videos.")
-    # pool_size = min(4, len(video_list))
-    # assert pool_size < mp.cpu_count(), "The pool size should be less than the number of CPU cores."
-    # pool = mp.Pool(pool_size)
-    # pool.starmap(get_data_from_video, video_list)
-    # pool.close()
 
 
-# get_frames_for_ids("/workspaces/gorillatracker/tmp/R014_20220628_151_tracked.json")
-tracker = GorillaVideoTracker("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels", "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked", "/workspaces/gorillatracker/videos")
-tracker.track_files()
-# tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R033_20220707_100.json")
-# tracker.track_file("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_backup/R092_20220717_054.json")
-# tracker.save_video("/workspaces/gorillatracker/videos/R033_20220926_092.mp4")
-# create_dataset_from_videos("/workspaces/gorillatracker/videos", "/workspaces/gorillatracker/tmp/", "/workspaces/gorillatracker/tmp/")
-# create_dataset_from_videos(
-#     "/workspaces/gorillatracker/videos",
-#     "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked",
-#     "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces",
-# )
+create_dataset_from_videos(
+    "/workspaces/gorillatracker/videos",
+    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked",
+    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces",
+)
