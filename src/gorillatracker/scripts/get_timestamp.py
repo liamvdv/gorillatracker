@@ -1,7 +1,8 @@
-import cv2
-import easyocr
 import json
 import os
+
+import cv2
+import easyocr
 
 
 def get_time_stamp(video_path: str) -> str:
@@ -40,7 +41,7 @@ def get_time_stamp(video_path: str) -> str:
     try:
         h = int(time_stamp[:2])
         m = int(time_stamp[2:4])
-        am = True if time_stamp[4:6].lower() == "am" else False    
+        am = True if time_stamp[4:6].lower() == "am" else False
     except ValueError:
         return 1
 
@@ -49,7 +50,7 @@ def get_time_stamp(video_path: str) -> str:
     return f"{str(h).zfill(2)}:{str(m).zfill(2)} {'AM' if am else 'PM'}"
 
 
-def write_timestamps_to_json(json_path:str, video_path:str) -> None:
+def write_timestamps_to_json(json_path: str, video_path: str) -> None:
     """
     Writes the time stamps of the given video file to the json file.
     Args:
@@ -59,7 +60,7 @@ def write_timestamps_to_json(json_path:str, video_path:str) -> None:
     if not os.path.exists(json_path):
         with open(json_path, "w") as f:
             json.dump({}, f)
-            
+
     with open(json_path, "r") as f:
         data = json.load(f)
 
@@ -79,4 +80,8 @@ def write_timestamps_to_json(json_path:str, video_path:str) -> None:
     with open(json_path, "w") as f:
         json.dump(data, f, indent=4)
 
-write_timestamps_to_json("/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/timestamps.json", "/workspaces/gorillatracker/videos")
+
+write_timestamps_to_json(
+    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/timestamps.json",
+    "/workspaces/gorillatracker/videos",
+)
