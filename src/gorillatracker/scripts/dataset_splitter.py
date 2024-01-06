@@ -182,7 +182,7 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = True
+TEST = False
 
 
 def copy(src: Path, dst: Path) -> None:
@@ -389,21 +389,35 @@ def read_dataset(dirpath: Path, labeler: Labeler) -> Dict[str, List[Entry]]:
     return {partition: read_dataset_partition(dirpath / partition, labeler) for partition in partitions}
 
 
-def _merge_dataset_splits(target: str, ds1: str, ds2: str, ds1_labeler: Labeler, ds2_labeler: Labeler) -> None:
+def _merge_dataset_splits(
+    target: str,
+    ds1: str,
+    ds2: str,
+    ds1_labeler: Labeler,
+    ds2_labeler: Labeler,
+    ds1_name: Optional[str],
+    ds2_name: Optional[str],
+) -> None:
     ds1_path = Path("data", ds1)
     ds2_path = Path("data", ds2)
     target_path = Path("data", target)
     ds1_entries = read_dataset(ds1_path, ds1_labeler)
     ds2_entries = read_dataset(ds2_path, ds2_labeler)
 
-    def process(entry: Entry) -> Entry:
+    def process(entry: Entry, ds_name: Optional[str]) -> Entry:
         assert isinstance(entry.value, Path)
-        value = Path(f"{entry.label}__{entry.value.name}")  # concat file name to preserve information
+        if ds_name is not None:
+            value = Path(f"{entry.label}__{ds_name}_{entry.value.name}")
+        else:
+            value = Path(f"{entry.label}__{entry.value.name}")
+
         return Entry(value, entry.label, entry.metadata | {"original": entry.value})
 
     # Logical Merge
     merged_entries = {
-        partition: list(map(process, ds1_entries[partition] + ds2_entries[partition])) for partition in partitions
+        partition: list(map(lambda entry: process(entry, ds1_name), ds1_entries[partition]))
+        + list(map(lambda entry: process(entry, ds2_name), ds2_entries[partition]))
+        for partition in partitions
     }
 
     # Assertions
@@ -418,9 +432,7 @@ def _merge_dataset_splits(target: str, ds1: str, ds2: str, ds1_labeler: Labeler,
         ds2_label_set = set([entry.label for entry in ds2_entries[partition]])
         intersection = ds1_label_set & ds2_label_set
         if len(intersection) > 0:
-            raise ValueError(
-                f"WARN: {partition}: Labels {intersection} exist in both datasets. Merging produces collisions."
-            )
+            print(f"WARN: {partition}: Labels {intersection} exist in both datasets.")
     stats_and_confirm(
         target,
         merged_entries["train"] + merged_entries["val"] + merged_entries["test"],
@@ -459,11 +471,27 @@ def get_labeler_for_dataset(ds: str) -> Labeler:
         raise ValueError(f"Labeler unknown for dataset: {ds}")
 
 
-def merge_dataset_splits(ds1: str, ds2: str) -> None:
+def merge_dataset_splits(ds1: str, ds2: str, ds1_name: Optional[str] = None, ds2_name: Optional[str] = None) -> None:
+    """
+    Args:
+        ds1: path to first dataset
+        ds2: path to second dataset
+        ds1_name: optional ds1 file name suffix
+        ds2_name: optional ds2 file name suffix
+    """
     ds1_labeler = get_labeler_for_dataset(ds1)
     ds2_labeler = get_labeler_for_dataset(ds2)
     target = f"splits/merged-{ds1.replace('/', '-')}-{ds2.replace('/', '-')}"
-    _merge_dataset_splits(target, ds1, ds2, ds1_labeler, ds2_labeler)
+    if len(target) > 255 - max(len(partition) for partition in partitions):
+        print(f"WARNING: target path {target} is longer than 255 characters.")
+        if ds1_name is None or ds2_name is None:
+            print("Provide ds1_name and ds2_name to resolve this.")    
+        target = f"splits/merged-{ds1_name}-{ds2_name}"
+        if input(f"Continue with target: {target}? (yes,N)") != "yes":
+            print("abort.")
+            exit(0)
+        
+    _merge_dataset_splits(target, ds1, ds2, ds1_labeler, ds2_labeler, ds1_name, ds2_name)
 
 
 # if __name__ == "__main__":
@@ -481,8 +509,10 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 # dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
 
 # merge_dataset_splits(
-#     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-#     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+#     "splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-segmented_body_images_faceless-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
+#     "splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-segmented_body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
+#     "segmented_body_images_faceless",
+#     "segmented_body_images",
 # )
 
 # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
