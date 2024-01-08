@@ -1,15 +1,16 @@
 import json
 import os
-import numpy as np
 
 import cv2
+import numpy as np
 
-BBox = tuple[float, float, float, float] # x, y, w, h
-BBoxFrame = tuple[int, BBox] # frame_idx, x, y, w, h
-IdFrameDict = dict[int, list[BBoxFrame]] # id -> list of frames
-IdDict = dict[int, list[int]] # id -> list of negatives
-JsonDict = dict[str, list[str]] # video_name-id -> list of negatives
-               
+BBox = tuple[float, float, float, float]  # x, y, w, h
+BBoxFrame = tuple[int, BBox]  # frame_idx, x, y, w, h
+IdFrameDict = dict[int, list[BBoxFrame]]  # id -> list of frames
+IdDict = dict[int, list[int]]  # id -> list of negatives
+JsonDict = dict[str, list[str]]  # video_name-id -> list of negatives
+
+
 def get_json_data(json_path: str) -> JsonDict:
     """Return the data from the given JSON file and create it if it doesn't exist.
 
@@ -44,9 +45,7 @@ def add_labels_to_json(id_negatives: IdDict, video_name: str, json_output_path: 
         json.dump(out_data, f, indent=4)
 
 
-def get_negatives(
-    id_frames: IdFrameDict, min_frames: int, json_path: str
-) -> tuple[IdFrameDict, IdDict]:
+def get_negatives(id_frames: IdFrameDict, min_frames: int, json_path: str) -> tuple[IdFrameDict, IdDict]:
     """Return negatives for each ID and remove IDs with too few frames from the given dictionary.
 
     Args:
@@ -97,7 +96,7 @@ def get_frames_for_ids(json_path: str) -> IdFrameDict:
     return id_frames
 
 
-def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_path: str) -> None: # type: ignore # because of frame type
+def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_path: str) -> None:  # type: ignore # because of frame type
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
 
     Args:
@@ -142,13 +141,13 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
         frame_list = [frames[i] for i in range(0, images_per_individual * step_size, step_size)]
         for frame_idx, bbox in frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-            frame = video.read()[1] # read the frame. read() returns a tuple of (success, frame)
+            frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
             crop_and_save_image(
                 frame,
-                bbox[0], #x
-                bbox[1], #y
-                bbox[2], #w
-                bbox[3], #h
+                bbox[0],  # x
+                bbox[1],  # y
+                bbox[2],  # w
+                bbox[3],  # h
                 os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.jpg"),
             )
     video.release()
@@ -173,6 +172,7 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         if video_name in video_skip_list or not os.path.exists(json_path):
             continue
         get_data_from_video(video_path, json_path, output_dir)
+
 
 create_dataset_from_videos(
     "/workspaces/gorillatracker/videos",
