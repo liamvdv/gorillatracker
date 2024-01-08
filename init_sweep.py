@@ -1,12 +1,11 @@
 import os
-from typing import Dict, Union
+from typing import Any, Dict, Union
 
 import yaml
-
 from wandb import agent, sweep
 
 
-def check_sweep_configs(configs: Dict[str, Dict]):
+def check_sweep_configs(configs: list[dict[str, Any]]) -> None:
     for config in configs:
         assert (
             len(config["project_name"].split("-")) >= 4
@@ -14,7 +13,7 @@ def check_sweep_configs(configs: Dict[str, Dict]):
         get_config(config["config_path"])
 
 
-def get_config(config_path: str) -> Dict:
+def get_config(config_path: str) -> Dict[str, Any]:
     assert os.path.isfile(config_path), f"Config file not found at {config_path}"
     assert config_path.endswith(".yml") or config_path.endswith(".yaml"), "Config file must be YAML"
     config_dict: Dict[str, Union[str, int, float, bool]] = dict()
@@ -23,7 +22,7 @@ def get_config(config_path: str) -> Dict:
     return config_dict
 
 
-def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict[str, Dict]):
+def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict[str, Dict[str, Any]]) -> None:
     sweep_config = {
         "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": project_name,
@@ -76,7 +75,7 @@ check_sweep_configs(sweeps)
 for current_sweep in sweeps:
     print(f"Running sweep: {current_sweep['project_name']}")
     try:
-        run_sweep(**current_sweep)
+        run_sweep(**current_sweep)  # type: ignore
     except Exception as e:
         print(f"Error running sweep: {current_sweep['project_name']}")
         print(e)
