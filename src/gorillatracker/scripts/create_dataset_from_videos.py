@@ -1,12 +1,16 @@
 import json
-import multiprocessing as mp
 import os
-from typing import Dict
+import numpy as np
 
 import cv2
 
-
-def get_json_data(json_path: str) -> dict:
+BBox = tuple[float, float, float, float] # x, y, w, h
+BBoxFrame = tuple[int, BBox] # frame_idx, x, y, w, h
+IdFrameDict = dict[int, list[BBoxFrame]] # id -> list of frames
+IdDict = dict[int, list[int]] # id -> list of negatives
+JsonDict = dict[str, list[str]] # video_name-id -> list of negatives
+               
+def get_json_data(json_path: str) -> JsonDict:
     """Return the data from the given JSON file and create it if it doesn't exist.
 
     Args:
@@ -23,7 +27,7 @@ def get_json_data(json_path: str) -> dict:
     return data
 
 
-def add_labels_to_json(id_negatives: dict[list[int]], video_name: str, json_output_path: str):
+def add_labels_to_json(id_negatives: IdDict, video_name: str, json_output_path: str) -> None:
     """Add the labels from one video to the given JSON file.
 
     Args:
@@ -31,7 +35,7 @@ def add_labels_to_json(id_negatives: dict[list[int]], video_name: str, json_outp
         video_name: Name of the video.
         json_output_path: Path to the JSON file to write.
     """
-    out_dict: dict[str, list[str]] = {}
+    out_dict: JsonDict = {}
     out_data = get_json_data(json_output_path)
     for id, negatives in id_negatives.items():
         out_dict[f"{video_name}-{id}"] = [f"{video_name}-{negative}" for negative in negatives]
@@ -41,8 +45,8 @@ def add_labels_to_json(id_negatives: dict[list[int]], video_name: str, json_outp
 
 
 def get_negatives(
-    id_frames: dict[int, list[(int, (float, float, float, float))]], min_frames: int, json_path: str
-) -> (dict[int, list[(int, (float, float, float, float))]], dict[int, list[int]]):
+    id_frames: IdFrameDict, min_frames: int, json_path: str
+) -> tuple[IdFrameDict, IdDict]:
     """Return negatives for each ID and remove IDs with too few frames from the given dictionary.
 
     Args:
@@ -67,7 +71,7 @@ def get_negatives(
     return id_frames, id_negatives
 
 
-def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, float, float))]]:
+def get_frames_for_ids(json_path: str) -> IdFrameDict:
     """Get the frames for the given IDs.
 
     Args:
@@ -76,7 +80,7 @@ def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, fl
     Returns:
         A list of lists of frames for each ID.
     """
-    id_frames: Dict[int, list[(int, (float, float, float, float))]] = {}
+    id_frames: IdFrameDict = {}
     face_class: int = 1
     # read the JSON file
     with open(json_path, "r") as f:
@@ -93,7 +97,7 @@ def get_frames_for_ids(json_path: str) -> dict[int, list[(int, (float, float, fl
     return id_frames
 
 
-def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_path: str) -> None:
+def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_path: str) -> None: # type: ignore # because of frame type
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
 
     Args:
@@ -138,13 +142,13 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
         frame_list = [frames[i] for i in range(0, images_per_individual * step_size, step_size)]
         for frame_idx, bbox in frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-            frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
+            frame = video.read()[1] # read the frame. read() returns a tuple of (success, frame)
             crop_and_save_image(
                 frame,
-                bbox[0],  # x
-                bbox[1],  # y
-                bbox[2],  # w
-                bbox[3],  # h
+                bbox[0], #x
+                bbox[1], #y
+                bbox[2], #w
+                bbox[3], #h
                 os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.jpg"),
             )
     video.release()
@@ -169,7 +173,6 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         if video_name in video_skip_list or not os.path.exists(json_path):
             continue
         get_data_from_video(video_path, json_path, output_dir)
-
 
 create_dataset_from_videos(
     "/workspaces/gorillatracker/videos",
