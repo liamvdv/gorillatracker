@@ -46,7 +46,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.run = wandb_run
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
-        
+
     def _get_knn_with_training_args(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
@@ -83,7 +83,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             artifact.add(table, "embeddings_table_epoch_{}".format(current_epoch))
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
-            
+
             train_embeddings, train_labels = self._get_knn_with_training_args(trainer)
             # log metrics to wandb
             evaluate_embeddings(
@@ -123,9 +123,15 @@ def load_embeddings_from_wandb(embedding_name: str, run: Runner) -> pd.DataFrame
 
 
 def evaluate_embeddings(
-    data: pd.DataFrame, embedding_name: str, metrics: Dict[str, Any], train_embeddings: Optional[npt.NDArray[np.float_]] = None, train_labels: Optional[gtypes.MergedLabels] = None
+    data: pd.DataFrame,
+    embedding_name: str,
+    metrics: Dict[str, Any],
+    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
+    train_labels: Optional[gtypes.MergedLabels] = None,
 ) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
-    assert (train_embeddings is not None and train_labels is not None) or (train_embeddings is None and train_labels is None)
+    assert (train_embeddings is not None and train_labels is not None) or (
+        train_embeddings is None and train_labels is None
+    )
 
     # Transform any type to numeric type labels
     le = LabelEncoder()
@@ -135,14 +141,14 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
-    if len(val_embeddings) == 0: 
+    if len(val_embeddings) == 0:
         raise ValueError("No validation embeddings given.")
     print(len(val_embeddings))
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
         for metric_name, metric in metrics.items()
     }
-    
+
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
@@ -154,9 +160,16 @@ def evaluate_embeddings(
 
 
 def fc_layer(
-    embeddings: torch.Tensor, labels: gtypes.MergedLabels, batch_size: int = 64, epochs: int = 300, seed: int = 42, **kwargs: Any
+    embeddings: torch.Tensor,
+    labels: gtypes.MergedLabels,
+    batch_size: int = 64,
+    epochs: int = 300,
+    seed: int = 42,
+    **kwargs: Any,
 ) -> Dict[str, float]:
-    num_classes = int(np.max(labels)) + 1 # NOTE(liamvdv): not len() because train_labels also gets intermediate ids assigned.
+    num_classes = (
+        int(np.max(labels)) + 1
+    )  # NOTE(liamvdv): not len() because train_labels also gets intermediate ids assigned.
     model = torch.nn.Sequential(
         torch.nn.Linear(embeddings.shape[1], 100),
         torch.nn.Sigmoid(),
@@ -215,19 +228,36 @@ def fc_layer(
     assert f1 is not None
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
-def knn(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5, use_train_embeddings: bool = False, train_embeddings: Optional[npt.NDArray[np.float_]] = None, train_labels: Optional[gtypes.MergedLabels] = None) -> Dict[str, torch.Number]:
+
+def knn(
+    val_embeddings: torch.Tensor,
+    val_labels: gtypes.MergedLabels,
+    k: int = 5,
+    use_train_embeddings: bool = False,
+    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
+    train_labels: Optional[gtypes.MergedLabels] = None,
+) -> Dict[str, torch.Number]:
     if use_train_embeddings:
-        return knn_with_train(val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels)
+        return knn_with_train(
+            val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels
+        )
     else:
         return knn_naive(val_embeddings, val_labels, k=k)
 
-def knn_with_train(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5, train_embeddings: Optional[npt.NDArray[np.float_]] = None, train_labels: Optional[gtypes.MergedLabels] = None) -> Dict[str, torch.Number]:
+
+def knn_with_train(
+    val_embeddings: torch.Tensor,
+    val_labels: gtypes.MergedLabels,
+    k: int = 5,
+    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
+    train_labels: Optional[gtypes.MergedLabels] = None,
+) -> Dict[str, torch.Number]:
     """
     Algorithmic Description:
     1. Calculate the distance matrix between all embeddings (len(embeddings) x len(embeddings))
        Set the diagonal of the distance matrix to a large value so that the distance to itself is ignored
     2. For each embedding find the k closest [smallest distances] embeddings (len(embeddings) x k)
-       First find the indexes, the map to the labels (numbers). 
+       First find the indexes, the map to the labels (numbers).
     3. Create classification matrix where every embedding has a row with the probability for each class in it's top k surroundings (len(embeddings) x num_classes)
     4. Select only the validation part of the classification matrix (len(val_embeddings) x num_classes)
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
@@ -237,7 +267,7 @@ def knn_with_train(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels
     val_labels = torch.tensor(val_labels)
     train_embeddings = torch.tensor(train_embeddings)
     train_labels = torch.tensor(train_labels)
-    
+
     combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
 
@@ -251,17 +281,17 @@ def knn_with_train(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels
 
     _, closest_indices = torch.topk(distance_matrix, k, largest=False)
     assert closest_indices.shape == (len(combined_embeddings), k)
-    
+
     closest_labels = combined_labels[closest_indices]
     assert closest_labels.shape == closest_indices.shape
-    
+
     classification_matrix = torch.zeros((len(combined_embeddings), num_classes))
     for i in range(num_classes):
         classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
     assert classification_matrix.shape == (len(combined_embeddings), num_classes)
 
     # Select only the validation part of the classification matrix
-    val_classification_matrix = classification_matrix[-len(val_embeddings):]
+    val_classification_matrix = classification_matrix[-len(val_embeddings) :]
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
@@ -281,7 +311,7 @@ def knn_with_train(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels
     print("knn done")
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
-        
+
 def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, torch.Number]:
     num_classes = np.max(val_labels).item() + 1
     if num_classes < k:
@@ -331,8 +361,9 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
-
-def pca(embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
+def pca(
+    embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
+) -> wandb.Image:  # generate a 2D plot of the embeddings
     num_classes = len(np.unique(labels))
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
