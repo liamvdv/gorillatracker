@@ -96,6 +96,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         args.batch_size,
         args.loss_mode,
         model_transforms,
+        model.get_training_transforms(),
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -117,8 +118,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss",
+        monitor="val/loss_epoch",
         mode="min",
+        min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
 

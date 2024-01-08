@@ -13,9 +13,7 @@ lint:
 
 .PHONY: mypy
 mypy:
-	# TODO(memben): reinclude cvat_import.py
-	# TODO(joschaSchroff): reinclude video_json_tracker.py
-	mypy $(sources) --exclude ^dlib/ --exclude ^src/gorillatracker/scripts/video_json_tracker.py
+	mypy $(sources) --exclude ^dlib/
 
 .PHONY: test
 test:
