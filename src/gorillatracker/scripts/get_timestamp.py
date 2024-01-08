@@ -43,7 +43,7 @@ def get_time_stamp(video_path: str) -> str:
         m = int(time_stamp[2:4])
         am = True if time_stamp[4:6].lower() == "am" else False
     except ValueError:
-        return 1
+        return str(1)
 
     video.release()
 
@@ -70,7 +70,7 @@ def write_timestamps_to_json(json_path: str, video_path: str) -> None:
         if os.path.splitext(video)[1] != ".mp4":
             continue
         time_stamp = get_time_stamp(os.path.join(video_path, video))
-        if time_stamp == 1:
+        if time_stamp == "1":
             continue
         data[video_name] = time_stamp
         if idx % 10 == 0:
