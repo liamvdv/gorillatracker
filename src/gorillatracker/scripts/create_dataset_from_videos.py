@@ -2,7 +2,6 @@ import json
 import os
 
 import cv2
-import numpy as np
 
 BBox = tuple[float, float, float, float]  # x, y, w, h
 BBoxFrame = tuple[int, BBox]  # frame_idx, x, y, w, h
