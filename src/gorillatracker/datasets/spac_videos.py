@@ -60,7 +60,7 @@ class SPACVideosDataset(Dataset[Tuple[Image.Image, Label]]):
         """
         dirpath = data_dir / Path(partition)
         if partition == "train":
-            self.samples = get_samples_video(dirpath / "video_data")
+            self.samples = get_samples_video(dirpath)
         else:
             self.samples = get_samples_cxl(dirpath)
         self.transform = transform

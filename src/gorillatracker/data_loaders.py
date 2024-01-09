@@ -165,7 +165,7 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
 
     def __iter__(self) -> Iterator[Tuple[int, int, int]]:
         anchor_shuffle = next(self.shuffled_indices_generator)
-        for anchor in anchor_shuffle[:10]:
+        for anchor in anchor_shuffle:
             anchor_label = self.dataset[anchor][1]
             astart, alength = self.labelsection[anchor_label]
             positive = randint_except(astart, astart + alength, anchor)
