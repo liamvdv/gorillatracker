@@ -2,6 +2,7 @@ import math
 from typing import List, Optional, Tuple
 
 import cv2
+import cv2.typing as cvt
 import numpy as np
 import numpy.typing as npt
 from matplotlib import pyplot as plt
@@ -12,7 +13,7 @@ from matplotlib.patches import Rectangle
 from gorillatracker.utils.yolo_helpers import convert_from_yolo_format
 
 BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
-IMAGE = npt.NDArray[np.uint8]
+IMAGE = cvt.MatLike
 
 
 # Helper functions provided in https://github.com/facebookresearch/segment-anything/blob/9e8f1309c94f1128a6e5c047a10fdcb02fc8d651/notebooks/predictor_example.ipynb
