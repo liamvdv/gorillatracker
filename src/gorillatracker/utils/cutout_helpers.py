@@ -23,7 +23,8 @@ def get_cutout_bbox(full_image: IMAGE, cutout: IMAGE, threshold: float = 0.95) -
     _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
     assert maxVal > threshold, "Cutout not found in full image"
     cutout_height, cutout_width, _ = cutout.shape
-    top_left = tuple(maxLoc[:2])
+    top_left_x, top_left_y = maxLoc[:2]
+    top_left = (top_left_x, top_left_y)
     bottom_right = (top_left[0] + cutout_width, top_left[1] + cutout_height)
     return (top_left, bottom_right)
 
