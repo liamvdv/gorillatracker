@@ -10,6 +10,7 @@ import gorillatracker.utils.yolo_helpers as yolo_helpers
 
 def _is_coutout_in_image(image: gtyping.Image, cutout: gtyping.Image) -> bool:
     res = cv2.matchTemplate(image, cutout, cv2.TM_CCOEFF_NORMED)
+    res = np.array(res)
     threshold = 0.8
     loc = np.where(res >= threshold)
     return len(loc[0]) > 0
@@ -124,13 +125,13 @@ def cutout_dataset_with_integrity(
 
 
 if __name__ == "__main__":
-    cutout_dataset_with_integrity(
-        "/workspaces/gorillatracker/data/ground_truth/cxl/full_images",
-        "/workspaces/gorillatracker/data/ground_truth/cxl/face_images",
-        "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_bbox",
-        "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images",
-        expand_bbox=True,
-    )
+    # cutout_dataset_with_integrity(
+    #     "/workspaces/gorillatracker/data/ground_truth/cxl/full_images",
+    #     "/workspaces/gorillatracker/data/ground_truth/cxl/face_images",
+    #     "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_bbox",
+    #     "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images",
+    #     expand_bbox=True,
+    # )
     assert_matching_cutouts(
         "/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images",
         "/workspaces/gorillatracker/data/ground_truth/cxl/face_images",
