@@ -1,11 +1,10 @@
 from typing import Tuple
 
 import cv2
-import numpy as np
-import numpy.typing as npt
+import cv2.typing as cvt
 
 BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
-IMAGE = npt.NDArray[np.uint8]
+IMAGE = cvt.MatLike
 
 
 def get_cutout_bbox(full_image: IMAGE, cutout: IMAGE, threshold: float = 0.95) -> BOUNDING_BOX:
@@ -24,7 +23,8 @@ def get_cutout_bbox(full_image: IMAGE, cutout: IMAGE, threshold: float = 0.95) -
     _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
     assert maxVal > threshold, "Cutout not found in full image"
     cutout_height, cutout_width, _ = cutout.shape
-    top_left = maxLoc
+    top_left_x, top_left_y = maxLoc[:2]
+    top_left = (top_left_x, top_left_y)
     bottom_right = (top_left[0] + cutout_width, top_left[1] + cutout_height)
     return (top_left, bottom_right)
 
