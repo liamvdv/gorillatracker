@@ -1,18 +1,14 @@
 import os
-from typing import List, Tuple
 
 import cv2
 import numpy as np
-import numpy.typing as npt
 
+import gorillatracker.type_helper as gtyping
 import gorillatracker.utils.cutout_helpers as cutout_helpers
 import gorillatracker.utils.yolo_helpers as yolo_helpers
 
-IMAGE = npt.NDArray[np.uint8]
-BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
 
-
-def _is_coutout_in_image(image: IMAGE, cutout: IMAGE) -> bool:
+def _is_coutout_in_image(image: gtyping.Image, cutout: gtyping.Image) -> bool:
     res = cv2.matchTemplate(image, cutout, cv2.TM_CCOEFF_NORMED)
     threshold = 0.8
     loc = np.where(res >= threshold)
@@ -41,13 +37,13 @@ def assert_matching_cutouts(image_dir: str, cutout_dir: str) -> None:
         assert _is_coutout_in_image(image, cutout), f"{cutout_file} not in corresponding image"
 
 
-def calculate_area(box: BOUNDING_BOX) -> float:
+def calculate_area(box: gtyping.BoundingBox) -> float:
     x_min, y_min = box[0]
     x_max, y_max = box[1]
     return (x_max - x_min) * (y_max - y_min)
 
 
-def calculate_intersection_area(box1: BOUNDING_BOX, box2: BOUNDING_BOX) -> float:
+def calculate_intersection_area(box1: gtyping.BoundingBox, box2: gtyping.BoundingBox) -> float:
     x_left = max(box1[0][0], box2[0][0])
     x_right = min(box1[1][0], box2[1][0])
     y_top = max(box1[0][1], box2[0][1])
@@ -59,7 +55,7 @@ def calculate_intersection_area(box1: BOUNDING_BOX, box2: BOUNDING_BOX) -> float
     return (x_right - x_left) * (y_bottom - y_top)
 
 
-def find_max_intersection(target_bbox: BOUNDING_BOX, bboxes: List[BOUNDING_BOX]) -> BOUNDING_BOX:
+def find_max_intersection(target_bbox: gtyping.BoundingBox, bboxes: list[gtyping.BoundingBox]) -> gtyping.BoundingBox:
     max_area = 0.0
     max_bbox = None
 
@@ -76,7 +72,9 @@ def find_max_intersection(target_bbox: BOUNDING_BOX, bboxes: List[BOUNDING_BOX])
     return max_bbox
 
 
-def expand_bounding_box(bbox_to_expand: BOUNDING_BOX, bbox_to_include: BOUNDING_BOX) -> BOUNDING_BOX:
+def expand_bounding_box(
+    bbox_to_expand: gtyping.BoundingBox, bbox_to_include: gtyping.BoundingBox
+) -> gtyping.BoundingBox:
     x_min = min(bbox_to_include[0][0], bbox_to_expand[0][0])
     y_min = min(bbox_to_include[0][1], bbox_to_expand[0][1])
     x_max = max(bbox_to_include[1][0], bbox_to_expand[1][0])

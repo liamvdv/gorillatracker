@@ -1,22 +1,20 @@
 import os
-from typing import List, Tuple
 
 import cv2
 import numpy as np
 import numpy.typing as npt
 from segment_anything import SamPredictor, sam_model_registry
 
+import gorillatracker.type_helper as gtyping
 import gorillatracker.utils.cutout_helpers as cutout_helpers
 
 MODEL_PATH = "/workspaces/gorillatracker/models/sam_vit_h_4b8939.pth"
 MODEL_TYPE = "vit_h"
 DEVICE = "cuda"
 
-BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
-
 
 def _predict_mask(
-    predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX, image_format: str
+    predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: gtyping.BoundingBox, image_format: str
 ) -> npt.NDArray[np.uint8]:
     x_min, y_min = bbox[0]
     x_max, y_max = bbox[1]
@@ -39,7 +37,7 @@ def _remove_background(image: npt.NDArray[np.uint8], mask: npt.NDArray[np.uint8]
     return image * reshaped_mask + inverted_mask
 
 
-def segment_image(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArray[np.uint8]:
+def segment_image(image: npt.NDArray[np.uint8], bbox: gtyping.BoundingBox) -> npt.NDArray[np.uint8]:
     """
     Args:
         image: (H, W, 3) RGB image
@@ -50,8 +48,8 @@ def segment_image(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArr
 
 
 def segment_images(
-    images: List[npt.NDArray[np.uint8]], bboxes: List[BOUNDING_BOX], image_format: str = "RGB"
-) -> List[npt.NDArray[np.uint8]]:
+    images: list[npt.NDArray[np.uint8]], bboxes: list[gtyping.BoundingBox], image_format: str = "RGB"
+) -> list[npt.NDArray[np.uint8]]:
     """
     Args:
         images: list of (H, W, 3) RGB images

@@ -2,6 +2,7 @@ import os
 from typing import Dict, Union, cast
 
 import yaml
+
 from wandb import agent, sweep
 
 # Set your default config
