@@ -21,6 +21,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.datasets.spac_videos import SPACVideosDataset
+from pathlib import Path
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -42,11 +43,33 @@ def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, st
             labelsection[prev_label] = (prev_start, i - prev_start)
             prev_label = label
             prev_start = i
+        # print(i)
     assert prev_label is not None and prev_start is not None  # make typing happy
     if prev_label:
         labelsection[prev_label] = (prev_start, n - prev_start)
     return labelsection
 
+def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
+    image_paths = sorted(data_dir.glob("*.jpg"))
+    n = len(image_paths)
+    labelsection: LabelSection = defaultdict(lambda: (-1, -1))
+    prev_label = None
+    prev_start = None
+    for i, image_path in enumerate(image_paths):
+        label = image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1]
+        assert prev_label is None or prev_label <= label, "dataset passed to TripletSampler must be label-sorted."
+        if prev_label is None:
+            prev_label = label
+            prev_start = i
+        elif prev_label != label:
+            labelsection[prev_label] = (prev_start, i - prev_start)
+            prev_label = label
+            prev_start = i
+    assert prev_label is not None and prev_start is not None  # make typing happy
+    if prev_label:
+        labelsection[prev_label] = (prev_start, n - prev_start)
+    return labelsection    
+    
 
 def iter_index_permutations_generator(n: int) -> Iterator[Tuple[int, ...]]:
     """
@@ -158,8 +181,11 @@ class VideoTripletSampler(TripletSampler):
         shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
         json_path: str = None,
     ):
-        super().__init__(sorted_dataset, shuffled_indices_generator)
+        self.dataset = sorted_dataset
+        self.n = len(self.dataset)
         self.json_path = json_path
+        self.labelsection = generate_labelsection_video_data(Path(json_path).parent)
+        self.shuffled_indices_generator = shuffled_indices_generator(self.n)
 
     def any_sample_not(self, label: gtypes.Label) -> int:
         # read json file
