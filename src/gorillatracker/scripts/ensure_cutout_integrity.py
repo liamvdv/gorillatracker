@@ -10,11 +10,8 @@ import gorillatracker.utils.yolo_helpers as yolo_helpers
 
 def _is_coutout_in_image(image: gtyping.Image, cutout: gtyping.Image) -> bool:
     res = cv2.matchTemplate(image, cutout, cv2.TM_CCOEFF_NORMED)
-    res = np.array(res).astype(np.float32)  # for type checking
-    # assert data type is correct
-    assert res.dtype == np.float32
     threshold = 0.8
-    loc = np.where(res >= threshold)
+    loc = np.where(res >= threshold) # type: ignore
     return len(loc[0]) > 0
 
 
