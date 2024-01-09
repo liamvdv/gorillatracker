@@ -165,7 +165,7 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
 
     def __iter__(self) -> Iterator[Tuple[int, int, int]]:
         anchor_shuffle = next(self.shuffled_indices_generator)
-        for anchor in anchor_shuffle:
+        for anchor in anchor_shuffle[:10]:
             anchor_label = self.dataset[anchor][1]
             astart, alength = self.labelsection[anchor_label]
             positive = randint_except(astart, astart + alength, anchor)
@@ -179,13 +179,14 @@ class VideoTripletSampler(TripletSampler):
     def __init__(
         self,
         dataset: Dataset[Tuple[Any, gtypes.Label]],
-        json_path: str,
+        data_dir: str,
         shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
     ):
-        self.dataset = dataset # type: ignore
+        self.dataset = dataset  # type: ignore
         self.n = len(self.dataset)
-        self.json_path = json_path
-        self.labelsection = generate_labelsection_video_data(Path(json_path).parent)
+        self.data_dir = data_dir
+        self.json_path = data_dir + "/negatives.json"
+        self.labelsection = generate_labelsection_video_data(Path(data_dir))
         self.shuffled_indices_generator = shuffled_indices_generator(self.n)
 
     def any_sample_not(self, label: gtypes.Label) -> int:
@@ -209,7 +210,7 @@ class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
         sorted_dataset: Sequence[Tuple[Any, gtypes.Label]],
         shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
     ):
-        self.dataset = sorted_dataset 
+        self.dataset = sorted_dataset
         self.n = len(self.dataset)
         self.labelsection = generate_labelsection(self.dataset)
         self.shuffled_indices_generator = shuffled_indices_generator(self.n)
@@ -294,7 +295,7 @@ def QuadletDataLoader(
 
 
 def VideoTripletDataLoader(
-    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, json_path: str, shuffle: bool = True
+    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, data_dir: str, shuffle: bool = True
 ) -> gtypes.BatchTripletDataLoader:
     """
     VideoTripletDataLoader will take any Dataset that returns a single sample in the form of
@@ -302,11 +303,11 @@ def VideoTripletDataLoader(
     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
     dataset will be shuffled once at the start and not after that.
     """
-    sampler = VideoTripletSampler(dataset, json_path=json_path)
+    sampler = VideoTripletSampler(dataset, data_dir=data_dir)
     if not shuffle:
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(dataset)
-    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size) # type: ignore
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)  # type: ignore
 
 
 if __name__ == "__main__":
@@ -315,12 +316,9 @@ if __name__ == "__main__":
         "train",
         SPACVideosDataset.get_transforms(),
     )
-    json_path = "data/derived_data/spac_gorillas_converted_labels_cropped_faces/negatives.json"
+    data_dir = "data/derived_data/spac_gorillas_converted_labels_cropped_faces/train"
     print("creating DataLoader")
-    dataloader = VideoTripletDataLoader(dataset, 1, json_path=json_path, shuffle=False)
+    dataloader = VideoTripletDataLoader(dataset, 1, data_dir=data_dir, shuffle=False)
     print("created DataLoader")
-    # print labels first 10 batches
-    for i, batch in enumerate(dataloader):
-        if i > 10:
-            break
-        print(batch[1])
+    # print first batch label
+    print(next(iter(dataloader))[1])
