@@ -14,8 +14,8 @@ DEVICE = "cuda"
 
 
 def _predict_mask(
-    predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: gtyping.BoundingBox, image_format: str
-) -> npt.NDArray[np.uint8]:
+    predictor: SamPredictor, image: gtyping.Image, bbox: gtyping.BoundingBox, image_format: str
+) -> npt.NDArray[np.bool_]:
     x_min, y_min = bbox[0]
     x_max, y_max = bbox[1]
     box = np.array([x_min, y_min, x_max, y_max])
@@ -30,14 +30,15 @@ def _predict_mask(
     return mask
 
 
-def _remove_background(image: npt.NDArray[np.uint8], mask: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
-    h, w = mask.shape[-2:]
-    reshaped_mask = mask.reshape(h, w, 1)
-    inverted_mask = (1 - reshaped_mask) * 255
-    return image * reshaped_mask + inverted_mask
+def _remove_background(image: gtyping.Image, mask: npt.NDArray[np.bool_]) -> gtyping.Image:
+    mask = mask.squeeze()
+    assert image.shape[:2] == mask.shape
+    background_color = (255, 255, 255)
+    image[~mask] = background_color
+    return image
 
 
-def segment_image(image: npt.NDArray[np.uint8], bbox: gtyping.BoundingBox) -> npt.NDArray[np.uint8]:
+def segment_image(image: gtyping.Image, bbox: gtyping.BoundingBox) -> gtyping.Image:
     """
     Args:
         image: (H, W, 3) RGB image
@@ -48,8 +49,8 @@ def segment_image(image: npt.NDArray[np.uint8], bbox: gtyping.BoundingBox) -> np
 
 
 def segment_images(
-    images: list[npt.NDArray[np.uint8]], bboxes: list[gtyping.BoundingBox], image_format: str = "RGB"
-) -> list[npt.NDArray[np.uint8]]:
+    images: list[gtyping.Image], bboxes: list[gtyping.BoundingBox], image_format: str = "RGB"
+) -> list[gtyping.Image]:
     """
     Args:
         images: list of (H, W, 3) RGB images
@@ -87,7 +88,6 @@ def segment_dir(image_dir: str, cutout_dir: str, target_dir: str) -> None:
     ]
 
     segmented_images = segment_images(full_images, bboxes, image_format="BGR")
-
     for name, segment_image, bbox in zip(cutout_image_names, segmented_images, bboxes):
         cutout_helpers.cutout_image(segment_image, bbox, os.path.join(target_dir, name))
 
