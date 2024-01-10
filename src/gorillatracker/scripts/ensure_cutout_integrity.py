@@ -11,7 +11,8 @@ import gorillatracker.utils.yolo_helpers as yolo_helpers
 def _is_coutout_in_image(image: gtyping.Image, cutout: gtyping.Image) -> bool:
     res = cv2.matchTemplate(image, cutout, cv2.TM_CCOEFF_NORMED)
     threshold = 0.8
-    loc = np.where(res >= threshold) # type: ignore
+    # TODO(memben): investigate why this does work on local but not on github actions
+    loc = np.where(res >= threshold)  # type: ignore
     return len(loc[0]) > 0
 
 
