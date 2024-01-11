@@ -37,6 +37,7 @@ class TrainingArgs:
     early_stopping_patience: int = 3
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
+    dropout_p: float = field(default=0.0)
 
     learning_rate: float = field(default=0.001)
     weight_decay: float = field(default=0.1)
