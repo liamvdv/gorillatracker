@@ -76,7 +76,7 @@ def get_frames_for_ids(json_path: str) -> IdFrameDict:
         json_path: Path to the JSON file containing the IDs.
 
     Returns:
-        A list of lists of frames for each ID.
+        Dictionary of IDs to frames.
     """
     id_frames: IdFrameDict = {}
     face_class: int = 1
@@ -99,7 +99,7 @@ def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_pa
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
 
     Args:
-        image_path: Path to the image to crop.
+        frame: Image to crop.
         x: Relative x coordinate of the center of the bounding box.
         y: Relative y coordinate of the center of the bounding box.
         w: Relative width of the bounding box.
@@ -123,6 +123,7 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
 
     Args:
         video_path: Path to the video.
+        json_path: Path to the tracked json file.
         output_dir: Path to the directory to save the cropped images to.
     """
 
