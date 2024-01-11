@@ -1,6 +1,7 @@
 import itertools
 import json
 from collections import defaultdict
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -21,7 +22,6 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.datasets.spac_videos import SPACVideosDataset
-from pathlib import Path
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -49,6 +49,7 @@ def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, st
         labelsection[prev_label] = (prev_start, n - prev_start)
     return labelsection
 
+
 def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
     image_paths = sorted(data_dir.glob("*.jpg"))
     n = len(image_paths)
@@ -68,8 +69,8 @@ def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
     assert prev_label is not None and prev_start is not None  # make typing happy
     if prev_label:
         labelsection[prev_label] = (prev_start, n - prev_start)
-    return labelsection    
-    
+    return labelsection
+
 
 def iter_index_permutations_generator(n: int) -> Iterator[Tuple[int, ...]]:
     """

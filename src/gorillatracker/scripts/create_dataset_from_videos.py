@@ -173,8 +173,9 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         if not os.path.exists(json_path):
             continue
         get_data_from_video(video_path, json_path, output_dir)
-    print("" * 80) # clear the line
+    print("" * 80)  # clear the line
     print("all videos processed")
+
 
 create_dataset_from_videos(
     "/workspaces/gorillatracker/videos",
