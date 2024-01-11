@@ -4,6 +4,7 @@ from typing import Any, Tuple
 import torch
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.losses.focal_loss_pytorch import FocalLoss
 
 # import variational prototype learning from insightface
 
@@ -22,18 +23,31 @@ class ArcFaceLoss(torch.nn.Module):
         self.margin = margin
         self.cos_m = math.cos(margin)
         self.sin_m = math.sin(margin)
-        self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
+        self.num_classes = num_classes
+        if torch.cuda.is_available():
+            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
+        else:
+            self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
+        
         torch.nn.init.xavier_uniform_(self.prototypes)
-        self.ce = torch.nn.CrossEntropyLoss()
+        # self.ce = torch.nn.CrossEntropyLoss()
+        self.ce = FocalLoss(gamma=10.0)
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
 
         # get cos(theta) for each embedding and prototype
+        prototypes = self.prototypes.to(embeddings.device)
+        
+        if labels.device != embeddings.device:
+            labels.to(embeddings.device)
+        
         cos_theta = torch.nn.functional.linear(
-            torch.nn.functional.normalize(embeddings), torch.nn.functional.normalize(self.prototypes)
+            torch.nn.functional.normalize(embeddings), torch.nn.functional.normalize(prototypes)
         )
-        sine_theta = torch.sqrt(1.0 - torch.pow(cos_theta, 2)).clamp(eps, 1.0 - eps)
+        sine_theta = torch.sqrt(
+            torch.maximum(1.0 - torch.pow(cos_theta, 2), torch.tensor([eps], device=cos_theta.device))
+        ).clamp(eps, 1.0 - eps)
         phi = (
             cos_theta * self.cos_m - sine_theta * self.sin_m
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
@@ -46,6 +60,15 @@ class ArcFaceLoss(torch.nn.Module):
         loss = self.ce(output, labels)
 
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
+    
+    def set_weights(self, weights: torch.Tensor) -> None:
+        """Sets the weights of the prototypes"""
+        assert weights.shape == self.prototypes.shape
+        
+        if torch.cuda.is_available() and self.prototypes.device != weights.device:
+            weights = weights.cuda()
+        
+        self.prototypes = torch.nn.Parameter(weights)
 
 
 class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the completely original implementation
