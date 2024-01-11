@@ -4,12 +4,11 @@ from typing import Any, Tuple
 import torch
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.focal_loss_pytorch import FocalLoss
 
 # import variational prototype learning from insightface
 
 
-eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
+eps = 1e-16  # an arbitrary small value to be used for numerical stability
 
 
 class ArcFaceLoss(torch.nn.Module):
@@ -28,20 +27,19 @@ class ArcFaceLoss(torch.nn.Module):
             self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
-        
+
         torch.nn.init.xavier_uniform_(self.prototypes)
-        # self.ce = torch.nn.CrossEntropyLoss()
-        self.ce = FocalLoss(gamma=10.0)
+        self.ce = torch.nn.CrossEntropyLoss()
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
 
         # get cos(theta) for each embedding and prototype
         prototypes = self.prototypes.to(embeddings.device)
-        
+
         if labels.device != embeddings.device:
             labels.to(embeddings.device)
-        
+
         cos_theta = torch.nn.functional.linear(
             torch.nn.functional.normalize(embeddings), torch.nn.functional.normalize(prototypes)
         )
@@ -60,14 +58,14 @@ class ArcFaceLoss(torch.nn.Module):
         loss = self.ce(output, labels)
 
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
-    
+
     def set_weights(self, weights: torch.Tensor) -> None:
         """Sets the weights of the prototypes"""
         assert weights.shape == self.prototypes.shape
-        
+
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
             weights = weights.cuda()
-        
+
         self.prototypes = torch.nn.Parameter(weights)
 
 
@@ -117,14 +115,14 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         """Sets whether or not to use the memory bank"""
         self.using_memory_bank = using_memory_bank
         return self.using_memory_bank
-    
+
     def set_weights(self, weights: torch.Tensor) -> None:
         """Sets the weights of the prototypes"""
         assert weights.shape == self.prototypes.shape
-        
+
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
             weights = weights.cuda()
-        
+
         self.prototypes = torch.nn.Parameter(weights)
 
     def update_memory_bank(self, embeddings: torch.Tensor, labels: torch.Tensor) -> None:
@@ -155,7 +153,6 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
     @torch.no_grad()
     def get_memory_bank_prototypes(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Returns the prototypes and their frequency in the memory bank"""
-
         prototypes = torch.zeros(self.num_classes, self.embedding_size, device=self.memory_bank.device)
         frequency = torch.zeros(self.num_classes, device=self.memory_bank.device)
         for i in range(self.num_classes):
@@ -167,8 +164,8 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
         return prototypes, frequency
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
-        """Forward pass of the Variational Prototype Learning loss function"""
+    def calculate_prototype(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Calculates the prototype for the given embeddings and labels"""
         if self.using_memory_bank:
             mem_bank_prototypes, prototype_frequency = self.get_memory_bank_prototypes()
             mem_bank_prototypes = mem_bank_prototypes.to(embeddings.device)
@@ -185,16 +182,20 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
             self.update_memory_bank(embeddings, labels)
         else:
             prototypes = self.prototypes
-        
+
         if prototypes.device != embeddings.device:
             prototypes = prototypes.to(embeddings.device)
+
+        return prototypes
+
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+        """Forward pass of the Variational Prototype Learning loss function"""
+        prototypes = self.calculate_prototype(embeddings, labels)
 
         cos_theta = (
             torch.nn.functional.normalize(embeddings).unsqueeze(1)
             * torch.nn.functional.normalize(prototypes).unsqueeze(0)
-        ).sum(
-            dim=2
-        )  # (1, batch_size, embedding_size) * (num_classes, 1, embedding_size) -> (num_classes, batch_size)
+        ).sum(dim=2)
 
         sine_theta = torch.sqrt(
             torch.maximum(1.0 - torch.pow(cos_theta, 2), torch.tensor([eps], device=cos_theta.device))

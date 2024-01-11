@@ -3,7 +3,7 @@ accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
-precision: 16                   # Training precision (e.g., "bf16-mixed")
+precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
 workers: 4                      # Number of workers for data loading
 
@@ -15,7 +15,7 @@ wandb_tags: ["pure-openset"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: False             # Enable fast development run
+fast_dev_run: True             # Enable fast development run
 profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
@@ -34,7 +34,7 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "softmax/arcface"
+loss_mode: "softmax/vpl"
 # loss_mode: "offline/native"
 
 learning_rate: 1e-4             # Learning rate
