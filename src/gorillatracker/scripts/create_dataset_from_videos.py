@@ -147,7 +147,7 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
                 bbox[1],  # y
                 bbox[2],  # w
                 bbox[3],  # h
-                os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.jpg"),
+                os.path.join(output_dir, f"{video_name}-{id}-{frame_idx}.png"),
             )
     video.release()
 
@@ -164,17 +164,20 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
     negative_json = os.path.join(output_dir, "negatives.json")
     video_skip_list = set([id.split("-")[0] for id in get_json_data(negative_json).keys()])
     print(f"Skipping {len(video_skip_list)} videos.")
-    for video in os.listdir(video_dir):
+    video_list = [video for video in os.listdir(video_dir) if os.path.splitext(video)[0] not in video_skip_list]
+    for idx, video in enumerate(video_list):
+        print(f"processing videos: {idx + 1}/{len(video_list)}", end="\r")
         video_name = os.path.splitext(video)[0]
         video_path = os.path.join(video_dir, video)
         json_path = os.path.join(json_dir, f"{video_name}_tracked.json")
-        if video_name in video_skip_list or not os.path.exists(json_path):
+        if not os.path.exists(json_path):
             continue
         get_data_from_video(video_path, json_path, output_dir)
-
+    print("" * 80) # clear the line
+    print("all videos processed")
 
 create_dataset_from_videos(
     "/workspaces/gorillatracker/videos",
     "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked",
-    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces",
+    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/train_png",
 )
