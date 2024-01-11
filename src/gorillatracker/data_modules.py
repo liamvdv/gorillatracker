@@ -6,7 +6,8 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader
+from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader, VideoTripletDataLoader
+from gorillatracker.type_helper import BatchNletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,6 +77,13 @@ class NletDataModule(L.LightningDataModule):
 class TripletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
+
+
+class VideoTripletDataModule(TripletDataModule):
+    def train_dataloader(self) -> BatchNletDataLoader:
+        return VideoTripletDataLoader(
+            self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
+        )
 
 
 class QuadletDataModule(NletDataModule):

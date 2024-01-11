@@ -95,6 +95,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         str(args.data_dir),
         args.batch_size,
         args.loss_mode,
+        args.video_data,
         model_transforms,
         model.get_training_transforms(),
     )
