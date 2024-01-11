@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose, ToTensor
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_modules import QuadletDataModule, TripletDataModule, VideoTripletDataModule, NletDataModule
+from gorillatracker.data_modules import NletDataModule, QuadletDataModule, TripletDataModule, VideoTripletDataModule
 
 
 def get_dataset_class(pypath: str) -> Type[Dataset[Tuple[torch.Tensor, Union[str, int]]]]:
@@ -47,4 +47,4 @@ def get_data_module(
             model_transforms,
         ]
     )
-    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms) 
+    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
