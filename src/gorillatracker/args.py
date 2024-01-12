@@ -49,7 +49,7 @@ class TrainingArgs:
     initial_lr: float = field(default=1e-3)
     start_lr: float = field(default=1e-3)
     end_lr: float = field(default=1e-5)
-    
+
     margin: float = field(default=0.5)
     loss_mode: Literal["offline", "offline/native", "online/soft", "online/hard", "online/semi-hard"] = field(
         default="offline"

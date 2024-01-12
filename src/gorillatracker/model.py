@@ -22,26 +22,31 @@ from torchvision.models import (
 import gorillatracker.type_helper as gtypes
 from gorillatracker.triplet_loss import get_triplet_loss
 
-def warmup_lr(warmup_mode, epoch, initial_lr, start_lr, warmup_epochs): 
+
+def warmup_lr(warmup_mode, epoch, initial_lr, start_lr, warmup_epochs):
     if warmup_mode == "linear":
         return (epoch / warmup_epochs * (start_lr - initial_lr) + initial_lr) / initial_lr
     elif warmup_mode == "cosine":
         return (start_lr - (start_lr - initial_lr) * (np.cos(np.pi * epoch / warmup_epochs) + 1) / 2) / initial_lr
     elif warmup_mode == "exponential":
         decay = (start_lr / initial_lr) ** (1 / warmup_epochs)
-        return  (decay ** epoch)
+        return decay**epoch
     else:
         return initial_lr
 
-def linear_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args): 
+
+def linear_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args):
     return (end_lr + (start_lr - end_lr) * (1 - epoch / n_epochs)) / initial_lr
 
-def cosine_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args): 
+
+def cosine_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args):
     return (end_lr + (start_lr - end_lr) * (np.cos(np.pi * epoch / n_epochs) + 1) / 2) / initial_lr
 
-def exponential_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args): 
+
+def exponential_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args):
     decay = (end_lr / start_lr) ** (1 / n_epochs)
-    return  start_lr * (decay ** epoch) / initial_lr
+    return start_lr * (decay**epoch) / initial_lr
+
 
 def schedule_lr(lr_schedule_mode, epochs, initial_lr, start_lr, end_lr, n_epochs):
     if lr_schedule_mode == "linear":
@@ -55,22 +60,11 @@ def schedule_lr(lr_schedule_mode, epochs, initial_lr, start_lr, end_lr, n_epochs
 
 
 def combine_schedulers(warmup_mode, lr_schedule_mode, epochs, initial_lr, start_lr, end_lr, n_epochs, warmup_epochs):
-    if epochs < warmup_epochs: # 0 : warmup_epochs - 1
-        return warmup_lr(
-            warmup_mode,
-            epochs, 
-            initial_lr,
-            start_lr,
-            warmup_epochs
-        )
-    else: # warmup_epochs - 1 : n_epochs - 1
+    if epochs < warmup_epochs:  # 0 : warmup_epochs - 1
+        return warmup_lr(warmup_mode, epochs, initial_lr, start_lr, warmup_epochs)
+    else:  # warmup_epochs - 1 : n_epochs - 1
         return schedule_lr(
-            lr_schedule_mode,
-            epochs - warmup_epochs,
-            initial_lr,
-            start_lr,
-            end_lr,
-            n_epochs - warmup_epochs
+            lr_schedule_mode, epochs - warmup_epochs, initial_lr, start_lr, end_lr, n_epochs - warmup_epochs
         )
 
 
@@ -106,7 +100,7 @@ class BaseModule(L.LightningModule):
             self.save_hyperparameters(ignore=["save_hyperparameters"])
 
         self.weight_decay = weight_decay
-        
+
         self.lr_schedule = lr_schedule
         self.warmup_mode = warmup_mode
         self.warmup_epochs = warmup_epochs
@@ -186,7 +180,7 @@ class BaseModule(L.LightningModule):
             logger.info(
                 f"Using {self.lr_schedule} learning rate schedule with {self.warmup_mode} warmup for {self.max_epochs} epochs."
             )
-        
+
         optimizer = AdamW(
             self.model.parameters(),
             lr=self.initial_lr,
@@ -194,26 +188,26 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay,
         )
-        
+
         def lambda_schedule(epoch):
             return combine_schedulers(
-                self.warmup_mode, 
-                self.lr_schedule, 
-                epoch, 
+                self.warmup_mode,
+                self.lr_schedule,
+                epoch,
                 self.initial_lr,
-                self.start_lr, 
-                self.end_lr, 
-                self.max_epochs, 
-                self.warmup_epochs
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs,
+                self.warmup_epochs,
             )
-        
+
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer=optimizer,
             lr_lambda=lambda_schedule,
         )
-        
+
         if self.lr_schedule == "reduce_on_plateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau( # TODO
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(  # TODO
                 optimizer=optimizer,
                 mode="min",
                 factor=self.lr_decay,
@@ -225,8 +219,7 @@ class BaseModule(L.LightningModule):
                 min_lr=0,
                 eps=1e-08,
             )
-            
-        
+
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     @classmethod
