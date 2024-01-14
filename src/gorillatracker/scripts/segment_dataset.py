@@ -1,26 +1,26 @@
 import os
-from typing import List, Tuple
 
 import cv2
 import numpy as np
 import numpy.typing as npt
 from segment_anything import SamPredictor, sam_model_registry
 
+import gorillatracker.type_helper as gtyping
 import gorillatracker.utils.cutout_helpers as cutout_helpers
 
 MODEL_PATH = "/workspaces/gorillatracker/models/sam_vit_h_4b8939.pth"
 MODEL_TYPE = "vit_h"
 DEVICE = "cuda"
 
-BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
 
-
-def _predict_mask(predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArray[np.uint8]:
+def _predict_mask(
+    predictor: SamPredictor, image: gtyping.Image, bbox: gtyping.BoundingBox, image_format: str
+) -> npt.NDArray[np.bool_]:
     x_min, y_min = bbox[0]
     x_max, y_max = bbox[1]
     box = np.array([x_min, y_min, x_max, y_max])
 
-    predictor.set_image(image)
+    predictor.set_image(image, image_format)
     mask, _, _ = predictor.predict(
         point_coords=None,
         point_labels=None,
@@ -30,14 +30,15 @@ def _predict_mask(predictor: SamPredictor, image: npt.NDArray[np.uint8], bbox: B
     return mask
 
 
-def _remove_background(image: npt.NDArray[np.uint8], mask: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
-    h, w = mask.shape[-2:]
-    reshaped_mask = mask.reshape(h, w, 1)
-    inverted_mask = (1 - reshaped_mask) * 255
-    return image * reshaped_mask + inverted_mask
+def _remove_background(image: gtyping.Image, mask: npt.NDArray[np.bool_]) -> gtyping.Image:
+    mask = mask.squeeze()
+    assert image.shape[:2] == mask.shape
+    background_color = (255, 255, 255)
+    image[~mask] = background_color
+    return image
 
 
-def segment_image(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArray[np.uint8]:
+def segment_image(image: gtyping.Image, bbox: gtyping.BoundingBox) -> gtyping.Image:
     """
     Args:
         image: (H, W, 3) RGB image
@@ -47,7 +48,9 @@ def segment_image(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> npt.NDArr
     return segment_images([image], [bbox])[0]
 
 
-def segment_images(images: List[npt.NDArray[np.uint8]], bboxes: List[BOUNDING_BOX]) -> List[npt.NDArray[np.uint8]]:
+def segment_images(
+    images: list[gtyping.Image], bboxes: list[gtyping.BoundingBox], image_format: str = "RGB"
+) -> list[gtyping.Image]:
     """
     Args:
         images: list of (H, W, 3) RGB images
@@ -59,8 +62,9 @@ def segment_images(images: List[npt.NDArray[np.uint8]], bboxes: List[BOUNDING_BO
     predictor = SamPredictor(sam)
 
     segment_images = []
+    assert len(images) == len(bboxes)
     for image, bbox in zip(images, bboxes):
-        mask = _predict_mask(predictor, image, bbox)
+        mask = _predict_mask(predictor, image, bbox, image_format)
         segment_images.append(_remove_background(image, mask))
     return segment_images
 
@@ -77,15 +81,12 @@ def segment_dir(image_dir: str, cutout_dir: str, target_dir: str) -> None:
 
     """
     cutout_image_names = os.listdir(cutout_dir)
-    full_images = [cv2.imread(os.path.join(image_dir, image_name)) for image_name in cutout_image_names]
-    cutout_images = [cv2.imread(os.path.join(cutout_dir, image_name)) for image_name in cutout_image_names]
-    bboxes = [
-        cutout_helpers.get_cutout_bbox(full_image, cutout_image)
-        for full_image, cutout_image in zip(full_images, cutout_images)
-    ]
-    full_images = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in full_images]
+    full_images = [cv2.imread(os.path.join(image_dir, i)) for i in cutout_image_names]
+    cutout_images = [cv2.imread(os.path.join(cutout_dir, i)) for i in cutout_image_names]
+    assert len(full_images) == len(cutout_images)
+    bboxes = [cutout_helpers.get_cutout_bbox(f, c) for f, c in zip(full_images, cutout_images)]
 
-    segmented_images = segment_images(full_images, bboxes)
+    segmented_images = segment_images(full_images, bboxes, image_format="BGR")
     for name, segment_image, bbox in zip(cutout_image_names, segmented_images, bboxes):
         cutout_helpers.cutout_image(segment_image, bbox, os.path.join(target_dir, name))
 

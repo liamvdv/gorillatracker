@@ -12,8 +12,8 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ConvNeXtV2-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "14-baseline-using-default-config" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["offline/native", "batch_size=12"]            # WandB tags for experiment tracking
+run_name: "96-run-baseline-sweeps-on-all-backbones" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["baseline", "pure-openset"]            # WandB tags for experiment tracking
 model_name_or_path: "ConvNeXtV2_Base" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -34,7 +34,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
 loss_mode: "offline/native"
 
-learning_rate: 1e-5            # Learning rate
+learning_rate: 1e-6            # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
 lr_schedule: "linear"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_epochs: 1                # Number of warmup epochs (for the learning rate schedule -> linearly increasing learning rate)

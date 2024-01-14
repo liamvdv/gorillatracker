@@ -158,8 +158,7 @@ def yolo_detect(
     output_dir = os.path.join(output_dir, model_name, output_task)
     os.makedirs(output_dir, exist_ok=True)
 
-    image_files = os.listdir(image_dir)
-    image_files = list(filter(lambda x: x.endswith(file_extension), image_files))
+    image_files = [f for f in os.listdir(image_dir) if f.endswith(file_extension)]
 
     for image_file in image_files:
         image_path = os.path.join(image_dir, image_file)
