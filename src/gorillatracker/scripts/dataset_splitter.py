@@ -471,11 +471,6 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 # copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 
 # dir = generate_split(
-#     dataset="ground_truth/rohan-cxl/face_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-# )
-# dir = generate_split(dataset="ground_truth/rohan-cxl/face_images", mode="closedset", seed=42)
-
-# dir = generate_split(
 #     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
 # )
 # dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
