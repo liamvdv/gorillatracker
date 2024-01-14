@@ -37,3 +37,9 @@ def convert_from_yolo_format(box: List[float], img_width: int, img_height: int) 
     x_max = int((x_center + width / 2) * img_width)
     y_max = int((y_center + height / 2) * img_height)
     return ((x_min, y_min), (x_max, y_max))
+
+
+def convert_annotation_file(yolo_annotation_file: str, img_width: int, img_height: int) -> List[gtyping.BoundingBox]:
+    yolo_boxes = read_yolo_annotation_file(yolo_annotation_file)
+    yolo_boxes = remove_class_and_confidence(yolo_boxes)
+    return [convert_from_yolo_format(box, img_width, img_height) for box in yolo_boxes]
