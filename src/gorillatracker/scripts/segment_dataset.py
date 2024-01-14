@@ -62,6 +62,7 @@ def segment_images(
     predictor = SamPredictor(sam)
 
     segment_images = []
+    assert len(images) == len(bboxes)
     for image, bbox in zip(images, bboxes):
         mask = _predict_mask(predictor, image, bbox, image_format)
         segment_images.append(_remove_background(image, mask))
@@ -80,12 +81,10 @@ def segment_dir(image_dir: str, cutout_dir: str, target_dir: str) -> None:
 
     """
     cutout_image_names = os.listdir(cutout_dir)
-    full_images = [cv2.imread(os.path.join(image_dir, image_name)) for image_name in cutout_image_names]
-    cutout_images = [cv2.imread(os.path.join(cutout_dir, image_name)) for image_name in cutout_image_names]
-    bboxes = [
-        cutout_helpers.get_cutout_bbox(full_image, cutout_image)
-        for full_image, cutout_image in zip(full_images, cutout_images)
-    ]
+    full_images = [cv2.imread(os.path.join(image_dir, i)) for i in cutout_image_names]
+    cutout_images = [cv2.imread(os.path.join(cutout_dir, i)) for i in cutout_image_names]
+    assert len(full_images) == len(cutout_images)
+    bboxes = [cutout_helpers.get_cutout_bbox(f, c) for f, c in zip(full_images, cutout_images)]
 
     segmented_images = segment_images(full_images, bboxes, image_format="BGR")
     for name, segment_image, bbox in zip(cutout_image_names, segmented_images, bboxes):
