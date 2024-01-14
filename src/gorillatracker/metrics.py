@@ -87,7 +87,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        return log_train_images_to_wandb(self.run, trainer, n_samples=1)
+        log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
