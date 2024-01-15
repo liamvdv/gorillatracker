@@ -1,5 +1,5 @@
 import importlib
-from typing import Callable, Type
+from typing import Any, Callable, Type
 
 import lightning as L
 import pandas as pd
@@ -181,6 +181,9 @@ class EfficientNetV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         )
 
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.blocks[-1].conv  # TODO(liamvdv)
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -204,6 +207,9 @@ class ConvNeXtV2Wrapper(BaseModule):
         self.model = timm.create_model("convnextv2_base", pretrained=not self.from_scratch)
         self.model.reset_classifier(self.embedding_size)
 
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.stages[-1].blocks[-1].conv_dw
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -226,6 +232,20 @@ class VisionTransformerWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
         self.model.reset_classifier(self.embedding_size)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
+        return self.model.blocks[-1].norm1
+
+    def get_grad_cam_reshape_transform(self) -> Any:
+        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
+        def reshape_transform(tensor: torch.Tensor, height: int = 14, width: int = 14) -> torch.Tensor:
+            result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
+
+            result = result.transpose(2, 3).transpose(1, 2)
+            return result
+
+        return reshape_transform
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -262,6 +282,26 @@ class SwinV2BaseWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
         )
 
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
+        return self.model.layers[-1].blocks[-1].norm1
+
+    def get_grad_cam_reshape_transform(self) -> Any:
+        # Implementation for "swin_base_patch4_window7_224"
+        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
+
+        # NOTE(liamvdv): we use this implementation for "swinv2_base_window12_192.ms_in22k"
+        # TODO(liamvdv): I'm not sure this is correct, but it seems to work...
+        def reshape_transform(tensor: torch.Tensor) -> torch.Tensor:
+            batch_size, _, _, _ = tensor.shape
+            total_elements = tensor.numel()
+            num_channels = total_elements // (batch_size * 12 * 12)
+
+            result = tensor.reshape(batch_size, num_channels, 12, 12)
+            return result
+
+        return reshape_transform
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
@@ -292,6 +332,9 @@ class ResNet18Wrapper(BaseModule):
         )
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
 
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.layer4[-1]
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -316,6 +359,9 @@ class ResNet152Wrapper(BaseModule):
             resnet152() if kwargs.get("from_scratch", False) else resnet152(weights=ResNet152_Weights.IMAGENET1K_V1)
         )
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.layer4[-1]
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
