@@ -54,8 +54,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         for batch in self.train_dataloader:
             images, labels = batch
             anchor_images = images[0].cuda()
-            embedding = trainer.model(anchor_images)
-            train_embedding_batches.append(embedding)
+            embeddings = trainer.model(anchor_images)
+            train_embedding_batches.append(embeddings)
             anchor_labels = labels[0]
             train_labels.extend(anchor_labels)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
