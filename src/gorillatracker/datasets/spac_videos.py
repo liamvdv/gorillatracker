@@ -21,7 +21,7 @@ def get_samples_video(dirpath: Path) -> List[Tuple[Path, str]]:
     Label is <video_name>-<id>
     """
     samples = []
-    image_paths = sorted(dirpath.glob("*.jpg"))
+    image_paths = sorted(dirpath.glob("*.png"))
     for image_path in image_paths:
         label = image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1]
         samples.append((image_path, label))

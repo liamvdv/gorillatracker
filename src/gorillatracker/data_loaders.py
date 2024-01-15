@@ -51,7 +51,7 @@ def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, st
 
 
 def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
-    image_paths = sorted(data_dir.glob("*.jpg"))
+    image_paths = sorted(data_dir.glob("*.png"))
     n = len(image_paths)
     labelsection: LabelSection = defaultdict(lambda: (-1, -1))
     prev_label = None

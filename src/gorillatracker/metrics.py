@@ -39,7 +39,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
     def __init__(self, every_n_val_epochs: int, wandb_run: Runner) -> None:
         super().__init__()
-        self.logged_epochs: Set[int] = set()
+        self.current_val_epoch: int = 0
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
         self.run = wandb_run
@@ -47,23 +47,21 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
 
-        current_epoch = trainer.current_epoch
+        current_train_epoch = trainer.current_epoch
         assert trainer.max_epochs is not None
-        if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
-            trainer.max_epochs - 1 == current_epoch
+        if self.current_val_epoch % self.every_n_val_epochs == 0 or (
+            trainer.max_epochs - 1 == current_train_epoch
         ):
-            self.logged_epochs.add(current_epoch)
-
             # Assuming you have an 'embeddings' variable containing your embeddings
 
             table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
             artifact = wandb.Artifact(
-                name="run_{0}_epoch_{1}".format(self.run.name, current_epoch),
+                name="run_{0}_epoch_{1}".format(self.run.name, self.current_val_epoch),
                 type="embeddings",
-                metadata={"epoch": current_epoch},
-                description="Embeddings from epoch {}".format(current_epoch),
+                metadata={"epoch": self.current_val_epoch},
+                description="Embeddings from epoch {}".format(self.current_val_epoch),
             )
-            artifact.add(table, "embeddings_table_epoch_{}".format(current_epoch))
+            artifact.add(table, "embeddings_table_epoch_{}".format(self.current_val_epoch))
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
             # log metrics to wandb
@@ -81,6 +79,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             # wandb.log({"epoch": current_epoch})
             # for visibility also log the
         # clear the table where the embeddings are stored
+        self.current_val_epoch+=1
         pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
 

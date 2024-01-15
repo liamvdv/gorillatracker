@@ -137,6 +137,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     # Initialize trainer
     trainer = Trainer(
         max_epochs=args.max_epochs,
+        val_check_interval=args.val_check_interval,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),
