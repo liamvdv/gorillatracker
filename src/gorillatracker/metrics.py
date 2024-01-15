@@ -47,7 +47,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
 
-    def _get_knn_with_training_args(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
+    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
         train_labels = []
@@ -84,7 +84,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
 
-            train_embeddings, train_labels = self._get_knn_with_training_args(trainer)
+            train_embeddings, train_labels = self._get_train_embeddings_for_knn(trainer)
             # log metrics to wandb
             evaluate_embeddings(
                 data=embeddings_table,
@@ -141,9 +141,8 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
-    if len(val_embeddings) == 0:
-        raise ValueError("No validation embeddings given.")
-    print(len(val_embeddings))
+    assert len(val_embeddings) == 0, "No validation embeddings given."
+
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
         for metric_name, metric in metrics.items()
