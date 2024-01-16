@@ -11,7 +11,7 @@ IdDict = dict[int, list[int]]  # id -> list of negatives
 JsonDict = dict[str, list[str]]  # video_name-id -> list of negatives
 
 
-def get_json_data(json_path: str) -> JsonDict:
+def _get_json_data(json_path: str) -> JsonDict:
     """Return the data from the given JSON file and create it if it doesn't exist.
 
     Args:
@@ -28,7 +28,7 @@ def get_json_data(json_path: str) -> JsonDict:
     return data
 
 
-def add_labels_to_json(id_negatives: IdDict, video_name: str, json_output_path: str) -> None:
+def _add_labels_to_json(id_negatives: IdDict, video_name: str, json_output_path: str) -> None:
     """Add the labels from one video to the given JSON file.
 
     Args:
@@ -37,7 +37,7 @@ def add_labels_to_json(id_negatives: IdDict, video_name: str, json_output_path: 
         json_output_path: Path to the JSON file to write.
     """
     out_dict: JsonDict = {}
-    out_data = get_json_data(json_output_path)
+    out_data = _get_json_data(json_output_path)
     for id, negatives in id_negatives.items():
         out_dict[f"{video_name}-{id}"] = [f"{video_name}-{negative}" for negative in negatives]
     out_data.update(out_dict)
@@ -45,7 +45,7 @@ def add_labels_to_json(id_negatives: IdDict, video_name: str, json_output_path: 
         json.dump(out_data, f, indent=4)
 
 
-def get_negatives(id_frames: IdFrameDict, min_frames: int, json_path: str) -> tuple[IdFrameDict, IdDict]:
+def _get_negatives(id_frames: IdFrameDict, min_frames: int, json_path: str) -> tuple[IdFrameDict, IdDict]:
     """Return negatives for each ID and remove IDs with too few frames from the given dictionary.
 
     Args:
@@ -70,7 +70,7 @@ def get_negatives(id_frames: IdFrameDict, min_frames: int, json_path: str) -> tu
     return id_frames, id_negatives
 
 
-def get_frames_for_ids(json_path: str) -> IdFrameDict:
+def _get_frames_for_ids(json_path: str) -> IdFrameDict:
     """Get the frames for the given IDs.
 
     Args:
@@ -96,7 +96,7 @@ def get_frames_for_ids(json_path: str) -> IdFrameDict:
     return id_frames
 
 
-def crop_and_save_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float, output_path: str) -> None:
+def _crop_and_save_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float, output_path: str) -> None:
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
 
     Args:
@@ -119,7 +119,7 @@ def crop_and_save_image(frame: cvt.MatLike, x: float, y: float, w: float, h: flo
     cv2.imwrite(output_path, cropped_frame)
 
 
-def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> None:
+def _get_data_from_video(video_path: str, json_path: str, output_dir: str) -> None:
     """crop images from the video in the given path and copy negative list to negatives.json
 
     Args:
@@ -132,18 +132,18 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
     # create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    id_frames = get_frames_for_ids(json_path)
+    id_frames = _get_frames_for_ids(json_path)
     # open the video
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     video = cv2.VideoCapture(video_path)
-    id_frames, id_negatives = get_negatives(id_frames, images_per_individual, json_path)
+    id_frames, id_negatives = _get_negatives(id_frames, images_per_individual, json_path)
     for id, frames in id_frames.items():
         step_size = len(frames) // images_per_individual
         frame_list = [frames[i] for i in range(0, images_per_individual * step_size, step_size)]
         for frame_idx, bbox in frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
-            crop_and_save_image(
+            _crop_and_save_image(
                 frame,
                 bbox[0],  # x
                 bbox[1],  # y
@@ -153,7 +153,7 @@ def get_data_from_video(video_path: str, json_path: str, output_dir: str) -> Non
             )
     video.release()
 
-    add_labels_to_json(id_negatives, video_name, os.path.join(output_dir, "negatives.json"))
+    _add_labels_to_json(id_negatives, video_name, os.path.join(output_dir, "negatives.json"))
 
 
 def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -> None:
@@ -164,7 +164,7 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         output_dir: Path to the directory to save the cropped images to.
     """
     negative_json = os.path.join(output_dir, "negatives.json")
-    video_skip_list = set([id.split("-")[0] for id in get_json_data(negative_json).keys()])
+    video_skip_list = set([id.split("-")[0] for id in _get_json_data(negative_json).keys()])
     print(f"Skipping {len(video_skip_list)} videos.")
     video_list = [video for video in os.listdir(video_dir) if os.path.splitext(video)[0] not in video_skip_list]
     for idx, video in enumerate(video_list):
@@ -174,7 +174,7 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         json_path = os.path.join(json_dir, f"{video_name}_tracked.json")
         if not os.path.exists(json_path):
             continue
-        get_data_from_video(video_path, json_path, output_dir)
+        _get_data_from_video(video_path, json_path, output_dir)
     print("" * 80)  # clear line
     print("all videos processed")
 
