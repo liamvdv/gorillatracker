@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -48,7 +48,6 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
         current_step = trainer.global_step
         assert trainer.max_epochs is not None
-    
 
         table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
         artifact = wandb.Artifact(
