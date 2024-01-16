@@ -2,6 +2,7 @@ import json
 import os
 
 import cv2
+import cv2.typing as cvt
 
 BBox = tuple[float, float, float, float]  # x, y, w, h
 BBoxFrame = tuple[int, BBox]  # frame_idx, x, y, w, h
@@ -95,7 +96,7 @@ def get_frames_for_ids(json_path: str) -> IdFrameDict:
     return id_frames
 
 
-def crop_and_save_image(frame, x: float, y: float, w: float, h: float, output_path: str) -> None:  # type: ignore # because of frame type
+def crop_and_save_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float, output_path: str) -> None:
     """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
 
     Args:
@@ -174,12 +175,12 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
         if not os.path.exists(json_path):
             continue
         get_data_from_video(video_path, json_path, output_dir)
-    print("" * 80)  # clear the line
+    print("" * 80)  # clear line
     print("all videos processed")
 
 
 create_dataset_from_videos(
     "/workspaces/gorillatracker/videos",
     "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked",
-    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/train_png",
+    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/train",
 )
