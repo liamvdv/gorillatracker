@@ -5,7 +5,7 @@ import yaml
 from wandb import agent, sweep
 
 # Set your default config
-config_path = "./cfgs/resnet18_cxl.yml"
+config_path = "./cfgs/visiontransformer_cxl.yml"
 # Assuming `config_path` is the path to your YAML config file
 assert os.path.isfile(config_path), f"Config file not found at {config_path}"
 assert config_path.endswith(".yml") or config_path.endswith(".yaml"), "Config file must be YAML"
@@ -22,16 +22,17 @@ sweep_config = {
     "program": "./train.py",  # Note: not the sweep file, but the training script
     "name": project_name,
     "method": "grid",  # Specify the search method (random search in this case)
-    "metric": {"goal": "minimize", "name": "val/loss"},  # Specify the metric to optimize
+    "metric": {"goal": "minimize", "name": "val/loss_epoch"},  # Specify the metric to optimize
     "parameters": {
         # "param1": {"min": 1, "max": 10},  # Define parameter search space
-        "loss_mode": {"values": ["offline", "offline/native", "online/soft", "online/semi-hard"]},
+        "weight_decay": {"values": [1e-2, 1e-3, 1e-4, 1e-5]},
+        "learning_rate": {"values": [1e-3, 1e-4, 1e-5]},
         # Add other parameters as needed
     },
     "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
 }
 # Initialize the sweep
-project_name = "test_losses"
+project_name = "Embedding-ViT-CXL-OpenSet"
 entity = "gorillas"
 sweep_id = sweep(sweep=sweep_config, project=project_name, entity=entity)
 # Print the sweep ID directly
