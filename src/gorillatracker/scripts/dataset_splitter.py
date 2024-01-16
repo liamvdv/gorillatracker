@@ -180,11 +180,6 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
     return train_count, val_count, test_count
 
 
-# You must ensure this is set to True when pushed. Do not keep a TEST = False
-# version on main.
-TEST = False
-
-
 def copy(src: Path, dst: Path) -> None:
     if TEST:
         print(f"{src} -> {dst}")
@@ -479,20 +474,27 @@ def merge_dataset_splits(ds1: str, ds2: str, ds1_name: Optional[str] = None, ds2
         ds1_name: optional ds1 file name suffix
         ds2_name: optional ds2 file name suffix
     """
+    # store unix file name max char in constant
+    UNIX_MAX_FILE_NAME = 255
+
     ds1_labeler = get_labeler_for_dataset(ds1)
     ds2_labeler = get_labeler_for_dataset(ds2)
     target = f"splits/merged-{ds1.replace('/', '-')}-{ds2.replace('/', '-')}"
-    if len(target) > 255 - max(len(partition) for partition in partitions):
-        print(f"WARNING: target path {target} is longer than 255 characters.")
+    if len(target) > UNIX_MAX_FILE_NAME - max(len(partition) for partition in partitions):
+        print(f"WARNING: target path {target} is longer than {UNIX_MAX_FILE_NAME} characters.")
         if ds1_name is None or ds2_name is None:
-            print("Provide ds1_name and ds2_name to resolve this.")    
+            print("Provide ds1_name and ds2_name to resolve this.")
         target = f"splits/merged-{ds1_name}-{ds2_name}"
         if input(f"Continue with target: {target}? (yes,N)") != "yes":
             print("abort.")
             exit(0)
-        
+
     _merge_dataset_splits(target, ds1, ds2, ds1_labeler, ds2_labeler, ds1_name, ds2_name)
 
+
+# You must ensure this is set to True when pushed. Do not keep a TEST = False
+# version on main.
+TEST = True
 
 # if __name__ == "__main__":
 # dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
