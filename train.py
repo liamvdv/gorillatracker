@@ -103,6 +103,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,
         wandb_run=wandb_logger.experiment,
+        dm=dm,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -117,7 +118,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss",
+        monitor="val/loss_epoch",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
