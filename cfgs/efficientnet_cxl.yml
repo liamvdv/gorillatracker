@@ -10,8 +10,8 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 project_name: "Embedding-Efficientnet-CXL-OpenSet" # WandB project name
-run_name: "96-run-baseline-sweeps-on-all-backbones" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["baseline", "pure-openset"]            # WandB tags for experiment tracking
+run_name: "115-run-exploratory-sweeps-low-learning-rate-different-modes" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["sweep"]            # WandB tags for experiment tracking        # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)

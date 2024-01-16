@@ -1,5 +1,5 @@
 import math
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -9,9 +9,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 
+import gorillatracker.type_helper as gtyping
 from gorillatracker.utils.yolo_helpers import convert_from_yolo_format
-
-BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
 
 
 # Helper functions provided in https://github.com/facebookresearch/segment-anything/blob/9e8f1309c94f1128a6e5c047a10fdcb02fc8d651/notebooks/predictor_example.ipynb
@@ -25,7 +24,7 @@ def show_sam_mask(
     ax.imshow(mask_image)
 
 
-def show_sam_box(box: BOUNDING_BOX, ax: Axes) -> None:
+def show_sam_box(box: gtyping.BoundingBox, ax: Axes) -> None:
     x_min, y_min = box[0]
     x_max, y_max = box[1]
     w = x_max - x_min
@@ -51,7 +50,7 @@ def show_yolo_box(image_path: str, bbox_path: str) -> None:
     plt.show()
 
 
-def show_image_on_remote(image: npt.NDArray[np.uint8]) -> None:
+def show_image_on_remote(image: gtyping.Image) -> None:
     """
     Show a cv2 image.
 
@@ -62,7 +61,7 @@ def show_image_on_remote(image: npt.NDArray[np.uint8]) -> None:
     plt.savefig("my_plot.png")
 
 
-def show_bbox(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> None:
+def show_bbox(image: gtyping.Image, bbox: gtyping.BoundingBox) -> None:
     """
     Show a bounding box on an image.
 
@@ -78,7 +77,7 @@ def show_bbox(image: npt.NDArray[np.uint8], bbox: BOUNDING_BOX) -> None:
     plt.show()
 
 
-def draw_bbox(img: npt.NDArray[np.uint8], bbox: BOUNDING_BOX, label: Optional[str] = None) -> npt.NDArray[np.uint8]:
+def draw_bbox(img: gtyping.Image, bbox: gtyping.BoundingBox, label: Optional[str] = None) -> gtyping.Image:
     """
     Show a bounding box on an image.
 
@@ -96,7 +95,7 @@ def draw_bbox(img: npt.NDArray[np.uint8], bbox: BOUNDING_BOX, label: Optional[st
     return cv2.rectangle(img, bbox[0], bbox[1], red, 3)
 
 
-def create_image_grid(images: List[npt.NDArray[np.uint8]], width: int = 3) -> Figure:
+def create_image_grid(images: list[gtyping.Image], width: int = 3) -> Figure:
     """
     Creates a grid of images.
     """
