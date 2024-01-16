@@ -2,7 +2,6 @@ import os
 from typing import Any, Dict, Union
 
 import yaml
-
 from wandb import agent, sweep
 
 
