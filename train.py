@@ -103,6 +103,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,
         wandb_run=wandb_logger.experiment,
+        dm=dm,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(

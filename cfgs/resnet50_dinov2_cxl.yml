@@ -11,10 +11,10 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-ResNet152-CXL-OpenSet" # WandB project name
-run_name: "115-run-exploratory-sweeps-low-learning-rate-different-modes" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep"]            # WandB tags for experiment tracking
-model_name_or_path: "ResNet152"  # Model name or path 
+project_name: "Embedding-ResNet50-CXL-OpenSet" # WandB project name
+run_name: "124-test-different-pretrainings-weights-across-backbones-clip-dino" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["dinov2"]            # WandB tags for experiment tracking
+model_name_or_path: "ResNet50DinoV2Wrapper"  # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False             # Enable fast development run
@@ -25,14 +25,15 @@ seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
 early_stopping_patience: 3      # Early stopping patience (number of epochs)
-embedding_size: 128
+min_delta: 0.005
+embedding_size: 2048
 
-weight_decay: 0.2               # Weight decay
+weight_decay: 0.5               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "offline/native"
+loss_mode: "online/soft"
 
 learning_rate: 1e-5             # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
@@ -45,7 +46,7 @@ lr_decay_interval: 1            # Learning rate decay interval (for the learning
 batch_size: 12                # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 20                  # Training goal (large number)
+max_epochs: 40                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
