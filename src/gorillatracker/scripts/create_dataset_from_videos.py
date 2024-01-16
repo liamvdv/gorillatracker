@@ -179,8 +179,10 @@ def create_dataset_from_videos(video_dir: str, json_dir: str, output_dir: str) -
     print("all videos processed")
 
 
-create_dataset_from_videos(
-    "/workspaces/gorillatracker/videos",
-    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked",
-    "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/train",
-)
+# example usage
+# if __name__ == "__main__":
+#    create_dataset_from_videos(
+#        "/workspaces/gorillatracker/videos",
+#        "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked",
+#        "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces/train",
+#    )
