@@ -198,7 +198,7 @@ class EfficientNetV2Wrapper(BaseModule):
         )
 
 
-class ConvNeXtV2Wrapper(BaseModule):
+class ConvNeXtV2BaseWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
         **kwargs,
@@ -219,6 +219,20 @@ class ConvNeXtV2Wrapper(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
+
+
+class ConvNeXtV2HugeWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = timm.create_model("convnextv2_huge", pretrained=not self.from_scratch)
+        self.model.reset_classifier(self.embedding_size)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Resize((224), antialias=True)
 
 
 class VisionTransformerWrapper(BaseModule):
@@ -403,6 +417,41 @@ class SwinV2BaseWrapper(BaseModule):
         )
 
 
+class SwinV2LargeWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        swin_model = "swinv2_large_window12_192.ms_in22k"
+        self.model = (
+            timm.create_model(swin_model, pretrained=False)
+            if kwargs.get("from_scratch", False)
+            else timm.create_model(swin_model, pretrained=True)
+        )
+        self.model.head.fc = torch.nn.Linear(
+            in_features=self.model.head.fc.in_features, out_features=self.embedding_size
+        )
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms.Resize((192), antialias=True),
+                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+            ]
+        )
+
+
 class ResNet18Wrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -513,12 +562,14 @@ class ResNet50DinoV2Wrapper(BaseModule):
 custom_model_cls = {
     "EfficientNetV2_Large": EfficientNetV2Wrapper,
     "SwinV2Base": SwinV2BaseWrapper,
+    "SwinV2LargeWrapper": SwinV2LargeWrapper,
     "ViT_Large": VisionTransformerWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
     "ResNet50Wrapper": ResNet50Wrapper,
     "ResNet50DinoV2Wrapper": ResNet50DinoV2Wrapper,
-    "ConvNeXtV2_Base": ConvNeXtV2Wrapper,
+    "ConvNeXtV2_Base": ConvNeXtV2BaseWrapper,
+    "ConvNeXtV2_Huge": ConvNeXtV2HugeWrapper,
     "ConvNextWrapper": ConvNextWrapper,
     "ConvNextClipWrapper": ConvNextClipWrapper,
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,

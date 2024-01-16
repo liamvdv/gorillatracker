@@ -12,7 +12,7 @@ from gorillatracker.scripts.ensure_integrity_openset import (
     ensure_integrity_openset,
     get_test_val_train_proprietary_subjects,
 )
-from gorillatracker.scripts.train_yolo import detect_gorillafaces_cxl, modify_dataset_train_yolo
+from gorillatracker.scripts.train_yolo import modify_dataset_train_yolo, yolo_detect
 
 
 def save_dict_json(dict: Dict[Any, Any], file_path: str) -> None:
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     model = ultralytics.YOLO(model_path)
 
     bristol_split_dir = "/workspaces/gorillatracker/data/splits/ground_truth-bristol-full_images-openset-reid-val-0-test-0-mintraincount-3-seed-69-train-70-val-15-test-15"
-    detect_gorillafaces_cxl(model, model_name)
+    yolo_detect(model, model_name)
     meta_data, face_crop_dataset = crop_images_save_metadata_cxl(model_name, bristol_split_dir)
     # convert absolute to relative paths
     face_crop_dataset = os.path.relpath(face_crop_dataset, "/workspaces/gorillatracker/data")
