@@ -1,10 +1,12 @@
 from functools import partial
-from typing import Any, Dict, List, Optional, Set, Tuple
+from itertools import islice
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import PIL
 import seaborn as sns
 import sklearn
 import torch
@@ -13,6 +15,7 @@ import wandb
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
+from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 
@@ -83,6 +86,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         # clear the table where the embeddings are stored
         pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
+    def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
+        log_train_images_to_wandb(self.run, trainer, n_samples=1)
+
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
 # 1. add a fully connected layer to the model that takes the embeddings as input and outputs the labels -> then train this model -> evaluate false positive, false negative, accuracy, ...)
@@ -97,6 +103,43 @@ def load_embeddings_from_wandb(embedding_name: str, run: Runner) -> pd.DataFrame
     data_table = artifact.get("embeddings_table_epoch_10")  # TODO
     data = pd.DataFrame(data=data_table.data, columns=data_table.columns)
     return data
+
+
+def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
+    return ToPILImage()(tensor.cpu()).convert("RGB")
+
+
+def get_n_samples_from_dataloader(
+    dataloader: gtypes.BatchNletDataLoader, n_samples: int = 1
+) -> List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]]:
+    samples: List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]] = []
+    for batch in dataloader:
+        images, labels = batch
+        row_batch = zip(zip(*images), zip(*labels))
+        take_max_n = n_samples - len(samples)
+        samples.extend(list(islice(row_batch, take_max_n)))
+        if len(samples) == n_samples:
+            break
+    return samples
+
+
+def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 1) -> None:
+    """
+    Log nlet images from the train dataloader to wandb.
+    Visual sanity check to see if the dataloader works as expected.
+    """
+    # get first n_samples triplets from the train dataloader
+    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=n_samples)  # type: ignore
+    for i, sample in enumerate(samples):
+        # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
+        row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
+        row_images, row_labels = sample
+        img_label_meaning = zip(row_images, row_labels, row_meaning)
+        artifacts = [
+            wandb.Image(tensor_to_image(img), caption=f"{meaning} label={label}")
+            for img, label, meaning in img_label_meaning
+        ]
+        run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
 
 
 def evaluate_embeddings(
