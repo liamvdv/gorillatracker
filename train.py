@@ -1,13 +1,13 @@
 from pathlib import Path
 
 import torch
-import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
 from torchvision.transforms import Compose, Resize
 
+import wandb
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
