@@ -186,14 +186,22 @@ class EfficientNetV2Wrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        return transforms_v2.Compose(
+            [
+                transforms_v2.Resize((224,224), antialias=True),
+                transforms_v2.ToTensor(),
+                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=(0.485 * 255, 0.456 * 255, 0.406 * 255), scale=(0.02, 0.13)),
+                # transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomRotation(60, fill=(0.485 * 255, 0.456 * 255, 0.406 * 255)),
             ]
         )
 

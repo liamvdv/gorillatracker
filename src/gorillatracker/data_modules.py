@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader
+from gorillatracker.transform_utils import SquarePad
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,11 +23,13 @@ class NletDataModule(L.LightningDataModule):
         data_dir: str,
         batch_size: int = 32,
         dataset_class: Optional[Type[Dataset[Any]]] = None,
-        transforms: Optional[gtypes.Transform] = None,
+        dataset_transforms: Optional[gtypes.Transform] = None,
+        model_transforms: Optional[gtypes.Transform] = None,
         training_transforms: Optional[gtypes.Transform] = None,
     ) -> None:
         super().__init__()
-        self.transforms = transforms
+        self.dataset_transforms = dataset_transforms
+        self.model_transforms = model_transforms
         self.training_transforms = training_transforms
         self.dataset_class = dataset_class
         self.data_dir = data_dir
@@ -42,12 +45,12 @@ class NletDataModule(L.LightningDataModule):
         )
 
         if stage == "fit":
-            self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.dataset_transforms, self.training_transforms, self.model_transforms]))  # type: ignore
+            # self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
         elif stage == "test":
-            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            self.test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
         elif stage == "validate":
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None

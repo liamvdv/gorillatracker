@@ -45,6 +45,8 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         dirpath = data_dir / Path(partition)
         self.samples = get_samples(dirpath)
         self.transform = transform
+        
+        self.partition = partition
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -54,16 +56,21 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
+            
+        # save img
+        img2 = transforms.ToPILImage()(img)
+        img2.save(f"img_{self.partition}.png")
+        
+        
         return img, label
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:
         return transforms.Compose(
             [
-                SquarePad(),
                 # Uniform input, you may choose higher/lower sizes.
-                transforms.Resize(224),
-                transforms.ToTensor(),
+                SquarePad(),
+                # transforms.ToTensor(),
             ]
         )
 
