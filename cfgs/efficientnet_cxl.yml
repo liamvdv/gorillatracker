@@ -30,13 +30,13 @@ weight_decay: 1.0               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
+
 margin: 1.0                   # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "softmax/vpl"
-# loss_mode: "offline/native"
+loss_mode: "offline/native"        # Loss mode (e.g., "softmax", "triplet", "softmax/triplet", "softmax/vpl", "triplet/vpl", "softmax/triplet/vpl")
 
 learning_rate: 1e-4             # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
