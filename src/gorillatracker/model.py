@@ -134,7 +134,7 @@ class BaseModule(L.LightningModule):
             torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
         )
         embeddings = self.forward(vec)
-
+        
         self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors], images[0])  # type: ignore
         loss, pos_dist, neg_dist = self.triplet_loss(embeddings, flat_labels)  # type: ignore
         self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
