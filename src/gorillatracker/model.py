@@ -223,7 +223,7 @@ class BaseModule(L.LightningModule):
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
                 self.warmup_mode,
-                self.lr_schedule, # type: ignore
+                self.lr_schedule,  # type: ignore
                 epoch,
                 self.initial_lr,
                 self.start_lr,
