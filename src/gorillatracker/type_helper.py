@@ -1,6 +1,10 @@
 from typing import Any, Callable, Tuple, Union
 
+import cv2.typing as cvt
 import torch
+
+BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
+Image = cvt.MatLike
 
 Label = Union[str, int]
 TripletLabel = Tuple[Label, Label, Label]

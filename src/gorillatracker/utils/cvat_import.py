@@ -6,15 +6,15 @@ from typing import Dict, List, Tuple
 import numpy as np
 import numpy.typing as npt
 
-BOUNDING_BOX = Tuple[Tuple[int, int], Tuple[int, int]]
+import gorillatracker.type_helper as gtyping
 
 
 @dataclass
 class SegmentedImageData:
     path: str
-    segments: Dict[str, List[Tuple[npt.NDArray[np.bool_], BOUNDING_BOX]]] = field(default_factory=dict)
+    segments: Dict[str, List[Tuple[npt.NDArray[np.bool_], gtyping.BoundingBox]]] = field(default_factory=dict)
 
-    def add_segment(self, class_label: str, mask: npt.NDArray[np.bool_], box: BOUNDING_BOX) -> None:
+    def add_segment(self, class_label: str, mask: npt.NDArray[np.bool_], box: gtyping.BoundingBox) -> None:
         """
         class_label: label of the segment
         mask: binary mask of the segment
@@ -62,7 +62,7 @@ def _expand_segment_to_img_mask(
     return mask
 
 
-def _extract_boxes_from_mask(mask_element: ET.Element) -> BOUNDING_BOX:
+def _extract_boxes_from_mask(mask_element: ET.Element) -> gtyping.BoundingBox:
     left_str = mask_element.get("left")
     top_str = mask_element.get("top")
     width_str = mask_element.get("width")
