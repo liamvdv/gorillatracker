@@ -223,7 +223,7 @@ class BaseModule(L.LightningModule):
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
                 self.warmup_mode,
-                self.lr_schedule,
+                self.lr_schedule, # type: ignore
                 epoch,
                 self.initial_lr,
                 self.start_lr,
@@ -233,15 +233,15 @@ class BaseModule(L.LightningModule):
             )
 
         if self.lr_schedule != "reduce_on_plateau":
-            scheduler = torch.optim.lr_scheduler.LambdaLR(
+            lambda_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer=optimizer,
                 lr_lambda=lambda_schedule,
             )
 
-            return {"optimizer": optimizer, "lr_scheduler": scheduler}
+            return {"optimizer": optimizer, "lr_scheduler": lambda_scheduler}
 
         else:
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer=optimizer,
                 mode="min",
                 factor=self.lr_decay,
@@ -253,7 +253,7 @@ class BaseModule(L.LightningModule):
                 min_lr=0,
                 eps=1e-08,
             )
-            return {"optimizer": optimizer, "lr_scheduler": scheduler}
+            return {"optimizer": optimizer, "lr_scheduler": plateau_scheduler}
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
