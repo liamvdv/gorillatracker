@@ -182,7 +182,8 @@ class EfficientNetV2Wrapper(BaseModule):
         )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.blocks[-1].conv  # TODO(liamvdv)
+        # return self.model.blocks[-1].conv
+        return self.model.features[-1][0]  # TODO(liamvdv)
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -333,7 +334,8 @@ class ResNet18Wrapper(BaseModule):
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.layer4[-1]
+        # return self.model.layer4[-1]
+        return self.model.layer4[-1].conv2
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -361,7 +363,8 @@ class ResNet152Wrapper(BaseModule):
         self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.layer4[-1]
+        # return self.model.layer4[-1]
+        return self.model.layer4[-1].conv3
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
