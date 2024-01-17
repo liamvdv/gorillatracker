@@ -185,16 +185,13 @@ class VideoTripletSampler(TripletSampler):
         self.dataset = dataset  # type: ignore
         self.n = len(self.dataset)
         self.data_dir = data_dir
-        self.json_path = data_dir + "/negatives.json"
+        with open(data_dir + "/negatives.json") as f:
+            self.negatives = json.load(f)
         self.labelsection = generate_labelsection_video_data(Path(data_dir))
         self.shuffled_indices_generator = shuffled_indices_generator(self.n)
 
     def any_sample_not(self, label: gtypes.Label) -> int:
-        # read json file
-        with open(self.json_path) as f:
-            negatives = json.load(f)
-
-        possible_negative_labels = negatives[label]
+        possible_negative_labels = self.negatives[label]
         negative_label = possible_negative_labels[torch.randint(len(possible_negative_labels), (1,)).item()]
 
         negative_start, negative_length = self.labelsection[negative_label]
@@ -318,7 +315,7 @@ if __name__ == "__main__":
     )
     data_dir = "data/derived_data/spac_gorillas_converted_labels_cropped_faces/train"
     print("creating DataLoader")
-    dataloader = VideoTripletDataLoader(dataset, 1, data_dir=data_dir, shuffle=False)
+    dataloader = VideoTripletDataLoader(dataset, 12, data_dir=data_dir, shuffle=True)
     print("created DataLoader")
     # print first batch label
-    print(next(iter(dataloader))[1])
+    next(iter(dataloader))
