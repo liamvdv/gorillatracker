@@ -1,5 +1,5 @@
 import importlib
-from typing import Callable, Type
+from typing import Any, Callable, Literal, Type
 
 import lightning as L
 import numpy as np
@@ -23,7 +23,13 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.triplet_loss import get_triplet_loss
 
 
-def warmup_lr(warmup_mode, epoch, initial_lr, start_lr, warmup_epochs):
+def warmup_lr(
+    warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
+    epoch: int,
+    initial_lr: float,
+    start_lr: float,
+    warmup_epochs: int,
+) -> float:
     if warmup_mode == "linear":
         return (epoch / warmup_epochs * (start_lr - initial_lr) + initial_lr) / initial_lr
     elif warmup_mode == "cosine":
@@ -31,35 +37,57 @@ def warmup_lr(warmup_mode, epoch, initial_lr, start_lr, warmup_epochs):
     elif warmup_mode == "exponential":
         decay = (start_lr / initial_lr) ** (1 / warmup_epochs)
         return decay**epoch
-    else:
+    elif warmup_mode == "constant":
         return initial_lr
+    else:
+        raise ValueError(f"Unknown warmup_mode {warmup_mode}")
 
 
-def linear_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args):
+def linear_lr(epoch: int, n_epochs: int, initial_lr: float, start_lr: float, end_lr: float, **args: Any) -> float:
     return (end_lr + (start_lr - end_lr) * (1 - epoch / n_epochs)) / initial_lr
 
 
-def cosine_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args):
+def cosine_lr(epoch: int, n_epochs: int, initial_lr: float, start_lr: float, end_lr: float, **args: Any) -> float:
     return (end_lr + (start_lr - end_lr) * (np.cos(np.pi * epoch / n_epochs) + 1) / 2) / initial_lr
 
 
-def exponential_lr(epoch, n_epochs, initial_lr, start_lr, end_lr, **args):
+def exponential_lr(
+    epoch: int, n_epochs: float, initial_lr: float, start_lr: float, end_lr: float, **args: Any
+) -> float:
     decay = (end_lr / start_lr) ** (1 / n_epochs)
     return start_lr * (decay**epoch) / initial_lr
 
 
-def schedule_lr(lr_schedule_mode, epochs, initial_lr, start_lr, end_lr, n_epochs):
+def schedule_lr(
+    lr_schedule_mode: Literal["linear", "cosine", "exponential", "constant"],
+    epochs: int,
+    initial_lr: float,
+    start_lr: float,
+    end_lr: float,
+    n_epochs: int,
+) -> float:
     if lr_schedule_mode == "linear":
         return linear_lr(epochs, n_epochs, initial_lr, start_lr, end_lr)
     elif lr_schedule_mode == "cosine":
         return cosine_lr(epochs, n_epochs, initial_lr, start_lr, end_lr)
     elif lr_schedule_mode == "exponential":
         return exponential_lr(epochs, n_epochs, initial_lr, start_lr, end_lr)
-    else:
+    elif lr_schedule_mode == "constant":
         return initial_lr
+    else:
+        raise ValueError(f"Unknown lr_schedule_mode {lr_schedule_mode}")
 
 
-def combine_schedulers(warmup_mode, lr_schedule_mode, epochs, initial_lr, start_lr, end_lr, n_epochs, warmup_epochs):
+def combine_schedulers(
+    warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
+    lr_schedule_mode: Literal["linear", "cosine", "exponential", "constant"],
+    epochs: int,
+    initial_lr: float,
+    start_lr: float,
+    end_lr: float,
+    n_epochs: int,
+    warmup_epochs: int,
+) -> float:
     if epochs < warmup_epochs:  # 0 : warmup_epochs - 1
         return warmup_lr(warmup_mode, epochs, initial_lr, start_lr, warmup_epochs)
     else:  # warmup_epochs - 1 : n_epochs - 1
@@ -80,8 +108,8 @@ class BaseModule(L.LightningModule):
         from_scratch: bool,
         loss_mode: str,
         weight_decay: float,
-        lr_schedule: str,
-        warmup_mode: str,
+        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"],
+        warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
         warmup_epochs: int,
         max_epochs: int,
         initial_lr: float,
@@ -189,7 +217,7 @@ class BaseModule(L.LightningModule):
             weight_decay=self.weight_decay,
         )
 
-        def lambda_schedule(epoch):
+        def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
                 self.warmup_mode,
                 self.lr_schedule,
@@ -201,13 +229,16 @@ class BaseModule(L.LightningModule):
                 self.warmup_epochs,
             )
 
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer=optimizer,
-            lr_lambda=lambda_schedule,
-        )
+        if self.lr_schedule != "reduce_on_plateau":
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer=optimizer,
+                lr_lambda=lambda_schedule,
+            )
 
-        if self.lr_schedule == "reduce_on_plateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(  # TODO
+            return {"optimizer": optimizer, "lr_scheduler": scheduler}
+
+        else:
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer=optimizer,
                 mode="min",
                 factor=self.lr_decay,
@@ -219,8 +250,7 @@ class BaseModule(L.LightningModule):
                 min_lr=0,
                 eps=1e-08,
             )
-
-        return {"optimizer": optimizer, "lr_scheduler": scheduler}
+            return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:

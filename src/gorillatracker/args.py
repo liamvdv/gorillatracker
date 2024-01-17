@@ -43,11 +43,11 @@ class TrainingArgs:
     beta2: float = field(default=0.999)
     epsilon: float = field(default=1e-8)
 
-    lr_schedule: Literal["linear", "cosine", "exponential", "reduce_on_plateau"] = field(default="linear")
-    warmup_mode: Literal["linear", "cosine", "exponential"] = field(default="cosine")
-    warmup_epochs: int = field(default=1)
-    initial_lr: float = field(default=1e-3)
-    start_lr: float = field(default=1e-3)
+    lr_schedule: Literal["linear", "cosine", "exponential", "reduce_on_plateau", "constant"] = field(default="constant")
+    warmup_mode: Literal["linear", "cosine", "exponential", "constant"] = field(default="constant")
+    warmup_epochs: int = field(default=0)
+    initial_lr: float = field(default=1e-5)
+    start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
 
     margin: float = field(default=0.5)
