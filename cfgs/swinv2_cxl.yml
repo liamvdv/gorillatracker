@@ -4,7 +4,7 @@ accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
-precision: 32                   # Training precision (e.g., "bf16-mixed")
+precision: 16                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
 workers: 4                      # Number of workers for data loading
 
@@ -12,8 +12,8 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-SwinV2-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "96-run-baseline-sweeps-on-all-backbones" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["baseline", "pure-openset"]            # WandB tags for experiment tracking
+run_name: "115-run-exploratory-sweeps-low-learning-rate-different-modes" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["sweep"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2Base"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -32,7 +32,7 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "offline/native"
+loss_mode: "online/soft"
 
 learning_rate: 1e-5             # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
@@ -42,7 +42,7 @@ lr_decay: 0.9                   # Learning rate decay (for the learning rate sch
 lr_decay_interval: 1            # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
 # )
 
-batch_size: 12                  # Training batch size
+batch_size: 28                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 10                  # Training goal (large number)

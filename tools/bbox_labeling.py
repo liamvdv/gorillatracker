@@ -81,7 +81,7 @@ def _label_group(group: str, full_images_group: List[str], src_dir: str, target_
         label = _label_image(os.path.join(src_dir, image), model)
         if label is None:
             continue
-        cutout_helpers.cutout_image(os.path.join(src_dir, image), label, os.path.join(target_dir, image))
+        cutout_helpers.cutout_image(cv2.imread(os.path.join(src_dir, image)), label, os.path.join(target_dir, image))
         bbox[image] = label
     
 def label_dataset(src_dir: str, target_dir: str, model: YOLO) -> None:
