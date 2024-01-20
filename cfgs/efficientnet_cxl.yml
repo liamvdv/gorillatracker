@@ -22,7 +22,7 @@ data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 3      # Early stopping patience (number of epochs)
+early_stopping_patience: 10      # Early stopping patience (number of epochs)
 embedding_size: 128
 
 weight_decay: 0.2               # Weight decay
@@ -30,20 +30,20 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "offline/native"
+loss_mode: "online/soft"        # Loss mode (e.g., "online/hard", "online/soft", "offline/native"...)
 
-learning_rate: 1e-4             # Learning rate
-# TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
-lr_schedule: "linear"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
-warmup_epochs: 1                # Number of warmup epochs (for the learning rate schedule -> linearly increasing learning rate)
-lr_decay: 0.9                   # Learning rate decay (for the learning rate schedule -> reduce_on_plateau)
-lr_decay_interval: 1            # Learning rate decay interval (for the learning rate schedule -> reduce_on_plateau)
-# )
+lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
+warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
+warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
+initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+
+max_epochs: 20                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 8                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
