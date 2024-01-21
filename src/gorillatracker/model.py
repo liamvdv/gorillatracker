@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Callable, Literal, Type, Tuple
+from typing import Any, Callable, Literal, Tuple, Type
 
 import lightning as L
 import numpy as np
