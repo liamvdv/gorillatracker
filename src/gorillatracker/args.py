@@ -37,21 +37,28 @@ class TrainingArgs:
     early_stopping_patience: int = 3
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
+    dropout_p: float = field(default=0.0)
 
-    learning_rate: float = field(default=0.001)
     weight_decay: float = field(default=0.1)
     beta1: float = field(default=0.9)
     beta2: float = field(default=0.999)
     epsilon: float = field(default=1e-8)
 
-    lr_schedule: Literal["linear", "cosine", "exponential", "reduce_on_plateau"] = field(default="linear")
-    warmup_epochs: int = field(default=1)
-    lr_decay: float = field(default=0.97)
-    lr_decay_interval: int = field(default=3)
+    lr_schedule: Literal["linear", "cosine", "exponential", "reduce_on_plateau", "constant"] = field(default="constant")
+    warmup_mode: Literal["linear", "cosine", "exponential", "constant"] = field(default="constant")
+    warmup_epochs: int = field(default=0)
+    initial_lr: float = field(default=1e-5)
+    start_lr: float = field(default=1e-5)
+    end_lr: float = field(default=1e-5)
+
     margin: float = field(default=0.5)
-    loss_mode: Literal["offline", "offline/native", "online/soft", "online/hard", "online/semi-hard"] = field(
-        default="offline"
-    )
+    s: float = field(default=64.0)
+    delta_t: int = field(default=100)
+    mem_bank_start_epoch: int = field(default=2)
+    lambda_membank: float = field(default=0.5)
+    loss_mode: Literal[
+        "offline", "offline/native", "online/soft", "online/hard", "online/semi-hard", "softmax/arcface", "softmax/vpl"
+    ] = field(default="offline")
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

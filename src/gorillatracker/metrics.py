@@ -104,10 +104,6 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 train_embeddings=train_embeddings,
                 train_labels=train_labels,
             )
-            # wandb.log({"epoch": current_epoch})
-            # for visibility also log the
-        # clear the table where the embeddings are stored
-        pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
@@ -184,7 +180,7 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
-    assert len(val_embeddings) == 0, "No validation embeddings given."
+    assert len(val_embeddings) != 0, "No validation embeddings given."
 
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
@@ -278,7 +274,7 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
-) -> Dict[str, torch.Number]:
+) -> Dict[str, Any]:
     if use_train_embeddings:
         return knn_with_train(
             val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels
@@ -293,7 +289,7 @@ def knn_with_train(
     k: int = 5,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
-) -> Dict[str, torch.Number]:
+) -> Dict[str, Any]:
     """
     Algorithmic Description:
     1. Calculate the distance matrix between all embeddings (len(embeddings) x len(embeddings))
@@ -354,7 +350,7 @@ def knn_with_train(
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, torch.Number]:
+def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, Any]:
     num_classes = np.max(val_labels).item() + 1
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
