@@ -45,15 +45,17 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     model_args = dict(
         model_name_or_path=args.model_name_or_path,
         from_scratch=args.from_scratch,
-        learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
         beta1=args.beta1,
         beta2=args.beta2,
         epsilon=args.epsilon,
         lr_schedule=args.lr_schedule,
+        warmup_mode=args.warmup_mode,
         warmup_epochs=args.warmup_epochs,
-        lr_decay=args.lr_decay,
-        lr_decay_interval=args.lr_decay_interval,
+        max_epochs=args.max_epochs,
+        initial_lr=args.initial_lr,
+        start_lr=args.start_lr,
+        end_lr=args.end_lr,
         margin=args.margin,
         loss_mode=args.loss_mode,
         embedding_size=args.embedding_size,
@@ -195,7 +197,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/config.yml"
+    config_path = "./cfgs/efficientnet_cxl.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments
