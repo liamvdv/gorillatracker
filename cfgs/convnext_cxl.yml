@@ -11,10 +11,17 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
+<<<<<<< HEAD:cfgs/convnextv2_cxl.yml
 project_name: "Embedding-ConvNeXtV2-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
 run_name: "143-explore-regularisierung-l2sp" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["sweep"]            # WandB tags for experiment tracking
 model_name_or_path: "ConvNeXtV2_Base" # Model name or path 
+=======
+project_name: "Embedding-ConvNeXt-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "124-test-different-pretrainings-weights-across-backbones-clip-dino" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["vanilla"]            # WandB tags for experiment tracking
+model_name_or_path: "ConvNextWrapper" # Model name or path 
+>>>>>>> origin/main:cfgs/convnext_cxl.yml
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False             # Enable fast development run
@@ -32,7 +39,7 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "offline/native"
+loss_mode: "online/soft"
 
 learning_rate: 1e-6            # Learning rate
 # TODO(all): NO LEARNING RATE SCHEDULE IS CURRENTLY IMPLEMENTED! IGNORE (
