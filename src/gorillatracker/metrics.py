@@ -13,6 +13,8 @@ import sklearn
 import torch
 import torchmetrics as tm
 import wandb
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
@@ -112,6 +114,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
+    def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
+        log_grad_cam_images_to_wandb(self.run, trainer)
+
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
 # 1. add a fully connected layer to the model that takes the embeddings as input and outputs the labels -> then train this model -> evaluate false positive, false negative, accuracy, ...)
@@ -163,6 +168,33 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
             for img, label, meaning in img_label_meaning
         ]
         run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
+
+
+def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
+    # NOTE(liamvdv): inverse grad cam support to model since we might not be using
+    #                a model which grad cam does not support.
+    # NOTE(liamvdv): Transform models may have different interpretations.
+    assert trainer.model is not None, "Must only call log_grad_cam_images... after model was initialized."
+    if not hasattr(trainer.model, "get_grad_cam_layer"):
+        return
+    target_layer = trainer.model.get_grad_cam_layer()
+    get_reshape_transform = getattr(trainer.model, "get_grad_cam_reshape_transform", lambda: None)
+    cam = GradCAM(model=trainer.model, target_layers=[target_layer], reshape_transform=get_reshape_transform())
+
+    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=1)  # type: ignore
+    wandb_images: List[wandb.Image] = []
+    for sample in samples:
+        # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
+        row_images, row_labels = sample
+        anchor, *rest = row_images
+        grayscale_cam = cam(input_tensor=anchor.unsqueeze(0), targets=None)
+
+        # Overlay heatmap on original image
+        heatmap = grayscale_cam[0, :]
+        image = np.array(ToPILImage()(anchor)).astype(np.float32) / 255.0  # NOTE(liamvdv): needs be normalized
+        image_with_heatmap = show_cam_on_image(image, heatmap, use_rgb=True)
+        wandb_images.append(wandb.Image(image_with_heatmap, caption=f"label={row_labels[0]}"))
+    run.log({"Grad-CAM": wandb_images})
 
 
 def evaluate_embeddings(
