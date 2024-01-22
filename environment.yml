@@ -7,6 +7,7 @@ channels:
   # be listed explicitly here.
   - nodefaults
   - pyviz/label/dev
+  - pyviz/label/dev
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
@@ -44,6 +45,9 @@ dependencies:
   - bokeh
   - colorcet
   - ipywidgets
+  - bokeh
+  - colorcet
+  - ipywidgets
 
   # Dev dependencies
   - black
@@ -63,8 +67,8 @@ dependencies:
       - types-PyYAML
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
-<<<<<<< HEAD
-      - umap-learn
+      - grad-cam
+>>>>>>> origin/main
 =======
       - grad-cam
 >>>>>>> origin/main
