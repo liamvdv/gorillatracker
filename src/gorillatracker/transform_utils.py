@@ -1,6 +1,5 @@
 import torch
 from torchvision.transforms.functional import pad
-import torchvision.transforms as transforms
 
 
 class SquarePad:
@@ -16,7 +15,7 @@ class SquarePad:
             padding_left = (height - width) // 2
             padding_right = height - width - padding_left
             padding = (padding_left, 0, padding_right, 0)
-        
+
         # image = transforms.ToPILImage()(image)
         # image.save("img_before_pad.png")
         image = pad(image, padding, (0.485 * 255, 0.456 * 255, 0.406 * 255), "constant")

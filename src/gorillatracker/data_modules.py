@@ -6,8 +6,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader, SimpleDataLoader
-from gorillatracker.transform_utils import SquarePad
+from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,13 +76,13 @@ class NletDataModule(L.LightningDataModule):
 
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
-            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.dataset_transforms, self.training_transforms, self.model_transforms]))  # type: ignore
             return train.get_num_classes()  # type: ignore
         elif mode == "val":
-            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
             return val.get_num_classes()  # type: ignore
         elif mode == "test":
-            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
             return test.get_num_classes()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")

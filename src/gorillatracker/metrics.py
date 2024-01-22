@@ -24,6 +24,22 @@ import gorillatracker.type_helper as gtypes
 Runner = Any
 
 
+def cosine_similarity_matrix(combined_embeddings):
+    # Normalize the embeddings to have unit norm
+    normed_embeddings = combined_embeddings / combined_embeddings.norm(dim=1, keepdim=True)
+    
+    # Compute the cosine similarity matrix
+    similarity_matrix = torch.mm(normed_embeddings, normed_embeddings.t())
+    
+    # Since cosine similarity is a measure of similarity (not distance),
+    # you might want to convert it to distance. One common way is to use: distance = 1 - similarity
+    distance_matrix = 1 - similarity_matrix
+
+    distance_matrix.clamp_(min=0, max=2)
+    
+    return distance_matrix
+
+
 def log_as_wandb_table(embeddings_table: pd.DataFrame, run: Runner) -> None:
     tmp = embeddings_table.apply(
         lambda row: pd.concat([pd.Series([row["label"]]), pd.Series(row["embedding"])]), axis=1
@@ -56,7 +72,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_labels = []
         for batch in self.train_dataloader:
             images, labels = batch
-            anchor_images = images[0].cuda()
+            anchor_images = images[0].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             anchor_labels = labels[0]
@@ -97,6 +113,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                     "knn": partial(knn, k=1),
                     "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
                     "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                    "knn-with-train-cossim": partial(knn, k=1, use_train_embeddings=True, cos_sim=True),
+                    "knn5-with-train-cossim": partial(knn, k=5, use_train_embeddings=True, cos_sim=True),
                     "pca": pca,
                     "tsne": tsne,
                     "fc_layer": fc_layer,
@@ -216,7 +234,7 @@ def fc_layer(
     for param in model.parameters():
         param.requires_grad_(True)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay=0.001)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.001)
     criterion = torch.nn.CrossEntropyLoss()
     # acitvate gradients
     with torch.set_grad_enabled(True):
@@ -274,10 +292,12 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
+    cos_sim: bool = False,
 ) -> Dict[str, Any]:
     if use_train_embeddings:
+        print("Using train embeddings for knn")
         return knn_with_train(
-            val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels
+            val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels, cos_sim=cos_sim
         )
     else:
         return knn_naive(val_embeddings, val_labels, k=k)
@@ -289,6 +309,7 @@ def knn_with_train(
     k: int = 5,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
+    cos_sim: bool = False,
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -314,7 +335,12 @@ def knn_with_train(
     if num_classes < k:
         k = num_classes
 
-    distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+    distance_matrix = None
+    if not cos_sim:
+        distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+    else:
+        distance_matrix = cosine_similarity_matrix(combined_embeddings)
+        
     distance_matrix.fill_diagonal_(float("inf"))
 
     _, closest_indices = torch.topk(distance_matrix, k, largest=False)
