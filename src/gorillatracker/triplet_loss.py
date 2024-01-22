@@ -3,10 +3,9 @@ from typing import Callable, Literal, Tuple
 import torch
 import torch.nn.functional as F
 from sklearn.preprocessing import LabelEncoder
-from torch import Tensor, nn
+from torch import nn
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.type_helper import MergedLabels
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 

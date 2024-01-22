@@ -5,7 +5,7 @@ import yaml
 from wandb import agent, sweep
 
 # Set your default config
-config_path = "./cfgs/visiontransformer_cxl.yml"
+config_path = "./cfgs/swinv2_large_cxl.yml"
 # Assuming `config_path` is the path to your YAML config file
 assert os.path.isfile(config_path), f"Config file not found at {config_path}"
 assert config_path.endswith(".yml") or config_path.endswith(".yaml"), "Config file must be YAML"
@@ -32,7 +32,7 @@ sweep_config = {
     "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
 }
 # Initialize the sweep
-project_name = "Embedding-ViT-CXL-OpenSet"
+project_name = "Embedding-SwinV2Large-CXL-Open"
 entity = "gorillas"
 sweep_id = sweep(sweep=sweep_config, project=project_name, entity=entity)
 # Print the sweep ID directly
