@@ -30,16 +30,16 @@ from_scratch: False             # Train the model from scratch
 early_stopping_patience: 5      # Early stopping patience (number of epochs)
 embedding_size: 128
 dropout_p: 0.32
-=======
+
 early_stopping_patience: 3      # Early stopping patience (number of epochs)
 embedding_size: 256
->>>>>>> origin/main
+# Origin/main branch changes
 
 weight_decay: 0.2              # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
-<<<<<<< HEAD
+# HEAD branch changes
 
 margin: 1.0                   # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
