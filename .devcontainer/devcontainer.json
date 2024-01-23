@@ -51,6 +51,7 @@
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.
         "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind,ro",
         "source=/scratch2/gorillatracker/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
+        "source=/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", // cannot mount into data
         // NOTE(liamvdv): Allow write.
         "source=/scratch2/gorillatracker/models/,target=/workspaces/gorillatracker/models,type=bind"
     ],
