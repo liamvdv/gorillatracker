@@ -59,6 +59,7 @@ dependencies:
       - types-PyYAML
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
+      - grad-cam
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:
