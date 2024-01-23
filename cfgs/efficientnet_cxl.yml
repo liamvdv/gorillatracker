@@ -31,7 +31,7 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "online/soft"        # Loss mode (e.g., "online/hard", "online/soft", "offline/native"...)
+loss_mode: "online/soft"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")

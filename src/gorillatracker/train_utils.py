@@ -25,7 +25,7 @@ def _assert_tensor(x: Any) -> torch.Tensor:
     return x
 
 
-def get_data_module(  # TODO(rob2u): add simple data module
+def get_data_module(
     dataset_class_id: str,
     data_dir: str,
     batch_size: int,
