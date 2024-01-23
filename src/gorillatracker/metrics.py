@@ -43,11 +43,14 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_share: Log embeddings to wandb every n epochs.
     """
 
-    def __init__(self, every_n_val_epochs: int, wandb_run: Runner, dm: L.LightningDataModule) -> None:
+    def __init__(
+        self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule
+    ) -> None:
         super().__init__()
         self.logged_epochs: Set[int] = set()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
+        self.knn_with_train = knn_with_train
         self.run = wandb_run
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
@@ -89,23 +92,35 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
 
-            train_embeddings, train_labels = self._get_train_embeddings_for_knn(trainer)
-            # log metrics to wandb
+            train_embeddings, train_labels = (
+                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+            )
+
+            metrics = {
+                "knn5": partial(knn, k=5),
+                "knn": partial(knn, k=1),
+                "pca": pca,
+                "tsne": tsne,
+                "fc_layer": fc_layer,
+            }
+            metrics |= (
+                {
+                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                }
+                if self.knn_with_train
+                else {}
+            )
+            # log to wandb
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
-                metrics={
-                    "knn5": partial(knn, k=5),
-                    "knn": partial(knn, k=1),
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                    "pca": pca,
-                    "tsne": tsne,
-                    "fc_layer": fc_layer,
-                },  # "flda": flda_metric,
+                metrics=metrics,
                 train_embeddings=train_embeddings,
                 train_labels=train_labels,
             )
+        # clear the table where the embeddings are stored
+        pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
@@ -212,7 +227,7 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
-    assert len(val_embeddings) != 0, "No validation embeddings given."
+    assert len(val_embeddings) > 0, "No validation embeddings given."
 
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)

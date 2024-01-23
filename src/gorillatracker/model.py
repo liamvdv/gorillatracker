@@ -238,9 +238,9 @@ class BaseModule(L.LightningModule):
         self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
         if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-            self.log("val/loss", loss, on_epoch=True, sync_dist=True, prog_bar=True)
-            self.log("val/positive_distance", pos_dist, on_epoch=True)
-            self.log("val/negative_distance", neg_dist, on_epoch=True)
+            self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
+            self.log("val/positive_distance", pos_dist, on_step=True)
+            self.log("val/negative_distance", neg_dist, on_step=True)
             return loss
         else:
             return torch.tensor(0.0)
