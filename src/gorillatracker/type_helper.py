@@ -3,6 +3,7 @@ from typing import Any, Callable, Tuple, Union
 import cv2.typing as cvt
 import torch
 
+# Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
 Image = cvt.MatLike
 

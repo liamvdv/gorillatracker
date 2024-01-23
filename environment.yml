@@ -35,6 +35,7 @@ dependencies:
   - scikit-learn
 
   # Misc
+  - pydantic
   - jsonlines
   - zstandard
   - debugpy
