@@ -92,8 +92,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
 
-            train_embeddings, train_labels = self._get_train_embeddings_for_knn(trainer)
-            # log metrics to wandb
+            train_embeddings, train_labels = (
+                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+            )
 
             metrics = {
                 "knn5": partial(knn, k=5),
@@ -110,7 +111,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 if self.knn_with_train
                 else {}
             )
-
+            # log to wandb
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
@@ -118,8 +119,6 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 train_embeddings=train_embeddings,
                 train_labels=train_labels,
             )
-            # wandb.log({"epoch": current_epoch})
-            # for visibility also log the
         # clear the table where the embeddings are stored
         pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
