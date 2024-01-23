@@ -104,6 +104,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,
+        knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
     )

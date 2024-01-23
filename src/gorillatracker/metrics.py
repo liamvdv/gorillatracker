@@ -43,11 +43,14 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_share: Log embeddings to wandb every n epochs.
     """
 
-    def __init__(self, every_n_val_epochs: int, wandb_run: Runner, dm: L.LightningDataModule) -> None:
+    def __init__(
+        self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule
+    ) -> None:
         super().__init__()
         self.logged_epochs: Set[int] = set()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
+        self.knn_with_train = knn_with_train
         self.run = wandb_run
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
@@ -91,18 +94,27 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
             train_embeddings, train_labels = self._get_train_embeddings_for_knn(trainer)
             # log metrics to wandb
+
+            metrics = {
+                "knn5": partial(knn, k=5),
+                "knn": partial(knn, k=1),
+                "pca": pca,
+                "tsne": tsne,
+                "fc_layer": fc_layer,
+            }
+            metrics |= (
+                {
+                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                }
+                if self.knn_with_train
+                else {}
+            )
+
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
-                metrics={
-                    "knn5": partial(knn, k=5),
-                    "knn": partial(knn, k=1),
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                    "pca": pca,
-                    "tsne": tsne,
-                    "fc_layer": fc_layer,
-                },  # "flda": flda_metric,
+                metrics=metrics,
                 train_embeddings=train_embeddings,
                 train_labels=train_labels,
             )
@@ -216,7 +228,7 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
-    assert len(val_embeddings) == 0, "No validation embeddings given."
+    assert len(val_embeddings) > 0, "No validation embeddings given."
 
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
@@ -310,7 +322,7 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
-) -> Dict[str, torch.Number]:
+) -> Dict[str, Any]:
     if use_train_embeddings:
         return knn_with_train(
             val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels
@@ -325,7 +337,7 @@ def knn_with_train(
     k: int = 5,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
-) -> Dict[str, torch.Number]:
+) -> Dict[str, Any]:
     """
     Algorithmic Description:
     1. Calculate the distance matrix between all embeddings (len(embeddings) x len(embeddings))
@@ -386,7 +398,7 @@ def knn_with_train(
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, torch.Number]:
+def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, Any]:
     num_classes = np.max(val_labels).item() + 1
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")

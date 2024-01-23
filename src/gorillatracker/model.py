@@ -199,7 +199,7 @@ class BaseModule(L.LightningModule):
         )
         embeddings = self.forward(vec)
 
-        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors], images[0])  # type: ignore
+        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
         loss, pos_dist, neg_dist = self.triplet_loss(embeddings, flat_labels)  # type: ignore
         self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
         self.log("val/positive_distance", pos_dist, on_step=True)
