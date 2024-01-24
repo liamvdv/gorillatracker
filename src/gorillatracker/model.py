@@ -41,7 +41,7 @@ def warmup_lr(
         decay = (start_lr / initial_lr) ** (1 / warmup_epochs)
         return decay**epoch
     elif warmup_mode == "constant":
-        return initial_lr
+        return 1.0
     else:
         raise ValueError(f"Unknown warmup_mode {warmup_mode}")
 
@@ -76,7 +76,7 @@ def schedule_lr(
     elif lr_schedule_mode == "exponential":
         return exponential_lr(epochs, n_epochs, initial_lr, start_lr, end_lr)
     elif lr_schedule_mode == "constant":
-        return initial_lr
+        return 1.0
     else:
         raise ValueError(f"Unknown lr_schedule_mode {lr_schedule_mode}")
 
