@@ -61,7 +61,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_labels = []
         for batch in self.train_dataloader:
             images, labels = batch
-            anchor_images = images[0].cuda()
+            anchor_images = images[0].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             anchor_labels = labels[0]

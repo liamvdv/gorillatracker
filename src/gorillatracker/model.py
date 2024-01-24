@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Callable, Literal, Type
+from typing import Any, Callable, Literal, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -23,7 +23,8 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.triplet_loss import get_triplet_loss
+from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
+from gorillatracker.losses.triplet_loss import get_loss
 
 
 def warmup_lr(
@@ -41,7 +42,7 @@ def warmup_lr(
         decay = (start_lr / initial_lr) ** (1 / warmup_epochs)
         return decay**epoch
     elif warmup_mode == "constant":
-        return initial_lr
+        return 1.0
     else:
         raise ValueError(f"Unknown warmup_mode {warmup_mode}")
 
@@ -76,7 +77,7 @@ def schedule_lr(
     elif lr_schedule_mode == "exponential":
         return exponential_lr(epochs, n_epochs, initial_lr, start_lr, end_lr)
     elif lr_schedule_mode == "constant":
-        return initial_lr
+        return 1.0
     else:
         raise ValueError(f"Unknown lr_schedule_mode {lr_schedule_mode}")
 
@@ -123,7 +124,14 @@ class BaseModule(L.LightningModule):
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         margin: float = 0.5,
+        s: float = 64.0,
+        delta_t: int = 200,
+        mem_bank_start_epoch: int = 2,
+        lambda_membank: float = 0.5,
         embedding_size: int = 256,
+        batch_size: int = 32,
+        num_classes: Tuple[int, int, int] = (0, 0, 0),
+        accelerator: str = "cpu",
     ) -> None:
         super().__init__()
 
@@ -153,12 +161,41 @@ class BaseModule(L.LightningModule):
         ##### Create Table embeddings_table
         self.embeddings_table_columns = ["label", "embedding"]
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
-
-        # TODO(rob2u): rename loss mode
-        self.triplet_loss = get_triplet_loss(loss_mode, margin)
+        self.loss_module_train = get_loss(
+            loss_mode,
+            margin=self.margin,
+            embedding_size=self.embedding_size,
+            batch_size=batch_size,
+            delta_t=delta_t,
+            s=s,
+            num_classes=num_classes[0],
+            mem_bank_start_epoch=mem_bank_start_epoch,
+            lambda_membank=lambda_membank,
+            accelerator=accelerator,
+        )
+        self.loss_module_val = get_loss(
+            loss_mode,
+            margin=self.margin,
+            embedding_size=self.embedding_size,
+            batch_size=batch_size,
+            delta_t=delta_t,
+            s=s,
+            num_classes=num_classes[1],
+            mem_bank_start_epoch=mem_bank_start_epoch,
+            lambda_membank=lambda_membank,
+            accelerator=accelerator,
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
+
+    def on_train_epoch_start(self) -> None:
+        if (
+            isinstance(self.loss_module_train, VariationalPrototypeLearning)
+            and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
+        ):
+            self.loss_module_train.set_using_memory_bank(True)
+            logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         images, labels = batch
@@ -167,7 +204,7 @@ class BaseModule(L.LightningModule):
         flat_labels = (
             torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
         )
-        loss, pos_dist, neg_dist = self.triplet_loss(embeddings, flat_labels)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -200,11 +237,43 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
 
         self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
-        loss, pos_dist, neg_dist = self.triplet_loss(embeddings, flat_labels)  # type: ignore
-        self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
-        self.log("val/positive_distance", pos_dist, on_step=True)
-        self.log("val/negative_distance", neg_dist, on_step=True)
-        return loss
+        if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
+            self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
+            self.log("val/positive_distance", pos_dist, on_step=True)
+            self.log("val/negative_distance", neg_dist, on_step=True)
+            return loss
+        else:
+            return torch.tensor(0.0)
+
+    def on_validation_epoch_end(self) -> None:
+        # calculate loss after all embeddings have been processed
+        if isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+            logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
+
+            # get weights for all classes by averaging over all embeddings
+            class_weights = torch.zeros(self.loss_module_val.num_classes, self.embedding_size).to(self.device)
+            for label in range(self.loss_module_val.num_classes):
+                class_weights[label] = torch.tensor(
+                    self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()
+                ).mean(dim=0)
+                if torch.isnan(class_weights[label]).any():
+                    class_weights[label] = 0.0
+
+            # calculate loss for all embeddings
+            self.loss_module_val.set_weights(class_weights)
+
+            losses = []
+            for _, row in self.embeddings_table.iterrows():
+                loss, _, _ = self.loss_module_val(
+                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)
+                )
+                losses.append(loss)
+            loss = torch.tensor(losses).mean()
+            self.log("val/loss", loss, sync_dist=True)
+
+        # clear the table where the embeddings are stored
+        self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)  # reset embeddings table
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         if self.global_rank == 0:
@@ -286,8 +355,15 @@ class EfficientNetV2Wrapper(BaseModule):
             if is_from_scratch
             else efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
         )
+        # self.model.classifier = torch.nn.Sequential(
+        #     torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
+        # )
+        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.classifier = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.classifier[1].in_features),
+            torch.nn.Dropout(p=dropout_p),
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
         )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
@@ -315,7 +391,14 @@ class ConvNeXtV2BaseWrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("convnextv2_base", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         return self.model.stages[-1].blocks[-1].conv_dw
@@ -341,7 +424,14 @@ class ConvNeXtV2HugeWrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("convnextv2_huge", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -355,7 +445,14 @@ class VisionTransformerWrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
@@ -397,7 +494,14 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -425,7 +529,14 @@ class VisionTransformerClipWrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_base_patch16_clip_224.metaclip_2pt5b", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -458,8 +569,12 @@ class ConvNextClipWrapper(BaseModule):
             if kwargs.get("from_scratch", False)
             else timm.create_model(model_name, pretrained=True)
         )
+        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
         )
 
     @classmethod
@@ -488,7 +603,14 @@ class ConvNextWrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("convnext_base", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -521,8 +643,15 @@ class SwinV2BaseWrapper(BaseModule):
             if kwargs.get("from_scratch", False)
             else timm.create_model(swin_model, pretrained=True)
         )
+        # self.model.head.fc = torch.nn.Sequential(
+        #     torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+        # ) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
         )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
@@ -576,8 +705,15 @@ class SwinV2LargeWrapper(BaseModule):
             if kwargs.get("from_scratch", False)
             else timm.create_model(swin_model, pretrained=True)
         )
-        self.model.head.fc = torch.nn.Linear(
-            in_features=self.model.head.fc.in_features, out_features=self.embedding_size
+        # self.model.head.fc = torch.nn.Linear(
+        #     in_features=self.model.head.fc.in_features, out_features=self.embedding_size
+        # ) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.head.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
         )
 
     @classmethod
@@ -608,7 +744,14 @@ class ResNet18Wrapper(BaseModule):
         self.model = (
             resnet18() if kwargs.get("from_scratch", False) else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
         )
-        self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
+        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.layer4[-1]
@@ -637,7 +780,14 @@ class ResNet152Wrapper(BaseModule):
         self.model = (
             resnet152() if kwargs.get("from_scratch", False) else resnet152(weights=ResNet152_Weights.IMAGENET1K_V1)
         )
-        self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
+        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.layer4[-1]
@@ -666,7 +816,14 @@ class ResNet50Wrapper(BaseModule):
         self.model = (
             resnet50() if kwargs.get("from_scratch", False) else resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
         )
-        self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size)
+        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.fc.in_features),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -689,7 +846,14 @@ class ResNet50DinoV2Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
-        self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size)
+        # self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size) # TODO
+        dropout_p = kwargs.get("dropout_p", 0.0)
+        self.last_linear = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(2048),
+            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Linear(in_features=2048, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         outputs = self.model(x)
