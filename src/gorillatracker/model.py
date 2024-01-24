@@ -161,8 +161,6 @@ class BaseModule(L.LightningModule):
         ##### Create Table embeddings_table
         self.embeddings_table_columns = ["label", "embedding"]
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
-
-        # TODO(rob2u): rename loss mode
         self.loss_module_train = get_loss(
             loss_mode,
             margin=self.margin,
@@ -174,6 +172,7 @@ class BaseModule(L.LightningModule):
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
+            
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -195,7 +194,7 @@ class BaseModule(L.LightningModule):
         if (
             isinstance(self.loss_module_train, VariationalPrototypeLearning)
             and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
-        ):  # TODO
+        ):
             self.loss_module_train.set_using_memory_bank(True)
             logger.info("Using memory bank")
 
@@ -248,7 +247,7 @@ class BaseModule(L.LightningModule):
         else:
             return torch.tensor(0.0)
 
-    def on_validation_epoch_end(self) -> None:  # TODO (rob2u): test + refactor
+    def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
         if isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
