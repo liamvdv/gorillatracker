@@ -131,6 +131,7 @@ class BaseModule(L.LightningModule):
         embedding_size: int = 256,
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
+        accelerator: str = "cpu",
     ) -> None:
         super().__init__()
 
@@ -172,6 +173,8 @@ class BaseModule(L.LightningModule):
             num_classes=num_classes[0],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
+            accelerator=accelerator,
+            
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -183,6 +186,7 @@ class BaseModule(L.LightningModule):
             num_classes=num_classes[1],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
+            accelerator=accelerator,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
