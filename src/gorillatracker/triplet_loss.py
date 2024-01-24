@@ -304,26 +304,25 @@ class TripletLossOffline(nn.Module):
         self.margin = margin
 
     def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
-        """
-        Compute loss.
-
-        Args:
-          embeddings: Batch of embeddings, e.g., output of the encoder. shape: (batch_size, embedding_dim)
-          labels: Batch of integer labels associated with embeddings. shape: (batch_size,)
-
-        Returns:
-          Scalar loss value.
-        """
-        # NOTE(rob2u): custom implementation to return pos/neg distances.
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
+        return triplet_margin_loss_with_distances(anchors, positives, negatives, margin=self.margin)
 
-        distance_positive = torch.functional.norm(anchors - positives, dim=1)
-        distance_negative = torch.functional.norm(anchors - negatives, dim=1)
-        losses = torch.relu(distance_positive - distance_negative + self.margin).mean()
-        return losses.mean(), distance_positive.mean(), distance_negative.mean()
+def triplet_margin_loss_with_distances(anchor: torch.Tensor, positive: torch.Tensor, negative: torch.Tensor, margin: float = 1.0, p: float = 2, eps: float = 1e-6, swap: bool = False, reduction: str = "mean") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    positive_distances = F.pairwise_distance(anchor, positive, p, eps)
+    negative_distances = F.pairwise_distance(anchor, negative, p, eps)
 
+    loss = torch.clamp(positive_distances - negative_distances + margin, min=0.0)
+    if reduction == "mean":
+        loss = torch.mean(loss)
+    elif reduction == "sum":
+        loss = torch.sum(loss)
+
+    return loss, torch.mean(positive_distances), torch.mean(negative_distances)
+
+def round_tensor(tensor: torch.Tensor, decimal_places: int = 3) -> torch.Tensor:
+    return torch.round(tensor * 10 ** decimal_places) / (10 ** decimal_places)
 
 class TripletLossOfflineNative(nn.Module):
     """
@@ -341,8 +340,15 @@ class TripletLossOfflineNative(nn.Module):
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
+        loss = self.loss(anchors, positives, negatives)
+    
+        # NOTE(liamvdv): This code is used to validate our custom implementation.
+        # TODO(liamvdv): Shift all offline/native to offline after 2024-02-24.
+        check_loss, _, _ = triplet_margin_loss_with_distances(anchors, positives, negatives, margin=self.margin)
+        assert round_tensor(loss, 3) == round_tensor(check_loss, 3), f"Torch native loss {loss} does not match our custom loss {check_loss}" # NOTE(liamvdv): reach out to me 
+        
         NO_VALUE = torch.tensor([-1], dtype=torch.float32)
-        return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
+        return loss, NO_VALUE, NO_VALUE
 
 
 def get_triplet_loss(loss_mode: str, margin: float) -> Callable[[torch.Tensor, gtypes.BatchLabel], LossPosNegDist]:
