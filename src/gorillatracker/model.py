@@ -174,7 +174,6 @@ class BaseModule(L.LightningModule):
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
-            
         )
         self.loss_module_val = get_loss(
             loss_mode,

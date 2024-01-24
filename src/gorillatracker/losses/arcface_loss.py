@@ -15,7 +15,14 @@ class ArcFaceLoss(torch.nn.Module):
     """ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):"""
 
     def __init__(
-        self, embedding_size: int, num_classes: int, s: float = 64.0, margin: float = 0.5, accelerator: str = "cpu", *args: Any, **kwargs: Any
+        self,
+        embedding_size: int,
+        num_classes: int,
+        s: float = 64.0,
+        margin: float = 0.5,
+        accelerator: str = "cpu",
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super(ArcFaceLoss, self).__init__(*args, **kwargs)
         self.s = s
