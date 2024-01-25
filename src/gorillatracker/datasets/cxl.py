@@ -55,10 +55,6 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         # new
         labels_string = [label for _, label in samples]
         labels_int = cast_label_to_int(labels_string)
-<<<<<<< HEAD
-        self.mapping = dict(zip(labels_int, labels_string))
-=======
->>>>>>> origin/main
         self.samples = list(zip([path for path, _ in samples], labels_int))
 
         self.transform = transform
@@ -93,8 +89,62 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def get_num_classes(self) -> int:
         labels = [label for _, label in self.samples]
         return len(set(labels))
+<<<<<<< HEAD
+        self.mapping = dict(zip(labels_int, labels_string))
+=======
+>>>>>>> origin/main
+        self.samples = list(zip([path for path, _ in samples], labels_int))
+
+        self.transform = transform
+
+        self.partition = partition
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+        img_path, label = self.samples[idx]
+        img = Image.open(img_path)
+        if self.transform:
+            img = self.transform(img)
+
+        # save img
+        # img2 = transforms.ToPILImage()(img)
+        # img2.save(f"img_{self.partition}.png")
+        return img, label
+
+    @classmethod
+    def get_transforms(cls) -> gtypes.Transform:
+        return transforms.Compose(
+            [
+                # Uniform input, you may choose higher/lower sizes.
+                SquarePad(),
+                # transforms.ToTensor(),
+            ]
+        )
+
+    def get_num_classes(self) -> int:
+        labels = [label for _, label in self.samples]
+        return len(set(labels))
 
 
+if __name__ == "__main__":
+    cxl = CXLDataset(
+        "data/DO-NOT-USE-PING-BEN-IF-IN-DOUBT-joined_splits/cxl_face-openset=True_0",
+        "train",
+        CXLDataset.get_transforms(),
+    )
+    image = cxl[0][0]
+    transformations = transforms.Compose(
+        [
+            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms_v2.RandomHorizontalFlip(p=0.5),
+            transforms.RandomErasing(p=1, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+        ]
+    )
+    image = transformations(image)
+    pil_image = transforms.ToPILImage()(image)
+    pil_image.save("test.png")
 if __name__ == "__main__":
     cxl = CXLDataset(
         "data/DO-NOT-USE-PING-BEN-IF-IN-DOUBT-joined_splits/cxl_face-openset=True_0",
