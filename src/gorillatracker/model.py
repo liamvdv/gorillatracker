@@ -246,7 +246,7 @@ class BaseModule(L.LightningModule):
         )
         embeddings = self.forward(vec)
 
-        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
+        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors], images[0])  # type: ignore
         if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)

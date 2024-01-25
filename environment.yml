@@ -41,9 +41,6 @@ dependencies:
   - debugpy
   - tqdm
   - ipykernel
-  - bokeh
-  - colorcet
-  - ipywidgets
 
   # Dev dependencies
   - black
@@ -64,6 +61,9 @@ dependencies:
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
       - umap-learn
+      - bokeh
+      - colorcet
+      - ipywidgets
       - grad-cam
 
 # Non-standard section listing target platforms for conda-lock:
