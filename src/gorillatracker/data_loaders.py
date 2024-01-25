@@ -99,9 +99,11 @@ class ToNthDataset(Dataset[Tuple[Tuple[T, ...], Tuple[R, ...]]], Generic[T, R]):
     def __len__(self) -> int:
         return len(self.dataset)  # type: ignore
 
-    def __getitem__(self, idxs: Union[List[int], torch.Tensor]) -> Tuple[Tuple[T, ...], Tuple[R, ...]]:
+    def __getitem__(self, idxs: Union[int, List[int], torch.Tensor]) -> Tuple[Tuple[T, ...], Tuple[R, ...]]:
         if torch.is_tensor(idxs):  # type: ignore
             idxs = idxs.tolist()  # type: ignore
+        if isinstance(idxs, int):
+            idxs = [idxs]
 
         xs, ys = [], []
         for idx in idxs:
@@ -237,3 +239,10 @@ def QuadletDataLoader(
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+
+
+def SimpleDataLoader(
+    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+) -> gtypes.BatchSimpleDataLoader:
+    final_dataset = ToNthDataset(dataset)
+    return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size)

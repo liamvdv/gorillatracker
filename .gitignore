@@ -1,4 +1,5 @@
 data/*
+video_data/*
 !data/mock/
 data/mock/tokenized/*
 logs/
