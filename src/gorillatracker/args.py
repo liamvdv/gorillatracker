@@ -49,6 +49,7 @@ class TrainingArgs:
     initial_lr: float = field(default=1e-5)
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
+    stepwise_schedule: bool = field(default=False)
 
     margin: float = field(default=0.5)
     loss_mode: Literal["offline", "offline/native", "online/soft", "online/hard", "online/semi-hard"] = field(

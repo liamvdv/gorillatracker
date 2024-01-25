@@ -40,6 +40,7 @@ warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is per
 initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
 start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+stepwise_schedule: True         # Use stepwise schedule with lr change after each validation
 
 batch_size: 12                # Training batch size
 grad_clip: 1.0                   # Gradient clipping value

@@ -118,6 +118,8 @@ class BaseModule(L.LightningModule):
         initial_lr: float,
         start_lr: float,
         end_lr: float,
+        stepwise_schedule: bool,
+        lr_interval: int,
         beta1: float,
         beta2: float,
         epsilon: float = 1e-8,
@@ -139,6 +141,9 @@ class BaseModule(L.LightningModule):
         self.initial_lr = initial_lr
         self.start_lr = start_lr
         self.end_lr = end_lr
+        self.stepwise_schedule = stepwise_schedule
+        self.lr_interval = lr_interval
+        
 
         self.beta1 = beta1
         self.beta2 = beta2
@@ -237,8 +242,22 @@ class BaseModule(L.LightningModule):
                 optimizer=optimizer,
                 lr_lambda=lambda_schedule,
             )
-
-            return {"optimizer": optimizer, "lr_scheduler": lambda_scheduler}
+            if self.stepwise_schedule:
+                lr_scheduler = {
+                    "scheduler": lambda_scheduler,
+                    "interval": "step",
+                    "frequency": self.lr_interval,
+                }
+            else:
+                lr_scheduler = {
+                    "scheduler": lambda_scheduler, 
+                    "interval": "epoch"
+                }
+            
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": lr_scheduler,
+            }
 
         else:
             plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
