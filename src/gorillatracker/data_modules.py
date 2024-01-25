@@ -1,12 +1,12 @@
 import logging
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Literal, Optional, Type
 
 import lightning as L
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_loaders import QuadletDataLoader, TripletDataLoader
+from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -72,6 +72,19 @@ class NletDataModule(L.LightningDataModule):
         # NOTE(liamvdv): used to clean-up when the run is finished
         pass
 
+    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
+        if mode == "train":
+            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            return train.get_num_classes()  # type: ignore
+        elif mode == "val":
+            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            return val.get_num_classes()  # type: ignore
+        elif mode == "test":
+            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            return test.get_num_classes()  # type: ignore
+        else:
+            raise ValueError(f"unknown mode '{mode}'")
+
 
 class TripletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
@@ -81,3 +94,8 @@ class TripletDataModule(NletDataModule):
 class QuadletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
         return QuadletDataLoader
+
+
+class SimpleDataModule(NletDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
+        return SimpleDataLoader

@@ -55,7 +55,10 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         # new
         labels_string = [label for _, label in samples]
         labels_int = cast_label_to_int(labels_string)
+<<<<<<< HEAD
         self.mapping = dict(zip(labels_int, labels_string))
+=======
+>>>>>>> origin/main
         self.samples = list(zip([path for path, _ in samples], labels_int))
 
         self.transform = transform
