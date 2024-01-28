@@ -218,9 +218,11 @@ class BaseModule(L.LightningModule):
 
         assert len(self.embeddings_table_columns) == 2
         data = {
-            self.embeddings_table_columns[0]: anchor_labels.tolist()  # type: ignore
-            if torch.is_tensor(anchor_labels)  # type: ignore
-            else anchor_labels,
+            self.embeddings_table_columns[0]: (
+                anchor_labels.tolist()  # type: ignore
+                if torch.is_tensor(anchor_labels)  # type: ignore
+                else anchor_labels
+            ),
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
         }
 
