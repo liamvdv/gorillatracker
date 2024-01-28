@@ -26,6 +26,7 @@ dependencies:
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
+  - facenet_pytorch
 
   # Good to have
   - numpy
