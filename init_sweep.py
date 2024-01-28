@@ -70,23 +70,6 @@ sweeps = [
     },
 ]
 
-sweeps = [
-    {
-        "project_name": "Embedding-FaceNet-CXL-OpenSet",
-        "entity": "gorillas",
-        "config_path": "./cfgs/facenet_cxl.yml",
-        "parameters": {
-            "loss_mode": {"values": ["offline/native", "online/soft"]},
-            "batch_size": {"values": [14, 28]},
-            "embedding_size": {"values": [128, 256]},
-            "weight_decay": {"values": [0.2, 0.5]},
-            "initial_lr": {"values": [1e-7, 1e-5]},
-            "start_lr": {"values": [1e-7, 1e-5]},
-            "end_lr": {"values": [1e-7, 1e-5]},
-        },
-    }
-]
-
 check_sweep_configs(sweeps)
 
 for current_sweep in sweeps:
