@@ -7,6 +7,7 @@ import pandas as pd
 import timm
 import torch
 import torchvision.transforms.v2 as transforms_v2
+from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
 from torch.optim import AdamW
 from torchvision import transforms
@@ -21,7 +22,6 @@ from torchvision.models import (
     resnet152,
 )
 from transformers import ResNetModel
-from facenet_pytorch import InceptionResnetV1
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
@@ -884,8 +884,8 @@ class FaceNetWrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = InceptionResnetV1(pretrained='vggface2')
-        
+        self.model = InceptionResnetV1(pretrained="vggface2")
+
         dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.last_linear = torch.nn.Sequential(
             torch.nn.BatchNorm1d(1792),
@@ -911,6 +911,7 @@ class FaceNetWrapper(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
+
 
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {
