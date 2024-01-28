@@ -26,7 +26,6 @@ dependencies:
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
-  - facenet_pytorch
 
   # Good to have
   - numpy
@@ -61,6 +60,8 @@ dependencies:
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
       - grad-cam
+      - facenet_pytorch
+
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:
