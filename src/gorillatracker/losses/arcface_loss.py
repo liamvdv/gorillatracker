@@ -152,7 +152,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
         self.memory_bank[
             self.memory_bank_ptr * self.batch_size : (self.memory_bank_ptr + 1) * self.batch_size
-        ] = embeddings
+        ] = (embeddings)
         self.memory_bank_labels[
             self.memory_bank_ptr * self.batch_size : (self.memory_bank_ptr + 1) * self.batch_size
         ] = labels
