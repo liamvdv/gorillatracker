@@ -44,7 +44,7 @@ def get_data_module(
     if video_data:
         base = VideoTripletDataModule
     else:
-        base = QuadletDataModule if loss_mode.startswith("online") else None
+        base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
         base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
         base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
