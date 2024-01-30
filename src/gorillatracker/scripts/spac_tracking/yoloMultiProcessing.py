@@ -104,9 +104,9 @@ def predict_video(
 
     # grabbing parameters from config
 
-    post_process_functions: List[
-        Callable[[List[ultralytics.engine.results.Results], str], None]
-    ] = config.post_process_functions
+    post_process_functions: List[Callable[[List[ultralytics.engine.results.Results], str], None]] = (
+        config.post_process_functions
+    )
     yolo_args = config.yolo_args
     checkpoint_path = config.checkpoint_path
     # file_name = os.path.basename(input_path)
