@@ -11,9 +11,9 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-SwinV2Large--CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "137-swin-train-larger-model" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["large"]            # WandB tags for experiment tracking
+project_name: "Embedding-SwinV2Large-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "143-explore-regularisierung-l2sp" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["sweep"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2LargeWrapper"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -38,7 +38,7 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "offline/native"        # Loss mode (e.g., "softmax", "triplet", "softmax/triplet", "softmax/vpl", "triplet/vpl", "softmax/triplet/vpl")
+loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 
 learning_rate: 1e-5             # Learning rate

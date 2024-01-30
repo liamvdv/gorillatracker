@@ -4,7 +4,6 @@ This means that the train set does not contain any images that by accident conta
 The exact same applies to the val set.
 """
 
-
 import logging
 import os
 import shutil

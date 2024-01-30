@@ -80,6 +80,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         lambda_membank=args.lambda_membank,
         num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
         dropout_p=args.dropout_p,
+        accelerator=args.accelerator,
     )
 
     if args.saved_checkpoint_path is not None:
@@ -114,6 +115,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,
+        knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
     )

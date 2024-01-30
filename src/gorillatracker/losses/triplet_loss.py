@@ -356,6 +356,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             num_classes=kw_args["num_classes"],
             s=kw_args["s"],
             margin=kw_args["margin"],
+            accelerator=kw_args["accelerator"],
         ),  # TODO
         "softmax/vpl": VariationalPrototypeLearning(
             embedding_size=kw_args["embedding_size"],
@@ -365,6 +366,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             margin=kw_args["margin"],
             delta_t=kw_args["delta_t"],
             mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+            accelerator=kw_args["accelerator"],
         ),  # TODO
     }
     return loss_modes[loss_mode]
