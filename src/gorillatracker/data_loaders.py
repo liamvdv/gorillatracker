@@ -292,11 +292,13 @@ def QuadletDataLoader(
     final_dataset = ToNthDataset(label_sorted_dataset)
     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
 
+
 def SimpleDataLoader(
     dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
 ) -> gtypes.BatchSimpleDataLoader:
     final_dataset = ToNthDataset(dataset)
     return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size)
+
 
 def VideoTripletDataLoader(
     dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, data_dir: str, shuffle: bool = True

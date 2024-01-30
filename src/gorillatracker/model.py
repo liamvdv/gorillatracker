@@ -152,7 +152,6 @@ class BaseModule(L.LightningModule):
         self.end_lr = end_lr
         self.stepwise_schedule = stepwise_schedule
         self.lr_interval = lr_interval
-        
 
         self.beta1 = beta1
         self.beta2 = beta2
@@ -321,11 +320,8 @@ class BaseModule(L.LightningModule):
                     "frequency": self.lr_interval,
                 }
             else:
-                lr_scheduler = {
-                    "scheduler": lambda_scheduler, 
-                    "interval": "epoch"
-                }
-            
+                lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}
+
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": lr_scheduler,
