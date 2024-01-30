@@ -3,19 +3,19 @@
 {
     "name": "bp_devcontainer:1.0.2",
     // Put your own built docker image here
-    "image": "liamvdv/gorillatracker-ubuntu-dev",
+    //"image": "liamvdv/gorillatracker-ubuntu-dev",
     //-------------------------------------------------
     // ---- Alternative: let VS Code build the image---
     // ------------------------------------------------
-    // "build": {
-    //     // Sets the run context to one level up instead of the .devcontainer folder.
-    //     "context": "..",
-    //     // Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
-    //     "dockerfile": "../Dockerfile",
-    //     "args": {
-    //         "OS_SELECTOR": "ubuntu" // force ubuntu base OS for devcontainer, necessary if you want to use "features"
-    //     }
-    // },
+    "build": {
+        // Sets the run context to one level up instead of the .devcontainer folder.
+        "context": "..",
+        // Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
+        "dockerfile": "../Dockerfile",
+        "args": {
+            "OS_SELECTOR": "ubuntu" // force ubuntu base OS for devcontainer, necessary if you want to use "features"
+        }
+    },
     ////////////////////////////////////////////////////////////
     // -----------------------------------
     // CUSTOMIZE SOME THINGS BELOW HERE !!!!!
