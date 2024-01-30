@@ -4,6 +4,7 @@ from typing import List, Literal, Optional, Tuple, Union
 import torch
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
+from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -28,6 +29,12 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
     return samples
 
 
+def cast_label_to_int(labels: List[str]) -> List[int]:
+    le = LabelEncoder()
+    le.fit(labels)
+    return le.transform(labels)
+
+
 class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def __init__(
         self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
@@ -43,13 +50,19 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
                     ...
         """
         dirpath = data_dir / Path(partition)
-        self.samples = get_samples(dirpath)
+        samples = get_samples(dirpath)
+
+        # new
+        labels_string = [label for _, label in samples]
+        labels_int = cast_label_to_int(labels_string)
+        self.samples = list(zip([path for path, _ in samples], labels_int))
+
         self.transform = transform
 
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
@@ -66,6 +79,10 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
                 transforms.ToTensor(),
             ]
         )
+
+    def get_num_classes(self) -> int:
+        labels = [label for _, label in self.samples]
+        return len(set(labels))
 
 
 if __name__ == "__main__":

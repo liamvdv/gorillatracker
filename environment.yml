@@ -60,6 +60,8 @@ dependencies:
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
       - grad-cam
+      - facenet_pytorch
+
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:

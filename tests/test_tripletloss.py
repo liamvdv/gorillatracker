@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 from torch.nn import TripletMarginLoss
 
-from gorillatracker.triplet_loss import TripletLossOffline, TripletLossOnline
+from gorillatracker.losses.triplet_loss import TripletLossOffline, TripletLossOnline
 
 
 def calc_loss_of_triplet(

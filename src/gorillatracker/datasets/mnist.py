@@ -28,7 +28,7 @@ class MNISTDataset(Dataset[Tuple[torch.Tensor, int]]):
                 MNIST(data_dir, train=True, download=True, transform=transform), [0.8, 0.2]
             )
         elif partition == "test":
-            self.test = MNIST(data_dir, train=False, download=True, trainsform=transform)
+            self.test = MNIST(data_dir, train=False, download=True, transform=transform)
         else:
             raise ValueError(f"unknown partition '{partition}'")
 
@@ -37,6 +37,9 @@ class MNISTDataset(Dataset[Tuple[torch.Tensor, int]]):
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         return getattr(self, self.partition)[idx]
+
+    def get_num_classes(self) -> int:
+        return 10
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:

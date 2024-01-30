@@ -1,4 +1,4 @@
-from typing import Callable, Literal, Tuple
+from typing import Any, Callable, Literal
 
 import torch
 import torch.nn.functional as F
@@ -6,10 +6,9 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
-
-LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
 
 def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
@@ -209,7 +208,7 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -303,7 +302,7 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
         """
         Compute loss.
 
@@ -337,7 +336,7 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
@@ -345,13 +344,30 @@ class TripletLossOfflineNative(nn.Module):
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
 
 
-def get_triplet_loss(loss_mode: str, margin: float) -> Callable[[torch.Tensor, gtypes.BatchLabel], LossPosNegDist]:
+def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
     loss_modes = {
-        "online/hard": TripletLossOnline(margin=margin, mode="hard"),
-        "online/semi-hard": TripletLossOnline(margin=margin, mode="semi-hard"),
-        "online/soft": TripletLossOnline(margin=margin, mode="soft"),
-        "offline": TripletLossOffline(margin=margin),
-        "offline/native": TripletLossOfflineNative(margin=margin),
+        "online/hard": TripletLossOnline(mode="hard", margin=kw_args["margin"]),
+        "online/semi-hard": TripletLossOnline(mode="semi-hard", margin=kw_args["margin"]),
+        "online/soft": TripletLossOnline(mode="soft", margin=kw_args["margin"]),
+        "offline": TripletLossOffline(margin=kw_args["margin"]),
+        "offline/native": TripletLossOfflineNative(margin=kw_args["margin"]),
+        "softmax/arcface": ArcFaceLoss(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+            accelerator=kw_args["accelerator"],
+        ),  # TODO
+        "softmax/vpl": VariationalPrototypeLearning(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            batch_size=kw_args["batch_size"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+            delta_t=kw_args["delta_t"],
+            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+            accelerator=kw_args["accelerator"],
+        ),  # TODO
     }
     return loss_modes[loss_mode]
 
