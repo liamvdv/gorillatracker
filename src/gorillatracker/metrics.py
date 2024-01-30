@@ -325,8 +325,12 @@ def knn(
     if use_train_embeddings:
         print("Using train embeddings for knn")
         return knn_with_train(
-            val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels,
-            )
+            val_embeddings,
+            val_labels,
+            k=k,
+            train_embeddings=train_embeddings,
+            train_labels=train_labels,
+        )
     else:
         return knn_naive(val_embeddings, val_labels, k=k)
 
@@ -363,7 +367,7 @@ def knn_with_train(
         k = num_classes
 
     distance_matrix = pairwise_euclidean_distance(combined_embeddings)
-        
+
     distance_matrix.fill_diagonal_(float("inf"))
 
     _, closest_indices = torch.topk(distance_matrix, k, largest=False)

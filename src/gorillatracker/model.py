@@ -733,7 +733,7 @@ class SwinV2LargeWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Compose(
@@ -754,6 +754,7 @@ class SwinV2LargeWrapper(BaseModule):
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
+
 
 class ResNet18Wrapper(BaseModule):
     def __init__(  # type: ignore
