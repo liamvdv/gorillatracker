@@ -34,6 +34,8 @@ dependencies:
   - pandas
   - seqeval
   - scikit-learn
+  - matplotlib
+  - seaborn
 
   # Misc
   - jsonlines

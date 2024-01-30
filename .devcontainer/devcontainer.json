@@ -3,19 +3,19 @@
 {
     "name": "bp_devcontainer:1.0.2",
     // Put your own built docker image here
-    "image": "liamvdv/gorillatracker-ubuntu-dev",
+    // "image": "liamvdv/gorillatracker-ubuntu-dev",
     //-------------------------------------------------
     // ---- Alternative: let VS Code build the image---
     // ------------------------------------------------
-    // "build": {
-    //     // Sets the run context to one level up instead of the .devcontainer folder.
-    //     "context": "..",
-    //     // Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
-    //     "dockerfile": "../Dockerfile",
-    //     "args": {
-    //         "OS_SELECTOR": "ubuntu" // force ubuntu base OS for devcontainer, necessary if you want to use "features"
-    //     }
-    // },
+    "build": {
+        // Sets the run context to one level up instead of the .devcontainer folder.
+        "context": "..",
+        // Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
+        "dockerfile": "../Dockerfile",
+        "args": {
+            "OS_SELECTOR": "ubuntu" // force ubuntu base OS for devcontainer, necessary if you want to use "features"
+        }
+    },
     ////////////////////////////////////////////////////////////
     // -----------------------------------
     // CUSTOMIZE SOME THINGS BELOW HERE !!!!!
@@ -49,7 +49,7 @@
         "source=${localEnv:HOME}/.cache,target=/home/mamba/.cache,type=bind", // general cache directory
         // GorillaTracker specific mounts.
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.
-        "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind,ro",
+        "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind",
         "source=/scratch2/gorillatracker/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
         // NOTE(liamvdv): Allow write.
         "source=/scratch2/gorillatracker/models/,target=/workspaces/gorillatracker/models,type=bind"
@@ -94,7 +94,7 @@
             ]
         }
     },
-    "postCreateCommand": "pip install -e ."
+    "postCreateCommand": "pip install -e .",
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": []
 }
