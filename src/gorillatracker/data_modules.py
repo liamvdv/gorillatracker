@@ -76,6 +76,7 @@ class NletDataModule(L.LightningDataModule):
 
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
+<<<<<<< HEAD
             train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.dataset_transforms, self.training_transforms, self.model_transforms]))  # type: ignore
             return train.get_num_classes()  # type: ignore
         elif mode == "val":
@@ -83,6 +84,15 @@ class NletDataModule(L.LightningDataModule):
             return val.get_num_classes()  # type: ignore
         elif mode == "test":
             test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
+=======
+            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            return train.get_num_classes()  # type: ignore
+        elif mode == "val":
+            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            return val.get_num_classes()  # type: ignore
+        elif mode == "test":
+            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+>>>>>>> origin/main
             return test.get_num_classes()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")

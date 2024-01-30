@@ -39,7 +39,11 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
+<<<<<<< HEAD
 loss_mode: "offline/native"        # Loss mode (e.g., "softmax", "triplet", "softmax/triplet", "softmax/vpl", "triplet/vpl", "softmax/triplet/vpl")
+=======
+loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+>>>>>>> origin/main
 
 
 learning_rate: 1e-5             # Learning rate

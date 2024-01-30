@@ -15,7 +15,18 @@ class ArcFaceLoss(torch.nn.Module):
     """ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):"""
 
     def __init__(
+<<<<<<< HEAD
         self, embedding_size: int, num_classes: int, s: float = 64.0, margin: float = 0.5, *args: Any, **kwargs: Any
+=======
+        self,
+        embedding_size: int,
+        num_classes: int,
+        s: float = 64.0,
+        margin: float = 0.5,
+        accelerator: str = "cpu",
+        *args: Any,
+        **kwargs: Any,
+>>>>>>> origin/main
     ) -> None:
         super(ArcFaceLoss, self).__init__(*args, **kwargs)
         self.s = s
@@ -23,7 +34,11 @@ class ArcFaceLoss(torch.nn.Module):
         self.cos_m = math.cos(margin)
         self.sin_m = math.sin(margin)
         self.num_classes = num_classes
+<<<<<<< HEAD
         if torch.cuda.is_available():
+=======
+        if accelerator == "cuda":
+>>>>>>> origin/main
             self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
@@ -84,6 +99,10 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         delta_t: int = 100,
         lambda_membank: float = 0.5,
         mem_bank_start_epoch: int = 2,
+<<<<<<< HEAD
+=======
+        accelerator: str = "cpu",
+>>>>>>> origin/main
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -95,7 +114,11 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         self.delta_t = delta_t
         self.lambda_membank = lambda_membank
         self.mem_bank_start_epoch = mem_bank_start_epoch
+<<<<<<< HEAD
         if torch.cuda.is_available():
+=======
+        if accelerator == "cuda":
+>>>>>>> origin/main
             self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
@@ -142,9 +165,15 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
             self.memory_bank = self.memory_bank.to(embeddings.device)
             self.memory_bank_labels = self.memory_bank_labels.to(embeddings.device)
 
+<<<<<<< HEAD
         self.memory_bank[
             self.memory_bank_ptr * self.batch_size : (self.memory_bank_ptr + 1) * self.batch_size
         ] = embeddings
+=======
+        self.memory_bank[self.memory_bank_ptr * self.batch_size : (self.memory_bank_ptr + 1) * self.batch_size] = (
+            embeddings
+        )
+>>>>>>> origin/main
         self.memory_bank_labels[
             self.memory_bank_ptr * self.batch_size : (self.memory_bank_ptr + 1) * self.batch_size
         ] = labels

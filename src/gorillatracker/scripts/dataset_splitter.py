@@ -41,6 +41,7 @@ closedset/
     
     Splits are done on a photos.
 """
+
 import logging
 import os
 import random

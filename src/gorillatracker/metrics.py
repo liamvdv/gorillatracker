@@ -13,6 +13,8 @@ import sklearn
 import torch
 import torchmetrics as tm
 import wandb
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
@@ -57,11 +59,14 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_share: Log embeddings to wandb every n epochs.
     """
 
-    def __init__(self, every_n_val_epochs: int, wandb_run: Runner, dm: L.LightningDataModule) -> None:
+    def __init__(
+        self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule
+    ) -> None:
         super().__init__()
         self.logged_epochs: Set[int] = set()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
+        self.knn_with_train = knn_with_train
         self.run = wandb_run
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
@@ -103,11 +108,30 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
 
-            train_embeddings, train_labels = self._get_train_embeddings_for_knn(trainer)
-            # log metrics to wandb
+            train_embeddings, train_labels = (
+                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+            )
+
+            metrics = {
+                "knn5": partial(knn, k=5),
+                "knn": partial(knn, k=1),
+                "pca": pca,
+                "tsne": tsne,
+                "fc_layer": fc_layer,
+            }
+            metrics |= (
+                {
+                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                }
+                if self.knn_with_train
+                else {}
+            )
+            # log to wandb
             evaluate_embeddings(
                 data=embeddings_table,
                 embedding_name="val/embeddings",
+<<<<<<< HEAD
                 metrics={
                     "knn5": partial(knn, k=5),
                     "knn": partial(knn, k=1),
@@ -122,9 +146,20 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 train_embeddings=train_embeddings,
                 train_labels=train_labels,
             )
+=======
+                metrics=metrics,
+                train_embeddings=train_embeddings,
+                train_labels=train_labels,
+            )
+        # clear the table where the embeddings are stored
+        pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
+>>>>>>> origin/main
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
+
+    def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
+        log_grad_cam_images_to_wandb(self.run, trainer)
 
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
@@ -179,6 +214,33 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
         run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
 
 
+def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
+    # NOTE(liamvdv): inverse grad cam support to model since we might not be using
+    #                a model which grad cam does not support.
+    # NOTE(liamvdv): Transform models may have different interpretations.
+    assert trainer.model is not None, "Must only call log_grad_cam_images... after model was initialized."
+    if not hasattr(trainer.model, "get_grad_cam_layer"):
+        return
+    target_layer = trainer.model.get_grad_cam_layer()
+    get_reshape_transform = getattr(trainer.model, "get_grad_cam_reshape_transform", lambda: None)
+    cam = GradCAM(model=trainer.model, target_layers=[target_layer], reshape_transform=get_reshape_transform())
+
+    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=1)  # type: ignore
+    wandb_images: List[wandb.Image] = []
+    for sample in samples:
+        # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
+        row_images, row_labels = sample
+        anchor, *rest = row_images
+        grayscale_cam = cam(input_tensor=anchor.unsqueeze(0), targets=None)
+
+        # Overlay heatmap on original image
+        heatmap = grayscale_cam[0, :]
+        image = np.array(ToPILImage()(anchor)).astype(np.float32) / 255.0  # NOTE(liamvdv): needs be normalized
+        image_with_heatmap = show_cam_on_image(image, heatmap, use_rgb=True)
+        wandb_images.append(wandb.Image(image_with_heatmap, caption=f"label={row_labels[0]}"))
+    run.log({"Grad-CAM": wandb_images})
+
+
 def evaluate_embeddings(
     data: pd.DataFrame,
     embedding_name: str,
@@ -198,7 +260,11 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
+<<<<<<< HEAD
     assert len(val_embeddings) != 0, "No validation embeddings given."
+=======
+    assert len(val_embeddings) > 0, "No validation embeddings given."
+>>>>>>> origin/main
 
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
@@ -292,7 +358,10 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
+<<<<<<< HEAD
     cos_sim: bool = False,
+=======
+>>>>>>> origin/main
 ) -> Dict[str, Any]:
     if use_train_embeddings:
         print("Using train embeddings for knn")
@@ -309,7 +378,10 @@ def knn_with_train(
     k: int = 5,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
+<<<<<<< HEAD
     cos_sim: bool = False,
+=======
+>>>>>>> origin/main
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
