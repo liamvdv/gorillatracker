@@ -1,9 +1,9 @@
-import torch
+from PIL.Image import Image
 from torchvision.transforms.functional import pad
 
 
 class SquarePad:
-    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+    def __call__(self, image: Image) -> Image:
         # calc padding
         width, height = image.size
         aspect_ratio = width / height
