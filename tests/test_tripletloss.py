@@ -27,7 +27,7 @@ def calc_loss_and_distance_of_triplet(
 
 
 def approx_equal(a: torch.Tensor, b: torch.Tensor, eps: float = 1e-6) -> bool:
-    return torch.abs(a - b) < eps
+    return torch.abs(a - b) < eps  # type: ignore
 
 
 def test_tripletloss_offline() -> None:
