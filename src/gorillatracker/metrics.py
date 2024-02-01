@@ -109,7 +109,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             data=embeddings_table,
             embedding_name="val/embeddings",
             metrics=metrics,
-            train_embeddings=train_embeddings,
+            train_embeddings=train_embeddings,  # type: ignore
             train_labels=train_labels,
         )
         # clear the table where the embeddings are stored

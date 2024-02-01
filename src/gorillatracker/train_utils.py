@@ -56,4 +56,11 @@ def get_data_module(  # TODO(rob2u): add simple data module
         ]
     )
 
-    return base(data_dir, batch_size, dataset_class, dataset_transforms=dataset_transforms, model_transforms=model_transforms, training_transforms=training_transforms)  # type: ignore
+    return base(
+        data_dir,
+        batch_size,
+        dataset_class,
+        dataset_transforms=dataset_transforms,
+        model_transforms=model_transforms,
+        training_transforms=training_transforms,
+    )

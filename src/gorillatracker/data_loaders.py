@@ -198,7 +198,7 @@ class VideoTripletSampler(TripletSampler):
 
         negative_start, negative_length = self.labelsection[negative_label]
         i = torch.randint(negative_start, negative_start + negative_length, (1,)).item()
-        return i
+        return i  # type: ignore
 
 
 class QuadletSampler(Sampler[Tuple[int, int, int, int]]):

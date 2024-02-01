@@ -442,7 +442,9 @@ class ConvNeXtV2BaseWrapper(BaseModule):
         return transforms.Compose(
             [
                 transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, scale=(0.02, 0.13)), # TODO(rob2u) this might cause weird errors on PIL.Images? 
+                transforms_v2.RandomErasing(
+                    p=0.5, scale=(0.02, 0.13)
+                ),
             ]
         )
 

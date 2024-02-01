@@ -373,10 +373,9 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             delta_t=kw_args["delta_t"],
             mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
             accelerator=kw_args["accelerator"],
-        ),
+        )
     else:
         raise ValueError(f"Unknown loss mode '{loss_mode}'")
-    
 
 
 if __name__ == "__main__":

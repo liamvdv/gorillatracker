@@ -1,6 +1,6 @@
 # Device Arguments
 
-accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
+accelerator: cpu               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
@@ -17,7 +17,7 @@ wandb_tags: ["baseline", "pure-openset"]            # WandB tags for experiment 
 model_name_or_path: "ConvNeXtV2_Base" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: False             # Enable fast development run
+fast_dev_run: True             # Enable fast development run
 profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
@@ -42,16 +42,17 @@ start_lr: 1e-5                  # Learning Rate after warmup at the beginning of
 end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True         # Use stepwise schedule with lr change after each validation
 
-batch_size: 12                # Training batch size
+batch_size: 10                # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 1               # Training goal (large number)
 val_check_interval: 400         # Validation check interval as a fraction of total steps or as an fixed number of steps
-val_before_training: True      # Perform validation before training
+val_before_training: False      # Perform validation before training
 only_val: False                 # Perform only validation
 
 save_interval: 2               # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
+knn_with_train: False           # Perform knn with train set
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
