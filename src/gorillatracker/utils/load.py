@@ -1,27 +1,28 @@
-from typing import Any, Callable
+from typing import Any, Callable, Literal, Union
 
+import pandas as pd
 import torch
 import torchvision.transforms as transforms
 import wandb
-import pandas as pd
 from tqdm import tqdm
 
 from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.model import BaseModule
 
 
-# load model from wandb artifact
-def load_model_from_wandb(wandb_fullname, model_cls: Any, embedding_size, device: str) -> Any:  # TODO
+def load_model_from_wandb(
+    wandb_fullname: str, model_cls: BaseModule = BaseModule(), embedding_size: int = 128, device: str = "cpu"
+) -> BaseModule:
     wandb.login()
     wandb.init(mode="disabled")
     api = wandb.Api()
 
-    artifact = api.artifact(
-        wandb_fullname,  # your artifact name
+    artifact = api.artifact( # type: ignore
+        wandb_fullname,
         type="model",
     )
     artifact_dir = artifact.download()
-    model = artifact_dir + "/model.ckpt"
+    model = artifact_dir + "/model.ckpt"  # all of our models are saved as model.ckpt
     checkpoint = torch.load(model, map_location=torch.device("cpu"))
     model_state_dict = checkpoint["state_dict"]
 
@@ -41,8 +42,7 @@ def load_model_from_wandb(wandb_fullname, model_cls: Any, embedding_size, device
     return model
 
 
-# generate embeddings (dataframe) from model and dataset
-def generate_embeddings(model, dataset, device):  # TODO
+def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu") -> pd.DataFrame:
     embeddings = []
     df = pd.DataFrame(columns=["embedding", "label", "input", "label_string"])
     with torch.no_grad():
@@ -67,7 +67,7 @@ def generate_embeddings(model, dataset, device):  # TODO
                                 "embedding": [embeddings[i]],
                                 "label": [labels[i]],
                                 "input": [input_img],
-                                "label_string": [dataset.mapping[labels[i]]],
+                                "label_string": [dataset.mapping[labels[i]]] if dataset.mapping else None,
                             }
                         ),
                     ]
@@ -77,11 +77,11 @@ def generate_embeddings(model, dataset, device):  # TODO
 
 
 def get_dataset(
-    partition: str = "val",
+    partition: Literal['train', 'val', 'test'] = "val",
     data_dir: str = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
-    transform: Callable = None,
+    transform: Union[Callable[..., Any], None] = None,
     model: BaseModule = BaseModule(),
-):
+) -> CXLDataset:
     if transform is None:
         transform = transforms.Compose(
             [

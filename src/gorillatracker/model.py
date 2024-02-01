@@ -106,7 +106,7 @@ class BaseModule(L.LightningModule):
     must be subclassed and set self.model = ...
     """
 
-    def __init__( # TODO(rob2u): set defaults for all args -> allows easy loading from checkpoint.
+    def __init__(  # TODO(rob2u): set defaults for all args -> allows easy loading from checkpoint.
         self,
         model_name_or_path: str = "resnet18",
         # model_kwargs: dict,
