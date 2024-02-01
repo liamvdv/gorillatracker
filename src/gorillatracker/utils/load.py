@@ -28,6 +28,7 @@ def generate_embeddings(model, dataset, device): # TODO
     return df
 
 """ Code from my notebook
+
 wandb.login()
 wandb.init(mode="disabled")
 api = wandb.Api()
