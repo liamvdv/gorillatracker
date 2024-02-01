@@ -17,7 +17,7 @@ def load_model_from_wandb(
     wandb.init(mode="disabled")
     api = wandb.Api()
 
-    artifact = api.artifact( # type: ignore
+    artifact = api.artifact(  # type: ignore
         wandb_fullname,
         type="model",
     )
@@ -35,6 +35,9 @@ def load_model_from_wandb(
     ):  # necessary because arcface loss also saves prototypes
         model.loss_module_train.prototypes = torch.nn.Parameter(model_state_dict["loss_module_train.prototypes"])
         model.loss_module_val.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.prototypes"])
+
+    # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
+    # easiest fix is to just use the old embedding structure in the model class
 
     model.load_state_dict(model_state_dict)
     model.to(device)
@@ -77,7 +80,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu") ->
 
 
 def get_dataset(
-    partition: Literal['train', 'val', 'test'] = "val",
+    partition: Literal["train", "val", "test"] = "val",
     data_dir: str = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
     transform: Union[Callable[..., Any], None] = None,
     model: BaseModule = BaseModule(),
