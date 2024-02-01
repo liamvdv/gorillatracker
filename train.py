@@ -81,7 +81,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         delta_t=args.delta_t,
         mem_bank_start_epoch=args.mem_bank_start_epoch,
         lambda_membank=args.lambda_membank,
-        num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
+        num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")) if not args.video_data else (-1, -1, -1),
         dropout_p=args.dropout_p,
         accelerator=args.accelerator,
     )
@@ -224,7 +224,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/efficientnet_cxl.yml"
+    config_path = "./cfgs/config.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments

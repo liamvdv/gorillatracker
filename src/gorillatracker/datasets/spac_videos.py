@@ -80,6 +80,7 @@ class SPACVideosDataset(Dataset[Tuple[Image.Image, Label]]):
         return transforms.Compose(
             [
                 SquarePad(),
+                transforms.ToTensor(),
                 # Uniform input, you may choose higher/lower sizes.
             ]
         )

@@ -59,15 +59,19 @@ class NletDataModule(L.LightningDataModule):
             raise ValueError(f"unknown stage '{stage}'")
 
     def train_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("fit")
         return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("validate")
         return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("test")
         return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False)
 
     def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("predict")
         # return self.get_dataloader()(self.predict, batch_size=self.batch_size, shuffle=False)
         raise NotImplementedError("predict_dataloader not implemented")
 

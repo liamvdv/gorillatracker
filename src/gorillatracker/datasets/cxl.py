@@ -83,7 +83,7 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
             [
                 # Uniform input, you may choose higher/lower sizes.
                 SquarePad(),
-                # transforms.ToTensor(),
+                transforms.ToTensor(),
             ]
         )
 

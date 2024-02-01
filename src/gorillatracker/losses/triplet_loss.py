@@ -345,20 +345,26 @@ class TripletLossOfflineNative(nn.Module):
 
 
 def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
-    loss_modes = {
-        "online/hard": TripletLossOnline(mode="hard", margin=kw_args["margin"]),
-        "online/semi-hard": TripletLossOnline(mode="semi-hard", margin=kw_args["margin"]),
-        "online/soft": TripletLossOnline(mode="soft", margin=kw_args["margin"]),
-        "offline": TripletLossOffline(margin=kw_args["margin"]),
-        "offline/native": TripletLossOfflineNative(margin=kw_args["margin"]),
-        "softmax/arcface": ArcFaceLoss(
+    if loss_mode == "online/hard":
+        return TripletLossOnline(mode="hard", margin=kw_args["margin"])
+    elif loss_mode == "online/semi-hard":
+        return TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
+    elif loss_mode == "online/soft":
+        return TripletLossOnline(mode="soft", margin=kw_args["margin"])
+    elif loss_mode == "offline":
+        return TripletLossOffline(margin=kw_args["margin"])
+    elif loss_mode == "offline/native":
+        return TripletLossOfflineNative(margin=kw_args["margin"])
+    elif loss_mode == "softmax/arcface":
+        return ArcFaceLoss(
             embedding_size=kw_args["embedding_size"],
             num_classes=kw_args["num_classes"],
             s=kw_args["s"],
             margin=kw_args["margin"],
             accelerator=kw_args["accelerator"],
-        ),  # TODO
-        "softmax/vpl": VariationalPrototypeLearning(
+        )
+    elif loss_mode == "softmax/vpl":
+        return VariationalPrototypeLearning(
             embedding_size=kw_args["embedding_size"],
             num_classes=kw_args["num_classes"],
             batch_size=kw_args["batch_size"],
@@ -367,9 +373,10 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             delta_t=kw_args["delta_t"],
             mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
             accelerator=kw_args["accelerator"],
-        ),  # TODO
-    }
-    return loss_modes[loss_mode]
+        ),
+    else:
+        raise ValueError(f"Unknown loss mode '{loss_mode}'")
+    
 
 
 if __name__ == "__main__":
