@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import os
 from datetime import datetime
+from functools import lru_cache
 from itertools import groupby
 from typing import Dict, List, Tuple
 
@@ -33,9 +34,22 @@ class TrackedFrame(BaseModel):
     A bounding box in a frame.
     """
 
-    frame: int
-    bounding_box: BoundingBox
-    confidence: float
+    # abbreviations to save space in the json files
+    f: int = Field(alias="frame")
+    bb: BoundingBox = Field(alias="bounding_box")
+    c: float = Field(alias="confidence")
+
+    @property
+    def frame(self) -> int:
+        return self.f
+
+    @property
+    def bounding_box(self) -> BoundingBox:
+        return self.bb
+
+    @property
+    def confidence(self) -> float:
+        return self.c
 
     def bbox_size(self) -> float:
         return calculate_area(self.bounding_box)
@@ -102,31 +116,41 @@ class Video(BaseModel):
     """
 
     camera_id: str
-    subclips: List[VideoClip] = Field(default_factory=list)
+    clips: List[VideoClip] = Field(default_factory=list)
 
     @property
     def start_time(self) -> datetime:
-        return min([clip.start_time for clip in self.subclips])
+        return min([clip.start_time for clip in self.clips])
 
     @property
     def end_time(self) -> datetime:
-        return max([clip.end_time for clip in self.subclips])
+        return max([clip.end_time for clip in self.clips])
 
+    @lru_cache(maxsize=1)
     def avg_bbox_size(self) -> float:
-        return sum([clip.avg_bbox_size() for clip in self.subclips]) / (len(self.subclips) + EPSILON)
+        return sum([clip.avg_bbox_size() for clip in self.clips]) / (len(self.clips) + EPSILON)
 
+    @lru_cache(maxsize=10)
     def bboxes_above_size(self, size: float) -> int:
-        return sum([clip.bboxes_above_size(size) for clip in self.subclips])
+        return sum([clip.bboxes_above_size(size) for clip in self.clips])
 
+    @lru_cache(maxsize=1)
     def tracked_gorillas(self) -> int:
-        return sum([clip.tracked_gorillas() for clip in self.subclips])
+        return sum([clip.tracked_gorillas() for clip in self.clips])
 
+    @lru_cache(maxsize=1)
     def tracked_gorilla_frames(self, tracker: TrackerType) -> int:
-        return sum([clip.tracked_gorilla_frames(tracker) for clip in self.subclips])
+        return sum([clip.tracked_gorilla_frames(tracker) for clip in self.clips])
 
 
-class VideoDataset(BaseModel):
+class VideoDataset:
     videos: List[Video]
+
+    def __init__(self, videos_path: str):
+        self.videos = []
+        with open(videos_path) as f:
+            for line in f:
+                self.videos.append(Video(**line))
 
     def avg_bbox_size(self) -> float:
         return sum([video.avg_bbox_size() for video in self.videos]) / (len(self.videos) + EPSILON)
@@ -147,7 +171,6 @@ def _parse_tracked_gorilla(video_id: str, json: str) -> Tuple[int, TrackedGorill
     return individual_id, TrackedGorilla(video_id=video_id, individual_id=individual_id, negative_ids=negative_ids)
 
 
-# parse tracked video from json
 def _parse_tracked_gorillas(video_id: str, json: str) -> List[TrackedGorilla]:
     tracked_gorillas = dict(_parse_tracked_gorilla(video_id, i) for i in json["tracked_IDs"])  # type: ignore
     for frame_n, frame in enumerate(json["labels"]):  # type: ignore
@@ -170,7 +193,22 @@ def _parse_tracked_gorillas(video_id: str, json: str) -> List[TrackedGorilla]:
     return list(tracked_gorillas.values())
 
 
-def _parse_tracked_video(path: str, timestamps: Dict[str, str], parse_content: bool) -> VideoClip:
+def _parse_tracked_video(video_clip: VideoClip, video_clip_path: str) -> VideoClip:
+    """
+    Args:
+        video_clip: the video clip to add the parsed data to
+        video_clip_json: the json file to parse
+    """
+    with open(video_clip_path) as f:
+        video_clip_json = json.load(f)
+    n_frames = len(video_clip_json["labels"])
+    tracked_gorillas = _parse_tracked_gorillas(video_clip.video_id, video_clip_json)
+    video_clip.trackings = tracked_gorillas
+    video_clip.total_frames = n_frames
+    return video_clip
+
+
+def _parse_tracked_video_name(path: str, timestamps: Dict[str, str]) -> VideoClip:
     filename, _ = os.path.splitext(os.path.basename(path))
     filename = filename[: -len("_tracked")]
     camera_id, date_str, _ = filename.split("_")
@@ -178,16 +216,7 @@ def _parse_tracked_video(path: str, timestamps: Dict[str, str], parse_content: b
     timestamp = timestamps[filename]
     daytime = datetime.strptime(timestamp, "%I:%M %p")
     date = datetime.combine(date, daytime.time())
-
-    if not parse_content:
-        return VideoClip(video_id=filename, camera_id=camera_id, start_time=date)
-
-    video_clip_json = json.load(open(path))
-    n_frames = len(video_clip_json["labels"])
-    tracked_gorillas = _parse_tracked_gorillas(filename, video_clip_json)
-    return VideoClip(
-        video_id=filename, camera_id=camera_id, start_time=date, total_frames=n_frames, trackings=tracked_gorillas
-    )
+    return VideoClip(video_id=filename, camera_id=camera_id, start_time=date)
 
 
 def _group_video_clips_by_camera_id_and_date(video_clips: List[VideoClip]) -> List[List[VideoClip]]:
@@ -207,43 +236,78 @@ def _combine_video_clips(video_clips: List[VideoClip], video_time_difference: dt
             elif clip.start_time - video.end_time > video_time_difference:
                 videos.append(video)
                 video = Video(camera_id=clip.camera_id)
-            video.subclips.append(clip)
+            video.clips.append(clip)
         assert video is not None
         videos.append(video)
     return videos
 
 
-def parse_dataset(
-    path: str, timestamps_path: str, video_time_difference: dt.timedelta, parse_content: bool
-) -> VideoDataset:
+def _parse_by_video(video_dataset: VideoDataset, dataset_path: str, save_path: str) -> None:
+    """
+    Args:
+        dataset: the dataset to parse
+        dataset_path: the path to the videos dataset
+        save_path: the path to save the parsed dataset
+    """
+    assert save_path.endswith(".jsonl")
+    for v in video_dataset.videos:
+        video = v.model_copy(deep=True)
+        for video_clip in video.clips:
+            video_clip_path = os.path.join(dataset_path, f"{video_clip.video_id}_tracked.json")
+            _parse_tracked_video(video_clip, video_clip_path)
+        with open(save_path, "a") as f:
+            json.dump(video.model_dump_json(), f)
+            f.write("\n")
+        del video
+
+
+def parse_dataset_with_content(
+    *, dataset_path: str, save_path: str, timestamps_path: str, video_cutoff: dt.timedelta
+) -> None:
+    """
+    Args:
+        path: path to directory with tracked videos
+        save_path: path to save the parsed dataset
+        timestamps_path: path to timestamps.json
+        video_cutoff: the max time difference until a video clip is considered a new video
+    """
+    assert save_path.endswith(".json")
+    dataset = parse_dataset(dataset_path, timestamps_path, video_cutoff)
+    p, _ = os.path.split(save_path)
+    jsonl = os.path.join(p, "videos.jsonl")
+    _parse_by_video(dataset, dataset_path, jsonl)
+
+
+def parse_dataset(path: str, timestamps_path: str, video_cutoff: dt.timedelta) -> VideoDataset:
     """
     Args:
         path: path to directory with tracked videos
         timestamps_path: path to timestamps.json
-        video_time_difference: the max time difference until a video clip is considered a new video
-        parse_content: whether to parse the content of the video clips or just the metadata
+        video_cutoff: the max time difference until a video clip is considered a new video
     """
-    timestamps = json.load(open(timestamps_path))
+    with open(timestamps_path) as f:
+        timestamps = json.load(f)
     video_clips = []
     for video_clip_filename in os.listdir(path):
         if video_clip_filename == ".mp4_tracked.json":
+            print(f"Skipping {video_clip_filename}, does not match pattern")
             continue
         if not video_clip_filename.endswith(".json"):
             print(f"Skipping {video_clip_filename}")
             continue
         assert len(video_clip_filename.split("_")) == 4
-        video_clip = _parse_tracked_video(os.path.join(path, video_clip_filename), timestamps, parse_content)
+        video_clip = _parse_tracked_video_name(os.path.join(path, video_clip_filename), timestamps)
         video_clips.append(video_clip)
-    print(len(video_clips))
-    videos = _combine_video_clips(video_clips, video_time_difference)
+    videos = _combine_video_clips(video_clips, video_cutoff)
+
     return VideoDataset(videos=videos)
 
 
-if __name__ == "__main__":
-    path = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked"
-    timestamps = "/workspaces/gorillatracker/data/derived_data/timestamps.json"
-    # TODO(memben) assert video width and height
-    video_dataset = parse_dataset(path, timestamps, dt.timedelta(minutes=10), parse_content=True)
-    video_dataset_json = video_dataset.model_dump_json()
-    with open("/workspaces/gorillatracker/data/derived_data/video_dataset.json", "w") as f:
-        f.write(video_dataset_json)
+# if __name__ == "__main__":
+#     path = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_tracked"
+#     timestamps = "/workspaces/gorillatracker/data/derived_data/timestamps.json"
+#     save_path = "/workspaces/gorillatracker/data/derived_data/cxl_videos.json"
+#     # TODO(memben) assert video width and height, FPS
+#     parse_dataset_with_content(
+#         dataset_path=path, save_path=save_path, timestamps_path=timestamps, video_cutoff=dt.timedelta(minutes=30)
+#     )
