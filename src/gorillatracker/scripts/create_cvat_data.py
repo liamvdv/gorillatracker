@@ -42,7 +42,7 @@ def save_yolo_annotation(image_path: str, output_dir: str, yolo_model: YOLO) -> 
     result = yolo_model(image_path)
     annotation_file = os.path.basename(image_path).replace(".jpg", ".txt")
     annotation_path = os.path.join(output_dir, annotation_file)
-    result[0].save_txt(annotation_path, save_conf=True)
+    result[0].save_txt(annotation_path, save_conf=False)
 
 
 def process_videos(video_paths: list[str], output_dir: str, yolo_model: YOLO) -> None:
@@ -54,9 +54,14 @@ def process_videos(video_paths: list[str], output_dir: str, yolo_model: YOLO) ->
         output_dir: directory to save frames and annotations
         yolo_model: YOLO model
     """
+    image_paths = []
     for video_path in video_paths:
         image_path = save_random_frame(video_path, output_dir + "/images")
         save_yolo_annotation(image_path, output_dir + "/annotations", yolo_model)
+        image_paths.append(image_path)
+    with open(os.path.join(output_dir, "train.txt"), "w") as f:
+        for image_path in image_paths:
+            f.write(f"{image_path}\n")
 
 
 if __name__ == "__main__":
@@ -66,4 +71,3 @@ if __name__ == "__main__":
     yolo_model_path = "/workspaces/gorillatracker/models/yolov8n_gorillabody_ybyh495y.pt"
     yolo_model = YOLO(yolo_model_path)
     process_videos(video_paths[0:10], output_dir, yolo_model)
-    print("Done!")
