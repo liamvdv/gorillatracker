@@ -29,8 +29,8 @@
         // DO NOT COMMIT THIS ENABLED TO REMOTE.
         // "--gpus",
         // "device=1",
-        // "-u",
-        // "0"
+        "-u",
+        "0"
     ],
     // ------------------------------------------------------------
     // Setup your mounts and env vars like for a docker run command
@@ -50,6 +50,7 @@
         // GorillaTracker specific mounts.
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.
         "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind,ro",
+        "source=/scratch2/gorillatracker/data/derived_data/,target=/workspaces/gorillatracker/data/derived_data,type=bind",
         "source=/scratch2/gorillatracker/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
         "source=/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", // cannot mount into data
         // NOTE(liamvdv): Allow write.
