@@ -82,7 +82,7 @@ def randint_except(start: int, end: int, excluded: int) -> int:
         # raise ValueError("class must have >=2 instances")
         return start
     while True:
-        idx = torch.randint(start, end, (1,)).item()
+        idx: int = torch.randint(start, end, (1,)).item()  # type: ignore
         if idx != excluded:
             return idx
 
@@ -131,7 +131,7 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
     def any_sample_not(self, label: gtypes.Label) -> int:
         start, length = self.labelsection[label]
         end = start + length
-        i = torch.randint(self.n - length, (1,)).item()
+        i: int = torch.randint(self.n - length, (1,)).item()  # type: ignore
         if start <= i and i < end:
             i += length
         return i
@@ -165,7 +165,7 @@ class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
     def any_sample_not(self, label: gtypes.Label) -> int:
         start, length = self.labelsection[label]
         end = start + length
-        i = torch.randint(self.n - length, (1,)).item()
+        i: int = torch.randint(self.n - length, (1,)).item()  # type: ignore
         if start <= i and i < end:
             i += length
         return i

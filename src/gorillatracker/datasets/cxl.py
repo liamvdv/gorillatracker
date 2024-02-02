@@ -101,7 +101,6 @@ if __name__ == "__main__":
     image = cxl[0][0]
     transformations = transforms.Compose(
         [
-            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             transforms_v2.RandomHorizontalFlip(p=0.5),
             transforms.RandomErasing(p=1, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
         ]
