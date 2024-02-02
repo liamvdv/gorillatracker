@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import timm
 import torch
-import wandb
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
