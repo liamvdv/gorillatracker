@@ -197,12 +197,13 @@ def _parse_tracked_gorillas(video_id: str, json: str) -> List[TrackedGorilla]:
     return list(tracked_gorillas.values())
 
 
-def _parse_tracked_video(video_clip: VideoClip, video_clip_path: str) -> VideoClip:
+def _parse_tracked_video_clip(video_clip: VideoClip, video_clip_path: str) -> VideoClip:
     """
     Args:
         video_clip: the video clip to add the parsed data to
-        video_clip_json: the json file to parse
+        video_clip_path: the path to the tracked video clip
     """
+    assert video_clip_path.endswith(".json")
     with open(video_clip_path) as f:
         video_clip_json = json.load(f)
     n_frames = len(video_clip_json["labels"])
@@ -258,7 +259,7 @@ def _parse_by_video(video_dataset: VideoDataset, dataset_path: str, save_path: s
         video = v.model_copy(deep=True)
         for video_clip in video.clips:
             video_clip_path = os.path.join(dataset_path, f"{video_clip.video_id}_tracked.json")
-            _parse_tracked_video(video_clip, video_clip_path)
+            _parse_tracked_video_clip(video_clip, video_clip_path)
         with open(save_path, "a") as f:
             json.dump(video.model_dump_json(), f)
             f.write("\n")
