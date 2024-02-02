@@ -4,9 +4,10 @@ import os
 from datetime import datetime
 from functools import lru_cache
 from itertools import groupby
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 from pydantic import BaseModel, Field
+from tqdm import tqdm
 
 from gorillatracker.scripts.cutout import calculate_area
 from gorillatracker.type_helper import BoundingBox
@@ -35,9 +36,9 @@ class TrackedFrame(BaseModel):
     """
 
     # abbreviations to save space in the json files
-    f: int = Field(alias="frame")
-    bb: BoundingBox = Field(alias="bounding_box")
-    c: float = Field(alias="confidence")
+    f: int
+    bb: BoundingBox
+    c: float
 
     @property
     def frame(self) -> int:
@@ -144,13 +145,16 @@ class Video(BaseModel):
 
 
 class VideoDataset:
-    videos: List[Video]
-
-    def __init__(self, videos_path: str):
-        self.videos = []
-        with open(videos_path) as f:
-            for line in f:
-                self.videos.append(Video(**line))
+    def __init__(self, videos: Union[str, List[Video]]):
+        if isinstance(videos, str):
+            self.videos = []
+            with open(videos) as f:
+                for line in tqdm(f, desc="Loading videos", unit="Videos", total=1403):
+                    self.videos.append(Video.model_validate_json(json.loads(line)))
+        elif isinstance(videos, list):
+            self.videos = videos
+        else:
+            raise TypeError("videos must be either a path (str) or a list of Video objects")
 
     def avg_bbox_size(self) -> float:
         return sum([video.avg_bbox_size() for video in self.videos]) / (len(self.videos) + EPSILON)
@@ -181,7 +185,7 @@ def _parse_tracked_gorillas(video_id: str, json: str) -> List[TrackedGorilla]:
                 VIDEO_WIDTH,
                 VIDEO_HEIGHT,
             )
-            tracked_frame = TrackedFrame(frame=frame_n, bounding_box=bbox, confidence=float(yolo_bbox["conf"]))  # type: ignore
+            tracked_frame = TrackedFrame(f=frame_n, bb=bbox, c=float(yolo_bbox["conf"]))  # type: ignore
 
             class_id = int(yolo_bbox["class"])  # type: ignore
             assert class_id in [TrackerType.GORILLA, TrackerType.GORILLA_FACE]
@@ -250,7 +254,7 @@ def _parse_by_video(video_dataset: VideoDataset, dataset_path: str, save_path: s
         save_path: the path to save the parsed dataset
     """
     assert save_path.endswith(".jsonl")
-    for v in video_dataset.videos:
+    for v in tqdm(video_dataset.videos, desc="Parsing videos", unit="Videos", total=len(video_dataset.videos)):
         video = v.model_copy(deep=True)
         for video_clip in video.clips:
             video_clip_path = os.path.join(dataset_path, f"{video_clip.video_id}_tracked.json")
