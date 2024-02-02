@@ -211,26 +211,19 @@ class BaseModule(L.LightningModule):
         self.log("train/negative_distance", neg_dist, on_step=True)
         return loss
 
-    def add_validation_embeddings(self, anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels, anchor_tensors: list[torch.Tensor]) -> None:
+    def add_validation_embeddings(self, anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels) -> None:
         # save anchor embeddings of validation step for later analysis in W&B
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
         embeddings = embeddings.cpu()
-        
-        invTrans = transforms.Compose(
-            [
-                transforms.Normalize(mean=[0.0, 0.0, 0.0], std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
-                transforms.Normalize(mean=[-0.485, -0.456, -0.406], std=[1.0, 1.0, 1.0]),
-            ]
-        )
-        images = [transforms.ToPILImage()(invTrans(image.cpu())) for image in anchor_tensors]
 
-        assert len(self.embeddings_table_columns) == 3
+        assert len(self.embeddings_table_columns) == 2
         data = {
-            self.embeddings_table_columns[0]: anchor_labels.tolist()  # type: ignore
-            if torch.is_tensor(anchor_labels)  # type: ignore
-            else anchor_labels,
+            self.embeddings_table_columns[0]: (
+                anchor_labels.tolist()  # type: ignore
+                if torch.is_tensor(anchor_labels)  # type: ignore
+                else anchor_labels
+            ),
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
-            self.embeddings_table_columns[2]: [wandb.Image(image) for image in images],
         }
 
         df = pd.DataFrame(data)
@@ -246,7 +239,7 @@ class BaseModule(L.LightningModule):
         )
         embeddings = self.forward(vec)
 
-        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors], images[0])  # type: ignore
+        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
         if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)

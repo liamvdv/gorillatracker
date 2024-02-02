@@ -72,9 +72,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
-        
-        log_missclassified_images(embeddings_table, self.run)
-        
+
         current_epoch = trainer.current_epoch
         assert trainer.max_epochs is not None
         if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
@@ -131,46 +129,6 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_grad_cam_images_to_wandb(self.run, trainer)
 
-def knn_helper(embeddings: torch.Tensor, labels: torch.Tensor, k: int) -> torch.Tensor:
-    num_classes = len(np.unique(labels.numpy()))
-    distance_matrix = pairwise_euclidean_distance(embeddings)
-    # Ensure distances on the diagonal are set to a large value so they are ignored
-    distance_matrix.fill_diagonal_(float("inf"))
-    # Find the indices of the closest embeddings for each embedding
-    classification_matrix = torch.zeros((len(distance_matrix), k))
-    for i in range(k):
-        closest_indices = torch.argmin(distance_matrix, dim=1)
-        closest_labels = labels[closest_indices]
-        # Set the distance to the closest embedding to a large value so it is ignored
-        distance_matrix[torch.arange(len(distance_matrix)), closest_indices] = float("inf")
-        classification_matrix[:, i] = closest_labels
-    # Calculate the most common label for each embedding
-    # transform classification_matrix of shape (n,k) to (n,num_classes) where num_classes is the number of unique labels
-    # the idea is that in the end the classification_matrix contains the probability for each class for each embedding
-    classification_matrix_cpy = classification_matrix.clone()
-    classification_matrix = torch.zeros((len(classification_matrix), num_classes))
-    for i in range(num_classes):
-        classification_matrix[:, i] = torch.sum(classification_matrix_cpy == i, dim=1) / k
-    return classification_matrix
-
-def log_missclassified_images(embeddings_table: pd.DataFrame, run: Runner) -> None:
-    misclassified_images = []
-    encoded_labels = embeddings_table["label"]
-    embeddings = embeddings_table["embedding"]
-    images = embeddings_table["image"]
-    le = LabelEncoder()
-    labels = le.inverse_transform(encoded_labels)
-    classification_matrix = knn_helper(torch.tensor(embeddings), torch.tensor(encoded_labels), k=1)
-    for i in range(len(labels)):
-        true_label = labels[i]
-        predicted_label = labels[torch.argmax(classification_matrix[i]).item()]
-        if true_label != predicted_label:
-            misclassified_images.append((images[i], true_label, predicted_label))
-    image_dict = {
-        f"True label: {true_label}, predicted label: {predicted_label}": image
-        for image, true_label, predicted_label in misclassified_images
-    }
-    wandb.log({"misclassified_images": image_dict})
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
 # 1. add a fully connected layer to the model that takes the embeddings as input and outputs the labels -> then train this model -> evaluate false positive, false negative, accuracy, ...)
@@ -450,8 +408,27 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
     val_embeddings = torch.tensor(val_embeddings)
     val_labels = torch.tensor(val_labels)
 
-    classification_matrix = knn_helper(val_embeddings, val_labels, k)
-    
+    distance_matrix = pairwise_euclidean_distance(val_embeddings)
+
+    # Ensure distances on the diagonal are set to a large value so they are ignored
+    distance_matrix.fill_diagonal_(float("inf"))
+
+    # Find the indices of the closest embeddings for each embedding
+    classification_matrix = torch.zeros((len(distance_matrix), k))
+    for i in range(k):
+        closest_indices = torch.argmin(distance_matrix, dim=1)
+        closest_labels = val_labels[closest_indices]
+        # Set the distance to the closest embedding to a large value so it is ignored
+        distance_matrix[torch.arange(len(distance_matrix)), closest_indices] = float("inf")
+        classification_matrix[:, i] = closest_labels
+    # Calculate the most common label for each embedding
+    # transform classification_matrix of shape (n,k) to (n,num_classes) where num_classes is the number of unique labels
+    # the idea is that in the end the classification_matrix contains the probability for each class for each embedding
+    classification_matrix_cpy = classification_matrix.clone()
+    classification_matrix = torch.zeros((len(classification_matrix), num_classes))
+    for i in range(num_classes):
+        classification_matrix[:, i] = torch.sum(classification_matrix_cpy == i, dim=1) / k
+
     accuracy = tm.functional.accuracy(
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
@@ -468,6 +445,7 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
     assert f1 is not None
     print("knn done")
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
+
 
 
 def pca(
