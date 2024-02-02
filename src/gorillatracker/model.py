@@ -355,16 +355,16 @@ class EfficientNetV2Wrapper(BaseModule):
             if is_from_scratch
             else efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
         )
-        # self.model.classifier = torch.nn.Sequential(
-        #     torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
-        # )
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.classifier = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.classifier[1].in_features),
-            torch.nn.Dropout(p=dropout_p),
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
         )
+        # dropout_p = kwargs.get("dropout_p", 0.0)
+        # self.model.classifier = torch.nn.Sequential(
+        #     torch.nn.BatchNorm1d(self.model.classifier[1].in_features),
+        #     torch.nn.Dropout(p=dropout_p),
+        #     torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
+        #     torch.nn.BatchNorm1d(self.embedding_size),
+        # )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv

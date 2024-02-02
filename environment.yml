@@ -24,7 +24,7 @@ dependencies:
   - sentencepiece
   - ultralytics=8.0.186
   - torchvision
-  - faiss-cpu
+  - faiss-gpu
   - timm  # maybe necessary to switch to faiss-cuda
 
   # Good to have
@@ -33,6 +33,7 @@ dependencies:
   - pandas
   - seqeval
   - scikit-learn
+  - networkx
 
   # Misc
   - jsonlines
