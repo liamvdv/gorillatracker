@@ -24,7 +24,7 @@ def save_random_frame(video_path: str, output_dir: str) -> str:
         raise ValueError("Failed to read frame from video")
     cap.release()
     os.makedirs(output_dir, exist_ok=True)
-    image_name = f"{os.path.basename(video_path).split('.')[0]}_{random_frame_number}.jpg"
+    image_name = f"{os.path.basename(video_path).split('.')[0]}_{random_frame_number}.png"
     image_path = os.path.join(output_dir, image_name)
     cv2.imwrite(image_path, image)
     return image_path
@@ -40,7 +40,7 @@ def save_yolo_annotation(image_path: str, output_dir: str, yolo_model: YOLO) -> 
         yolo_model: YOLO model
     """
     result = yolo_model(image_path)
-    annotation_file = os.path.basename(image_path).replace(".jpg", ".txt")
+    annotation_file = os.path.basename(image_path).replace(".png", ".txt")
     annotation_path = os.path.join(output_dir, annotation_file)
     result[0].save_txt(annotation_path, save_conf=False)
 
