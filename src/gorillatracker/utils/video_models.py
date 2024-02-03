@@ -27,6 +27,8 @@ VIDEO_WIDTH = 1920
 VIDEO_HEIGHT = 1080
 FRAMES_PER_SECOND = 60
 
+HARDCODED_NUMBER_VIDEOS = 1419 # Too slow to infer at runtime
+
 EPSILON = 0.0001
 
 
@@ -85,7 +87,7 @@ class VideoClip(BaseModel):
     A single mp4 file that is recorded by a camera.
     """
 
-    video_id: str
+    video_id: str  # filename without .mp4 e.g. M002_20220328_015
     camera_id: str
     start_time: datetime
     total_frames: int = Field(default=0)
@@ -149,7 +151,7 @@ class VideoDataset:
         if isinstance(videos, str):
             self.videos = []
             with open(videos) as f:
-                for line in tqdm(f, desc="Loading videos", unit="Videos", total=1403):
+                for line in tqdm(f, desc="Loading videos", unit="Videos", total=HARDCODED_NUMBER_VIDEOS):
                     self.videos.append(Video.model_validate_json(json.loads(line)))
         elif isinstance(videos, list):
             self.videos = videos
