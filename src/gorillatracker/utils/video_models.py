@@ -61,7 +61,7 @@ class TrackedGorilla(BaseModel):
     A gorilla that is tracked in a video clip.
     """
 
-    video_id: str
+    video_id: str # filename without .mp4 e.g. M002_20220328_015
     individual_id: int
     negative_ids: List[int] = Field(default_factory=list)
     bounding_boxes: List[TrackedFrame] = Field(default_factory=list)
