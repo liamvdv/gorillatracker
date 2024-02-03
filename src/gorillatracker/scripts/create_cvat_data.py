@@ -46,7 +46,7 @@ def save_yolo_annotation(image_path: str, output_dir: str, yolo_model: YOLO) -> 
     result = yolo_model(image_path)
     annotation_file = os.path.basename(image_path).replace(".png", ".txt")
     annotation_path = os.path.join(output_dir, annotation_file)
-    if len(result) == 0:
+    if result[0].boxes is None: # TODO(memben): check if this is the correct way to check for empty annotations
         return False
     result[0].save_txt(annotation_path, save_conf=False)
     return True
@@ -80,6 +80,6 @@ if __name__ == "__main__":
     videos = open(videos_path, "r").read().splitlines()
     video_paths = [os.path.join(video_dir, file) for file in videos]
     output_dir = "/workspaces/gorillatracker/data/derived_data/spac_gorillas_cvat_data/face"
-    yolo_model_path = "/workspaces/gorillatracker/src/gorillatracker/scripts/spac_tracking/weights/face.pt"
+    yolo_model_path = "/workspaces/gorillatracker/models/yolov8n_gorillaface_pkm2bzis.pt"
     yolo_model = YOLO(yolo_model_path)
     process_videos(video_paths, output_dir, yolo_model, 1)
