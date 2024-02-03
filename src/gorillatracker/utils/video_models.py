@@ -36,9 +36,9 @@ class TrackedFrame(BaseModel):
     """
 
     # abbreviations to save space in the json files
-    f: int
-    bb: BoundingBox
-    c: float
+    f: int # frame
+    bb: BoundingBox # bounding box
+    c: float # confidence
 
     @property
     def frame(self) -> int:
