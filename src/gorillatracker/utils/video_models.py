@@ -27,7 +27,7 @@ VIDEO_WIDTH = 1920
 VIDEO_HEIGHT = 1080
 FRAMES_PER_SECOND = 60
 
-HARDCODED_NUMBER_VIDEOS = 1419 # Too slow to infer at runtime
+HARDCODED_NUMBER_VIDEOS = 1419  # Too slow to infer at runtime
 
 EPSILON = 0.0001
 
@@ -38,9 +38,9 @@ class TrackedFrame(BaseModel):
     """
 
     # abbreviations to save space in the json files
-    f: int # frame
-    bb: BoundingBox # bounding box
-    c: float # confidence
+    f: int  # frame
+    bb: BoundingBox  # bounding box
+    c: float  # confidence
 
     @property
     def frame(self) -> int:
@@ -63,7 +63,7 @@ class TrackedGorilla(BaseModel):
     A gorilla that is tracked in a video clip.
     """
 
-    video_id: str # filename without .mp4 e.g. M002_20220328_015
+    video_id: str  # filename without .mp4 e.g. M002_20220328_015
     individual_id: int
     negative_ids: List[int] = Field(default_factory=list)
     bounding_boxes: List[TrackedFrame] = Field(default_factory=list)
