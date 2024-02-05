@@ -81,6 +81,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
         dropout_p=args.dropout_p,
         accelerator=args.accelerator,
+        l2_alpha=args.l2_alpha,
+        l2_beta=args.l2_beta,
+        path_to_pretrained_weights=args.path_to_pretrained_weights,
     )
 
     if args.saved_checkpoint_path is not None:
@@ -159,6 +162,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         callbacks=callbacks,
         precision=args.precision,
         gradient_clip_val=args.grad_clip,
+        log_every_n_steps=24,
         # accumulate_grad_batches=args.gradient_accumulation_steps,
         fast_dev_run=args.fast_dev_run,
         profiler=args.profiler,
