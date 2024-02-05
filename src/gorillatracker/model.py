@@ -134,6 +134,7 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
+        **kwargs,
     ) -> None:
         super().__init__()
 
@@ -396,7 +397,7 @@ class EfficientNetV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        
+
         self.set_losses(self.model, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
@@ -653,7 +654,7 @@ class ConvNextWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-        
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
@@ -759,7 +760,7 @@ class SwinV2LargeWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-        
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
@@ -834,7 +835,7 @@ class ResNet152Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-        
+
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.layer4[-1]
         return self.model.layer4[-1].conv3
@@ -871,7 +872,7 @@ class ResNet50Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-        
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -902,7 +903,7 @@ class ResNet50DinoV2Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-        
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         outputs = self.model(x)
         gap = torch.nn.AdaptiveAvgPool2d((1, 1))
@@ -941,7 +942,7 @@ class FaceNetWrapper(BaseModule):
         )
         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
         self.set_losses(self.model, **kwargs)
-        
+
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
