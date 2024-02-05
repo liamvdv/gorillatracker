@@ -144,9 +144,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
                 ),
                 dim=0,
             )
-            labels = torch.cat(
-                (labels, torch.zeros(self.batch_size - labels.shape[0], device=embeddings.device) - 1), dim=0
-            )
+            labels = torch.cat((labels, torch.zeros(self.batch_size - labels.shape[0], device=embeddings.device) - 1), dim=0)  # type: ignore
 
         if self.memory_bank.device != embeddings.device or self.memory_bank_labels.device != embeddings.device:
             self.memory_bank = self.memory_bank.to(embeddings.device)
@@ -167,7 +165,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         frequency = torch.zeros(self.num_classes, device=self.memory_bank.device)
         for i in range(self.num_classes):
             prototypes[i] = torch.mean(self.memory_bank[self.memory_bank_labels == i], dim=0)
-            frequency[i] = torch.sum(self.memory_bank_labels == i)
+            frequency[i] = torch.sum(self.memory_bank_labels == i)  # type: ignore
 
         # set to zero if frequency is zero
         prototypes[frequency == 0] = 0.0
