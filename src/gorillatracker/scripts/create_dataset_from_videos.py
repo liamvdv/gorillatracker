@@ -71,7 +71,7 @@ def _get_negatives(id_frames: IdFrameDict, min_frames: int, json_path: str) -> t
             del id_frames[id]
     # filter negatives again after removing IDs
     id_negatives = {id: negatives for id, negatives in id_negatives.items() if id in id_frames}
-    
+
     return id_frames, id_negatives
 
 
