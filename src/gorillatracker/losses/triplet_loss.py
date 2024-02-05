@@ -185,7 +185,7 @@ def euclidean_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     # handle numerical stability
     # derivative of the square root operation applied to 0 is infinite
     # we need to handle by setting any 0 to eps
-    mask = (distance_matrix == 0.0).float()  # performed on tensors, __eq__ overwritten
+    mask = (distance_matrix == 0.0).float()  # type: ignore # performed on tensors, __eq__ overwritten
 
     # use this mask to set indices with a value of 0 to eps
     distance_matrix_stable = torch.sqrt(distance_matrix + mask * eps) * (1.0 - mask)

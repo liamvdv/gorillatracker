@@ -55,12 +55,9 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         # new
         labels_string = [label for _, label in samples]
         labels_int = cast_label_to_int(labels_string)
-        self.mapping = dict(zip(labels_int, labels_string))
         self.samples = list(zip([path for path, _ in samples], labels_int))
 
         self.transform = transform
-
-        self.partition = partition
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -70,20 +67,16 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
-
-        # save img
-        # img2 = transforms.ToPILImage()(img)
-        # img2.save(f"img_{self.partition}.png")
-
         return img, label
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:
         return transforms.Compose(
             [
-                # Uniform input, you may choose higher/lower sizes.
                 SquarePad(),
-                # transforms.ToTensor(),
+                # Uniform input, you may choose higher/lower sizes.
+                transforms.Resize(224),
+                transforms.ToTensor(),
             ]
         )
 
@@ -101,6 +94,7 @@ if __name__ == "__main__":
     image = cxl[0][0]
     transformations = transforms.Compose(
         [
+            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             transforms_v2.RandomHorizontalFlip(p=0.5),
             transforms.RandomErasing(p=1, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
         ]

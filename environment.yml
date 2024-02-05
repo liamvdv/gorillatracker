@@ -6,7 +6,6 @@ channels:
   # which may be different for different users. All required channels should
   # be listed explicitly here.
   - nodefaults
-  - pyviz/label/dev
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
@@ -34,18 +33,14 @@ dependencies:
   - pandas
   - seqeval
   - scikit-learn
-  - matplotlib
-  - seaborn
 
   # Misc
+  - pydantic
   - jsonlines
   - zstandard
   - debugpy
   - tqdm
   - ipykernel
-  - bokeh
-  - colorcet
-  - ipywidgets
 
   # Dev dependencies
   - black

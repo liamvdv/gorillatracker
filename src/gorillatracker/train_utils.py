@@ -25,7 +25,7 @@ def _assert_tensor(x: Any) -> torch.Tensor:
     return x
 
 
-def get_data_module(  # TODO(rob2u): add simple data module
+def get_data_module(
     dataset_class_id: str,
     data_dir: str,
     batch_size: int,
@@ -37,11 +37,11 @@ def get_data_module(  # TODO(rob2u): add simple data module
     base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
     base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
     dataset_class = get_dataset_class(dataset_class_id)
-    dataset_transforms = Compose(
+    transforms = Compose(
         [
             dataset_class.get_transforms() if hasattr(dataset_class, "get_transforms") else ToTensor(),
-            # _assert_tensor,
+            _assert_tensor,
+            model_transforms,
         ]
     )
-
-    return base(data_dir, batch_size, dataset_class, dataset_transforms=dataset_transforms, model_transforms=model_transforms, training_transforms=training_transforms)  # type: ignore
+    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)  # type: ignore
