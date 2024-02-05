@@ -134,7 +134,6 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
-        **kwargs: Any,
     ) -> None:
         super().__init__()
 
@@ -368,7 +367,7 @@ class BaseModule(L.LightningModule):
         image non-MNIST Datasets. Setting it to `Null` / `None` will give you
         full control here.
         """
-        return transforms_v2.ToTensor()
+        return lambda x: x
 
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         """Add your data augmentations here. Function will be called after get_tensor_transforms in the training loop"""
@@ -406,22 +405,14 @@ class EfficientNetV2Wrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.Resize((224, 224), antialias=True),
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=(0.485 * 255, 0.456 * 255, 0.406 * 255), scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=(0.485 * 255, 0.456 * 255, 0.406 * 255)),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -449,12 +440,7 @@ class ConvNeXtV2BaseWrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -485,13 +471,7 @@ class ConvNeXtV2HugeWrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.Resize((224, 224), antialias=True),
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms.Resize((224), antialias=True)
 
 
 class VisionTransformerWrapper(BaseModule):
@@ -529,8 +509,7 @@ class VisionTransformerWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Compose(
             [
-                transforms_v2.Resize((224, 224), antialias=True),
-                transforms_v2.ToTensor(),
+                transforms.Resize((224), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -539,10 +518,8 @@ class VisionTransformerWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=(0.485 * 255, 0.456 * 255, 0.406 * 255), scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=(0.485 * 255, 0.456 * 255, 0.406 * 255)),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -569,7 +546,6 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
         return transforms_v2.Compose(
             [
                 transforms.Resize((518), antialias=True),
-                transforms_v2.ToTensor(),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -607,7 +583,6 @@ class VisionTransformerClipWrapper(BaseModule):
         return transforms_v2.Compose(
             [
                 transforms.Resize((224), antialias=True),
-                transforms_v2.ToTensor(),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -648,7 +623,6 @@ class ConvNextClipWrapper(BaseModule):
         return transforms.Compose(
             [
                 transforms.Resize((192), antialias=True),
-                transforms_v2.ToTensor(),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -685,7 +659,6 @@ class ConvNextWrapper(BaseModule):
         return transforms.Compose(
             [
                 transforms.Resize((192), antialias=True),
-                transforms_v2.ToTensor(),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -746,10 +719,9 @@ class SwinV2BaseWrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
+        return transforms.Compose(
             [
-                transforms_v2.Resize((192, 192), antialias=True),
-                transforms_v2.ToTensor(),
+                transforms.Resize((192), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -758,10 +730,8 @@ class SwinV2BaseWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=(0.485 * 255, 0.456 * 255, 0.406 * 255), scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=(0.485 * 255, 0.456 * 255, 0.406 * 255)),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -792,10 +762,9 @@ class SwinV2LargeWrapper(BaseModule):
         
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
+        return transforms.Compose(
             [
-                transforms_v2.Resize((192, 192), antialias=True),
-                transforms_v2.ToTensor(),
+                transforms.Resize((192), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -804,10 +773,8 @@ class SwinV2LargeWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=(0.485 * 255, 0.456 * 255, 0.406 * 255), scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=(0.485 * 255, 0.456 * 255, 0.406 * 255)),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -837,12 +804,7 @@ class ResNet18Wrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -879,12 +841,7 @@ class ResNet152Wrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -917,12 +874,7 @@ class ResNet50Wrapper(BaseModule):
         
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -961,12 +913,7 @@ class ResNet50DinoV2Wrapper(BaseModule):
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms_v2.ToTensor(),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1000,7 +947,6 @@ class FaceNetWrapper(BaseModule):
         return transforms.Compose(
             [
                 transforms.Resize((192), antialias=True),
-                transforms_v2.ToTensor(),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )

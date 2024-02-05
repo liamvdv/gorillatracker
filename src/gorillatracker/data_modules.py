@@ -22,13 +22,11 @@ class NletDataModule(L.LightningDataModule):
         data_dir: str,
         batch_size: int = 32,
         dataset_class: Optional[Type[Dataset[Any]]] = None,
-        dataset_transforms: Optional[gtypes.Transform] = None,
-        model_transforms: Optional[gtypes.Transform] = None,
+        transforms: Optional[gtypes.Transform] = None,
         training_transforms: Optional[gtypes.Transform] = None,
     ) -> None:
         super().__init__()
-        self.dataset_transforms = dataset_transforms
-        self.model_transforms = model_transforms
+        self.transforms = transforms
         self.training_transforms = training_transforms
         self.dataset_class = dataset_class
         self.data_dir = data_dir
@@ -44,12 +42,12 @@ class NletDataModule(L.LightningDataModule):
         )
 
         if stage == "fit":
-            self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.dataset_transforms, self.training_transforms, self.model_transforms]))  # type: ignore
-            # self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
         elif stage == "test":
-            self.test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
+            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
         elif stage == "validate":
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None
@@ -76,13 +74,13 @@ class NletDataModule(L.LightningDataModule):
 
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
-            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.dataset_transforms, self.training_transforms, self.model_transforms]))  # type: ignore
+            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             return train.get_num_classes()  # type: ignore
         elif mode == "val":
-            val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
+            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
             return val.get_num_classes()  # type: ignore
         elif mode == "test":
-            test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.dataset_transforms, self.model_transforms]))  # type: ignore
+            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
             return test.get_num_classes()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
