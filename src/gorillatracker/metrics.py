@@ -99,8 +99,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             metrics = {
                 "knn5": partial(knn, k=5),
                 "knn": partial(knn, k=1),
-                "pca": pca,
-                "tsne": tsne,
+                "pca": partial(plot2wandb_image, pca),
+                "tsne": partial(plot2wandb_image, tsne),
                 "fc_layer": fc_layer,
             }
             metrics |= (
@@ -466,26 +466,30 @@ def pca(
     plot.set_ylim(y_min, y_max)
     plot.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.0)
     # plot.figure.savefig("pca.png")
-    plot = wandb.Image(plot.figure)
     print("pca done")
     return plot
 
+def plot2wandb_image(f: callable, *args, **kwargs):
+    plot = f(*args, **kwargs)
+    return wandb.Image(plot.figure)
 
 def tsne(
-    embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
+    embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, perplexity: Optional[int] = None, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     num_classes = len(np.unique(labels))
     # downsample the embeddings and also the labels to 1000 samples
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]
-    if len(labels) < 50:
-        return None
     if with_pca:
-        embeddings = sklearn.decomposition.PCA(n_components=50).fit_transform(embeddings)
+        embeddings = sklearn.decomposition.PCA(n_components=num_classes).fit_transform(embeddings)
 
-    # tsne = TSNE(n_components=2, method="exact")
-    tsne = TSNE(n_components=2)
+    # NOTE(liamvdv): 
+    # The `perplexity` parameter is a guess about the number of close neighbors 
+    # each point has, and it should be less than the total number of samples.
+    # 30 by default in scikit-learn's implementation
+    # Explicitly set if you get an error.
+    tsne = TSNE(n_components=2, **{"perplexity": perplexity} if perplexity is not None else {})
     embeddings = tsne.fit_transform(embeddings)
 
     plt.figure()
@@ -503,7 +507,6 @@ def tsne(
     # place the legend outside of the plot but readable
     plot.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.0)
     # plot.figure.savefig("tnse.png")
-    plot = wandb.Image(plot.figure)
     print("tsne done")
     return plot
 
