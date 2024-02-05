@@ -23,7 +23,9 @@ def get_samples_video(dirpath: Path) -> List[Tuple[Path, str]]:
     samples = []
     image_paths = sorted(dirpath.glob("*.png"))
     for image_path in image_paths:
-        label = image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1] # expects image_path as video-id-frame
+        label = (
+            image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1]
+        )  # expects image_path as video-id-frame
         samples.append((image_path, label))
     return samples
 

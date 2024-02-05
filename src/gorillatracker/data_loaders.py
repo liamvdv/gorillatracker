@@ -57,7 +57,9 @@ def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
     prev_label = None
     prev_start = None
     for i, image_path in enumerate(image_paths):
-        label = image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1] # expects image_path as video-id-frame
+        label = (
+            image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1]
+        )  # expects image_path as video-id-frame
         assert prev_label is None or prev_label <= label, "dataset passed to TripletSampler must be label-sorted."
         if prev_label is None:
             prev_label = label
