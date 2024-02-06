@@ -21,6 +21,7 @@ from pathlib import Path
 import json
 import wandb
 import typer
+import os
 
 Run = Any
 
@@ -33,6 +34,8 @@ def keep(run) -> bool:
     return run.created_at <= ENFORCE_AFTER or "keep" in run.tags or "proof" in run.tags or "baseline" in run.tags
 
 # Initialize the WandB API
+if "WANDB_API_KEY" in os.environ:
+    wandb.login(key=os.environ["WANDB_API_KEY"])
 api = wandb.Api()
 
 
