@@ -170,7 +170,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
             frequency[i] = torch.sum(self.memory_bank_labels == i)
 
         # set to zero if frequency is zero
-        prototypes[frequency == 0] = 0.0
+        prototypes[frequency == 0] = eps
 
         return prototypes, frequency
 

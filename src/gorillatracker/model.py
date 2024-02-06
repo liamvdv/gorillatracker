@@ -133,6 +133,7 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
+        dropout_p: float = 0.0,
     ) -> None:
         super().__init__()
 
@@ -158,6 +159,7 @@ class BaseModule(L.LightningModule):
         # self.model = None
         self.from_scratch = from_scratch
         self.embedding_size = embedding_size
+        self.dropout_p = dropout_p
 
         ##### Create Table embeddings_table
         self.embeddings_table_columns = ["label", "embedding"]
@@ -361,10 +363,9 @@ class EfficientNetV2Wrapper(BaseModule):
         # self.model.classifier = torch.nn.Sequential(
         #     torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
         # )
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.classifier = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.classifier[1].in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -382,8 +383,8 @@ class EfficientNetV2Wrapper(BaseModule):
         return transforms.Compose(
             [
                 transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=(0.485, 0.456, 0.406), scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=(0.485, 0.456, 0.406)),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
@@ -397,10 +398,9 @@ class ConvNeXtV2BaseWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("convnextv2_base", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -430,10 +430,9 @@ class ConvNeXtV2HugeWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("convnextv2_huge", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -451,10 +450,9 @@ class VisionTransformerWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -500,10 +498,9 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -535,10 +532,9 @@ class VisionTransformerClipWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_base_patch16_clip_224.metaclip_2pt5b", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -574,10 +570,9 @@ class ConvNextClipWrapper(BaseModule):
             if kwargs.get("from_scratch", False)
             else timm.create_model(model_name, pretrained=True)
         )
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -609,10 +604,9 @@ class ConvNextWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("convnext_base", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -651,10 +645,9 @@ class SwinV2BaseWrapper(BaseModule):
         # self.model.head.fc = torch.nn.Sequential(
         #     torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
         # ) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -713,10 +706,9 @@ class SwinV2LargeWrapper(BaseModule):
         # self.model.head.fc = torch.nn.Linear(
         #     in_features=self.model.head.fc.in_features, out_features=self.embedding_size
         # ) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -750,10 +742,9 @@ class ResNet18Wrapper(BaseModule):
             resnet18() if kwargs.get("from_scratch", False) else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
         )
         # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -786,10 +777,9 @@ class ResNet152Wrapper(BaseModule):
             resnet152() if kwargs.get("from_scratch", False) else resnet152(weights=ResNet152_Weights.IMAGENET1K_V1)
         )
         # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -822,10 +812,9 @@ class ResNet50Wrapper(BaseModule):
             resnet50() if kwargs.get("from_scratch", False) else resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
         )
         # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -852,10 +841,9 @@ class ResNet50DinoV2Wrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
         # self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.last_linear = torch.nn.Sequential(
             torch.nn.BatchNorm1d(2048),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=2048, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
@@ -890,10 +878,9 @@ class FaceNetWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = InceptionResnetV1(pretrained="vggface2")
 
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.last_linear = torch.nn.Sequential(
             torch.nn.BatchNorm1d(1792),
-            torch.nn.Dropout(p=dropout_p),
+            torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
         )
         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
