@@ -106,22 +106,22 @@ class BaseModule(L.LightningModule):
     must be subclassed and set self.model = ...
     """
 
-    def __init__(  # TODO(rob2u): set defaults for all args -> allows easy loading from checkpoint.
+    def __init__(
         self,
-        model_name_or_path: str = "resnet18",
+        model_name_or_path: str,
         # model_kwargs: dict,
-        from_scratch: bool = False,
-        loss_mode: str = "offline/native",
-        weight_decay: float = 0.0,
-        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"] = "constant",
-        warmup_mode: Literal["linear", "cosine", "exponential", "constant"] = "constant",
-        warmup_epochs: int = 0,
-        max_epochs: int = 10,
-        initial_lr: float = 1e-4,
-        start_lr: float = 1e-4,
-        end_lr: float = 1e-4,
-        beta1: float = 0.9,
-        beta2: float = 0.999,
+        from_scratch: bool,
+        loss_mode: str,
+        weight_decay: float,
+        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"],
+        warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
+        warmup_epochs: int,
+        max_epochs: int,
+        initial_lr: float,
+        start_lr: float,
+        end_lr: float,
+        beta1: float,
+        beta2: float,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         margin: float = 0.5,
@@ -646,16 +646,17 @@ class SwinV2BaseWrapper(BaseModule):
             if kwargs.get("from_scratch", False)
             else timm.create_model(swin_model, pretrained=True)
         )
-        # self.model.head.fc = torch.nn.Sequential(
-        #     torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-        # ) # TODO
-        dropout_p = kwargs.get("dropout_p", 0.0)
         self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=dropout_p),
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
+        )  # TODO
+
+        # dropout_p = kwargs.get("dropout_p", 0.0)
+        # self.model.head.fc = torch.nn.Sequential(
+        #     torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+        #     torch.nn.Dropout(p=dropout_p),
+        #     torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+        #     torch.nn.BatchNorm1d(self.embedding_size),
+        # )
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
