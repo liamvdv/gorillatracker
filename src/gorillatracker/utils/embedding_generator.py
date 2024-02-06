@@ -1,6 +1,6 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Literal, Union
+from typing import Any, Callable, Dict, Literal, Tuple, Type, Union
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -12,15 +12,18 @@ from tqdm import tqdm
 
 from gorillatracker.model import BaseModule, get_model_cls
 from gorillatracker.train_utils import get_dataset_class
+from gorillatracker.type_helper import Image, Label
+
+wandbRun = Any
 
 
-def get_wandb_api():
+def get_wandb_api() -> wandb.Api:
     if not hasattr(get_wandb_api, "api"):
-        get_wandb_api.api = wandb.Api()
-    return get_wandb_api.api
+        get_wandb_api.api = wandb.Api()  # type: ignore
+    return get_wandb_api.api  # type: ignore
 
 
-def parse_wandb_url(url: str):
+def parse_wandb_url(url: str) -> Tuple[str, str, str]:
     assert url.startswith("https://wandb.ai/")
     parsed = urlparse(url)
     assert parsed.netloc == "wandb.ai"
@@ -35,15 +38,15 @@ def parse_wandb_url(url: str):
     return entity, project, run_id
 
 
-def get_run(url: str):
+def get_run(url: str) -> wandbRun:
     # https://docs.wandb.ai/ref/python/run
     entity, project, run_id = parse_wandb_url(url)
-    run = get_wandb_api().run(f"{entity}/{project}/{run_id}")
+    run = get_wandb_api().run(f"{entity}/{project}/{run_id}")  # type: ignore
     return run
 
 
 def load_model_from_wandb(
-    wandb_fullname: str, model_cls: BaseModule = BaseModule(), embedding_size: int = 128, device: str = "cpu"
+    wandb_fullname: str, model_cls: Type[BaseModule], model_config: Dict[str, Any], device: str = "cpu"
 ) -> BaseModule:
     api = get_wandb_api()
 
@@ -56,9 +59,7 @@ def load_model_from_wandb(
     checkpoint = torch.load(model, map_location=torch.device("cpu"))
     model_state_dict = checkpoint["state_dict"]
 
-    model = model_cls(
-        embedding_size=embedding_size,
-    )
+    model = model_cls(**model_config)
 
     if hasattr(model_state_dict, "loss_module_train.prototypes") and hasattr(
         model_state_dict, "loss_module_val.prototypes"
@@ -68,8 +69,8 @@ def load_model_from_wandb(
 
     # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
     # easiest fix is to just use the old embedding structure in the model class
-
     model.load_state_dict(model_state_dict)
+
     model.to(device)
     model.eval()
     return model
@@ -81,7 +82,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu") ->
     with torch.no_grad():
         print("Generating embeddings...")
         for imgs, labels in tqdm(dataset):
-            if isinstance(imgs, torch.Tensor):  # if single image is passe wrap it in list
+            if isinstance(imgs, torch.Tensor):
                 imgs = [imgs]
                 labels = [labels]
             batch_inputs = torch.stack(imgs)
@@ -110,29 +111,29 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu") ->
 
 
 def get_dataset(
-    partition: Literal["train", "val", "test"] = "val",
-    data_dir: str = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
+    model: BaseModule,
+    partition: Literal["train", "val", "test"],
+    data_dir: str,
+    dataset_class: str,
     transform: Union[Callable[..., Any], None] = None,
-    model: BaseModule = BaseModule(),
-    dataset_class: str = "gorillatracker.datasets.cxl.CXLDataset",
-) -> Dataset:
+) -> Dataset[Tuple[Image, Label]]:
     cls = get_dataset_class(dataset_class)
     if transform is None:
         transform = transforms.Compose(
             [
-                cls.get_transforms(),
+                cls.get_transforms(),  # type: ignore
                 model.get_tensor_transforms(),
             ]
         )
 
-    return cls(
+    return cls(  # type: ignore
         data_dir=data_dir,
         partition=partition,
         transform=transform,
     )
 
 
-def get_latest_model_checkpoint(run) -> wandb.Artifact:
+def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
     models = [a for a in run.logged_artifacts() if a.type == "model"]
     return max(models, key=lambda a: a.created_at)
 
@@ -144,20 +145,45 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
     partition, image_path, embedding, label, label_string
     """
     out = Path(outpath)
-    assert not out.exists(), "outpath must not exist"
-    assert out.parent.exists(), "outpath parent must exist"
-    assert out.suffix == ".pkl", "outpath must be a pickle file"
+    is_write = outpath != "-"
+    if is_write:
+        assert not out.exists(), "outpath must not exist"
+        assert out.parent.exists(), "outpath parent must exist"
+        assert out.suffix == ".pkl", "outpath must be a pickle file"
 
     run = get_run(run_url)
     print("Using model from run:", run.name)
     print("Config:", run.config)
     # args = TrainingArgs(**run.config) # NOTE(liamvdv): contains potenially unknown keys / missing keys (e. g. l2_beta)
-    args = {k: run.config[k] for k in ("model_name_or_path", "embedding_size", "dataset_class", "data_dir")}
+    args = {
+        k: run.config[k]
+        for k in (
+            # Others:
+            "model_name_or_path",
+            "dataset_class",
+            "data_dir",
+            # Model Params:
+            "embedding_size",
+            "from_scratch",
+            "loss_mode",
+            "weight_decay",
+            "lr_schedule",
+            "warmup_mode",
+            "warmup_epochs",
+            "max_epochs",
+            "initial_lr",
+            "start_lr",
+            "end_lr",
+            "beta1",
+            "beta2",
+            # NOTE(liamvdv): might need be extended by other keys if model keys change
+        )
+    }
 
     print("Loading model from latest checkpoint")
     model_path = get_latest_model_checkpoint(run).qualified_name
     model_cls = get_model_cls(args["model_name_or_path"])
-    model = load_model_from_wandb(model_path, model_cls=model_cls, embedding_size=args["embedding_size"])
+    model = load_model_from_wandb(model_path, model_cls=model_cls, model_config=args)
 
     train_dataset = get_dataset(
         partition="train", data_dir=args["data_dir"], model=model, dataset_class=args["dataset_class"]
@@ -177,7 +203,8 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
     print("Embeddings for", len(df), "images generated")
 
     # store
-    df.to_pickle(outpath)
+    if is_write:
+        df.to_pickle(outpath)
     print("done")
     return df
 

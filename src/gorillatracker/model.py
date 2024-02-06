@@ -133,6 +133,7 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
+        **kwargs: Any,
     ) -> None:
         super().__init__()
 
