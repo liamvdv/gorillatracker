@@ -81,7 +81,7 @@ def clear_failed(run: Run) -> Optional[str]:
         return "failed"
 
 
-def clear_untracable_names(run: Run) -> Optional[str]:
+def clear_untraceable_names(run: Run) -> Optional[str]:
     # {Issue Number}-{purpose}
     pattern = r"^\d+-.+"
     match = re.search(pattern, run.name)
@@ -89,7 +89,7 @@ def clear_untracable_names(run: Run) -> Optional[str]:
         return "name_untraceable"
 
 # https://docs.wandb.ai/ref/python/run
-run_filters = [clear_failed, clear_untracable_names]
+run_filters = [clear_failed, clear_untraceable_names]
 
 class WandbCleaner:
     def __init__(self, rules, entity=ENTITY):
