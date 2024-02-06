@@ -275,6 +275,7 @@ class BaseModule(L.LightningModule):
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
+            assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
             self.log("val/loss", loss, sync_dist=True)
 
         # clear the table where the embeddings are stored
