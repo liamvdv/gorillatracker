@@ -40,7 +40,7 @@ class ArcFaceLoss(torch.nn.Module):
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
-        
+
         assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
 
         # get cos(theta) for each embedding and prototype
@@ -58,7 +58,7 @@ class ArcFaceLoss(torch.nn.Module):
         phi = (
             cos_theta * self.cos_m - sine_theta * self.sin_m
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
-        
+
         assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
 
         mask = torch.zeros(cos_theta.size(), device=cos_theta.device)
@@ -67,7 +67,7 @@ class ArcFaceLoss(torch.nn.Module):
         output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: sometimes there is an additional penalty term
         output *= self.s
         loss = self.ce(output, labels)
-        
+
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
         print(f"loss: {loss}")
 
