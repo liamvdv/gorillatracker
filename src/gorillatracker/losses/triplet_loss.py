@@ -355,11 +355,10 @@ class L2SPRegularization_Wrapper(nn.Module):
         self.model = model
         self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
 
-
     def forward(self, *args, **kwargs):
         standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
         l2sp_loss = self.l2sp_loss(self.model)
-        
+
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
 
 
@@ -388,18 +387,18 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             accelerator=kw_args["accelerator"],
         ),  # TODO
     }
-    
+
     if "l2sp" in loss_mode:
         loss_name = loss_mode.replace("/l2sp", "")
         loss = loss_modes[loss_name]
         return L2SPRegularization_Wrapper(
-                loss=loss,
-                model=kw_args["model"],
-                path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
-                alpha=kw_args["l2_alpha"],
-                beta=kw_args["l2_beta"],
-            )
-        
+            loss=loss,
+            model=kw_args["model"],
+            path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
+            alpha=kw_args["l2_alpha"],
+            beta=kw_args["l2_beta"],
+        )
+
     return loss_modes[loss_mode]
 
 

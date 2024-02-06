@@ -199,15 +199,16 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
 
-        logger.info("Collecting PL checkpoint for wandb...")
-        artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
-        artifact.add_file(save_path, name="model.ckpt")
+        if args.save_model_to_wandb:
+            logger.info("Collecting PL checkpoint for wandb...")
+            artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
+            artifact.add_file(save_path, name="model.ckpt")
 
-        logger.info("Pushing to wandb...")
-        aliases = ["train_end", "latest"]
-        wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
+            logger.info("Pushing to wandb...")
+            aliases = ["train_end", "latest"]
+            wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
-        logger.success("Saving finished!")
+            logger.success("Saving finished!")
 
 
 if __name__ == "__main__":

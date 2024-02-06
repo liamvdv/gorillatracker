@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import timm
 import torch
+import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
@@ -21,7 +22,6 @@ from torchvision.models import (
     resnet50,
     resnet152,
 )
-import torch.nn as nn
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes

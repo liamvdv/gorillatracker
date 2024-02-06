@@ -39,10 +39,11 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
 
 sweeps = [
     {
-        "project_name": "Embedding-SwinV2-CXL-Open",
+        "project_name": "Embedding-ResNet152-CXL-Open",
         "entity": "gorillas",
-        "config_path": "./cfgs/swinv2_cxl.yml",
+        "config_path": "./cfgs/resnet152_cxl.yml",
         "parameters": {
+            "initial_lr": {"values": [1e-3, 1e-4, 1e-5, 1e-6]},
             "l2_alpha": {"values": [1e-2, 1e-3, 1e-4, 1e-5]},
             "l2_beta": {"values": [1e-2, 1e-3, 1e-4]},
         },
