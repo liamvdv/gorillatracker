@@ -79,6 +79,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         mem_bank_start_epoch=args.mem_bank_start_epoch,
         lambda_membank=args.lambda_membank,
         num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
+        dropout_p=args.dropout_p,
         accelerator=args.accelerator,
     )
 

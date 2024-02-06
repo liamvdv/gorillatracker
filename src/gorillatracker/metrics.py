@@ -116,7 +116,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 data=embeddings_table,
                 embedding_name="val/embeddings",
                 metrics=metrics,
-                train_embeddings=train_embeddings,
+                train_embeddings=train_embeddings,  # type: ignore
                 train_labels=train_labels,
             )
         # clear the table where the embeddings are stored
@@ -263,7 +263,7 @@ def fc_layer(
     for param in model.parameters():
         param.requires_grad_(True)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay=0.001)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.001)
     criterion = torch.nn.CrossEntropyLoss()
     # acitvate gradients
     with torch.set_grad_enabled(True):
@@ -286,7 +286,7 @@ def fc_layer(
                 loss.requires_grad_(True)
                 loss.backward()
                 # apply gradient clipping
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # type: ignore
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
                 loss_sum += loss.item()
 
@@ -323,8 +323,13 @@ def knn(
     train_labels: Optional[gtypes.MergedLabels] = None,
 ) -> Dict[str, Any]:
     if use_train_embeddings:
+        print("Using train embeddings for knn")
         return knn_with_train(
-            val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels
+            val_embeddings,
+            val_labels,
+            k=k,
+            train_embeddings=train_embeddings,
+            train_labels=train_labels,
         )
     else:
         return knn_naive(val_embeddings, val_labels, k=k)
@@ -350,18 +355,19 @@ def knn_with_train(
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
     val_labels = torch.tensor(val_labels)
-    train_embeddings = torch.tensor(train_embeddings)
+    train_embeddings = torch.tensor(train_embeddings)  # type: ignore
     train_labels = torch.tensor(train_labels)
 
-    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
+    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)  # type: ignore
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
 
-    num_classes = torch.max(combined_labels).item() + 1
+    num_classes: int = torch.max(combined_labels).item() + 1  # type: ignore
     assert num_classes == len(np.unique(combined_labels))
     if num_classes < k:
         k = num_classes
 
     distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+
     distance_matrix.fill_diagonal_(float("inf"))
 
     _, closest_indices = torch.topk(distance_matrix, k, largest=False)
