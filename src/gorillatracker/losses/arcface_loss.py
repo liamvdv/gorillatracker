@@ -69,8 +69,6 @@ class ArcFaceLoss(torch.nn.Module):
         loss = self.ce(output, labels)
 
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
-        print(f"loss: {loss}")
-
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
 
     def set_weights(self, weights: torch.Tensor) -> None:
