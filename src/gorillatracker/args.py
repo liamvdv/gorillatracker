@@ -39,10 +39,16 @@ class TrainingArgs:
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
 
+    # Optimizer Arguments
     weight_decay: float = field(default=0.1)
     beta1: float = field(default=0.9)
     beta2: float = field(default=0.999)
     epsilon: float = field(default=1e-8)
+
+    # L2SP Arguments
+    l2_alpha: float = field(default=0.1)
+    l2_beta: float = field(default=0.01)
+    path_to_pretrained_weights: Union[str, None] = field(default=None)
 
     lr_schedule: Literal["linear", "cosine", "exponential", "reduce_on_plateau", "constant"] = field(default="constant")
     warmup_mode: Literal["linear", "cosine", "exponential", "constant"] = field(default="constant")
@@ -51,13 +57,25 @@ class TrainingArgs:
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
 
+    save_model_to_wandb: bool = field(default=False)
+
     margin: float = field(default=0.5)
     s: float = field(default=64.0)
     delta_t: int = field(default=100)
     mem_bank_start_epoch: int = field(default=2)
     lambda_membank: float = field(default=0.5)
     loss_mode: Literal[
-        "offline", "offline/native", "online/soft", "online/hard", "online/semi-hard", "softmax/arcface", "softmax/vpl"
+        "offline",
+        "offline/native",
+        "online/soft",
+        "online/hard",
+        "online/semi-hard",
+        "softmax/arcface",
+        "softmax/vpl",
+        "offline/native/l2sp",
+        "online/soft/l2sp",
+        "online/hard/l2sp",
+        "online/semi-hard/l2sp",
     ] = field(default="offline")
 
     batch_size: int = field(default=8)
