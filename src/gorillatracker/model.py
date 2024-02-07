@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Callable, Literal, Tuple, Type
+from typing import Any, Callable, Dict, Literal, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -135,7 +135,7 @@ class BaseModule(L.LightningModule):
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
-        **kwargs,
+        **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
 
@@ -178,7 +178,7 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
-        **kwargs,
+        **kwargs: Dict[str, Any],
     ) -> None:
         self.loss_module_train = get_loss(
             loss_mode,

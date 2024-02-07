@@ -1,4 +1,4 @@
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Dict, List, Literal
 
 import torch
 import torch.nn.functional as F
@@ -355,7 +355,7 @@ class L2SPRegularization_Wrapper(nn.Module):
         self.model = model
         self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
 
-    def forward(self, *args, **kwargs):
+    def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
         standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
         l2sp_loss = self.l2sp_loss(self.model)
 
