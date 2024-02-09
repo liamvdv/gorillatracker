@@ -1,15 +1,15 @@
 import json
 import os
 import subprocess
-from typing import Dict, List, MutableSet, Tuple, Union
+from typing import List, MutableSet, Tuple, Union
 
 import cv2
 
-BBox = Dict[str, Union[int, float]]
+BBox = dict[str, Union[int, float]]
 FrameData = list[BBox]
 VideoData = list[FrameData]
-IDData = list[Dict[str, Union[int, list[int]]]]
-Data = Dict[str, Union[IDData, VideoData]]
+IDData = list[dict[str, Union[int, list[int]]]]
+Data = dict[str, Union[IDData, VideoData]]
 
 
 class GorillaVideoTracker:
