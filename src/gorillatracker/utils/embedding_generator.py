@@ -162,28 +162,28 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
             "model_name_or_path",
             "dataset_class",
             "data_dir",
-            # Model Params:
-            "embedding_size",
-            "from_scratch",
-            "loss_mode",
-            "weight_decay",
-            "lr_schedule",
-            "warmup_mode",
-            "warmup_epochs",
-            "max_epochs",
-            "initial_lr",
-            "start_lr",
-            "end_lr",
-            "beta1",
-            "beta2",
-            # NOTE(liamvdv): might need be extended by other keys if model keys change
+            # # Model Params:
+            # "embedding_size",
+            # "from_scratch",
+            # "loss_mode",
+            # "weight_decay",
+            # "lr_schedule",
+            # "warmup_mode",
+            # "warmup_epochs",
+            # "max_epochs",
+            # "initial_lr",
+            # "start_lr",
+            # "end_lr",
+            # "beta1",
+            # "beta2",
+            # # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }
 
     print("Loading model from latest checkpoint")
     model_path = get_latest_model_checkpoint(run).qualified_name
     model_cls = get_model_cls(args["model_name_or_path"])
-    model = load_model_from_wandb(model_path, model_cls=model_cls, model_config=args)
+    model = load_model_from_wandb(model_path, model_cls=model_cls, model_config=run.config)
 
     train_dataset = get_dataset(
         partition="train", data_dir=args["data_dir"], model=model, dataset_class=args["dataset_class"]
