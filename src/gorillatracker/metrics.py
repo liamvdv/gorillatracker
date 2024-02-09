@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -47,7 +47,6 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule
     ) -> None:
         super().__init__()
-        self.logged_epochs: Set[int] = set()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
@@ -72,53 +71,49 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
-        current_epoch = trainer.current_epoch
+        current_step = trainer.global_step
         assert trainer.max_epochs is not None
-        if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
-            trainer.max_epochs - 1 == current_epoch
-        ):
-            self.logged_epochs.add(current_epoch)
 
-            # Assuming you have an 'embeddings' variable containing your embeddings
+        table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
+        artifact = wandb.Artifact(
+            name="run_{0}_step_{1}".format(self.run.name, current_step),
+            type="embeddings",
+            metadata={"step": current_step},
+            description="Embeddings from step {}".format(current_step),
+        )
+        artifact.add(table, "embeddings_table_step_{}".format(current_step))
+        self.run.log_artifact(artifact)
+        self.embedding_artifacts.append(artifact.name)
 
-            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
-            artifact = wandb.Artifact(
-                name="run_{0}_epoch_{1}".format(self.run.name, current_epoch),
-                type="embeddings",
-                metadata={"epoch": current_epoch},
-                description="Embeddings from epoch {}".format(current_epoch),
-            )
-            artifact.add(table, "embeddings_table_epoch_{}".format(current_epoch))
-            self.run.log_artifact(artifact)
-            self.embedding_artifacts.append(artifact.name)
+        train_embeddings, train_labels = (
+            self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+        )
 
-            train_embeddings, train_labels = (
-                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-            )
-
-            metrics = {
-                "knn5": partial(knn, k=5),
-                "knn": partial(knn, k=1),
-                "pca": pca,
-                "tsne": tsne,
-                "fc_layer": fc_layer,
+        metrics = {
+            "knn5": partial(knn, k=5),
+            "knn": partial(knn, k=1),
+            "pca": pca,
+            "tsne": tsne,
+            "fc_layer": fc_layer,
+        }
+        metrics |= (
+            {
+                "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
             }
-            metrics |= (
-                {
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                }
-                if self.knn_with_train
-                else {}
-            )
-            # log to wandb
-            evaluate_embeddings(
-                data=embeddings_table,
-                embedding_name="val/embeddings",
-                metrics=metrics,
-                train_embeddings=train_embeddings,  # type: ignore
-                train_labels=train_labels,
-            )
+            if self.knn_with_train
+            else {}
+        )
+        # log to wandb
+        evaluate_embeddings(
+            data=embeddings_table,
+            embedding_name="val/embeddings",
+            metrics=metrics,
+            train_embeddings=train_embeddings,  # type: ignore
+            train_labels=train_labels,
+        )
+        # clear the table where the embeddings are stored
+        # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # rese t embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)

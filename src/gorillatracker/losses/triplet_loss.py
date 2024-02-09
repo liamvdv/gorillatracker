@@ -363,43 +363,58 @@ class L2SPRegularization_Wrapper(nn.Module):
 
 
 def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
-    loss_modes = {
-        "online/hard": TripletLossOnline(mode="hard", margin=kw_args["margin"]),
-        "online/semi-hard": TripletLossOnline(mode="semi-hard", margin=kw_args["margin"]),
-        "online/soft": TripletLossOnline(mode="soft", margin=kw_args["margin"]),
-        "offline": TripletLossOffline(margin=kw_args["margin"]),
-        "offline/native": TripletLossOfflineNative(margin=kw_args["margin"]),
-        "softmax/arcface": ArcFaceLoss(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            accelerator=kw_args["accelerator"],
-        ),  # TODO
-        "softmax/vpl": VariationalPrototypeLearning(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-            accelerator=kw_args["accelerator"],
-        ),  # TODO
-    }
-
+    l2sp = False
     if "l2sp" in loss_mode:
-        loss_name = loss_mode.replace("/l2sp", "")
-        loss = loss_modes[loss_name]
+        loss_mode = loss_mode.replace("/l2sp", "")
+        l2sp = True
+
+    loss_module = None
+
+    if loss_mode == "online/hard":
+        loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
+    elif loss_mode == "online/semi-hard":
+        loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
+    elif loss_mode == "online/soft":
+        return TripletLossOnline(mode="soft", margin=kw_args["margin"])
+    elif loss_mode == "offline":
+        loss_module = TripletLossOffline(margin=kw_args["margin"])
+    elif loss_mode == "offline/native":
+        loss_module = TripletLossOfflineNative(margin=kw_args["margin"])
+    elif loss_mode == "softmax/arcface":
+        loss_module = ArcFaceLoss(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+            accelerator=kw_args["accelerator"],
+        )
+    elif loss_mode == "softmax/vpl":
+        loss_module = (
+            VariationalPrototypeLearning(
+                embedding_size=kw_args["embedding_size"],
+                num_classes=kw_args["num_classes"],
+                batch_size=kw_args["batch_size"],
+                s=kw_args["s"],
+                margin=kw_args["margin"],
+                delta_t=kw_args["delta_t"],
+                mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+                accelerator=kw_args["accelerator"],
+            ),
+        )  # TODO
+
+    else:
+        raise ValueError(f"Loss mode {loss_mode} not supported")
+
+    if l2sp:
         return L2SPRegularization_Wrapper(
-            loss=loss,
+            loss=loss_module,
             model=kw_args["model"],
             path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
             alpha=kw_args["l2_alpha"],
             beta=kw_args["l2_beta"],
         )
 
-    return loss_modes[loss_mode]
+    return loss_module
 
 
 if __name__ == "__main__":

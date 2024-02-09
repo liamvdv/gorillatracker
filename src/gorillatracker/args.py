@@ -56,6 +56,7 @@ class TrainingArgs:
     initial_lr: float = field(default=1e-5)
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
+    stepwise_schedule: bool = field(default=False)
 
     save_model_to_wandb: bool = field(default=False)
 
@@ -82,6 +83,7 @@ class TrainingArgs:
     grad_clip: Union[float, None] = field(default=1.0)
     gradient_accumulation_steps: int = field(default=1)
     max_epochs: int = field(default=300)
+    val_check_interval: float = field(default=1.0)
     val_before_training: bool = field(default=False)
     only_val: bool = field(default=False)
     save_interval: float = field(default=10)
@@ -92,6 +94,7 @@ class TrainingArgs:
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
     data_resize_transform: Union[int, None] = field(default=None)
+    video_data: bool = field(default=False)
     # Add any additional fields as needed.
 
     def __post_init__(self) -> None:
