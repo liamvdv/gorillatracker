@@ -29,8 +29,8 @@
         // DO NOT COMMIT THIS ENABLED TO REMOTE.
         // "--gpus",
         // "device=1",
-        // "-u",
-        // "0"
+        "-u",
+        "0"
     ],
     // ------------------------------------------------------------
     // Setup your mounts and env vars like for a docker run command
@@ -95,7 +95,7 @@
             ]
         }
     },
-    "postCreateCommand": "pip install -e .",
+    "postCreateCommand": "pip install -e ."
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": []
 }

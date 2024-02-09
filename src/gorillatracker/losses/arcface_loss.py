@@ -41,6 +41,8 @@ class ArcFaceLoss(torch.nn.Module):
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
 
+        assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
+
         # get cos(theta) for each embedding and prototype
         prototypes = self.prototypes.to(embeddings.device)
 
@@ -57,6 +59,8 @@ class ArcFaceLoss(torch.nn.Module):
             cos_theta * self.cos_m - sine_theta * self.sin_m
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
 
+        assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
+
         mask = torch.zeros(cos_theta.size(), device=cos_theta.device)
         mask.scatter_(1, labels.view(-1, 1).long(), 1)  # mask is one-hot encoded labels
 
@@ -64,6 +68,7 @@ class ArcFaceLoss(torch.nn.Module):
         output *= self.s
         loss = self.ce(output, labels)
 
+        assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
 
     def set_weights(self, weights: torch.Tensor) -> None:
@@ -170,7 +175,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
             frequency[i] = torch.sum(self.memory_bank_labels == i)
 
         # set to zero if frequency is zero
-        prototypes[frequency == 0] = 0.0
+        prototypes[frequency == 0] = eps
 
         return prototypes, frequency
 

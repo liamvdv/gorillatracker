@@ -10,7 +10,7 @@
 # We automatically detect W&B login credentials in the ~/.netrc file and pass them to the docker container. To store them, do wandb login once on the host machine.
 
 # Default values
-image="liamvdv/gorillatracker-ubuntu-dev"
+image="liamvdv/gorillatracker-ubuntu-dev:1.0.1"
 command="bash"
 gpus="none"
 
