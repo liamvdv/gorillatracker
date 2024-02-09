@@ -367,11 +367,11 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
     if "l2sp" in loss_mode:
         loss_mode = loss_mode.replace("/l2sp", "")
         l2sp = True
-    
+
     loss_module = None
-    
+
     if loss_mode == "online/hard":
-        loss_module =TripletLossOnline(mode="hard", margin=kw_args["margin"])
+        loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
     elif loss_mode == "online/semi-hard":
         loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
     elif loss_mode == "online/soft":
@@ -389,20 +389,22 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             accelerator=kw_args["accelerator"],
         )
     elif loss_mode == "softmax/vpl":
-        loss_module = VariationalPrototypeLearning(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-            accelerator=kw_args["accelerator"],
-        ),  # TODO
+        loss_module = (
+            VariationalPrototypeLearning(
+                embedding_size=kw_args["embedding_size"],
+                num_classes=kw_args["num_classes"],
+                batch_size=kw_args["batch_size"],
+                s=kw_args["s"],
+                margin=kw_args["margin"],
+                delta_t=kw_args["delta_t"],
+                mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+                accelerator=kw_args["accelerator"],
+            ),
+        )  # TODO
 
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
-    
+
     if l2sp:
         return L2SPRegularization_Wrapper(
             loss=loss_module,
@@ -411,8 +413,6 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             alpha=kw_args["l2_alpha"],
             beta=kw_args["l2_beta"],
         )
-        
-    
 
     return loss_module
 
