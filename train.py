@@ -49,6 +49,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         str(args.data_dir),
         args.batch_size,
         args.loss_mode,
+        args.video_data,
         model_transforms,
         model_cls.get_training_transforms(),  # type: ignore
     )
@@ -70,6 +71,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         initial_lr=args.initial_lr,
         start_lr=args.start_lr,
         end_lr=args.end_lr,
+        stepwise_schedule=args.stepwise_schedule,
+        lr_interval=args.val_check_interval,
         margin=args.margin,
         loss_mode=args.loss_mode,
         embedding_size=args.embedding_size,
@@ -78,7 +81,11 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         delta_t=args.delta_t,
         mem_bank_start_epoch=args.mem_bank_start_epoch,
         lambda_membank=args.lambda_membank,
-        num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
+        num_classes=(
+            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
+            if not args.video_data
+            else (-1, -1, -1)
+        ),
         dropout_p=args.dropout_p,
         accelerator=args.accelerator,
         l2_alpha=args.l2_alpha,
@@ -112,8 +119,19 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             )
         model = torch.compile(model)
 
-    #################### Construct trainer #################
-
+    #################### Construct dataloaders & trainer #################
+    model_transforms = model.get_tensor_transforms()
+    if args.data_resize_transform is not None:
+        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    dm = get_data_module(
+        args.dataset_class,
+        str(args.data_dir),
+        args.batch_size,
+        args.loss_mode,
+        args.video_data,
+        model_transforms,
+        model.get_training_transforms(),
+    )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -154,6 +172,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     # Initialize trainer
     trainer = Trainer(
         max_epochs=args.max_epochs,
+        val_check_interval=args.val_check_interval,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),

@@ -121,6 +121,8 @@ class BaseModule(L.LightningModule):
         initial_lr: float,
         start_lr: float,
         end_lr: float,
+        stepwise_schedule: bool,
+        lr_interval: int,
         beta1: float,
         beta2: float,
         epsilon: float = 1e-8,
@@ -151,6 +153,8 @@ class BaseModule(L.LightningModule):
         self.initial_lr = initial_lr
         self.start_lr = start_lr
         self.end_lr = end_lr
+        self.stepwise_schedule = stepwise_schedule
+        self.lr_interval = lr_interval
 
         self.beta1 = beta1
         self.beta2 = beta2
@@ -341,8 +345,19 @@ class BaseModule(L.LightningModule):
                 optimizer=optimizer,
                 lr_lambda=lambda_schedule,
             )
+            if self.stepwise_schedule:
+                lr_scheduler = {
+                    "scheduler": lambda_scheduler,
+                    "interval": "step",
+                    "frequency": self.lr_interval,
+                }
+            else:
+                lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}
 
-            return {"optimizer": optimizer, "lr_scheduler": lambda_scheduler}
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": lr_scheduler,
+            }
 
         else:
             plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -450,8 +465,8 @@ class ConvNeXtV2BaseWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, scale=(0.02, 0.13)),
             ]
         )
 
@@ -555,7 +570,7 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -591,7 +606,7 @@ class VisionTransformerClipWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -630,7 +645,7 @@ class ConvNextClipWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -665,7 +680,7 @@ class ConvNextWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -805,7 +820,7 @@ class ResNet18Wrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -841,7 +856,7 @@ class ResNet152Wrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -873,7 +888,7 @@ class ResNet50Wrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -911,7 +926,7 @@ class ResNet50DinoV2Wrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
@@ -946,7 +961,7 @@ class FaceNetWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )

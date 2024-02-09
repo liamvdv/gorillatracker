@@ -1,5 +1,7 @@
 import itertools
+import json
 from collections import defaultdict
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -19,6 +21,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.datasets.spac_videos import SPACVideosDataset
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -32,6 +35,31 @@ def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, st
     prev_label = None
     prev_start = None
     for i, (_, label) in enumerate(sorted_value_labels):
+        assert prev_label is None or prev_label <= label, "dataset passed to TripletSampler must be label-sorted."
+        if prev_label is None:
+            prev_label = label
+            prev_start = i
+        elif prev_label != label:
+            labelsection[prev_label] = (prev_start, i - prev_start)
+            prev_label = label
+            prev_start = i
+        # print(i)
+    assert prev_label is not None and prev_start is not None  # make typing happy
+    if prev_label:
+        labelsection[prev_label] = (prev_start, n - prev_start)
+    return labelsection
+
+
+def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
+    image_paths = sorted(data_dir.glob("*.png"))
+    n = len(image_paths)
+    labelsection: LabelSection = defaultdict(lambda: (-1, -1))
+    prev_label = None
+    prev_start = None
+    for i, image_path in enumerate(image_paths):
+        label = (
+            image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1]
+        )  # expects image_path as video-id-frame
         assert prev_label is None or prev_label <= label, "dataset passed to TripletSampler must be label-sorted."
         if prev_label is None:
             prev_label = label
@@ -149,6 +177,32 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
             yield anchor, positive, negative
 
 
+class VideoTripletSampler(TripletSampler):
+    """TripletSampler that only samples negatives specified in json file."""
+
+    def __init__(
+        self,
+        dataset: Dataset[Tuple[Any, gtypes.Label]],
+        data_dir: str,
+        shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
+    ):
+        self.dataset = dataset  # type: ignore
+        self.n = len(self.dataset)
+        self.data_dir = data_dir
+        with open(data_dir + "/negatives.json") as f:
+            self.negatives = json.load(f)
+        self.labelsection = generate_labelsection_video_data(Path(data_dir))
+        self.shuffled_indices_generator = shuffled_indices_generator(self.n)
+
+    def any_sample_not(self, label: gtypes.Label) -> int:
+        possible_negative_labels = self.negatives[label]
+        negative_label = possible_negative_labels[torch.randint(len(possible_negative_labels), (1,)).item()]
+
+        negative_start, negative_length = self.labelsection[negative_label]
+        i = torch.randint(negative_start, negative_start + negative_length, (1,)).item()
+        return i  # type: ignore
+
+
 class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
     """Do not use DataLoader(..., shuffle=True) with QuadletSampler."""
 
@@ -246,3 +300,33 @@ def SimpleDataLoader(
 ) -> gtypes.BatchSimpleDataLoader:
     final_dataset = ToNthDataset(dataset)
     return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size)
+
+
+def VideoTripletDataLoader(
+    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, data_dir: str, shuffle: bool = True
+) -> gtypes.BatchTripletDataLoader:
+    """
+    VideoTripletDataLoader will take any Dataset that returns a single sample in the form of
+    (value, label) on __getitem__ and transform it into an efficient Triplet DataLoader.
+    If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
+    dataset will be shuffled once at the start and not after that.
+    """
+    sampler = VideoTripletSampler(dataset, data_dir=data_dir)
+    if not shuffle:
+        sampler = FreezeSampler(sampler)  # type: ignore
+    final_dataset = ToNthDataset(dataset)
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)  # type: ignore
+
+
+if __name__ == "__main__":
+    dataset = SPACVideosDataset(
+        "data/derived_data/spac_gorillas_converted_labels_cropped_faces",
+        "train",
+        SPACVideosDataset.get_transforms(),
+    )
+    data_dir = "data/derived_data/spac_gorillas_converted_labels_cropped_faces/train"
+    print("creating DataLoader")
+    dataloader = VideoTripletDataLoader(dataset, 12, data_dir=data_dir, shuffle=True)
+    print("created DataLoader")
+    # print first batch label
+    next(iter(dataloader))
