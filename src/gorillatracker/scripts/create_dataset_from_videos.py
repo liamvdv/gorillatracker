@@ -114,6 +114,23 @@ def _crop_and_save_image(frame: cvt.MatLike, x: float, y: float, w: float, h: fl
     """
 
     # calculate the bounding box coordinates
+    frame = _crop_image(frame, x, y, w, h)
+    cv2.imwrite(output_path, frame)
+
+
+def _crop_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float) -> cvt.MatLike:
+    """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
+
+    Args:
+        frame: Image to crop.
+        x: Relative x coordinate of the center of the bounding box.
+        y: Relative y coordinate of the center of the bounding box.
+        w: Relative width of the bounding box.
+        h: Relative height of the bounding box.
+        output_path: Path to save the cropped image to.
+    """
+
+    # calculate the bounding box coordinates
     frame_height, frame_width, _ = frame.shape
     left = int((x - (w / 2)) * frame_width)
     right = int((x + (w / 2)) * frame_width)
@@ -121,7 +138,7 @@ def _crop_and_save_image(frame: cvt.MatLike, x: float, y: float, w: float, h: fl
     bottom = int((y + (h / 2)) * frame_height)
 
     cropped_frame = frame[top:bottom, left:right]
-    cv2.imwrite(output_path, cropped_frame)
+    return cropped_frame
 
 
 def _get_data_from_video(video_path: str, json_path: str, output_dir: str) -> None:

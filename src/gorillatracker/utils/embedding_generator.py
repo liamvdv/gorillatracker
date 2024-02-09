@@ -15,6 +15,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from gorillatracker.model import BaseModule, get_model_cls
+from gorillatracker.scripts.create_dataset_from_videos import _crop_image
 from gorillatracker.train_utils import get_dataset_class
 from gorillatracker.type_helper import Label
 
@@ -92,8 +93,7 @@ def load_model_from_wandb(
     model = model_cls(**model_config)
 
     if (
-        "loss_module_train.prototypes" in model_state_dict.keys()
-        or "loss_module_val.prototypes" in model_state_dict.keys()
+        "loss_module_train.prototypes" in model_state_dict or "loss_module_val.prototypes" in model_state_dict
     ):  # necessary because arcface loss also saves prototypes
         model.loss_module_train.prototypes = torch.nn.Parameter(model_state_dict["loss_module_train.prototypes"])
         model.loss_module_val.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.prototypes"])
@@ -237,29 +237,6 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
         df.to_pickle(outpath)
     print("done")
     return df
-
-
-def _crop_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float) -> cvt.MatLike:
-    """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
-
-    Args:
-        frame: Image to crop.
-        x: Relative x coordinate of the center of the bounding box.
-        y: Relative y coordinate of the center of the bounding box.
-        w: Relative width of the bounding box.
-        h: Relative height of the bounding box.
-        output_path: Path to save the cropped image to.
-    """
-
-    # calculate the bounding box coordinates
-    frame_height, frame_width, _ = frame.shape
-    left = int((x - (w / 2)) * frame_width)
-    right = int((x + (w / 2)) * frame_width)
-    top = int((y - (h / 2)) * frame_height)
-    bottom = int((y + (h / 2)) * frame_height)
-
-    cropped_frame = frame[top:bottom, left:right]
-    return cropped_frame
 
 
 def generate_embeddings_from_tracked_video(
