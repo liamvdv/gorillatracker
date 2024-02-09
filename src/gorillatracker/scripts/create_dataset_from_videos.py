@@ -57,16 +57,21 @@ def _get_negatives(id_frames: IdFrameDict, min_frames: int, json_path: str) -> t
         The filtered dictionary.
         The negatives for each ID.
     """
+    # filter out IDs with too few frames
     id_frames = {id: frames for id, frames in id_frames.items() if len(frames) >= min_frames}
     with open(json_path, "r") as f:
         data = json.load(f)
         ids = data["tracked_IDs"]
+    # get the negatives from the json file for each ID
     id_negatives = {entry["id"]: entry["negatives"] for entry in ids if entry["id"] in id_frames}
+    # filter out negatives that are not in id_frames and remove IDs with no negatives
     for id in id_negatives:
         id_negatives[id] = [negative for negative in id_negatives[id] if negative in id_frames]
         if len(id_negatives[id]) < 1:
             del id_frames[id]
+    # filter negatives again after removing IDs
     id_negatives = {id: negatives for id, negatives in id_negatives.items() if id in id_frames}
+
     return id_frames, id_negatives
 
 
