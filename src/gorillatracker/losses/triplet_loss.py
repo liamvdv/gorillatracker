@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal, Union
 
 import torch
 import torch.nn.functional as F
@@ -368,7 +368,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
         loss_mode = loss_mode.replace("/l2sp", "")
         l2sp = True
 
-    loss_module = None
+    loss_module: Union[torch.nn.Module, None] = None
 
     if loss_mode == "online/hard":
         loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
@@ -389,19 +389,16 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             accelerator=kw_args["accelerator"],
         )
     elif loss_mode == "softmax/vpl":
-        loss_module = (
-            VariationalPrototypeLearning(
-                embedding_size=kw_args["embedding_size"],
-                num_classes=kw_args["num_classes"],
-                batch_size=kw_args["batch_size"],
-                s=kw_args["s"],
-                margin=kw_args["margin"],
-                delta_t=kw_args["delta_t"],
-                mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-                accelerator=kw_args["accelerator"],
-            ),
-        )  # TODO
-
+        loss_module = VariationalPrototypeLearning(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            batch_size=kw_args["batch_size"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+            delta_t=kw_args["delta_t"],
+            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+            accelerator=kw_args["accelerator"],
+        )
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
 

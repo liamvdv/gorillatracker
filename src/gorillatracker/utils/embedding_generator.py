@@ -19,6 +19,12 @@ from gorillatracker.scripts.create_dataset_from_videos import _crop_image
 from gorillatracker.train_utils import get_dataset_class
 from gorillatracker.type_helper import Label
 
+DataTransforms = Union[Callable[..., Any]]
+BBox = tuple[float, float, float, float]  # x, y, w, h
+BBoxFrame = tuple[int, BBox]  # frame_idx, x, y, w, h
+IdFrameDict = dict[int, list[BBoxFrame]]  # id -> list of frames
+IdDict = dict[int, list[int]]  # id -> list of negatives
+JsonDict = dict[str, list[str]]  # video_name-id -> list of negatives
 wandbRun = Any
 
 
@@ -240,8 +246,8 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
 
 
 def generate_embeddings_from_tracked_video(
-    model: BaseModule, video_path: str, tracking_data, model_transforms=lambda x: x
-) -> pd.DataFrame:  # TODO
+    model: BaseModule, video_path: str, tracking_data: IdFrameDict, model_transforms: DataTransforms = lambda x: x
+) -> pd.DataFrame:
     """
     Args:
         model: The model to use for embedding generation.
@@ -291,7 +297,9 @@ def generate_embeddings_from_tracked_video(
 
 
 @torch.no_grad()
-def get_embedding_from_frame(model: BaseModule, frame: cvt.MatLike, bbox, model_transforms) -> torch.Tensor:  # TODO
+def get_embedding_from_frame(
+    model: BaseModule, frame: cvt.MatLike, bbox: BBox, model_transforms: DataTransforms
+) -> torch.Tensor:
     frame_cropped = _crop_image(
         frame,
         bbox[0],  # x
@@ -306,7 +314,7 @@ def get_embedding_from_frame(model: BaseModule, frame: cvt.MatLike, bbox, model_
     img = model_transforms(img)
 
     model.eval()
-    embedding = model(img.unsqueeze(0))
+    embedding = model(img.unsqueeze(0))  # type: ignore
     return embedding
 
 

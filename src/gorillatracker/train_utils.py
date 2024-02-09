@@ -56,4 +56,4 @@ def get_data_module(
             model_transforms,
         ]
     )
-    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)  # type: ignore
+    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
