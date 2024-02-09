@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 from torch.nn import TripletMarginLoss
 
-from gorillatracker.triplet_loss import TripletLossOffline, TripletLossOnline
+from gorillatracker.losses.triplet_loss import TripletLossOffline, TripletLossOnline
 
 
 def calc_loss_of_triplet(
@@ -27,7 +27,7 @@ def calc_loss_and_distance_of_triplet(
 
 
 def approx_equal(a: torch.Tensor, b: torch.Tensor, eps: float = 1e-6) -> bool:
-    return torch.abs(a - b) < eps
+    return torch.abs(a - b) < eps  # type: ignore
 
 
 def test_tripletloss_offline() -> None:

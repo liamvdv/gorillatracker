@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -13,6 +13,8 @@ import sklearn
 import torch
 import torchmetrics as tm
 import wandb
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
@@ -41,11 +43,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_share: Log embeddings to wandb every n epochs.
     """
 
-    def __init__(self, every_n_val_epochs: int, wandb_run: Runner, dm: L.LightningDataModule) -> None:
+    def __init__(
+        self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule
+    ) -> None:
         super().__init__()
-        self.logged_epochs: Set[int] = set()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
+        self.knn_with_train = knn_with_train
         self.run = wandb_run
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
@@ -56,7 +60,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_labels = []
         for batch in self.train_dataloader:
             images, labels = batch
-            anchor_images = images[0].cuda()
+            anchor_images = images[0].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             anchor_labels = labels[0]
@@ -67,50 +71,55 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
-        current_epoch = trainer.current_epoch
+        current_step = trainer.global_step
         assert trainer.max_epochs is not None
-        if (current_epoch % self.every_n_val_epochs == 0 and current_epoch not in self.logged_epochs) or (
-            trainer.max_epochs - 1 == current_epoch
-        ):
-            self.logged_epochs.add(current_epoch)
 
-            # Assuming you have an 'embeddings' variable containing your embeddings
+        table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
+        artifact = wandb.Artifact(
+            name="run_{0}_step_{1}".format(self.run.name, current_step),
+            type="embeddings",
+            metadata={"step": current_step},
+            description="Embeddings from step {}".format(current_step),
+        )
+        artifact.add(table, "embeddings_table_step_{}".format(current_step))
+        self.run.log_artifact(artifact)
+        self.embedding_artifacts.append(artifact.name)
 
-            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
-            artifact = wandb.Artifact(
-                name="run_{0}_epoch_{1}".format(self.run.name, current_epoch),
-                type="embeddings",
-                metadata={"epoch": current_epoch},
-                description="Embeddings from epoch {}".format(current_epoch),
-            )
-            artifact.add(table, "embeddings_table_epoch_{}".format(current_epoch))
-            self.run.log_artifact(artifact)
-            self.embedding_artifacts.append(artifact.name)
+        train_embeddings, train_labels = (
+            self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+        )
 
-            train_embeddings, train_labels = self._get_train_embeddings_for_knn(trainer)
-            # log metrics to wandb
-            evaluate_embeddings(
-                data=embeddings_table,
-                embedding_name="val/embeddings",
-                metrics={
-                    "knn5": partial(knn, k=5),
-                    "knn": partial(knn, k=1),
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                    "pca": pca,
-                    "tsne": tsne,
-                    "fc_layer": fc_layer,
-                },  # "flda": flda_metric,
-                train_embeddings=train_embeddings,
-                train_labels=train_labels,
-            )
-            # wandb.log({"epoch": current_epoch})
-            # for visibility also log the
+        metrics = {
+            "knn5": partial(knn, k=5),
+            "knn": partial(knn, k=1),
+            "pca": pca,
+            "tsne": tsne,
+            "fc_layer": fc_layer,
+        }
+        metrics |= (
+            {
+                "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+            }
+            if self.knn_with_train
+            else {}
+        )
+        # log to wandb
+        evaluate_embeddings(
+            data=embeddings_table,
+            embedding_name="val/embeddings",
+            metrics=metrics,
+            train_embeddings=train_embeddings,  # type: ignore
+            train_labels=train_labels,
+        )
         # clear the table where the embeddings are stored
-        pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
+        # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # rese t embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
+
+    def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
+        log_grad_cam_images_to_wandb(self.run, trainer)
 
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
@@ -165,6 +174,33 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
         run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
 
 
+def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
+    # NOTE(liamvdv): inverse grad cam support to model since we might not be using
+    #                a model which grad cam does not support.
+    # NOTE(liamvdv): Transform models may have different interpretations.
+    assert trainer.model is not None, "Must only call log_grad_cam_images... after model was initialized."
+    if not hasattr(trainer.model, "get_grad_cam_layer"):
+        return
+    target_layer = trainer.model.get_grad_cam_layer()
+    get_reshape_transform = getattr(trainer.model, "get_grad_cam_reshape_transform", lambda: None)
+    cam = GradCAM(model=trainer.model, target_layers=[target_layer], reshape_transform=get_reshape_transform())
+
+    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=1)  # type: ignore
+    wandb_images: List[wandb.Image] = []
+    for sample in samples:
+        # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
+        row_images, row_labels = sample
+        anchor, *rest = row_images
+        grayscale_cam = cam(input_tensor=anchor.unsqueeze(0), targets=None)
+
+        # Overlay heatmap on original image
+        heatmap = grayscale_cam[0, :]
+        image = np.array(ToPILImage()(anchor)).astype(np.float32) / 255.0  # NOTE(liamvdv): needs be normalized
+        image_with_heatmap = show_cam_on_image(image, heatmap, use_rgb=True)
+        wandb_images.append(wandb.Image(image_with_heatmap, caption=f"label={row_labels[0]}"))
+    run.log({"Grad-CAM": wandb_images})
+
+
 def evaluate_embeddings(
     data: pd.DataFrame,
     embedding_name: str,
@@ -184,7 +220,7 @@ def evaluate_embeddings(
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
 
-    assert len(val_embeddings) == 0, "No validation embeddings given."
+    assert len(val_embeddings) > 0, "No validation embeddings given."
 
     results = {
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
@@ -220,7 +256,7 @@ def fc_layer(
     for param in model.parameters():
         param.requires_grad_(True)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay=0.001)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.001)
     criterion = torch.nn.CrossEntropyLoss()
     # acitvate gradients
     with torch.set_grad_enabled(True):
@@ -243,7 +279,7 @@ def fc_layer(
                 loss.requires_grad_(True)
                 loss.backward()
                 # apply gradient clipping
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # type: ignore
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
                 loss_sum += loss.item()
 
@@ -278,10 +314,15 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
-) -> Dict[str, torch.Number]:
+) -> Dict[str, Any]:
     if use_train_embeddings:
+        print("Using train embeddings for knn")
         return knn_with_train(
-            val_embeddings, val_labels, k=k, train_embeddings=train_embeddings, train_labels=train_labels
+            val_embeddings,
+            val_labels,
+            k=k,
+            train_embeddings=train_embeddings,
+            train_labels=train_labels,
         )
     else:
         return knn_naive(val_embeddings, val_labels, k=k)
@@ -293,7 +334,7 @@ def knn_with_train(
     k: int = 5,
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
-) -> Dict[str, torch.Number]:
+) -> Dict[str, Any]:
     """
     Algorithmic Description:
     1. Calculate the distance matrix between all embeddings (len(embeddings) x len(embeddings))
@@ -307,18 +348,19 @@ def knn_with_train(
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
     val_labels = torch.tensor(val_labels)
-    train_embeddings = torch.tensor(train_embeddings)
+    train_embeddings = torch.tensor(train_embeddings)  # type: ignore
     train_labels = torch.tensor(train_labels)
 
-    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
+    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)  # type: ignore
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
 
-    num_classes = torch.max(combined_labels).item() + 1
+    num_classes: int = torch.max(combined_labels).item() + 1  # type: ignore
     assert num_classes == len(np.unique(combined_labels))
     if num_classes < k:
         k = num_classes
 
     distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+
     distance_matrix.fill_diagonal_(float("inf"))
 
     _, closest_indices = torch.topk(distance_matrix, k, largest=False)
@@ -354,7 +396,7 @@ def knn_with_train(
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, torch.Number]:
+def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, Any]:
     num_classes = np.max(val_labels).item() + 1
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")

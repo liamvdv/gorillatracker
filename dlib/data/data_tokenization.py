@@ -4,6 +4,7 @@ We tokenize each document and concatenate the token ids into one large np.memmap
 We also store the start indices of each document in the concatenated file in a separate file.
 That way, have O(1) access to each document and can retrieve samples with arbitrary sequence length without re-tokenization.
 """
+
 import errno
 import json
 import os
