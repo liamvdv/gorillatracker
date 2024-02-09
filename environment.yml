@@ -69,6 +69,7 @@ dependencies:
       - umap-learn
       - grad-cam
       - facenet_pytorch
+      - streamlit
 
 
 # Non-standard section listing target platforms for conda-lock:
