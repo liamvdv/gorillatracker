@@ -2,10 +2,12 @@
 from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Tuple, Type, Union
 from urllib.parse import urlparse
+import json
 
 import cv2
 import cv2.typing as cvt
 import pandas as pd
+from PIL import Image
 import torch
 import torchvision.transforms as transforms
 import wandb
@@ -14,9 +16,35 @@ from tqdm import tqdm
 
 from gorillatracker.model import BaseModule, get_model_cls
 from gorillatracker.train_utils import get_dataset_class
-from gorillatracker.type_helper import Image, Label
+from gorillatracker.type_helper import Label
 
 wandbRun = Any
+
+
+def _get_frames_for_ids(json_path: str) -> Any:
+    """Get the frames for the given IDs.
+
+    Args:
+        json_path: Path to the JSON file containing the IDs.
+
+    Returns:
+        Dictionary of IDs to frames.
+    """
+    id_frames: Any = {}
+    face_class: int = 1
+    # read the JSON file
+    with open(json_path, "r") as f:
+        data = json.load(f)
+    for frame_idx, frame in enumerate(data["labels"]):
+        for bbox in frame:
+            if bbox["class"] != face_class:
+                continue
+            id = int(bbox["id"])
+            if id not in id_frames:
+                id_frames[id] = []
+            id_frames[id].append((frame_idx, (bbox["center_x"], bbox["center_y"], bbox["w"], bbox["h"])))
+
+    return id_frames
 
 
 def get_wandb_api() -> wandb.Api:
@@ -63,12 +91,12 @@ def load_model_from_wandb(
 
     model = model_cls(**model_config)
 
-    if hasattr(model_state_dict, "loss_module_train.prototypes") and hasattr(
-        model_state_dict, "loss_module_val.prototypes"
+    if (
+        "loss_module_train.prototypes" in model_state_dict.keys()
+        or "loss_module_val.prototypes" in model_state_dict.keys()
     ):  # necessary because arcface loss also saves prototypes
         model.loss_module_train.prototypes = torch.nn.Parameter(model_state_dict["loss_module_train.prototypes"])
         model.loss_module_val.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.prototypes"])
-
     # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
     # easiest fix is to just use the old embedding structure in the model class
     model.load_state_dict(model_state_dict)
@@ -118,7 +146,7 @@ def get_dataset(
     data_dir: str,
     dataset_class: str,
     transform: Union[Callable[..., Any], None] = None,
-) -> Dataset[Tuple[Image, Label]]:
+) -> Dataset[Tuple[Any, Label]]:
     cls = get_dataset_class(dataset_class)
     if transform is None:
         transform = transforms.Compose(
@@ -234,31 +262,38 @@ def _crop_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float) -> c
     return cropped_frame
 
 
-def generate_embeddings_from_tracked_video(model: BaseModule, video_path: str, tracking_data) -> pd.DataFrame: # TODO
+def generate_embeddings_from_tracked_video(
+    model: BaseModule, video_path: str, tracking_data, model_transforms=lambda x: x
+) -> pd.DataFrame:  # TODO
     """
     Args:
         model: The model to use for embedding generation.
         video_path: Path to the video.
         tracking_data: Dictionary of Individual IDs to frames. -> {id: List[(frame_idx, (bbox))]} (bbox = (x, y, w, h)
-    
+
     Returns:
         DataFrame with columns: invididual_id, frame_id, bbox, embedding,
     """
-    min_frames = 5 # discard if less than 5 images
+    min_frames = 15  # discard if less than 5 images
     max_per_individual = 15
-    
-    tracking_data = {id: frames for id, frames in tracking_data.items() if len(frames) >= min_frames} # discard if less than 5 images
-    
+
+    tracking_data = {
+        id: frames for id, frames in tracking_data.items() if len(frames) >= min_frames
+    }  # discard if less than 5 images
+    print("Using", len(tracking_data), "individuals")
+
     video = cv2.VideoCapture(video_path)
-    embedding_img_table = pd.DataFrame(columns=["embedding", "frame_id", "bb", "invididual_id"])
+    embedding_img_table = pd.DataFrame(columns=["embedding", "frame_id", "bbox", "invididual_id"])
 
     for id, frames in tracking_data.items():
         step_size = len(frames) // max_per_individual
+        if step_size == 0:
+            continue
         frame_list = [frames[i] for i in range(0, max_per_individual * step_size, step_size)]
         for frame_idx, bbox in frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
-            embedding = get_embedding_from_frame(model, frame, bbox)
+            embedding = get_embedding_from_frame(model, frame, bbox, model_transforms)
             embedding_img_table = pd.concat(
                 [
                     embedding_img_table,
@@ -271,30 +306,30 @@ def generate_embeddings_from_tracked_video(model: BaseModule, video_path: str, t
                         }
                     ),
                 ],
-                ignore_index=True
+                ignore_index=True,
             )
     video.release()
     embedding_img_table.reset_index(drop=False, inplace=True)
     return embedding_img_table
-    
 
-def get_embedding_from_frame(model: BaseModule, frame: cvt.MatLike, bbox) -> torch.Tensor: # TODO
+
+@torch.no_grad()
+def get_embedding_from_frame(model: BaseModule, frame: cvt.MatLike, bbox, model_transforms) -> torch.Tensor:  # TODO
     frame_cropped = _crop_image(
-                frame,
-                bbox[0],  # x
-                bbox[1],  # y
-                bbox[2],  # w
-                bbox[3],  # h
-            )
-    
-    #convert to pil image
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img_pil = Image.fromarray(img)
-    
-    embedding = embed_image(model, img_pil) # TODO: optimise using batches
+        frame,
+        bbox[0],  # x
+        bbox[1],  # y
+        bbox[2],  # w
+        bbox[3],  # h
+    )
+
+    # convert to pil image
+    img = cv2.cvtColor(frame_cropped, cv2.COLOR_BGR2RGB)
+    img = Image.fromarray(img)
+    img = model_transforms(img)
+
     model.eval()
-    image = model_transforms(image)
-    embedding = model(image)
+    embedding = model(img.unsqueeze(0))
     return embedding
 
 
