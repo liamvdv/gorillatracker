@@ -1,16 +1,16 @@
 # from gorillatracker.args import TrainingArgs
+import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Tuple, Type, Union
 from urllib.parse import urlparse
-import json
 
 import cv2
 import cv2.typing as cvt
 import pandas as pd
-from PIL import Image
 import torch
 import torchvision.transforms as transforms
 import wandb
+from PIL import Image
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
