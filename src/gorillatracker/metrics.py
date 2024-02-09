@@ -72,6 +72,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
         current_step = trainer.global_step
+
         assert trainer.max_epochs is not None
 
         table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore

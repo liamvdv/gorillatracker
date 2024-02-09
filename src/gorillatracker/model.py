@@ -167,7 +167,7 @@ class BaseModule(L.LightningModule):
         self.loss_mode = loss_mode
 
         ##### Create Table embeddings_table
-        self.embeddings_table_columns = ["label", "embedding"]
+        self.embeddings_table_columns = ["label", "embedding", "image"]
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
 
     def set_losses(
@@ -261,7 +261,7 @@ class BaseModule(L.LightningModule):
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        images, labels = batch  # embeddings either (ap, a, an, n) oder (a, p, n)
+        images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
         n_achors = len(images[0])
         vec = torch.cat(images, dim=0)
         flat_labels = (
