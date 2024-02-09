@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Tuple, Type, Union
 from urllib.parse import urlparse
 
+import cv2
+import cv2.typing as cvt
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
@@ -207,6 +209,93 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
         df.to_pickle(outpath)
     print("done")
     return df
+
+
+def _crop_image(frame: cvt.MatLike, x: float, y: float, w: float, h: float) -> cvt.MatLike:
+    """Crop the image at the given path using the given bounding box coordinates and save it to the given output path.
+
+    Args:
+        frame: Image to crop.
+        x: Relative x coordinate of the center of the bounding box.
+        y: Relative y coordinate of the center of the bounding box.
+        w: Relative width of the bounding box.
+        h: Relative height of the bounding box.
+        output_path: Path to save the cropped image to.
+    """
+
+    # calculate the bounding box coordinates
+    frame_height, frame_width, _ = frame.shape
+    left = int((x - (w / 2)) * frame_width)
+    right = int((x + (w / 2)) * frame_width)
+    top = int((y - (h / 2)) * frame_height)
+    bottom = int((y + (h / 2)) * frame_height)
+
+    cropped_frame = frame[top:bottom, left:right]
+    return cropped_frame
+
+
+def generate_embeddings_from_tracked_video(model: BaseModule, video_path: str, tracking_data) -> pd.DataFrame: # TODO
+    """
+    Args:
+        model: The model to use for embedding generation.
+        video_path: Path to the video.
+        tracking_data: Dictionary of Individual IDs to frames. -> {id: List[(frame_idx, (bbox))]} (bbox = (x, y, w, h)
+    
+    Returns:
+        DataFrame with columns: invididual_id, frame_id, bbox, embedding,
+    """
+    min_frames = 5 # discard if less than 5 images
+    max_per_individual = 15
+    
+    tracking_data = {id: frames for id, frames in tracking_data.items() if len(frames) >= min_frames} # discard if less than 5 images
+    
+    video = cv2.VideoCapture(video_path)
+    embedding_img_table = pd.DataFrame(columns=["embedding", "frame_id", "bb", "invididual_id"])
+
+    for id, frames in tracking_data.items():
+        step_size = len(frames) // max_per_individual
+        frame_list = [frames[i] for i in range(0, max_per_individual * step_size, step_size)]
+        for frame_idx, bbox in frame_list:
+            video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
+            embedding = get_embedding_from_frame(model, frame, bbox)
+            embedding_img_table = pd.concat(
+                [
+                    embedding_img_table,
+                    pd.DataFrame(
+                        {
+                            "invididual_id": [id],
+                            "frame_id": [frame_idx],
+                            "bbox": [bbox],
+                            "embedding": [embedding],
+                        }
+                    ),
+                ],
+                ignore_index=True
+            )
+    video.release()
+    embedding_img_table.reset_index(drop=False, inplace=True)
+    return embedding_img_table
+    
+
+def get_embedding_from_frame(model: BaseModule, frame: cvt.MatLike, bbox) -> torch.Tensor: # TODO
+    frame_cropped = _crop_image(
+                frame,
+                bbox[0],  # x
+                bbox[1],  # y
+                bbox[2],  # w
+                bbox[3],  # h
+            )
+    
+    #convert to pil image
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_pil = Image.fromarray(img)
+    
+    embedding = embed_image(model, img_pil) # TODO: optimise using batches
+    model.eval()
+    image = model_transforms(image)
+    embedding = model(image)
+    return embedding
 
 
 def read_embeddings_from_disk(path: str) -> pd.DataFrame:
