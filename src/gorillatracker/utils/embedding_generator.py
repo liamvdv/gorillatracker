@@ -1,7 +1,6 @@
 # from gorillatracker.args import TrainingArgs
-import json
 from pathlib import Path
-from typing import Any, Callable, Dict, Literal, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union
 from urllib.parse import urlparse
 
 import cv2
@@ -20,38 +19,12 @@ from gorillatracker.train_utils import get_dataset_class
 from gorillatracker.type_helper import Label
 
 DataTransforms = Union[Callable[..., Any]]
-BBox = tuple[float, float, float, float]  # x, y, w, h
-BBoxFrame = tuple[int, BBox]  # frame_idx, x, y, w, h
-IdFrameDict = dict[int, list[BBoxFrame]]  # id -> list of frames
-IdDict = dict[int, list[int]]  # id -> list of negatives
-JsonDict = dict[str, list[str]]  # video_name-id -> list of negatives
+BBox = Tuple[float, float, float, float]  # x, y, w, h
+BBoxFrame = Tuple[int, BBox]  # frame_idx, x, y, w, h
+IdFrameDict = Dict[int, List[BBoxFrame]]  # id -> list of frames
+IdDict = Dict[int, List[int]]  # id -> list of negatives
+JsonDict = Dict[str, List[str]]  # video_name-id -> list of negatives
 wandbRun = Any
-
-
-def _get_frames_for_ids(json_path: str) -> Any:
-    """Get the frames for the given IDs.
-
-    Args:
-        json_path: Path to the JSON file containing the IDs.
-
-    Returns:
-        Dictionary of IDs to frames.
-    """
-    id_frames: Any = {}
-    face_class: int = 1
-    # read the JSON file
-    with open(json_path, "r") as f:
-        data = json.load(f)
-    for frame_idx, frame in enumerate(data["labels"]):
-        for bbox in frame:
-            if bbox["class"] != face_class:
-                continue
-            id = int(bbox["id"])
-            if id not in id_frames:
-                id_frames[id] = []
-            id_frames[id].append((frame_idx, (bbox["center_x"], bbox["center_y"], bbox["w"], bbox["h"])))
-
-    return id_frames
 
 
 def get_wandb_api() -> wandb.Api:
