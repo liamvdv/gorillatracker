@@ -167,7 +167,7 @@ class BaseModule(L.LightningModule):
         self.loss_mode = loss_mode
 
         ##### Create Table embeddings_table
-        self.embeddings_table_columns = ["label", "embedding", "image"]
+        self.embeddings_table_columns = ["label", "embedding"]
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
 
     def set_losses(
