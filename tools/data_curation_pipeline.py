@@ -49,9 +49,10 @@ class CurationPipeline:
         self.num_workers = 8
 
         # curation settings
-        self.reduction_factor = 64  # reduce the number of images by this factor
-        self.similarity_threshold_self = 0.6  # similarity threshold for self dedublication
-        self.similarity_threshold_relative = 0.45  # similarity threshold for relative dedublication
+        self.k_nearest_neighbors = 8  # number of nearest neighbors to consider for clustering
+        self.similarity_threshold_self = 0.17  # similarity threshold for self dedublication
+        self.number_of_representatives = 1  # number of representatives to keep from each cluster
+        self.similarity_threshold_relative = 0.2  # similarity threshold for relative dedublication
 
         # setup embedding model
         self.embedding_model_path = embedding_model_path
@@ -67,7 +68,7 @@ class CurationPipeline:
         source = pathlib.Path(source)
         destination = pathlib.Path(destination)
         logger.info("Curating dataset from source: %s to destination: %s", source, destination)
-        partitions = ["test"]  # TODO: replace with ["train", "val", "test"]
+        partitions = ["test", "val"]  # TODO: replace with ["train", "val", "test"]
 
         for partition in partitions:
             logger.info("Curating partition: %s", partition)
@@ -78,7 +79,8 @@ class CurationPipeline:
 
     def _curate_dataset(self, dataset: data_utils.Dataset, destination: pathlib.Path) -> None:
         embeddings, paths = self._get_embeddings(dataset)
-        print(embeddings.shape)
+        representative_idxs, embeddings_dedublicated = self._self_dedublication(embeddings)
+        return embeddings_dedublicated
 
         # raise NotImplementedError()
 
@@ -104,20 +106,26 @@ class CurationPipeline:
         index = faiss.IndexFlatL2(dimension)
         index.add(embeddings)
 
-        D, I = index.search(embeddings, self.reduction_factor + 1)
-        distance_threshold = 2 * (1 - 0.6)
+        D, I = index.search(embeddings, self.k_nearest_neighbors + 1)
 
         G = nx.Graph()
         for idx, distances in enumerate(D):
             for neighbor_idx, distance in zip(I[idx], distances):
-                if distance < distance_threshold:
+                if distance < self.similarity_threshold_self:
                     G.add_edge(idx, neighbor_idx)
 
         connected_components = nx.connected_components(G)
-        representatives = [list(component)[0] for component in connected_components]
+        representatives = self._gather_representative_idxs(connected_components, self.number_of_representatives)
         deduplicated_embeddings = embeddings[representatives]
 
         return representatives, torch.Tensor(deduplicated_embeddings)
+
+    @staticmethod
+    def _gather_representative_idxs(connected_components: list[set[int]], num_representatives: int) -> list[int]:
+        representatives = []
+        for component in connected_components:
+            representatives.extend(list(component)[:num_representatives])
+        return representatives
 
     def _relative_dedublication(
         self,
@@ -125,24 +133,24 @@ class CurationPipeline:
         reference_embeddings: torch.Tensor,
     ) -> tuple[list[int], torch.Tensor]:
         """Removes images from source that are too similar to images from reference"""
+        source_embeddings = source_embeddings.cpu().numpy()
+        reference_embeddings = reference_embeddings.cpu().numpy()
         faiss.normalize_L2(source_embeddings)
         faiss.normalize_L2(reference_embeddings)
 
         combined_embeddings = np.vstack((source_embeddings, reference_embeddings))
         dimension = combined_embeddings.shape[1]
-        index = faiss.IndexFlatIP(dimension)
+        index = faiss.IndexFlatL2(dimension)
 
         index.add(combined_embeddings)
 
-        D, I = index.search(source_embeddings, self.reduction_factor + 1)
-
-        similarity_threshold = 0.45
+        D, I = index.search(source_embeddings, self.k_nearest_neighbors + 1)
 
         G = nx.Graph()
         num_source_images = source_embeddings.shape[0]
         for idx, similarities in enumerate(D):
             for neighbor_idx, similarity in zip(I[idx], similarities):
-                if similarity > similarity_threshold and neighbor_idx >= num_source_images:
+                if similarity < self.similarity_threshold_relative and neighbor_idx >= num_source_images:
                     G.add_edge(idx, neighbor_idx)
 
         to_discard = set()
