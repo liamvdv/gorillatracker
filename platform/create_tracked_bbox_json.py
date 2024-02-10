@@ -70,7 +70,7 @@ def precict_video_simple(
         labeled_video_frames.append(frame)
     #face
     index = 0
-    for frame in body_results:
+    for frame in face_results:
         boxes = frame.boxes.xywhn.tolist()
         confs = frame.boxes.conf.tolist()
         frame = []
