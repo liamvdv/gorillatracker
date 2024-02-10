@@ -85,7 +85,7 @@ def load_model_from_wandb(
     return model
 
 
-def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu") -> pd.DataFrame:
+def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", norm_input: bool = False) -> pd.DataFrame:
     embeddings = []
     df = pd.DataFrame(columns=["embedding", "label", "input", "label_string"])
     with torch.no_grad():
@@ -94,11 +94,20 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu") ->
             if isinstance(imgs, torch.Tensor):
                 imgs = [imgs]
                 labels = [labels]
-            batch_inputs = torch.stack(imgs)
+            
+            batch_inputs = torch.stack(imgs)    
             if batch_inputs.shape[0] != 1:
                 batch_inputs = batch_inputs.unsqueeze(1)
             batch_inputs = batch_inputs.to(device)
-            embeddings = model(batch_inputs)
+            
+            model_inputs = batch_inputs
+            if norm_input:
+                model_inputs = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(img) for img in imgs]
+                model_inputs = torch.stack(model_inputs)
+                model_inputs = model_inputs.to(device)
+                if model_inputs.shape[0] != 1:
+                    model_inputs = model_inputs.unsqueeze(1)
+            embeddings = model(model_inputs)
 
             for i in range(len(imgs)):
                 input_img = transforms.ToPILImage()(batch_inputs[i].cpu())
