@@ -1,14 +1,17 @@
 import json
 import tempfile
-import os 
 from pathlib import Path
-from typing import Dict, List, Optional, Union
-
-import ultralytics
+import torchvision.transforms as transforms
+from torchvision.transforms import v2 as transforms_v2
+from typing import Dict, List, Union
 from ultralytics import YOLO
-import tempfile
+import pandas as pd
 
 from gorillatracker.scripts.video_json_tracker import GorillaVideoTracker
+from gorillatracker.utils.embedding_generator import load_model_from_wandb, generate_embeddings_from_tracked_video
+from gorillatracker.model import SwinV2LargeWrapper
+from gorillatracker.transform_utils import SquarePad
+
 
 def create_tracked_bbox_json(video_path: str):
     """Create tracked Bounding Boxes json.
@@ -35,6 +38,20 @@ def create_tracked_bbox_json(video_path: str):
             tracked_json = json.load(file)
         tracked_json = tracked_json["labels"]
         return tracked_json
+
+    
+def get_frames_for_ids(data: str):
+    id_frames = {}
+    for frame_idx, frame in enumerate(data):
+        for bbox in frame:
+            if bbox["class"] != 1:  # faceclass
+                continue
+            id = int(bbox["id"])
+            if id not in id_frames:
+                id_frames[id] = []
+            id_frames[id].append((frame_idx, (bbox["center_x"], bbox["center_y"], bbox["w"], bbox["h"])))
+    return id_frames
+
 
 def precict_video_simple(
         video_path: str,
@@ -83,11 +100,89 @@ def precict_video_simple(
     json.dump({"labels":labeled_video_frames}, open(json_path, "w"), indent=4)
 
 
-# main 
+def get_swinv2_large(wandb_model_name: str):
+    model_config = {
+        "embedding_size": 128,
+        "from_scratch": False,
+        "loss_mode": "softmax/arcface",
+        "weight_decay": 0.0005,
+        "lr_schedule": "cosine",
+        "warmup_mode": "linear",
+        "warmup_epochs": 10,
+        "max_epochs": 100,
+        "initial_lr": 0.01,
+        "start_lr": 0.01,
+        "end_lr": 0.0001,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "model_name_or_path": "SwinV2LargeWrapper",
+        "stepwise_schedule": True,
+        "lr_interval": 10,
+        "l2_beta": 0.0,
+        "l2_alpha": 0.0,
+        "path_to_pretrained_weights": "a/b/c",
+    }
+    model = load_model_from_wandb(
+        wandb_model_name, SwinV2LargeWrapper, model_config, "cpu"
+    )
+    model.eval()
+    return model
+
+
+def convert_tracked_list_to_df(data: Dict, class_id=1):
+    tracked_df = pd.DataFrame(columns=["frame_id", "bbox", "individual_id"])
+    for frame_idx, frame in enumerate(data):
+        for bbox in frame:
+            if bbox["class"] != class_id:
+                continue
+            tracked_df = pd.concat(
+                [
+                    tracked_df,
+                    pd.DataFrame(
+                        {
+                            "individual_id": [bbox["id"]],
+                            "frame_id": [frame_idx],
+                            "bbox": [(bbox["center_x"], bbox["center_y"], bbox["w"], bbox["h"])],
+                        }
+                    ),
+                ],
+                ignore_index=True,
+            )
+    tracked_df = tracked_df.sort_values(by=["frame_id", "individual_id"])
+    tracked_df.set_index(["frame_id", "individual_id"], inplace=True)
+    tracked_df.rename(columns={"bbox": "body_bbox"}, inplace=True)
+    return tracked_df
+
+
+def get_tracking_and_embedding_data_for_video(video_path: str):
+    """Generates a DataFrame with:
+    Index: frame_id, individual_id
+    Columns: body_bbox, face_bbox, face_embedding
+    """
+    tracked_video_data = create_tracked_bbox_json(video_path)
+    
+    # Examples usage with embedding generation
+    model = get_swinv2_large("gorillas/Embedding-SwinV2Large-CXL-Open/model-a4t93htr:v14")
+    model_transforms = transforms.Compose(
+        [
+            SquarePad(),
+            transforms.ToTensor(),
+            transforms.Resize((192), antialias=True),
+            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+    
+    tracked_video_frames = get_frames_for_ids(tracked_video_data)
+    face_frame_embedding_df = generate_embeddings_from_tracked_video(model, video_path, tracked_video_frames, model_transforms)
+    
+    body_frame_df = convert_tracked_list_to_df(tracked_video_data, class_id=0)
+    final_df = body_frame_df.join(face_frame_embedding_df, on=["frame_id", "individual_id"])
+    return final_df
+
+
 if __name__ == "__main__":
     video_path = "/workspaces/gorillatracker/video_data/R506_20220330_184.mp4"
+    df = get_tracking_and_embedding_data_for_video(video_path)
     
-    json_data = create_tracked_bbox_json(video_path)
-    # print out first frame
-    print(json_data[:1])
+    print(df.head())
 

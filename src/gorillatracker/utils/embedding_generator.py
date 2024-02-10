@@ -239,7 +239,7 @@ def generate_embeddings_from_tracked_video(
     print("Using", len(tracking_data), "individuals")
 
     video = cv2.VideoCapture(video_path)
-    embedding_img_table = pd.DataFrame(columns=["embedding", "frame_id", "bbox", "invididual_id"])
+    embedding_img_table = pd.DataFrame(columns=["embedding", "frame_id", "bbox", "individual_id"])
 
     for id, frames in tracking_data.items():
         step_size = len(frames) // max_per_individual
@@ -255,7 +255,7 @@ def generate_embeddings_from_tracked_video(
                     embedding_img_table,
                     pd.DataFrame(
                         {
-                            "invididual_id": [id],
+                            "individual_id": [id],
                             "frame_id": [frame_idx],
                             "bbox": [bbox],
                             "embedding": [embedding],
@@ -265,7 +265,8 @@ def generate_embeddings_from_tracked_video(
                 ignore_index=True,
             )
     video.release()
-    embedding_img_table.reset_index(drop=False, inplace=True)
+    embedding_img_table.set_index(["frame_id", "individual_id"], inplace=True)
+    embedding_img_table.rename(columns={"embedding": "face_embedding", "bbox": "face_bbox"}, inplace=True)
     return embedding_img_table
 
 
