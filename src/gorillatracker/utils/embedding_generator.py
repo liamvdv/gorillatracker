@@ -94,16 +94,18 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
             if isinstance(imgs, torch.Tensor):
                 imgs = [imgs]
                 labels = [labels]
-            
-            batch_inputs = torch.stack(imgs)    
+
+            batch_inputs = torch.stack(imgs)
             if batch_inputs.shape[0] != 1:
                 batch_inputs = batch_inputs.unsqueeze(1)
             batch_inputs = batch_inputs.to(device)
-            
+
             model_inputs = batch_inputs
             if norm_input:
-                model_inputs = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(img) for img in imgs]
-                model_inputs = torch.stack(model_inputs)
+                model_inputs_list = [
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(img) for img in imgs
+                ]
+                model_inputs = torch.stack(model_inputs_list)
                 model_inputs = model_inputs.to(device)
                 if model_inputs.shape[0] != 1:
                     model_inputs = model_inputs.unsqueeze(1)
