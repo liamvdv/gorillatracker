@@ -162,7 +162,7 @@ def get_tracking_and_embedding_data_for_video(video_path: str):
     tracked_video_data = create_tracked_bbox_json(video_path)
     
     # Examples usage with embedding generation
-    model = get_swinv2_large("gorillas/Embedding-SwinV2Large-CXL-Open/model-a4t93htr:v14")
+    model = get_swinv2_large("gorillas/Embedding-SwinV2Large-CXL-Open/model-a4t93htr:v14") # wandb run -> https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/a4t93htr/overview
     model_transforms = transforms.Compose(
         [
             SquarePad(),
