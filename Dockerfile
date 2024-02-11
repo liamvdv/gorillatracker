@@ -142,5 +142,7 @@ RUN micromamba config set show_banner false --env
 # Install optional tricky pip dependencies that do not work with conda-lock
 # RUN micromamba run -n research pip install example-dependency --no-deps --no-cache-dir
 
+EXPOSE 8501
+
 # Use our environment `research` as default
 ENV ENV_NAME=research

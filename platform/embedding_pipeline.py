@@ -177,6 +177,7 @@ def get_tracking_and_embedding_data_for_video(video_path: str):
     
     body_frame_df = convert_tracked_list_to_df(tracked_video_data, class_id=0)
     final_df = body_frame_df.join(face_frame_embedding_df, on=["frame_id", "individual_id"])
+    final_df.reset_index(inplace=True)
     return final_df
 
 
