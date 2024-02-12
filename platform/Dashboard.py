@@ -13,18 +13,11 @@ import os
 # Usage
 # streamlit run platform/Dashboard.py
 
-
-# Generate via python3 repl:
-# $ python3
-# from gorillatracker.utils.embedding_generator import generate_embeddings_from_run
-# generate_embeddings_from_run("https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/a4t93htr/overview", "embeddings_a4t93htr.pkl")
 model_from_run = "https://wandb.ai/gorillas/Embedding-SwinV2-CXL-Open/runs/69ok0oyl"
 known_embeddings_data_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 known_embeddings_data_loader = "gorillatracker.datasets.cxl.CXLDataset"
 
 def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
-    print(df.head())
-    print(df.dtypes)
     # Generate output video path
     base, ext = os.path.splitext(input_video_path)
     output_video_path = f"{base}-annotated{ext}"
@@ -54,17 +47,11 @@ def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
 
         # Iterate over rows to draw bounding boxes
         for _, row in frame_data.iterrows():
-            # TODO(liamvdv): read df['individual_id'] as tracking number.
-
             # Draw body bounding box
-            print(row["body_bbox"], row["face_bbox"], type(row["body_bbox"]), type(row["face_bbox"]))
-            # x, y, w, h = row["body_bbox"]  # Assuming the format is a string like "(x, y, x2, y2)"
             p1, p2 = convert_from_yolo_format(row["body_bbox"], frame_width, frame_height)
             cv2.rectangle(frame, p1, p2, (255, 0, 0), 2)  # Blue for body
 
             if pd.notna(row["face_bbox"]):
-                # Draw face bounding box
-                # x, y, w, h = row["face_bbox"]
                 p1, p2 = convert_from_yolo_format(row["face_bbox"], frame_width, frame_height)
                 cv2.rectangle(frame, p1, p2, (0, 0, 255), 2)  # Red for face
 
@@ -147,8 +134,10 @@ def main():
 
         annotated_video_fp = annotate_video_with_bboxes(df, name)
         st.write(annotated_video_fp)
-        with open(annotated_video_fp, "rb") as f:
-            st.video(f)
+        
+        # Why does this not work?
+        # with open(annotated_video_fp, "rb") as f:
+        #     st.video(f)
 
         with open(annotated_video_fp, "rb") as f:
             st.download_button("Download Annotated Video", data=f, file_name="annotated_video.mp4")
