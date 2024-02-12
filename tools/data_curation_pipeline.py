@@ -6,6 +6,7 @@ import faiss
 import numpy as np
 import networkx as nx
 import logging
+import pandas as pd
 import gorillatracker.model as model
 import gorillatracker.datasets.cxl as cxl
 
@@ -65,24 +66,42 @@ class CurationPipeline:
         logger.info("CurationPipeline successfully initialized!")
 
     def curate_patitioned_dataset(self, source: str, destination: str) -> None:
-        source = pathlib.Path(source)
-        destination = pathlib.Path(destination)
         logger.info("Curating dataset from source: %s to destination: %s", source, destination)
         partitions = ["test", "val"]  # TODO: replace with ["train", "val", "test"]
 
+        embeddings_by_partition = self._get_embeddings_by_partition(source=source, partitions=partitions)
+        embeddings_test_df = pd.DataFrame(embeddings_by_partition["test"])
+        embeddings_val_df = pd.DataFrame(embeddings_by_partition["val"])
+        # embeddings_train_df = pd.DataFrame(embeddings_by_partition["train"])
+        embeddings_test_df.to_csv(pathlib.Path(destination) / "test_partition_df.csv.", index=False)
+        embeddings_train_df.to_csv(pathlib.Path(destination) / "train_partition_df.csv.", index=False)
+        embeddings_val_df.to_csv(pathlib.Path(destination) / "val_partition_df.csv.", index=False)
+
+        print(embeddings_test_df.shape)
+
+    def _get_embeddings_by_partition(
+        self, source: str, destination: str, partitions: list[str], use_cache: bool = True, save_embeddings: bool = True
+    ) -> dict[str, list]:
+        """Retrieves the embeddigns for all partitions given from the source path"""
+        embeddings_by_partition = {}
         for partition in partitions:
-            logger.info("Curating partition: %s", partition)
-            dataset = self.dataset_class(
-                data_dir=source, partition=partition, transform=self.dataset_class.get_transforms()
-            )
-            self._curate_dataset(dataset, destination / partition)
+            logger.info("Gathering embeddings for partion: %s", partition)
+            cache_destination = pathlib.Path(destination) / f"{partition}_partition_df.csv"
 
-    def _curate_dataset(self, dataset: data_utils.Dataset, destination: pathlib.Path) -> None:
-        embeddings, paths = self._get_embeddings(dataset)
-        representative_idxs, embeddings_dedublicated = self._self_dedublication(embeddings)
-        return embeddings_dedublicated
+            if use_cache and cache_destination.exists():
+                embeddings_df = pd.read_csv(cache_destination)
+            else:
+                dataset = self.dataset_class(
+                    data_dir=source, partition=partition, transform=self.dataset_class.get_transforms()
+                )
+                embeddings, paths = self._get_embeddings(dataset)
+                embeddings_for_df = []
+                for embedding, path in zip(embeddings, paths):
+                    embeddings_for_df.append({"embedding": embedding, "path": path})
+                embeddings_df = pd.DataFrame(embeddings_for_df)
+                embeddings_df.to_csv(cache_destination, index=False)
 
-        # raise NotImplementedError()
+        return embeddings_by_partition
 
     @torch.no_grad()
     def _get_embeddings(self, dataset: data_utils.Dataset) -> tuple[torch.Tensor, list[str]]:
@@ -94,7 +113,7 @@ class CurationPipeline:
         for batch in tqdm.tqdm(dataloader):
             embeddings.append(self.embedding_model(batch[0].to(self.device)))
 
-        return torch.cat(embeddings, dim=0), dataset.samples[1]
+        return torch.cat(embeddings, dim=0), dataset.samples
 
     def _self_dedublication(self, embeddings: torch.Tensor) -> tuple[list[int], torch.Tensor]:
         """Removes images that are too similar to each other"""
