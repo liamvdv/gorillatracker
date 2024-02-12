@@ -53,8 +53,8 @@ class LabelGatherer:
 
         return index
 
-    def get_label_for_embedding(self, embedding: torch.Tensor, k: int = 1) -> List[str]:
-        embedding = embedding.unsqueeze(0).numpy()
+    def get_label_for_embeddings(self, embedding: np.ndarray, k: int = 1) -> List[str]:
+        """embedding is a batch"""
         faiss.normalize_L2(embedding)
         _, I = self.index.search(embedding, k)
         return self.embeddings_df.iloc[I[0][0]]["label_string"]

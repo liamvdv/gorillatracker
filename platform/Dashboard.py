@@ -5,6 +5,7 @@ from gorillatracker.utils.yolo_helpers import convert_from_yolo_format
 from gather_labels import LabelGatherer
 import pandas as pd
 import numpy as np
+import torch
 import os
 
 # TODO(liamvdv): rename individual_id to tracking_id in the dataframe. This is the unique identifier for a yolo tracking. Then edit process_video
@@ -67,6 +68,10 @@ def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
                 p1, p2 = convert_from_yolo_format(row["face_bbox"], frame_width, frame_height)
                 cv2.rectangle(frame, p1, p2, (0, 0, 255), 2)  # Red for face
 
+                # Annotate face bounding box with label string
+                label = str(row["label_string"])
+                cv2.putText(frame, label, (p1[0], p1[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+
         # Write the modified frame
         out.write(frame)
 
@@ -83,10 +88,10 @@ def reidentify(df: pd.DataFrame) -> pd.DataFrame:
     lg = LabelGatherer(model_from_run=model_from_run, data_dir=known_embeddings_data_dir, dataset_class=known_embeddings_data_loader, use_cache=True)
     
     # iter over lg by tracking id, mean 'embedding column'. Then add gathered label to the df
-    # check if any face_embeddings
+    # check if any face_embedding
     
-    # filter out `face_embeddings` is NaN
-    df_filtered = df.dropna(subset=['face_embeddings'])
+    # filter out `face_embedding` is NaN
+    df_filtered = df.dropna(subset=["face_embedding"])
 
     def mean_embeddings(group):
         # Assuming embeddings are numpy arrays, if they're lists, you might need to convert them first
@@ -94,22 +99,22 @@ def reidentify(df: pd.DataFrame) -> pd.DataFrame:
         return embeddings.mean(axis=0)
 
     # (tracking_id, mean_embedding)
-    df_mean_embeddings = df_filtered.groupby('tracking_id')['face_embeddings'].agg(mean_embeddings).reset_index()
+    df_mean_embeddings = df_filtered.groupby("tracking_id")["face_embedding"].agg(mean_embeddings).reset_index()
 
-    for row in df_mean_embeddings.iterrows():
-        tracking_id = row['tracking_id']
-        embedding = row['face_embeddings']
-        label = lg.get_label_for_embedding(embedding)
-        df.loc[df['tracking_id'] == tracking_id, 'label_string'] = label
+    for _, row in df_mean_embeddings.iterrows():
+        tracking_id = row["tracking_id"]
+        embedding = row["face_embedding"]
+        label = lg.get_label_for_embeddings(embedding)
+        df.loc[df["tracking_id"] == tracking_id, "label_string"] = label
     
     return df
 
 
 @st.cache_data
-def process_video(path: str):
-    df = get_tracking_and_embedding_data_for_video(path)
+def process_video(path: str, model_from_run: str = model_from_run):
+    df = get_tracking_and_embedding_data_for_video(path, model_from_run=model_from_run)
     # TODO(liamvdv): REMOVE THIS, fix in get_tracking_and_embedding_data_for_video
-    df.rename(columns={'individual_id': 'tracking_id'}, inplace=True)
+    df.rename(columns={"individual_id": "tracking_id"}, inplace=True)
     return df
 
 
