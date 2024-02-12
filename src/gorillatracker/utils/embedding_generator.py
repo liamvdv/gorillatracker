@@ -1,6 +1,6 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union, Optional
 from urllib.parse import urlparse
 
 import cv2
@@ -146,12 +146,20 @@ def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
     models = [a for a in run.logged_artifacts() if a.type == "model"]
     return max(models, key=lambda a: a.created_at)
 
-def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
+def generate_embeddings_from_run(
+    run_url: str, outpath: str, data_dir: Optional[str] = None, dataset_class: Optional[str] = None
+) -> pd.DataFrame:
     """
     generate a pandas df that generates embeddings for all images in the dataset partitions train and val.
     stores to DataFrame
     partition, image_path, embedding, label, label_string
+
+    Args:
+        outpath: path to store the dataframe as pickle or "-" to print to stdout
     """
+    if bool(data_dir) ^ bool(dataset_class):
+        raise ValueError("either both or none of data_dir and dataset_class must be given")
+
     out = Path(outpath)
     is_write = outpath != "-"
     if is_write:
@@ -187,6 +195,10 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
             # # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }
+
+    if data_dir and dataset_class:
+        args["data_dir"] = data_dir
+        args["dataset_class"] = dataset_class
 
     print("Loading model from latest checkpoint")
     model_path = get_latest_model_checkpoint(run).qualified_name
