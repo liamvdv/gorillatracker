@@ -52,17 +52,11 @@ class LabelGatherer:
 
         return index
 
-    def _get_label_for_embedding(self, embedding: torch.Tensor, k: int = 1) -> List[str]:
+    def get_label_for_embedding(self, embedding: torch.Tensor, k: int = 1) -> List[str]:
         embedding = embedding.unsqueeze(0).numpy()
         faiss.normalize_L2(embedding)
         _, I = self.index.search(embedding, k)
         return self.embeddings_df.iloc[I[0][0]]["label_string"]
-
-    def get_labels_for_embeddings(self, embeddings: dict) -> set[str]:
-        labels = []
-        for embedding_value in embeddings.values():
-            labels.append(self._get_label_for_embedding(embedding_value["embedding"]))
-        return set(labels)
 
 
 if __name__ == "__main__":
