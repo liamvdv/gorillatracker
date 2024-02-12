@@ -63,5 +63,4 @@ if __name__ == "__main__":
     labl = LabelGatherer(
         model_from_run="https://wandb.ai/gorillas/Embedding-SwinV2-CXL-Open/runs/69ok0oyl"
     )
-    print(labl.get_labels_for_embeddings({"1": {"embedding": torch.rand(256)}}))
 
