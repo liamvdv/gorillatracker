@@ -146,7 +146,6 @@ def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
     models = [a for a in run.logged_artifacts() if a.type == "model"]
     return max(models, key=lambda a: a.created_at)
 
-
 def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
     """
     generate a pandas df that generates embeddings for all images in the dataset partitions train and val.
@@ -217,6 +216,14 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
     print("done")
     return df
 
+
+def get_model(run_url: str) -> BaseModule:
+    """helper for other code"""
+    run = get_run(run_url)
+    model_path = get_latest_model_checkpoint(run).qualified_name
+    model_cls = get_model_cls(run.config["model_name_or_path"])
+    model = load_model_from_wandb(model_path, model_cls=model_cls, model_config=run.config)
+    return model
 
 def generate_embeddings_from_tracked_video(
     model: BaseModule, video_path: str, tracking_data: IdFrameDict, model_transforms: DataTransforms = lambda x: x

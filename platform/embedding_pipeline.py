@@ -8,8 +8,7 @@ from ultralytics import YOLO
 import pandas as pd
 
 from gorillatracker.scripts.video_json_tracker import GorillaVideoTracker
-from gorillatracker.utils.embedding_generator import load_model_from_wandb, generate_embeddings_from_tracked_video
-from gorillatracker.model import SwinV2LargeWrapper
+from gorillatracker.utils.embedding_generator import generate_embeddings_from_tracked_video, get_model
 from gorillatracker.transform_utils import SquarePad
 
 
@@ -100,35 +99,6 @@ def precict_video_simple(
     json.dump({"labels":labeled_video_frames}, open(json_path, "w"), indent=4)
 
 
-def get_swinv2_large(wandb_model_name: str):
-    model_config = {
-        "embedding_size": 128,
-        "from_scratch": False,
-        "loss_mode": "softmax/arcface",
-        "weight_decay": 0.0005,
-        "lr_schedule": "cosine",
-        "warmup_mode": "linear",
-        "warmup_epochs": 10,
-        "max_epochs": 100,
-        "initial_lr": 0.01,
-        "start_lr": 0.01,
-        "end_lr": 0.0001,
-        "beta1": 0.9,
-        "beta2": 0.999,
-        "model_name_or_path": "SwinV2LargeWrapper",
-        "stepwise_schedule": True,
-        "lr_interval": 10,
-        "l2_beta": 0.0,
-        "l2_alpha": 0.0,
-        "path_to_pretrained_weights": "a/b/c",
-    }
-    model = load_model_from_wandb(
-        wandb_model_name, SwinV2LargeWrapper, model_config, "cpu"
-    )
-    model.eval()
-    return model
-
-
 def convert_tracked_list_to_df(data: Dict, class_id=1):
     tracked_df = pd.DataFrame(columns=["frame_id", "bbox", "individual_id"])
     for frame_idx, frame in enumerate(data):
@@ -154,7 +124,7 @@ def convert_tracked_list_to_df(data: Dict, class_id=1):
     return tracked_df
 
 
-def get_tracking_and_embedding_data_for_video(video_path: str):
+def get_tracking_and_embedding_data_for_video(video_path: str, model_from_run: str = "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/a4t93htr/overview"):
     """Generates a DataFrame with:
     Index: frame_id, individual_id
     Columns: body_bbox, face_bbox, face_embedding
@@ -162,13 +132,13 @@ def get_tracking_and_embedding_data_for_video(video_path: str):
     tracked_video_data = create_tracked_bbox_json(video_path)
     
     # Examples usage with embedding generation
-    model = get_swinv2_large("gorillas/Embedding-SwinV2Large-CXL-Open/model-a4t93htr:v14") # wandb run -> https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/a4t93htr/overview
+    model = get_model(model_from_run)
     model_transforms = transforms.Compose(
         [
             SquarePad(),
             transforms.ToTensor(),
-            transforms.Resize((192), antialias=True),
-            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            # TODO(liamvdv: Add more transforms here if needed?)
+            model.get_tensor_transforms(),
         ]
     )
     

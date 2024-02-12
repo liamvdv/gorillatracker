@@ -1,13 +1,13 @@
 import streamlit as st
 import cv2
-import tempfile
 from embedding_pipeline import get_tracking_and_embedding_data_for_video
 from gorillatracker.utils.yolo_helpers import convert_from_yolo_format
-from gorillatracker.utils.embedding_generator import read_embeddings_from_disk
-
+from gather_labels import LabelGatherer
 import pandas as pd
+import numpy as np
 import os
 
+# TODO(liamvdv): rename individual_id to tracking_id in the dataframe. This is the unique identifier for a yolo tracking. Then edit process_video
 
 # Usage
 # streamlit run platform/Dashboard.py
@@ -17,8 +17,9 @@ import os
 # $ python3
 # from gorillatracker.utils.embedding_generator import generate_embeddings_from_run
 # generate_embeddings_from_run("https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/a4t93htr/overview", "embeddings_a4t93htr.pkl")
-embedding_file = "embeddings_a4t93htr.pkl"
-
+model_from_run = "https://wandb.ai/gorillas/Embedding-SwinV2-CXL-Open/runs/69ok0oyl"
+known_embeddings_data_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+known_embeddings_data_loader = "gorillatracker.datasets.cxl.CXLDataset"
 
 def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
     print(df.head())
@@ -77,23 +78,39 @@ def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
     return output_video_path
 
 
-@st.cache_resource
-def load_known_embeddings(embedding_file: str) -> pd.DataFrame:
-    return read_embeddings_from_disk(embedding_file)
-
-
-# TODO(liamvdv): Use knn to add column 'label_string' to df
 def reidentify(df: pd.DataFrame) -> pd.DataFrame:
-    # known_df = load_known_embeddings(embedding_file)
-    # print(known_df.head())
-    # perform knn for every df row that has face_embedding, match to entry in known_df
+    """Adds the column 'label_string' to the dataframe, which contains the label of the individual in the frame."""
+    lg = LabelGatherer(model_from_run=model_from_run, data_dir=known_embeddings_data_dir, dataset_class=known_embeddings_data_loader, use_cache=True)
+    
+    # iter over lg by tracking id, mean 'embedding column'. Then add gathered label to the df
+    # check if any face_embeddings
+    
+    # filter out `face_embeddings` is NaN
+    df_filtered = df.dropna(subset=['face_embeddings'])
 
+    def mean_embeddings(group):
+        # Assuming embeddings are numpy arrays, if they're lists, you might need to convert them first
+        embeddings = np.array(group.tolist())
+        return embeddings.mean(axis=0)
+
+    # (tracking_id, mean_embedding)
+    df_mean_embeddings = df_filtered.groupby('tracking_id')['face_embeddings'].agg(mean_embeddings).reset_index()
+
+    for row in df_mean_embeddings.iterrows():
+        tracking_id = row['tracking_id']
+        embedding = row['face_embeddings']
+        label = lg.get_label_for_embedding(embedding)
+        df.loc[df['tracking_id'] == tracking_id, 'label_string'] = label
+    
     return df
 
 
 @st.cache_data
 def process_video(path: str):
-    return get_tracking_and_embedding_data_for_video(path)
+    df = get_tracking_and_embedding_data_for_video(path)
+    # TODO(liamvdv): REMOVE THIS, fix in get_tracking_and_embedding_data_for_video
+    df.rename(columns={'individual_id': 'tracking_id'}, inplace=True)
+    return df
 
 
 def main():
