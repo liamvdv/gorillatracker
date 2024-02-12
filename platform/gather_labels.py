@@ -32,6 +32,7 @@ class LabelGatherer:
         embeddings_on_disk_path = pathlib.Path(self.cache_destination) / (
             hashlib.sha256(combined_name_bytes).hexdigest() + ".pkl"
         )
+        print(embeddings_on_disk_path.exists())
         if use_cache and embeddings_on_disk_path.exists():
             return eg.read_embeddings_from_disk(str(embeddings_on_disk_path))
 
