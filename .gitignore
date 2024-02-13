@@ -154,5 +154,7 @@ MNIST/
 /datasets/
 /models/
 mnist/
+video_data/
+video_jsons_joscha/
 .gitconfig
 *.pt
