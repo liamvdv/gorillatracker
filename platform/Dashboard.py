@@ -130,7 +130,9 @@ def main():
         st.success("Re-identification successful")
 
         with st.expander("View Dataframe"):
-            st.dataframe(df)
+            displayable = df.copy()
+            displayable["face_embedding"] = displayable["face_embedding"].apply(lambda x: x.tolist() if pd.notna(x) else None)
+            st.dataframe(displayable)
 
         annotated_video_fp = annotate_video_with_bboxes(df, name)
         st.write(annotated_video_fp)
