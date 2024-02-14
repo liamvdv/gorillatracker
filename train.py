@@ -72,7 +72,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         start_lr=args.start_lr,
         end_lr=args.end_lr,
         stepwise_schedule=args.stepwise_schedule,
-        lr_interval=args.val_check_interval,
+        lr_interval=args.lr_interval,
         margin=args.margin,
         loss_mode=args.loss_mode,
         embedding_size=args.embedding_size,
@@ -132,7 +132,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         model_transforms,
         model.get_training_transforms(),
     )
-    lr_monitor = LearningRateMonitor(logging_interval="epoch")
+    lr_monitor = LearningRateMonitor(logging_interval=None)
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,

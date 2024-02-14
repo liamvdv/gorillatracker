@@ -57,6 +57,7 @@ class TrainingArgs:
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
     stepwise_schedule: bool = field(default=False)
+    lr_interval: int = field(default=200)
 
     save_model_to_wandb: bool = field(default=False)
 

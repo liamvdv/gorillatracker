@@ -500,10 +500,10 @@ class VisionTransformerWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+        self.model.head = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
@@ -540,6 +540,53 @@ class VisionTransformerWrapper(BaseModule):
             ]
         )
 
+class VisionTransformerGiantWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = timm.create_model("vit_giant_patch16_gap_224.in22k_ijepa", pretrained_cfg=dict(file="models/IN22K-vit.g.16-600e.pth.tar"))
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        self.model.head = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
+        return self.model.blocks[-1].norm1
+
+    def get_grad_cam_reshape_transform(self) -> Any:
+        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
+        def reshape_transform(tensor: torch.Tensor, height: int = 14, width: int = 14) -> torch.Tensor:
+            result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
+
+            result = result.transpose(2, 3).transpose(1, 2)
+            return result
+
+        return reshape_transform
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Compose(
+            [
+                transforms.Resize((224), antialias=True),
+                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+            ]
+        )
 
 class VisionTransformerDinoV2Wrapper(BaseModule):
     def __init__(  # type: ignore
@@ -973,6 +1020,7 @@ custom_model_cls = {
     "SwinV2Base": SwinV2BaseWrapper,
     "SwinV2LargeWrapper": SwinV2LargeWrapper,
     "ViT_Large": VisionTransformerWrapper,
+    "ViT_Giant": VisionTransformerGiantWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
     "ResNet50Wrapper": ResNet50Wrapper,
