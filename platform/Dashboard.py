@@ -17,7 +17,17 @@ model_from_run = "https://wandb.ai/gorillas/Embedding-SwinV2-CXL-Open/runs/69ok0
 known_embeddings_data_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 known_embeddings_data_loader = "gorillatracker.datasets.cxl.CXLDataset"
 
-def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
+
+def get_last_seen_frame_id(df: pd.DataFrame, search_frame_id: int) -> int:
+    """Returns the last frame_id where the individual was seen before the search_frame_id."""
+    return df[df["frame_id"] < search_frame_id]["frame_id"].max()
+
+
+def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str, fps_ratio: float = 1.0):
+    assert fps_ratio >= 1.0, "fps_ratio must be between 0.0 and 1.0"
+    if fps_ratio > 1.0:
+        df["frame_id"] = (df["frame_id"] * fps_ratio).astype(int) 
+    
     # Generate output video path
     base, ext = os.path.splitext(input_video_path)
     output_video_path = f"{base}-annotated{ext}"
@@ -43,7 +53,10 @@ def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str):
         current_frame_id = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1  # Frame IDs start at 0
 
         # Filter dataframe rows for the current frame
-        frame_data = df[df["frame_id"] == current_frame_id]
+        
+        
+        frame_data_idx = get_last_seen_frame_id(df, current_frame_id)
+        frame_data = df[df["frame_id"] == frame_data_idx]
 
         # Iterate over rows to draw bounding boxes
         for _, row in frame_data.iterrows():
@@ -97,6 +110,34 @@ def reidentify(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def reduce_frame_rate(input_video, output_video, target_fps):
+    cap = cv2.VideoCapture(input_video)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = None
+    frame_count = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame_count += 1
+        # Only write every nth frame to the output video
+        if frame_count % int(fps / target_fps) == 0:
+            if out is None:
+                out = cv2.VideoWriter(output_video, fourcc, target_fps, (frame_width, frame_height))
+            out.write(frame)
+
+    cap.release()
+    if out is not None:
+        out.release()
+        return fps / target_fps
+    return 1.0
+
+
 @st.cache_data
 def process_video(path: str, model_from_run: str = model_from_run):
     df = get_tracking_and_embedding_data_for_video(path, model_from_run=model_from_run)
@@ -122,8 +163,11 @@ def main():
 
         with st.expander("View Video"):
             st.video(video)
-
-        df = process_video(name)  # cached
+        
+        output_video_path = os.path.join("/tmp", video.name.split(".")[0] + "-reduced.mp4")
+        fps_ratio = reduce_frame_rate(name, output_video_path, 10)
+        
+        df = process_video(output_video_path)  # cached
         st.success("Video processed successfully")
 
         df = reidentify(df)
@@ -134,7 +178,7 @@ def main():
             displayable["face_embedding"] = displayable["face_embedding"].apply(lambda x: x.tolist() if pd.notna(x) else None)
             st.dataframe(displayable)
 
-        annotated_video_fp = annotate_video_with_bboxes(df, name)
+        annotated_video_fp = annotate_video_with_bboxes(df, name, fps_ratio)
         st.write(annotated_video_fp)
         
         # Why does this not work?

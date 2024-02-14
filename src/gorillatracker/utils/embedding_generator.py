@@ -37,7 +37,6 @@ def parse_wandb_url(url: str) -> Tuple[str, str, str]:
     assert url.startswith("https://wandb.ai/")
     parsed = urlparse(url)
     assert parsed.netloc == "wandb.ai"
-    print(parsed, parsed.path.split("/"), parsed.path)
     parts = parsed.path.strip("/").split(
         "/"
     )  # ['gorillas', 'Embedding-SwinV2-CXL-Open', 'runs', 'fnyvl65k', 'overview']
@@ -264,25 +263,40 @@ def generate_embeddings_from_tracked_video(
         step_size = len(frames) // max_per_individual
         if step_size == 0:
             continue
-        frame_list = [frames[i] for i in range(0, max_per_individual * step_size, step_size)]
-        for frame_idx, bbox in frame_list:
+        embedded_frame_list = [frames[i] for i in range(0, max_per_individual * step_size, step_size)]
+        not_embedded_frame_list = [frame for frame in frames if frame not in embedded_frame_list]
+        embedding_list = []
+        
+        for frame_idx, bbox in embedded_frame_list:
             video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
             embedding = get_embedding_from_frame(model, frame, bbox, model_transforms)
-            embedding_img_table = pd.concat(
-                [
-                    embedding_img_table,
-                    pd.DataFrame(
-                        {
-                            "individual_id": [id],
-                            "frame_id": [frame_idx],
-                            "bbox": [bbox],
-                            "embedding": [embedding],
-                        }
-                    ),
-                ],
-                ignore_index=True,
-            )
+            embedding_list.append(embedding)
+        embedding_img_table = pd.concat(
+            [
+                embedding_img_table,
+                pd.DataFrame(
+                    {
+                        "individual_id": [id] * len(embedded_frame_list),
+                        "frame_id": [frame_idx for frame_idx, _ in embedded_frame_list],
+                        "bbox": [bbox for _, bbox in embedded_frame_list],
+                        "embedding": embedding_list,
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )    
+        
+        print("Embedded", len(embedded_frame_list), "frames for individual", id)
+        not_embedded_df = pd.DataFrame(
+            {
+                "individual_id": [id] * len(not_embedded_frame_list),
+                "frame_id": [frame_idx for frame_idx, _ in not_embedded_frame_list],
+                "bbox": [bbox for _, bbox in not_embedded_frame_list],
+            }
+        )
+        embedding_img_table = pd.concat([embedding_img_table, not_embedded_df], ignore_index=True)
+        
     video.release()
     embedding_img_table.set_index(["frame_id", "individual_id"], inplace=True)
     embedding_img_table.rename(columns={"embedding": "face_embedding", "bbox": "face_bbox"}, inplace=True)
