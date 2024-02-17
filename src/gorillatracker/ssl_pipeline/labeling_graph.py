@@ -37,7 +37,7 @@ import random
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, Union
+from typing import Iterator
 
 
 class UnionFind:
@@ -83,8 +83,9 @@ class Graph:
         self._graph: list[set[Edge]] = [set() for _ in range(vertices)]
 
     def add_edge(self, u: int, v: int, relationship: Relationship) -> None:
-        assert not any(edge.vertex == v for edge in self._graph[u])
-        assert not any(edge.vertex == u for edge in self._graph[v])
+        assert u != v, "Invalid edge"
+        assert not any(edge.vertex == v for edge in self._graph[u]), "Edge already exists"
+        assert not any(edge.vertex == u for edge in self._graph[v]), "Edge already exists"
         self._graph[u].add(Edge(v, relationship))
         self._graph[v].add(Edge(u, relationship))
 
@@ -111,6 +112,7 @@ class UnionGraph:
         self.negative_relations: dict[int, set[int]] = {i: set() for i in range(vertices)}
 
     def add_edge(self, u: int, v: int, relationship: Relationship) -> None:
+        assert u != v, "Invalid edge"
         if relationship == Relationship.POSITIVE:
             assert not self.has_group_negative_edge(u, v)
             root_u = self.union_find.find(u)
@@ -158,6 +160,7 @@ class LabelTask:
         label_queue: deque[tuple[int, int]] - a queue of connections to be labeled
         control_probability: float - the probability of a control labeling task **not** being skipped
         """
+        assert all((b, a) not in label_queue for a, b in label_queue), "Queue contains duplicate edges"
         self.label_graph = label_graph
         self.label_queue = label_queue
         self.union_graph = transform_to_union_graph(label_graph)
@@ -172,16 +175,6 @@ class LabelTask:
             return True
         return False
 
-    def next(self) -> Union[tuple[int, int], None]:
-        if not self.label_queue:
-            return None
-        id_1, id_2 = self.label_queue.popleft()
-        self.passed.append((id_1, id_2))
-        if self.is_edge_redudant(id_1, id_2):
-            if random.random() > self.control_probability:
-                return self.next()
-        return (id_1, id_2)
-
     def label(self, id_1: int, id_2: int, relationship: Relationship) -> None:
         self.label_graph.add_edge(id_1, id_2, relationship)
         self.union_graph.add_edge(id_1, id_2, relationship)
@@ -190,10 +183,23 @@ class LabelTask:
     def undo(self) -> None:
         id_1, id_2 = self.history.pop()
         self.label_graph.remove_edge(id_1, id_2)
-        self.reevaluate_passed()
         self.union_graph = transform_to_union_graph(self.label_graph)
+        self.reevaluate_passed()
 
     def reevaluate_passed(self) -> None:
         for id_1, id_2 in reversed(self.passed):
             if not self.is_edge_redudant(id_1, id_2) and (id_1, id_2) not in self.label_queue:
                 self.label_queue.appendleft((id_1, id_2))
+
+    def __iter__(self) -> Iterator[tuple[int, int]]:
+        return self
+
+    def __next__(self) -> tuple[int, int]:
+        if not self.label_queue:
+            raise StopIteration
+        id_1, id_2 = self.label_queue.popleft()
+        self.passed.append((id_1, id_2))
+        if self.is_edge_redudant(id_1, id_2):
+            if random.random() > self.control_probability:
+                return self.__next__()
+        return (id_1, id_2)
