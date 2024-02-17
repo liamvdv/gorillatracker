@@ -20,17 +20,17 @@ def train(
         project=WANDB_PROJECT, name=training_name, data=data, epochs=epochs, batch=batch_size, patience=patience
     )
     shutil.move(WANDB_PROJECT, f"logs/{WANDB_PROJECT}-{training_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}")
-    
+
+
 def tune(
     model: YOLO,
     training_name: str,
     data: str,
     iterations: int = 30,
 ) -> None:
-    model.tune(
-        project=WANDB_PROJECT, name=training_name, data=data, iterations=iterations, epochs=150, batch=-1
-    )
+    model.tune(project=WANDB_PROJECT, name=training_name, data=data, iterations=iterations, epochs=150, batch=-1)
     shutil.move(WANDB_PROJECT, f"logs/{WANDB_PROJECT}-{training_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}")
+
 
 if __name__ == "__main__":
     model = YOLO("path/to/your/yolov8n.pt")
