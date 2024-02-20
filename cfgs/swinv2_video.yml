@@ -1,0 +1,64 @@
+# Device Arguments
+
+accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
+num_devices: 1                  # Number of devices (GPUs) to use
+distributed_strategy: "auto"    # Distributed training strategy (if applicable)
+force_deterministic: False      # Force deterministic behavior
+precision: 32                   # Training precision (e.g., "bf16-mixed")
+compile: False                  # Compile the model for faster execution
+workers: 4                      # Number of workers for data loading
+
+
+# Model and Training Arguments
+
+project_name: "Embedding-SwinV2-Video-OpenSet" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "97-run-baseline-for-video" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["baseline", "pure-openset"]            # WandB tags for experiment tracking
+model_name_or_path: "SwinV2Base"  # Model name or path 
+saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
+resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
+fast_dev_run: False               # Enable fast development run
+profiler: Null                    # Profiler to use (e.g., "simple", "advanced", "pytorch")
+offline: False                    # Enable offline mode for WandB
+data_preprocessing_only: False    # Run only data preprocessing
+seed: 42                          # Random seed for reproducibility
+debug: False                      # Enable debug mode
+from_scratch: False               # Train the model from scratch
+early_stopping_patience: 3        # Early stopping patience (number of epochs)
+min_delta: 0.001                   # Early stopping delta
+embedding_size: 128
+
+weight_decay: 0.2               # Weight decay
+beta1: 0.9                      # Adam optimizer's beta1 parameter
+beta2: 0.999                    # Adam optimizer's beta2 parameter
+epsilon: 1e-7                   # Adam optimizer's epsilon
+margin: 1.0                     # Margin for the contrastive loss (triplet loss)
+loss_mode: "offline/native"
+
+lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
+warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
+warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
+initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+stepwise_schedule: True         # Use stepwise schedule with lr change after each validation
+
+batch_size: 12                  # Training batch size
+grad_clip: 1.0                  # Gradient clipping value
+gradient_accumulation_steps: 4  # Gradient accumulation steps
+max_epochs: 1                  # Training goal (large number)
+val_check_interval: 200         # Validation check interval as a fraction of total steps or as an fixed number of steps
+val_before_training: True       # Perform validation before training
+only_val: False                 # Perform only validation
+
+save_interval: 2                # Model checkpoint save interval as a fraction of total steps
+embedding_save_interval: 1      # Embedding save interval
+knn_with_train: False           # Perform knn with train set
+
+# Config and Data Arguments
+# wandb_tags: ["research-template"] # WandB tags for experiment tracking
+
+data_dir: "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_labels_cropped_faces"
+dataset_class: "gorillatracker.datasets.spac_videos.SPACVideosDataset"
+data_resize_transform: 192
+video_data: True
