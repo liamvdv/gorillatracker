@@ -12,7 +12,7 @@ def train(
     training_name: str,
     data: str,
     epochs: int = 100,
-    batch_size: int = -1,
+    batch_size: int = -1, # -1 autobatch
     patience: int = 40,
 ) -> None:
     training_name = f"{training_name}"
@@ -28,7 +28,7 @@ def tune(
     data: str,
     iterations: int = 30,
 ) -> None:
-    model.tune(project=WANDB_PROJECT, name=training_name, data=data, iterations=iterations, epochs=150, batch=-1)
+    model.tune(project=WANDB_PROJECT, name=training_name, data=data, iterations=iterations, epochs=150, batch=-1) # -1 autobatch
     shutil.move(WANDB_PROJECT, f"logs/{WANDB_PROJECT}-{training_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}")
 
 
