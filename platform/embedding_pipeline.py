@@ -25,7 +25,7 @@ def create_tracked_bbox_json(video_path: str):
     with tempfile.TemporaryDirectory() as temp_dir:
         file_name = Path(video_path).stem
         json_path = f"{temp_dir}/{file_name}.json"
-        body_model_path = "/workspaces/gorillatracker/models/yolov8n_gorillabody_ybyh495y.pt"
+        body_model_path = "/workspaces/gorillatracker/models/yolov8n-gorillabody-fmc-ra63cs5m.pt"
         face_model_path = "/workspaces/gorillatracker/models/yolov8n_gorillaface_knwmwxko.pt"
         precict_video_simple(video_path, json_path, YOLO(face_model_path), YOLO(body_model_path), {})
 
