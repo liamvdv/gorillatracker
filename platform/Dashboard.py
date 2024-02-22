@@ -137,9 +137,6 @@ def annotate_video_with_bboxes(df: pd.DataFrame, input_video_path: str, fps_rati
         frame_data["bbox_distance"] = frame_data.apply(lambda x: 0 if pd.isna(x["face_bbox_prev"]) or pd.isna(x["face_bbox_next"]) else np.linalg.norm(np.array(x["face_bbox_prev"][0:2]) - np.array(x["face_bbox_next"][0:2])), axis=1, result_type=None)
         frame_data = frame_data.sort_values("bbox_distance").groupby("tracking_id").head(1)
         
-        
-        ft = cv2.free
-        
         # Iterate over rows to draw bounding boxes
         for _, row in frame_data.iterrows():
             # Draw body bounding box
