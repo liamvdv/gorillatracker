@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 
+
 def filter_and_extract(video_id: int, session: Session, base_dir: str, n_images: int) -> None:
     """
     Filter and extract frames from a video.
-    
+
     Args:
         video_id (int): The id of the video to extract frames from.
         session (Session): The database session.
