@@ -64,7 +64,8 @@ class SPACVideosDataset(Dataset[Tuple[Image.Image, Label]]):
         if partition == "train":
             self.samples = get_samples_video(dirpath)
         else:
-            self.samples = get_samples_cxl(dirpath)
+            self.samples = get_samples_cxl(Path("/workspaces/gorillatracker/data/derived_data/cxl/yolov8n_gorillabody_ybyh495y/body_images"))
+            # self.samples = get_samples_cxl(Path("/workspaces/gorillatracker/data/ground_truth/cxl/face_images"))
         self.transform = transform
 
     def __len__(self) -> int:

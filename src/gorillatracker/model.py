@@ -556,19 +556,19 @@ class VisionTransformerGiantWrapper(BaseModule):
         )
         self.set_losses(self.model, **kwargs)
 
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
-        return self.model.blocks[-1].norm1
+    # def get_grad_cam_layer(self) -> torch.nn.Module:
+    #     # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
+    #     return self.model.blocks[-1].norm1
 
-    def get_grad_cam_reshape_transform(self) -> Any:
-        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
-        def reshape_transform(tensor: torch.Tensor, height: int = 14, width: int = 14) -> torch.Tensor:
-            result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
+    # def get_grad_cam_reshape_transform(self) -> Any:
+    #     # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
+    #     def reshape_transform(tensor: torch.Tensor, height: int = 14, width: int = 14) -> torch.Tensor:
+    #         result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
 
-            result = result.transpose(2, 3).transpose(1, 2)
-            return result
+    #         result = result.transpose(2, 3).transpose(1, 2)
+    #         return result
 
-        return reshape_transform
+    #     return reshape_transform
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
