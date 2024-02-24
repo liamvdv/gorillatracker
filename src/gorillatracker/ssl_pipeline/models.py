@@ -35,6 +35,7 @@ class VideoClip(Base):
     __tablename__ = "video_clip"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    file_path: Mapped[str] = mapped_column(String(100))  # video_data/example.mp4
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.id"))
     start_time: Mapped[datetime.datetime]
     fps: Mapped[int]

@@ -230,6 +230,7 @@ def db_session_with_data(db_session: Session) -> Session:
         [
             VideoClip(
                 id=1,
+                file_path="path/to/video1",
                 camera_id=1,
                 start_time=generic_date,
                 fps=30,
@@ -240,6 +241,7 @@ def db_session_with_data(db_session: Session) -> Session:
             ),
             VideoClip(
                 id=2,
+                file_path="path/to/video2",
                 camera_id=2,
                 start_time=generic_date,
                 fps=60,
