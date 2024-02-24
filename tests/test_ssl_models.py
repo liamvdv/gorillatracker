@@ -175,7 +175,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 
-from gorillatracker.ssl_pipeline.dataset_models import (
+from gorillatracker.ssl_pipeline.models import (
     Animal,
     Base,
     Camera,

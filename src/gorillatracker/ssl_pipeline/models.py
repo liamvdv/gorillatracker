@@ -155,32 +155,5 @@ if __name__ == "__main__":
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
-    generic_date = datetime.datetime(2000, 1, 1, 0, 0, 0)
-    session.add_all(
-        [
-            VideoClip(
-                id=1,
-                camera_id=1,
-                start_time=generic_date,
-                fps=30,
-                frames=1000,
-                width=1920,
-                height=1080,
-                grayscale=False,
-            ),
-            VideoClip(
-                id=2,
-                camera_id=2,
-                start_time=generic_date,
-                fps=60,
-                frames=1000,
-                width=1920,
-                height=1080,
-                grayscale=False,
-            ),
-        ]
-    )
-    videos = session.query(VideoClip)
-    print(videos.filter(VideoClip.id == 1).one())
     session.close()
     Base.metadata.drop_all(engine)
