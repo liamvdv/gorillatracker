@@ -1021,7 +1021,7 @@ class MiewIdNet(nn.Module):
     def __init__(
         self,
         n_classes,
-        model_name="efficientnetv2_rw_m", # origianally efficientnet_b0
+        model_name="efficientnetv2_rw_m",  # origianally efficientnet_b0
         use_fc=False,
         fc_dim=512,
         dropout=0.0,
@@ -1155,14 +1155,14 @@ class MiewIdNetWrapper(BaseModule):
         super().__init__(**kwargs)
         is_from_scratch = kwargs.get("from_scratch", False)
         use_wildme_model = kwargs.get("use_wildme_model", False)
-        
+
         if use_wildme_model:
             logger.info("Using WildMe model")
             self.model = load_miewid_model()
             # fix model
             for param in self.model.parameters():
                 param.requires_grad = False
-            
+
             # self.model.global_pool = nn.Identity()
             # self.model.bn = nn.Identity()
             self.classifier = torch.nn.Sequential(
@@ -1173,11 +1173,11 @@ class MiewIdNetWrapper(BaseModule):
             )
             self.set_losses(self.model, **kwargs)
             return
-        
+
         self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
         in_features = self.model.classifier.in_features
 
-        self.model.global_pool = nn.Identity() # NOTE: GeM = Generalized Mean Pooling
+        self.model.global_pool = nn.Identity()  # NOTE: GeM = Generalized Mean Pooling
         self.model.classifier = nn.Identity()
 
         # TODO(rob2u): load wildme model weights here then initialize the classifier and get loss modes -> change the transforms accordingly (normalize, etc.)
@@ -1197,7 +1197,7 @@ class MiewIdNetWrapper(BaseModule):
             return self.model.blocks[-1]
         else:
             return self.model.backbone.blocks[-1]
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model(x)
         x = self.classifier(x)
@@ -1218,7 +1218,6 @@ class MiewIdNetWrapper(BaseModule):
                 transforms_v2.RandomResizedCrop(440, scale=(0.75, 1.0)),
             ]
         )
-
 
 
 # NOTE(liamvdv): Register custom model backbones here.
@@ -1248,6 +1247,3 @@ def get_model_cls(model_name: str) -> Type[BaseModule]:
         module, cls = model_name.rsplit(".", 1)
         model_cls = getattr(importlib.import_module(module), cls)
     return model_cls
-
-
-
