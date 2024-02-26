@@ -156,3 +156,4 @@ MNIST/
 mnist/
 .gitconfig
 *.pt
+*.ckpt

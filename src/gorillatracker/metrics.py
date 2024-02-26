@@ -120,7 +120,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        log_grad_cam_images_to_wandb(self.run, trainer)
+        # log_grad_cam_images_to_wandb(self.run, trainer)
+        return
 
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings
