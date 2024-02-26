@@ -1013,11 +1013,8 @@ class MiewIdNetWrapper(BaseModule):
 
         self.set_losses(self.model, **kwargs)
 
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        if hasattr(self.model, "blocks"):
-            return self.model.blocks[-1]
-        else:
-            return self.model.backbone.blocks[-1]
+    def get_grad_cam_layer(self) -> torch.nn.Module: 
+        return self.model.backbone.blocks[-1][-1].conv_pwl
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model(x)
