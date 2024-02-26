@@ -234,7 +234,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/miewidnet_cxl.yml"
+    config_path = "./cfgs/config.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments
