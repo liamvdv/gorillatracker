@@ -27,7 +27,7 @@ from transformers import ResNetModel
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import get_loss
-from gorillatracker.model_miewid import load_miewid_model, GeM
+from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 
 
 def warmup_lr(
@@ -966,6 +966,7 @@ class FaceNetWrapper(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
             ]
         )
+
 
 class MiewIdNetWrapper(BaseModule):
     def __init__(  # type: ignore

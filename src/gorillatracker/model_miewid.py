@@ -1,9 +1,9 @@
 # see https://github.com/WildMeOrg/wbia-plugin-miew-id/blob/main/wbia_miew_id/models
+# type: ignore
 import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 
 
 def weights_init_kaiming(m):
