@@ -2,7 +2,6 @@ import math
 from typing import Any, Tuple
 
 import torch
-
 import gorillatracker.type_helper as gtypes
 
 # import variational prototype learning from insightface
@@ -18,8 +17,8 @@ class ArcFaceLoss(torch.nn.Module):
         self,
         embedding_size: int,
         num_classes: int,
-        s: float = 64.0,
         margin: float = 0.5,
+        s: float = 64.0,
         accelerator: str = "cpu",
         *args: Any,
         **kwargs: Any,
@@ -30,6 +29,8 @@ class ArcFaceLoss(torch.nn.Module):
         self.cos_m = math.cos(margin)
         self.sin_m = math.sin(margin)
         self.num_classes = num_classes
+        self.embedding_size = embedding_size
+        self.accelerator = accelerator
         if accelerator == "cuda":
             self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
         else:
@@ -37,6 +38,10 @@ class ArcFaceLoss(torch.nn.Module):
 
         torch.nn.init.xavier_uniform_(self.prototypes)
         self.ce = torch.nn.CrossEntropyLoss()
+        
+    def get_prototypes(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Returns the prototypes"""
+        return self.prototypes
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
@@ -44,7 +49,7 @@ class ArcFaceLoss(torch.nn.Module):
         assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
 
         # get cos(theta) for each embedding and prototype
-        prototypes = self.prototypes.to(embeddings.device)
+        prototypes = self.get_prototypes(embeddings, labels).to(embeddings.device)
 
         if labels.device != embeddings.device:
             labels.to(embeddings.device)
@@ -66,7 +71,7 @@ class ArcFaceLoss(torch.nn.Module):
 
         output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: sometimes there is an additional penalty term
         output *= self.s
-        loss = self.ce(output, labels)
+        loss = self.get_loss(output, labels)
 
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
@@ -80,63 +85,40 @@ class ArcFaceLoss(torch.nn.Module):
 
         self.prototypes = torch.nn.Parameter(weights)
 
+    def get_loss(self, output: torch.Tensor, labels: torch.Tensor):
+        return self.ce(output, labels)
 
-class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the completely original implementation
+
+class VariationalPrototypeLearning(ArcFaceLoss):  # NOTE: this is not the completely original implementation
     """Variational Prototype Learning Loss
     See https://openaccess.thecvf.com/content/CVPR2021/papers/Deng_Variational_Prototype_Learning_for_Deep_Face_Recognition_CVPR_2021_paper.pdf
     """
 
     def __init__(
         self,
-        embedding_size: int,
-        num_classes: int,
         batch_size: int,
-        s: float = 64.0,
-        margin: float = 0.5,
         delta_t: int = 100,
         lambda_membank: float = 0.5,
         mem_bank_start_epoch: int = 2,
-        accelerator: str = "cpu",
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super(VariationalPrototypeLearning, self).__init__(*args, **kwargs)
-        self.s = s
-        self.margin = margin
-        self.cos_m = math.cos(margin)
-        self.sin_m = math.sin(margin)
+        
         self.delta_t = delta_t
         self.lambda_membank = lambda_membank
         self.mem_bank_start_epoch = mem_bank_start_epoch
-        if accelerator == "cuda":
-            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
-        else:
-            self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
-        torch.nn.init.xavier_uniform_(self.prototypes)
-
-        self.ce = torch.nn.CrossEntropyLoss()
         self.batch_size = batch_size
-        self.embedding_size = embedding_size
-        self.num_classes = num_classes
 
         self.memory_bank_ptr = 0  # pointer to the current memory bank position that will be replaced
-        self.memory_bank = torch.zeros(delta_t * batch_size, embedding_size)
-        self.memory_bank_labels = torch.zeros(delta_t * batch_size, dtype=torch.int32)
+        self.memory_bank = torch.zeros(delta_t * self.batch_size, self.embedding_size)
+        self.memory_bank_labels = torch.zeros(delta_t * self.batch_size, dtype=torch.int32)
         self.using_memory_bank = False
 
     def set_using_memory_bank(self, using_memory_bank: bool) -> bool:
         """Sets whether or not to use the memory bank"""
         self.using_memory_bank = using_memory_bank
         return self.using_memory_bank
-
-    def set_weights(self, weights: torch.Tensor) -> None:
-        """Sets the weights of the prototypes"""
-        assert weights.shape == self.prototypes.shape
-
-        if torch.cuda.is_available() and self.prototypes.device != weights.device:
-            weights = weights.cuda()
-
-        self.prototypes = torch.nn.Parameter(weights)
 
     def update_memory_bank(self, embeddings: torch.Tensor, labels: torch.Tensor) -> None:
         """Updates the memory bank with the current batch of embeddings and labels"""
@@ -179,7 +161,8 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
         return prototypes, frequency
 
-    def calculate_prototype(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+
+    def get_prototypes(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         """Calculates the prototype for the given embeddings and labels"""
         if self.using_memory_bank:
             mem_bank_prototypes, prototype_frequency = self.get_memory_bank_prototypes()
@@ -203,27 +186,18 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
         return prototypes
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
-        """Forward pass of the Variational Prototype Learning loss function"""
-        prototypes = self.calculate_prototype(embeddings, labels)
-
-        cos_theta = (
-            torch.nn.functional.normalize(embeddings).unsqueeze(1)
-            * torch.nn.functional.normalize(prototypes).unsqueeze(0)
-        ).sum(dim=2)
-
-        sine_theta = torch.sqrt(
-            torch.maximum(1.0 - torch.pow(cos_theta, 2), torch.tensor([eps], device=cos_theta.device))
-        ).clamp(eps, 1.0 - eps)
-        phi = (
-            cos_theta * self.cos_m - sine_theta * self.sin_m
-        )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
-
-        mask = torch.zeros(cos_theta.size(), device=cos_theta.device)
-        mask.scatter_(1, labels.view(-1, 1).long(), 1)  # mask is one-hot encoded labels
-
-        output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: sometimes there is an additional penalty term
-        output *= self.s
-        loss = self.ce(output, labels)
-
-        return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
+class ArcFaceSubcenter(ArcFaceLoss):
+    def __init__(self, k=2, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.k = k
+        
+        if self.accelerator == "cuda":
+            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(self.num_classes * self.k, self.embedding_size))  # type: ignore
+        else:
+            self.prototypes = torch.nn.Parameter(torch.FloatTensor(self.num_classes * self.k, self.embedding_size))
+        torch.nn.init.xavier_uniform_(self.prototypes)
+        
+    def get_loss(self, output: torch.Tensor, labels: torch.Tensor):
+        output = output.view(-1, self.num_classes, self.k)
+        output = torch.max(output, dim=2)[0]
+        return self.ce(output, labels)

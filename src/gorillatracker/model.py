@@ -132,7 +132,7 @@ class BaseModule(L.LightningModule):
         delta_t: int = 200,
         mem_bank_start_epoch: int = 2,
         lambda_membank: float = 0.5,
-        embedding_size: int = 256,
+        embedding_size: int = 128,
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
@@ -178,7 +178,6 @@ class BaseModule(L.LightningModule):
         delta_t: int = 200,
         mem_bank_start_epoch: int = 2,
         lambda_membank: float = 0.5,
-        embedding_size: int = 256,
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         accelerator: str = "cpu",
@@ -191,6 +190,7 @@ class BaseModule(L.LightningModule):
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
+            k=kwargs["k"],
             num_classes=num_classes[0],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
@@ -207,6 +207,7 @@ class BaseModule(L.LightningModule):
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
+            k=1,
             num_classes=num_classes[1],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
@@ -281,7 +282,7 @@ class BaseModule(L.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
-        if isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+        if isinstance(self.loss_module_val, ArcFaceLoss):
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
@@ -784,8 +785,10 @@ class SwinV2LargeWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 

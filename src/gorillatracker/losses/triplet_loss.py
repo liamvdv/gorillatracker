@@ -7,7 +7,7 @@ from torch import nn
 
 import gorillatracker.type_helper as gtypes
 import gorillatracker.utils.l2sp_regularisation as l2
-from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
+from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning, ArcFaceSubcenter
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -395,15 +395,24 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             margin=kw_args["margin"],
             accelerator=kw_args["accelerator"],
         )
+    elif loss_mode == "softmax/arcface/subcenter":
+        loss_module = ArcFaceSubcenter(
+            embedding_size=kw_args["embedding_size"],
+            num_classes=kw_args["num_classes"],
+            s=kw_args["s"],
+            margin=kw_args["margin"],
+            accelerator=kw_args["accelerator"],
+            k=kw_args["k"],
+        )
     elif loss_mode == "softmax/vpl":
         loss_module = VariationalPrototypeLearning(
+            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+            delta_t=kw_args["delta_t"],
             embedding_size=kw_args["embedding_size"],
             num_classes=kw_args["num_classes"],
             batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
             margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
+            s=kw_args["s"],
             accelerator=kw_args["accelerator"],
         )
     else:

@@ -36,7 +36,7 @@ class TrainingArgs:
     from_scratch: bool = field(default=False)
     early_stopping_patience: int = 3
     min_delta: float = field(default=0.01)
-    embedding_size: int = 256
+    embedding_size: int = 128
     dropout_p: float = field(default=0.0)
 
     # Optimizer Arguments
@@ -65,6 +65,7 @@ class TrainingArgs:
     delta_t: int = field(default=100)
     mem_bank_start_epoch: int = field(default=2)
     lambda_membank: float = field(default=0.5)
+    k: int = field(default=2)
     loss_mode: Literal[
         "offline",
         "offline/native",
@@ -72,6 +73,7 @@ class TrainingArgs:
         "online/hard",
         "online/semi-hard",
         "softmax/arcface",
+        "softmax/arcface/subcenter",
         "softmax/vpl",
         "offline/native/l2sp",
         "online/soft/l2sp",
