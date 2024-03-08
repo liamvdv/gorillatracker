@@ -34,7 +34,7 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
     sweep_id = sweep(sweep=sweep_config, project=project_name, entity=entity)
     # Print the sweep ID directly
     print(f"SWEEP_PATH={entity}/{project_name}/{sweep_id}")
-    agent(sweep_id)  # type: ignore
+    agent(sweep_id)
 
 
 sweeps = [
