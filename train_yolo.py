@@ -95,7 +95,7 @@ def train(
 @app.command()
 def tune_batch_size_all(
     training_name: str,
-    batch_sizes: str = "8,16,32,64,-1", # -1 for autobatch
+    batch_sizes: str = "8,16,32,64,-1",  # -1 for autobatch
     epochs: int = 200,
     patience: int = 40,
 ) -> None:
