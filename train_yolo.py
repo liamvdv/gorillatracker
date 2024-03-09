@@ -93,6 +93,33 @@ def train(
 
 
 @app.command()
+def tune_batch_size_all(
+    training_name: str,
+    batch_sizes: str = "8,16,32,64,-1", # -1 for autobatch
+    epochs: int = 200,
+    patience: int = 40,
+) -> None:
+    sizes = [int(x) for x in batch_sizes.split(",")]
+    for dataset_key in ["fmcb", "gsb", "gb", "gf90", "gf45"]:
+        for bs in sizes:
+            subprocess.run(
+                [
+                    "python",
+                    "train_yolo.py",
+                    "train",
+                    dataset_key,
+                    f"{training_name}-{dataset_key}",
+                    "--epochs",
+                    str(epochs),
+                    "--patience",
+                    str(patience),
+                    "--batch-size",
+                    str(bs),
+                ]
+            )
+
+
+@app.command()
 def tune_all(
     training_name: str,
     iterations: int = 20,
