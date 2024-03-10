@@ -54,6 +54,7 @@ dependencies:
   - isort
   - mypy
   - pytest
+  - typer
 
   # pip dependencies
   - pip

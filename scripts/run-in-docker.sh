@@ -94,7 +94,7 @@ fi
 docker run --rm -it --ipc=host \
     -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
     -v "/scratch2/gorillatracker/data:/workspaces/gorillatracker/data:ro" \
-    -v "/scratch2/gorillatracker/data/splits:/workspaces/gorillatracker/data/splits" \
+    -v "/scratch2/gorillatracker/data/splits:/workspaces/gorillatracker/data/splits:ro" \
     -v "/scratch2/gorillatracker/models:/workspaces/gorillatracker/models" \
     -v "/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", \
     --user 0:0 \
