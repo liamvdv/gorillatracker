@@ -26,7 +26,7 @@ from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
-from gorillatracker.losses.triplet_loss import get_loss, L2SPRegularization_Wrapper
+from gorillatracker.losses.triplet_loss import get_loss
 
 
 def warmup_lr(
@@ -1010,6 +1010,7 @@ class FaceNetWrapper(BaseModule):
             ]
         )
 
+
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {
     "EfficientNetV2_Large": EfficientNetV2Wrapper,
@@ -1027,7 +1028,6 @@ custom_model_cls = {
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
-    "InceptionV3": InceptionV3Wrapper,
 }
 
 
