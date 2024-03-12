@@ -77,6 +77,8 @@ class TrainingArgs:
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
+        "softmax/arcface/l2sp",
+        "softmax/vpl/l2sp",
     ] = field(default="offline")
 
     batch_size: int = field(default=8)

@@ -215,6 +215,13 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
+        # # delete everything in model except model.model
+        # for k in list(model.__dict__.keys()):
+        #     if k != "model" and not k.startswith("_"):
+        #         del model.__dict__[k]
+        # # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
+        # torch.save(model.state_dict(), "swin_base.pth")
+        
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
