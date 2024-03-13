@@ -55,7 +55,7 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
         while source_video.isOpened():
             success, frame = source_video.read()
             # TODO(memben): remove
-            if frame_nr > 1000:
+            if frame_nr > 2000:
                 break
             if not success:
                 break

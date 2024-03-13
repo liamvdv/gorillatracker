@@ -29,7 +29,7 @@ class Camera(Base):
     latitude: Mapped[float]
     longitude: Mapped[float]
 
-    videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete-orphan")
+    videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete")
 
     def __repr__(self) -> str:
         return f"Camera(id={self.camera_id}, name={self.name}, latitude={self.latitude}, longitude={self.longitude})"

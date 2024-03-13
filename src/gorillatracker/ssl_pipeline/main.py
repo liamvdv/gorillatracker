@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.create_ssl_dataset import filter_and_extract
 from gorillatracker.ssl_pipeline.models import Base
-from gorillatracker.ssl_pipeline.track_videos import track_and_store
+from gorillatracker.ssl_pipeline.video_tracker import track_and_store
 
 
 def ssl_pipeline(video_path: str, session: Session, base_dir: str, n_images: int) -> None:
