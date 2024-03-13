@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
@@ -9,23 +8,29 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+import logging
 import cv2
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 from ultralytics import YOLO
 from ultralytics.engine import results
 
-from gorillatracker.ssl_pipeline.models import Base, Camera, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video
+
+log = logging.getLogger(__name__)
 
 tracker = None
 session_cls = None
 metadata_extractor = None
 tracker_config = None
+assigned_gpu = None
 
 
 @dataclass(frozen=True)
 class VideoMetadata:
+    """High level metadata about a video."""
+
     camera_name: str
     start_time: datetime
 
@@ -60,8 +65,9 @@ def init_tracker(
     engine: Engine,
     video_metadata_extractor: Callable[[Path], VideoMetadata],
     tracker_cfg: TrackerConfig,
+    n_gpus: int = 1,
 ) -> None:
-    global tracker, session_cls, metadata_extractor, tracker_config
+    global tracker, session_cls, metadata_extractor, tracker_config, assigned_gpu
     metadata_extractor = video_metadata_extractor
     tracker_config = tracker_cfg
     tracker = YOLO(tracker_model)
@@ -69,14 +75,18 @@ def init_tracker(
         close=False
     )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
     session_cls = sessionmaker(bind=engine)
+    # NOTE(memben): As the processes are spawned consecutively, we can use the process id to assign a GPU
+    # This is **not** a garantuee for a good distribution among the GPUs
+    assigned_gpu = os.getpid() % n_gpus
 
 
 def track_and_store(video: Path) -> None:
-    global tracker, session_cls, metadata_extractor, tracker_config
+    global tracker, session_cls, metadata_extractor, tracker_config, n_gpus
     assert tracker is not None, "Tracker is not initialized, call init_tracker first"
-    assert session_cls is not None, "Session class is not initialized, call init_tracker first"
-    assert metadata_extractor is not None, "Metadata extractor is not initialized, call init_tracker first"
-    assert tracker_config is not None, "Tracker config is not initialized, call init_tracker first"
+    assert session_cls is not None, "Session class is not initialized, use init_tracker instead"
+    assert metadata_extractor is not None, "Metadata extractor is not initialized, use init_tracker instead"
+    assert tracker_config is not None, "Tracker config is not initialized, use init_tracker instead"
+    assert assigned_gpu is not None, "GPU is not assigned, use init_tracker instead"
     metadata = metadata_extractor(video)
     properties = video_properties_extractor(video)
     tracked_video = Video(
@@ -94,15 +104,15 @@ def track_and_store(video: Path) -> None:
             video,
             stream=True,
             half=True,
-            device="cuda:0",
+            device=f"cuda:{assigned_gpu}",
             vid_stride=tracker_config.frame_stride,
             tracker=tracker_config.tracker_config,
             iou=tracker_config.iou,
             conf=tracker_config.conf,
+            verbose=False,
         )
     ):
-        # TODO: remove
-        if relative_frame > 200:
+        if relative_frame > 100:
             break
 
         detections = result.boxes
@@ -126,20 +136,21 @@ def track_and_store(video: Path) -> None:
                 )
             )
 
-    with session_cls.begin() as session:
+    with session_cls() as session:
         stmt = select(Camera).where(Camera.name == metadata.camera_name)
         camera = session.execute(stmt).scalar_one()
         tracked_video.camera = camera
         session.add(tracked_video)
+        session.commit()
 
 
 def multiprocess_video_tracker(
     yolo_model: Path,
     videos: list[Path],
     tracker_config: TrackerConfig,
-    engine: Engine,
     metadata_extractor: Callable[[Path], VideoMetadata],
-    max_workers=4,
+    engine: Engine,
+    max_workers=8,
     n_gpus=1,
 ) -> None:
     """
@@ -158,49 +169,23 @@ def multiprocess_video_tracker(
     Returns:
         None, the videos are tracked and stored in the database.
     """
-    assert len(videos) == set(map(lambda x: x.stem, videos)), "Videos must have unique filenames"
+    assert len(videos) == len(set(map(lambda x: x.stem, videos))), "Videos must have unique filenames"
     with Session(engine) as session:
         cameras = session.execute(select(Camera)).scalars().all()
         assert cameras, "No cameras found in the database"
+        # TODO(memben): This could be a costly operation (e.g. OCR), consider caching the result of the metadata extractor 
         assert all(
             metadata_extractor(video).camera_name in map(lambda x: x.name, cameras) for video in videos
         ), "All videos must have a corresponding camera in the database"
 
+    log.info("Tracking videos")
+    
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_tracker,
         initargs=(yolo_model, engine, metadata_extractor, tracker_config),
     ) as executor:
-        tqdm(executor.map(track_and_store, videos), total=len(videos), desc="Tracking videos", unit="video")
-
-
-# if __name__ == "__main__":
-#     os.remove("test.db")
-#     engine = create_engine("sqlite:///test.db")
-#     benchmark_video = Path("video_data/R108_20230213_301.mp4")
-#     Base.metadata.create_all(engine)
-
-#     with Session(engine) as session:
-#         session.add(Camera(name="R108", latitude=0, longitude=0))
-#         session.commit()
-
-#     with ProcessPoolExecutor(
-#         initializer=init_tracker, initargs=(Path("models/yolov8n_gorilla_body.pt"), engine)
-#     ) as executor:
-#         executor.map(
-#             track_and_store,
-#             [benchmark_video],
-#             [video_metadata_extractor],
-#             [TrackerConfig(10, Path("cfgs/tracker/botsort.yaml"))],
-#         )
-
-#     with Session(engine) as session:
-#         stmt = select(Video).where(Video.filename == "R108_20230213_301.mp4")
-#         video = session.execute(stmt).scalar_one()
-#         print(video)
-#         print(video.camera)
-#         print(len(video.trackings))
-
-#     from gorillatracker.ssl_pipeline.visualizer import visualize_video
-
-#     visualize_video(benchmark_video, engine, Path("output.mp4"))
+        list(tqdm(executor.map(track_and_store, videos), total=len(videos), desc="Tracking videos", unit="video"))
+    
+    log.info("Tracking complete")
+    print("--------------------")
