@@ -46,10 +46,9 @@ class Video(Base):
     height: Mapped[int]
     fps: Mapped[int]
     frames: Mapped[int]
-    grayscale: Mapped[bool]
 
     camera: Mapped[Camera] = relationship("Camera", back_populates="videos")
-    video_features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
+    features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
 
     @property
@@ -57,7 +56,7 @@ class Video(Base):
         return timedelta(seconds=self.frames / self.fps)
 
     def __repr__(self) -> str:
-        return f"Video(id={self.video_id}, filename={self.filename}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames}, gray={self.grayscale})"
+        return f"Video(id={self.video_id}, filename={self.filename}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
 
 
 class VideoFeature(Base):
@@ -68,7 +67,7 @@ class VideoFeature(Base):
     type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
-    video: Mapped[Video] = relationship(back_populates="video_features")
+    video: Mapped[Video] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
         return f"VideoFeature(id={self.feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
@@ -90,18 +89,16 @@ class Tracking(Base):
     video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
 
     video: Mapped[Video] = relationship(back_populates="trackings")
-    tracking_features: Mapped[list[TrackingFeature]] = relationship(
-        back_populates="tracking", cascade="all, delete-orphan"
-    )
-    tracking_frame_features: Mapped[list[TrackingFrameFeature]] = relationship(
+    features: Mapped[list[TrackingFeature]] = relationship(back_populates="tracking", cascade="all, delete-orphan")
+    frame_features: Mapped[list[TrackingFrameFeature]] = relationship(
         back_populates="tracking", cascade="all, delete-orphan"
     )
 
     @property
     def tracking_duration(self) -> timedelta:
         fps = self.video.fps
-        start_frame = min(self.tracking_frame_features, key=lambda x: x.frame_nr).frame_nr
-        end_frame = max(self.tracking_frame_features, key=lambda x: x.frame_nr).frame_nr
+        start_frame = min(self.frame_features, key=lambda x: x.frame_nr).frame_nr
+        end_frame = max(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         return timedelta(seconds=(end_frame - start_frame) / fps)
 
     def __repr__(self) -> str:
@@ -116,7 +113,7 @@ class TrackingFeature(Base):
     type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
-    tracking: Mapped[Tracking] = relationship(back_populates="tracking_features")
+    tracking: Mapped[Tracking] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
         return f"TrackingFeature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, type={self.type}, value={self.value})"
@@ -137,7 +134,7 @@ class TrackingFrameFeature(Base):
     confidence: Mapped[float]
     type: Mapped[str] = mapped_column(String(255))
 
-    tracking: Mapped["Tracking"] = relationship(back_populates="tracking_frame_features")
+    tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
 
     __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
 
