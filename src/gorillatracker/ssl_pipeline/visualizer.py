@@ -1,3 +1,4 @@
+from colorsys import hsv_to_rgb
 from itertools import groupby
 from pathlib import Path
 
@@ -13,18 +14,14 @@ from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, V
 
 def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
     def id_to_color(track_id: int) -> tuple[int, int, int]:
-        hash = track_id
-        hash = ((hash >> 16) ^ hash) * 0x45d9f3b
-        hash = ((hash >> 16) ^ hash) * 0x45d9f3b
-        hash = (hash >> 16) ^ hash
-        hash &= 0xFFFFFFFF  # Ensure hash is within 32-bit range
-        h = (hash % 360) / 360.0  # Normalize to [0,1] for OpenCV
-        s = max(0.7, (hash // 360) % 2)  # Alternate saturation for contrast
-        v = 0.9  # Fixed value
-        # OpenCV HSV expects [0,179], [0,255], [0,255] 
-        hsv_color = np.uint8([[[h * 180, s * 255, v * 255]]]) # type: ignore
-        rgb_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
-        return tuple(map(int, rgb_color))
+        hash: int = ((track_id >> 16) ^ track_id) * 0x45D9F3B
+        hash = ((hash >> 16) ^ hash) * 0x45D9F3B
+        hash = (hash >> 16) ^ hash & 0xFFFFFFFF
+        h = (hash % 360) / 360.0
+        s = max(0.7, (hash // 360) % 2)
+        v = 0.9
+        r, g, b = hsv_to_rgb(h, s, v)
+        return int(r * 255), int(g * 255), int(b * 255)
 
     source_video = cv2.VideoCapture(str(video))
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
