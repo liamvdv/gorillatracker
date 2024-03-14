@@ -1,94 +1,107 @@
 from colorsys import hsv_to_rgb
 from itertools import groupby
 from pathlib import Path
+from typing import Sequence, Tuple
 
 import cv2
 from sqlalchemy import Engine, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session
 
 import gorillatracker.ssl_pipeline.helpers as helpers
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
 
 
-def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
-    def id_to_color(track_id: int) -> tuple[int, int, int]:
-        hash: int = ((track_id >> 16) ^ track_id) * 0x45D9F3B
-        hash = ((hash >> 16) ^ hash) * 0x45D9F3B
-        hash = (hash >> 16) ^ hash & 0xFFFFFFFF
-        h = (hash % 360) / 360.0
-        s = max(0.7, (hash // 360) % 2)
-        v = 0.9
-        r, g, b = hsv_to_rgb(h, s, v)
-        return int(r * 255), int(g * 255), int(b * 255)
+def id_to_color(track_id: int) -> Tuple[int, int, int]:
+    hash_value: int = ((track_id >> 16) ^ track_id) * 0x45D9F3B
+    hash_value = ((hash_value >> 16) ^ hash_value) * 0x45D9F3B
+    hash_value = (hash_value >> 16) ^ hash_value & 0xFFFFFFFF
+    h = (hash_value % 360) / 360.0
+    s = max(0.7, (hash_value // 360) % 2)
+    v = 0.9
+    r, g, b = hsv_to_rgb(h, s, v)
+    return int(r * 255), int(g * 255), int(b * 255)
 
-    if not video.exists():
-        raise FileNotFoundError(f"The specified video file does not exist: {video}")
 
-    source_video = cv2.VideoCapture(str(video))
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
-        tracked_video = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
-        stmt = (
-            select(TrackingFrameFeature)
-            .join(Tracking)
-            .where(Tracking.video_id == tracked_video.video_id)
-            .order_by(TrackingFrameFeature.frame_nr)
+def get_tracking_frame_features(session: Session, video: Video) -> Sequence[TrackingFrameFeature]:
+    stmt = (
+        select(TrackingFrameFeature)
+        .join(Tracking)
+        .where(Tracking.video_id == video.video_id)
+        .order_by(TrackingFrameFeature.frame_nr)
+    )
+    tracking_frame_features = session.scalars(stmt).all()
+    return tracking_frame_features
+
+
+def render_frame(
+    frame: cv2.typing.MatLike,
+    frame_features: Sequence[TrackingFrameFeature],
+    width: int,
+    height: int,
+    tracking_id_map: dict[int, int],
+) -> None:
+    for frame_feature in frame_features:
+        bbox = helpers.BoundingBox.from_yolo(
+            frame_feature.bbox_x_center,
+            frame_feature.bbox_y_center,
+            frame_feature.bbox_width,
+            frame_feature.bbox_height,
+            width,
+            height,
         )
-        tracking_frame_features = session.scalars(stmt).all()
+        cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
+        label = f"{tracking_id_map[frame_feature.tracking_id]} ({frame_feature.type})"
+        cv2.putText(
+            frame,
+            label,
+            (bbox.x_top_left, bbox.y_top_left - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            id_to_color(frame_feature.tracking_id),
+            3,
+        )
+
+
+def get_sampled_fps(tracked_video: Video, frames: list[tuple[int, list[TrackingFrameFeature]]]) -> int:
+    sampled_fps = int(tracked_video.fps / (frames[1][0] - frames[0][0]))
+    assert all(
+        int(tracked_video.fps / (next_frame[0] - frame[0])) == sampled_fps
+        for frame, next_frame in zip(frames, frames[1:])
+    ), "Visualizer only supports tracked videos with constant FPS"
+    return sampled_fps
+
+
+def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
+    assert video.exists()
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
+
+    with Session(engine) as session:
+        tracked_video = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
+        tracking_frame_features = get_tracking_frame_features(session, tracked_video)
+
         tracking_ids = set(f.tracking_id for f in tracking_frame_features)
         tracking_id_map = {id: i + 1 for i, id in enumerate(tracking_ids)}
-        frames = groupby(tracking_frame_features, key=lambda x: x.frame_nr)
-        frames = list((frame_nr, list(frame_features)) for frame_nr, frame_features in frames)
-        sampled_fps = int(tracked_video.fps / (frames[1][0] - frames[0][0]))
-        for frame, next_frame in zip(frames, frames[1:]):
-            assert int(tracked_video.fps / (next_frame[0] - frame[0])) == sampled_fps, f"{frame[0]} - {next_frame[0]}"
-        assert all(
-            int(tracked_video.fps / (next_frame[0] - frame[0])) == sampled_fps
-            for frame, next_frame in zip(frames, frames[1:])
-        ), "Visualizer only supports videos with constant FPS"
-        frames = groupby(tracking_frame_features, key=lambda x: x.frame_nr)
+        tracked_frames = [
+            (frame_nr, list(frame_features))
+            for frame_nr, frame_features in groupby(tracking_frame_features, key=lambda x: x.frame_nr)
+        ]
+        sampled_fps = get_sampled_fps(tracked_video, tracked_frames)
+
+        source_video = cv2.VideoCapture(str(video))
         output_video = cv2.VideoWriter(str(dest), fourcc, sampled_fps, (tracked_video.width, tracked_video.height))
-
-        frame_nr = 0
-        frames = (f for f in frames)
-        next_frame, frame_features = next(frames)
-        while source_video.isOpened():
+        # tracked_video == source_video
+        output_total_frames = tracked_video.fps * tracked_video.frames
+        for source_frame_idx, tracked_frame in zip(
+            range(0, output_total_frames, int(tracked_video.fps / sampled_fps)), tracked_frames
+        ):
+            output_frame_idx, frame_features = tracked_frame
+            assert source_frame_idx == output_frame_idx
+            source_video.set(cv2.CAP_PROP_POS_FRAMES, source_frame_idx)
             success, frame = source_video.read()
-            # TODO(memben): remove
-            if frame_nr > 200:
-                break
-            if not success:
-                break
-            if frame_nr != next_frame:
-                frame_nr += 1
-                continue
-            frame_nr += 1
-
-            for frame_feature in frame_features:
-                bbox = helpers.BoundingBox.from_yolo(
-                    frame_feature.bbox_x_center,
-                    frame_feature.bbox_y_center,
-                    frame_feature.bbox_width,
-                    frame_feature.bbox_height,
-                    tracked_video.width,
-                    tracked_video.height,
-                )
-                cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
-                label = f"{tracking_id_map[frame_feature.tracking_id]} ({frame_feature.type})"
-                cv2.putText(
-                    frame,
-                    label,
-                    (bbox.x_top_left, bbox.y_top_left - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9,
-                    id_to_color(frame_feature.tracking_id),
-                    3,
-                )
-
+            assert success
+            render_frame(frame, frame_features, tracked_video.width, tracked_video.height, tracking_id_map)
             output_video.write(frame)
-            try:
-                next_frame, frame_features = next(frames)
-            except StopIteration:
-                break
+
         output_video.release()
+        source_video.release()
