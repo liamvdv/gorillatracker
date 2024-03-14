@@ -68,19 +68,6 @@ def render_frame(
         )
 
 
-def get_sampled_fps(tracked_video: Video, frames: list[tuple[int, list[TrackingFrameFeature]]]) -> int:
-    frame_distances = [next_frame[0] - frame[0] for frame, next_frame in zip(frames, frames[1:])]
-    inferred_fps = tracked_video.fps / min(frame_distances)  # there might be multiple frames without a tracking
-
-    assert inferred_fps - int(inferred_fps) < 1e-6, "Visualizer only supports full (int) FPS"
-    sampled_fps = int(inferred_fps)
-
-    assert all(
-        frame_distance % int(tracked_video.fps / sampled_fps) == 0 for frame_distance in frame_distances
-    ), "Visualizer only supports tracked videos with constant FPS"
-    return sampled_fps
-
-
 def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
     assert video.exists()
 
@@ -96,15 +83,15 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
             (frame_nr, list(frame_features))
             for frame_nr, frame_features in groupby(tracking_frame_features, key=lambda x: x.frame_nr)
         ]  # NOTE(memben): There can be frames without any tracked features
+        assert all(next_frame[0] > frame[0] for frame, next_frame in zip(tracked_frames, tracked_frames[1:]))
         if len(tracked_frames) < 2:
             log.warning(
                 f"Video {video.name} has less than 2 frames with tracked features, saving the original video..."
             )
             copyfile(video, dest.parent / ("WARNING_" + dest.name))
 
-        sampled_fps = get_sampled_fps(tracked_video, tracked_frames)
-        assert sampled_fps > 0
-        # tracked_video refrences source_video
+        sampled_fps = tracked_video.sampled_fps
+        # NOTE: tracked_video is the tracked version of source_video
         source_video = cv2.VideoCapture(str(video))
         output_video = cv2.VideoWriter(str(dest), fourcc, sampled_fps, (tracked_video.width, tracked_video.height))
         output_total_frames = tracked_video.fps * tracked_video.frames

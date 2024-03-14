@@ -7,14 +7,14 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import pandas as pd
 from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video
-from gorillatracker.ssl_pipeline.video_tracker import TrackerConfig, VideoMetadata
+from gorillatracker.ssl_pipeline.video_tracker import VideoMetadata
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +52,14 @@ class SSLDatasetAdapter(ABC):
 
     @property
     @abstractmethod
-    def tracker_config(self) -> TrackerConfig:
+    def tracker_config(self) -> Path:
+        pass
+
+    @property
+    @abstractmethod
+    def yolo_kwargs(self) -> dict[str, Any]:
+        # full list of kwargs: https://docs.ultralytics.com/modes/predict/#inference-arguments
+        # reduce compute time with vid_stride (sample every nth frame), half (half size)
         pass
 
     @property
@@ -93,8 +100,18 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
         return GorillaDatasetAdapter.get_video_metadata
 
     @property
-    def tracker_config(self) -> TrackerConfig:
-        return TrackerConfig(frame_stride=10, tracker_config=Path("cfgs/tracker/botsort.yaml"))
+    def tracker_config(self) -> Path:
+        return Path("cfgs/tracker/botsort.yaml")
+
+    @property
+    def yolo_kwargs(self) -> dict[str, Any]:
+        return {
+            "vid_stride": 10,
+            "half": True,
+            "iou": 0.2,
+            "conf": 0.7,
+            "verbose": False,
+        }
 
     @property
     def engine(self) -> Engine:

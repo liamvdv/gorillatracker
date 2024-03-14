@@ -32,13 +32,13 @@ class Camera(Base):
     videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete-orphan")
 
     @validates("latitude")
-    def validate_latitude(self, key, value):
+    def validate_latitude(self, key: str, value: float) -> float:
         if not -90 <= value <= 90:
             raise ValueError(f"{key} must be between -90 and 90, is {value}")
         return value
 
     @validates("longitude")
-    def validate_longitude(self, key, value):
+    def validate_longitude(self, key: str, value: float) -> float:
         if not -180 <= value <= 180:
             raise ValueError(f"{key} must be between -180 and 180, is {value}")
         return value
@@ -56,12 +56,21 @@ class Video(Base):
     start_time: Mapped[datetime]
     width: Mapped[int]
     height: Mapped[int]
-    fps: Mapped[int]
+    fps: Mapped[int]  # of the original video
+    sampled_fps: Mapped[int]  # of the tracked video
     frames: Mapped[int]
 
     camera: Mapped[Camera] = relationship(back_populates="videos")
     features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
+
+    __table_args__ = (CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),)
+
+    @validates("width", "height", "fps", "sampled_fps", "frames")
+    def validate_positive(self, key: str, value: int) -> int:
+        if value <= 0:
+            raise ValueError(f"{key} must be positive, is {value}")
+        return value
 
     @property
     def duration(self) -> timedelta:
@@ -151,9 +160,16 @@ class TrackingFrameFeature(Base):
     __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
 
     @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
-    def validate_normalization(self, key, value):
+    def validate_normalization(self, key: str, value: float) -> float:
         if not 0 <= value <= 1:
             raise ValueError(f"{key} must be between 0 and 1, is {value}")
+        return value
+
+    @validates("frame_nr")
+    def validate_frame_nr(self, key: str, value: int) -> int:
+        video = self.tracking.video
+        if value % (video.fps // video.sampled_fps) != 0:
+            raise ValueError(f"frame_nr must be a multiple of video fps / video sampled_fps, is {value}")
         return value
 
     def __repr__(self) -> str:

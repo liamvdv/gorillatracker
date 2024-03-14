@@ -46,6 +46,7 @@ def visualize_pipeline(
 
     multiprocess_video_tracker(
         dataset_adapter.body_model,
+        dataset_adapter.yolo_kwargs,
         to_track,
         dataset_adapter.tracker_config,
         dataset_adapter.metadata_extractor,
