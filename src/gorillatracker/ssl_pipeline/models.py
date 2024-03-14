@@ -73,6 +73,11 @@ class Video(Base):
         return value
 
     @property
+    def frame_step(self) -> int:
+        """The number of frames to skip when sampling the video."""
+        return self.fps // self.sampled_fps 
+
+    @property
     def duration(self) -> timedelta:
         return timedelta(seconds=self.frames / self.fps)
 
@@ -166,11 +171,11 @@ class TrackingFrameFeature(Base):
         return value
 
     @validates("frame_nr")
-    def validate_frame_nr(self, key: str, value: int) -> int:
+    def validate_frame_nr(self, key: str, frame_nr: int) -> int:
         video = self.tracking.video
-        if value % (video.fps // video.sampled_fps) != 0:
-            raise ValueError(f"frame_nr must be a multiple of video fps / video sampled_fps, is {value}")
-        return value
+        if frame_nr % (video.frame_step) != 0:
+            raise ValueError(f"frame_nr must be a multiple of {video.frame_step}, is {frame_nr}")
+        return frame_nr
 
     def __repr__(self) -> str:
         return f"TrackingFrameFeature(id={self.tracking_frame_feature_id}, tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"

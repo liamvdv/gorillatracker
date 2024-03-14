@@ -74,8 +74,8 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
     with Session(engine) as session:
-        tracked_video = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
-        tracking_frame_features = get_tracking_frame_features(session, tracked_video)
+        video_tracking = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
+        tracking_frame_features = get_tracking_frame_features(session, video_tracking)
 
         tracking_ids = set(f.tracking_id for f in tracking_frame_features)
         tracking_id_map = {id: i + 1 for i, id in enumerate(tracking_ids)}
@@ -90,23 +90,22 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
             )
             copyfile(video, dest.parent / ("WARNING_" + dest.name))
 
-        sampled_fps = tracked_video.sampled_fps
         # NOTE: tracked_video is the tracked version of source_video
         source_video = cv2.VideoCapture(str(video))
-        output_video = cv2.VideoWriter(str(dest), fourcc, sampled_fps, (tracked_video.width, tracked_video.height))
-        output_total_frames = tracked_video.fps * tracked_video.frames
+        tracked_video = cv2.VideoWriter(str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height))
+        output_total_frames = video_tracking.fps * video_tracking.frames
         for source_frame_idx, tracked_frame in zip(
-            range(0, output_total_frames, int(tracked_video.fps / sampled_fps)), tracked_frames
+            range(0, output_total_frames, video_tracking.frame_step), tracked_frames
         ):
             output_frame_idx, frame_features = tracked_frame
             assert source_frame_idx == output_frame_idx
             source_video.set(cv2.CAP_PROP_POS_FRAMES, source_frame_idx)
             success, frame = source_video.read()
             assert success
-            render_frame(frame, frame_features, tracked_video.width, tracked_video.height, tracking_id_map)
-            output_video.write(frame)
+            render_frame(frame, frame_features, video_tracking.width, video_tracking.height, tracking_id_map)
+            tracked_video.write(frame)
 
-        output_video.release()
+        tracked_video.release()
         source_video.release()
 
 
