@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import Queue
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +17,7 @@ from ultralytics import YOLO
 from ultralytics.engine import results
 
 from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video
+
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def init_tracker(
     engine: Engine,
     video_metadata_extractor: Callable[[Path], VideoMetadata],
     tracker_cfg: TrackerConfig,
-    n_gpus: int = 1,
+    gpu_queue: Queue[int],
 ) -> None:
     global tracker, session_cls, metadata_extractor, tracker_config, assigned_gpu
     metadata_extractor = video_metadata_extractor
@@ -75,12 +76,10 @@ def init_tracker(
         close=False
     )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
     session_cls = sessionmaker(bind=engine)
-    # NOTE(memben): As the processes are spawned consecutively, we can use the process id to assign a GPU
-    # This is **not** a garantuee for a good distribution among the GPUs
-    assigned_gpu = os.getpid() % n_gpus
-    log.info(f"Process {os.getpid()} assigned GPU {assigned_gpu}")
+    assigned_gpu = gpu_queue.get()
+    log.info(f"Tracker initialized on GPU {assigned_gpu}")
 
-
+ 
 def track_and_store(video: Path) -> None:
     log = logging.getLogger(__name__)
     global tracker, session_cls, metadata_extractor, tracker_config, assigned_gpu
@@ -151,8 +150,8 @@ def multiprocess_video_tracker(
     tracker_config: TrackerConfig,
     metadata_extractor: Callable[[Path], VideoMetadata],
     engine: Engine,
-    max_workers: int = 8,
-    n_gpus: int = 1,
+    max_worker_per_gpu: int = 8,
+    gpus: list[int] = [0],
 ) -> None:
     """
     Track and store the videos in the database using the YOLO model and the tracker settings.
@@ -182,10 +181,16 @@ def multiprocess_video_tracker(
         ), "All videos must have a corresponding camera in the database"
 
     log.info("Tracking videos...")
+    gpu_queue: Queue[int] = Queue()
+    max_workers = len(gpus) * max_worker_per_gpu
+    for gpu in gpus:
+        for _ in range(max_worker_per_gpu):
+            gpu_queue.put(gpu)
+    
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_tracker,
-        initargs=(yolo_model, engine, metadata_extractor, tracker_config, n_gpus),
+        initargs=(yolo_model, engine, metadata_extractor, tracker_config, gpu_queue),
     ) as executor:
         list(tqdm(executor.map(track_and_store, videos), total=len(videos), desc="Tracking videos", unit="video"))
 

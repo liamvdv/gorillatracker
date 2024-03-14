@@ -23,7 +23,7 @@ dependencies:
   - evaluate
   - accelerate
   - sentencepiece
-  - ultralytics=8.0.186
+  - ultralytics
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
@@ -66,6 +66,7 @@ dependencies:
       - print-on-steroids[exceptions]
       - opencv-python-headless
       - types-PyYAML
+      - lapx>=0.5.2 # for ultralytics tracking
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
       - umap-learn
