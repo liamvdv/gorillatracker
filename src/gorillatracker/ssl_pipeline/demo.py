@@ -16,8 +16,6 @@ import logging
 import random
 from pathlib import Path
 
-import torch
-
 from gorillatracker.ssl_pipeline.dataset_adapter import GorillaDatasetAdapter, SSLDatasetAdapter
 from gorillatracker.ssl_pipeline.video_tracker import multiprocess_video_tracker
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
@@ -25,7 +23,9 @@ from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 log = logging.getLogger(__name__)
 
 
-def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_videos: int = 30, gpus: list[int] = [0]) -> None:
+def visualize_pipeline(
+    dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_videos: int = 30, gpus: list[int] = [0]
+) -> None:
     """
     Visualize the tracking results of the pipeline.
 
@@ -42,7 +42,6 @@ def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_vid
     random.seed(42)
     # NOTE: This unprocessed_videos is not idempotent
     videos = sorted(dataset_adapter.unprocessed_videos())
-    print(len(videos))
     to_track = random.sample(videos, n_videos)
 
     multiprocess_video_tracker(
@@ -51,7 +50,7 @@ def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_vid
         dataset_adapter.tracker_config,
         dataset_adapter.metadata_extractor,
         dataset_adapter.engine,
-        # max_workers=12,
+        max_worker_per_gpu=8,
         gpus=gpus,
     )
 
@@ -63,7 +62,5 @@ def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_vid
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
-    # dataset_adapter.setup_database()
-    visualize_pipeline(
-        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=2, gpus=[0, 1]
-    )
+    dataset_adapter.setup_database()
+    visualize_pipeline(dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=100, gpus=[0])

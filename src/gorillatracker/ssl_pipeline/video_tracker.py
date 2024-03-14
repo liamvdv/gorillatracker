@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import Queue
 from dataclasses import dataclass
 from datetime import datetime
+from multiprocessing import Queue
 from pathlib import Path
 from typing import Callable
 
@@ -17,7 +17,6 @@ from ultralytics import YOLO
 from ultralytics.engine import results
 
 from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video
-
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +78,7 @@ def init_tracker(
     assigned_gpu = gpu_queue.get()
     log.info(f"Tracker initialized on GPU {assigned_gpu}")
 
- 
+
 def track_and_store(video: Path) -> None:
     log = logging.getLogger(__name__)
     global tracker, session_cls, metadata_extractor, tracker_config, assigned_gpu
@@ -98,6 +97,9 @@ def track_and_store(video: Path) -> None:
         fps=properties.fps,
         frames=properties.frames,
     )
+
+    # Create a VideoCapture object using the memory-mapped file
+
     trackings: defaultdict[int, Tracking] = defaultdict(lambda: Tracking(video=tracked_video))
     result: results.Results
     for relative_frame, result in enumerate(
@@ -186,7 +188,7 @@ def multiprocess_video_tracker(
     for gpu in gpus:
         for _ in range(max_worker_per_gpu):
             gpu_queue.put(gpu)
-    
+
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_tracker,
