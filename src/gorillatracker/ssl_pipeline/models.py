@@ -3,8 +3,8 @@ from __future__ import annotations
 import enum
 from datetime import datetime, timedelta
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
 
 class VideoRelationshipType(enum.Enum):
@@ -29,7 +29,19 @@ class Camera(Base):
     latitude: Mapped[float]
     longitude: Mapped[float]
 
-    videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete")
+    videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete-orphan")
+
+    @validates("latitude")
+    def validate_latitude(self, key, value):
+        if not -90 <= value <= 90:
+            raise ValueError(f"{key} must be between -90 and 90, is {value}")
+        return value
+
+    @validates("longitude")
+    def validate_longitude(self, key, value):
+        if not -180 <= value <= 180:
+            raise ValueError(f"{key} must be between -180 and 180, is {value}")
+        return value
 
     def __repr__(self) -> str:
         return f"Camera(id={self.camera_id}, name={self.name}, latitude={self.latitude}, longitude={self.longitude})"
@@ -47,7 +59,7 @@ class Video(Base):
     fps: Mapped[int]
     frames: Mapped[int]
 
-    camera: Mapped[Camera] = relationship("Camera", back_populates="videos")
+    camera: Mapped[Camera] = relationship(back_populates="videos")
     features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
 
@@ -138,6 +150,12 @@ class TrackingFrameFeature(Base):
 
     __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
 
+    @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
+    def validate_normalization(self, key, value):
+        if not 0 <= value <= 1:
+            raise ValueError(f"{key} must be between 0 and 1, is {value}")
+        return value
+
     def __repr__(self) -> str:
         return f"TrackingFrameFeature(id={self.tracking_frame_feature_id}, tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
 
@@ -153,7 +171,12 @@ class VideoRelationship(Base):
     created_by: Mapped[str] = mapped_column(String(255))
 
     left_video: Mapped[Video] = relationship(foreign_keys=[left_video_id])
+
     right_video: Mapped[Video] = relationship(foreign_keys=[right_video_id])
+    __table_args__ = (
+        CheckConstraint("left_video_id < right_video_id", name="left_video_id_lt_right_video_id"),
+        UniqueConstraint("left_video_id", "right_video_id", "reason", "created_by"),
+    )
 
     def __repr__(self) -> str:
         return f"VideoRelationship(id={self.video_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
@@ -163,17 +186,22 @@ class TrackingRelationship(Base):
     __tablename__ = "TrackingRelationship"
 
     tracking_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    left_video_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
-    right_video_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
+    left_tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
+    right_tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
     edge: Mapped[TrackingRelationshipType]
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
-    left_tracking: Mapped[Tracking] = relationship(foreign_keys=[left_video_id])
-    right_tracking: Mapped[Tracking] = relationship(foreign_keys=[right_video_id])
+    left_tracking: Mapped[Tracking] = relationship(foreign_keys=[left_tracking_id])
+    right_tracking: Mapped[Tracking] = relationship(foreign_keys=[right_tracking_id])
+
+    __table_args__ = (
+        CheckConstraint("left_tracking_id < right_tracking_id", name="left_tracking_id_lt_right_tracking_id"),
+        UniqueConstraint("left_tracking_id", "right_tracking_id", "reason", "created_by"),
+    )
 
     def __repr__(self) -> str:
-        return f"TrackingRelationship(id={self.tracking_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
+        return f"TrackingRelationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
 
 if __name__ == "__main__":

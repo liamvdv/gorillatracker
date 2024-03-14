@@ -3,6 +3,7 @@ Contains adapter classes for different datasets.
 """
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,8 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video
 from gorillatracker.ssl_pipeline.video_tracker import TrackerConfig, VideoMetadata
 
+log = logging.getLogger(__name__)
+
 
 class SSLDatasetAdapter(ABC):
     def __init__(self, db_uri: str) -> None:
@@ -26,7 +29,7 @@ class SSLDatasetAdapter(ABC):
         with Session(self._engine) as session:
             stmt = select(Video.filename)
             videos = session.scalars(stmt).all()
-        print("Processed Videos:", videos)
+        log.info(f"Found {len(videos)} (processed) videos in the database")
         return [video for video in self.videos if video.name not in videos]
 
     @property

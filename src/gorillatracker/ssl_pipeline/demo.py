@@ -63,4 +63,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
     dataset_adapter.setup_database()
-    visualize_pipeline(dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=100, gpus=[0])
+    visualize_pipeline(dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=10, gpus=[0])

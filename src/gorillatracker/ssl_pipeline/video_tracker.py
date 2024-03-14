@@ -149,7 +149,7 @@ def track_and_store(video: Path) -> None:
 def multiprocess_video_tracker(
     yolo_model: Path,
     videos: list[Path],
-    tracker_config: TrackerConfig,
+    tracker_cfg: TrackerConfig,
     metadata_extractor: Callable[[Path], VideoMetadata],
     engine: Engine,
     max_worker_per_gpu: int = 8,
@@ -192,7 +192,7 @@ def multiprocess_video_tracker(
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_tracker,
-        initargs=(yolo_model, engine, metadata_extractor, tracker_config, gpu_queue),
+        initargs=(yolo_model, engine, metadata_extractor, tracker_cfg, gpu_queue),
     ) as executor:
         list(tqdm(executor.map(track_and_store, videos), total=len(videos), desc="Tracking videos", unit="video"))
 
