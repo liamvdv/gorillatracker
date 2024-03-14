@@ -78,9 +78,11 @@ def init_tracker(
     # NOTE(memben): As the processes are spawned consecutively, we can use the process id to assign a GPU
     # This is **not** a garantuee for a good distribution among the GPUs
     assigned_gpu = os.getpid() % n_gpus
+    log.info(f"Process {os.getpid()} assigned GPU {assigned_gpu}")
 
 
 def track_and_store(video: Path) -> None:
+    log = logging.getLogger(__name__)
     global tracker, session_cls, metadata_extractor, tracker_config, assigned_gpu
     assert tracker is not None, "Tracker is not initialized, call init_tracker first"
     assert session_cls is not None, "Session class is not initialized, use init_tracker instead"
@@ -172,12 +174,14 @@ def multiprocess_video_tracker(
     with Session(engine) as session:
         cameras = session.execute(select(Camera)).scalars().all()
         assert cameras, "No cameras found in the database"
+        tracked_videos = session.execute(select(Video.filename)).scalars().all()
+        assert not set(map(lambda x: x.name, videos)) & set(tracked_videos), "Some videos are already tracked"
         # TODO(memben): This could be a costly operation (e.g. OCR), consider caching the result of the metadata extractor
         assert all(
             metadata_extractor(video).camera_name in map(lambda x: x.name, cameras) for video in videos
         ), "All videos must have a corresponding camera in the database"
 
-    log.info("Tracking videos")
+    log.info("Tracking videos...")
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_tracker,
@@ -187,5 +191,6 @@ def multiprocess_video_tracker(
 
     with Session(engine) as session:
         stmt = select(Video.filename)
-        video_filenames = session.execute(stmt).scalars().all()
-        assert len(video_filenames) == len(videos), "Not all videos were tracked"
+        tracked_videos = session.execute(stmt).scalars().all()
+        # NOTE: We can run multiprocessing multiple times
+        assert set(map(lambda x: x.name, videos)) - set(tracked_videos) == set(), "Not all videos were tracked"

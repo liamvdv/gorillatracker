@@ -13,18 +13,17 @@ The pipeline consists of the following steps:
 """
 
 import logging
+import random
 from pathlib import Path
-
-from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.dataset_adapter import GorillaDatasetAdapter, SSLDatasetAdapter
 from gorillatracker.ssl_pipeline.video_tracker import multiprocess_video_tracker
-from gorillatracker.ssl_pipeline.visualizer import visualize_video
+from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 
 log = logging.getLogger(__name__)
 
 
-def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest: Path, n_videos: int = 30) -> None:
+def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_videos: int = 30) -> None:
     """
     Visualize the tracking results of the pipeline.
 
@@ -37,21 +36,24 @@ def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest: Path, n_videos:
         None, the visualizations are saved to the destination and to the SSLDatasetAdapter.
     """
 
+    # to_track = dataset_adapter.unprocessed_videos()[:n_videos]  # NOTE: This function is not idempotent
+    to_track = random.sample(dataset_adapter.unprocessed_videos(), n_videos)
+
     multiprocess_video_tracker(
         dataset_adapter.body_model,
-        dataset_adapter.videos[:n_videos],
+        to_track,
         dataset_adapter.tracker_config,
         dataset_adapter.metadata_extractor,
         dataset_adapter.engine,
     )
 
     log.info("Visualizing videos")
-    for video in list(tqdm(dataset_adapter.videos[:n_videos], desc="Visualizing videos", unit="video")):
-        visualize_video(video, dataset_adapter.engine, Path(dest, video.stem + ".mp4"))
+
+    multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
-    # dataset_adapter.setup_database()
+    dataset_adapter.setup_database()
     visualize_pipeline(dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=20)

@@ -46,7 +46,7 @@ dependencies:
   - ipykernel
   - bokeh
   - colorcet
-  - ipywidgets
+  - sqlalchemy
 
   # Dev dependencies
   - black
@@ -55,6 +55,7 @@ dependencies:
   - mypy
   - pytest
   - typer
+  - ipywidgets
 
   # pip dependencies
   - pip

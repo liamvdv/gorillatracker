@@ -1,4 +1,5 @@
 from colorsys import hsv_to_rgb
+from concurrent.futures import ProcessPoolExecutor
 from itertools import groupby
 from pathlib import Path
 from typing import Sequence, Tuple
@@ -6,6 +7,7 @@ from typing import Sequence, Tuple
 import cv2
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from tqdm import tqdm
 
 import gorillatracker.ssl_pipeline.helpers as helpers
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
@@ -71,7 +73,7 @@ def get_sampled_fps(tracked_video: Video, frames: list[tuple[int, list[TrackingF
     return sampled_fps
 
 
-def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
+def visualize_video(video: Path, engine: Engine, dest_dir: Path) -> None:
     assert video.exists()
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
@@ -89,7 +91,7 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
         sampled_fps = get_sampled_fps(tracked_video, tracked_frames)
 
         source_video = cv2.VideoCapture(str(video))
-        output_video = cv2.VideoWriter(str(dest), fourcc, sampled_fps, (tracked_video.width, tracked_video.height))
+        output_video = cv2.VideoWriter(str(dest_dir), fourcc, sampled_fps, (tracked_video.width, tracked_video.height))
         # tracked_video == source_video
         output_total_frames = tracked_video.fps * tracked_video.frames
         for source_frame_idx, tracked_frame in zip(
@@ -105,3 +107,33 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
 
         output_video.release()
         source_video.release()
+
+
+_engine = None
+
+
+def _init_visualizer(engine: Engine) -> None:
+    global _engine
+    _engine = engine
+    _engine.dispose(
+        close=False
+    )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
+
+
+def _visualize_video_process(video: Path, dest_dir: Path) -> None:
+    global _engine
+    assert _engine is not None, "Engine not initialized, call _init_visualizer first"
+    visualize_video(video, _engine, dest_dir / video.name)
+
+
+def multiprocess_visualize_video(videos: list[Path], engine: Engine, dest_dir: Path) -> None:
+
+    with ProcessPoolExecutor(initializer=_init_visualizer, initargs=(engine,)) as executor:
+        list(
+            tqdm(
+                executor.map(_visualize_video_process, videos, [dest_dir] * len(videos)),
+                total=len(videos),
+                desc="Visualizing videos",
+                unit="video",
+            )
+        )

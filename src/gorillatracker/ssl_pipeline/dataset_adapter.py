@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Callable
 
 import pandas as pd
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.models import Base, Camera
+from gorillatracker.ssl_pipeline.models import Base, Camera, Video
 from gorillatracker.ssl_pipeline.video_tracker import TrackerConfig, VideoMetadata
 
 
@@ -20,6 +20,14 @@ class SSLDatasetAdapter(ABC):
     def __init__(self, db_uri: str) -> None:
         engine = create_engine(db_uri)
         self._engine = engine
+
+    def unprocessed_videos(self) -> list[Path]:
+        """Returns a list of videos that have not been processed, this function is not Idempotent."""
+        with Session(self._engine) as session:
+            stmt = select(Video.filename)
+            videos = session.scalars(stmt).all()
+        print("Processed Videos:", videos)
+        return [video for video in self.videos if video.name not in videos]
 
     @property
     @abstractmethod
