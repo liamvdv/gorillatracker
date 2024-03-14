@@ -3,8 +3,6 @@ from itertools import groupby
 from pathlib import Path
 
 import cv2
-import numpy as np
-import tqdm
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import sessionmaker
 
@@ -22,6 +20,9 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
         v = 0.9
         r, g, b = hsv_to_rgb(h, s, v)
         return int(r * 255), int(g * 255), int(b * 255)
+
+    if not video.exists():
+        raise FileNotFoundError(f"The specified video file does not exist: {video}")
 
     source_video = cv2.VideoCapture(str(video))
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
@@ -55,7 +56,7 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
         while source_video.isOpened():
             success, frame = source_video.read()
             # TODO(memben): remove
-            if frame_nr > 2000:
+            if frame_nr > 200:
                 break
             if not success:
                 break
@@ -91,4 +92,3 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
             except StopIteration:
                 break
         output_video.release()
-    source_video.release()

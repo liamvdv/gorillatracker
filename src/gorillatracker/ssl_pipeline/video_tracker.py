@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
@@ -8,7 +9,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-import logging
 import cv2
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -81,7 +81,7 @@ def init_tracker(
 
 
 def track_and_store(video: Path) -> None:
-    global tracker, session_cls, metadata_extractor, tracker_config, n_gpus
+    global tracker, session_cls, metadata_extractor, tracker_config, assigned_gpu
     assert tracker is not None, "Tracker is not initialized, call init_tracker first"
     assert session_cls is not None, "Session class is not initialized, use init_tracker instead"
     assert metadata_extractor is not None, "Metadata extractor is not initialized, use init_tracker instead"
@@ -112,14 +112,13 @@ def track_and_store(video: Path) -> None:
             verbose=False,
         )
     ):
-        if relative_frame > 100:
-            break
-
         detections = result.boxes
         frame = relative_frame * tracker_config.frame_stride
         assert isinstance(detections, results.Boxes)
         for detection in detections:
-            assert detection.id is not None
+            if detection.id is None:
+                log.warning(f"For video {video.name}, frame {frame}, no associated tracking id found, continuing...")
+                continue
             tracking_id = int(detection.id[0].int().item())
             x, y, w, h = detection.xywhn[0].tolist()
             confidence = detection.conf.item()
@@ -150,8 +149,8 @@ def multiprocess_video_tracker(
     tracker_config: TrackerConfig,
     metadata_extractor: Callable[[Path], VideoMetadata],
     engine: Engine,
-    max_workers=8,
-    n_gpus=1,
+    max_workers: int = 8,
+    n_gpus: int = 1,
 ) -> None:
     """
     Track and store the videos in the database using the YOLO model and the tracker settings.
@@ -173,19 +172,20 @@ def multiprocess_video_tracker(
     with Session(engine) as session:
         cameras = session.execute(select(Camera)).scalars().all()
         assert cameras, "No cameras found in the database"
-        # TODO(memben): This could be a costly operation (e.g. OCR), consider caching the result of the metadata extractor 
+        # TODO(memben): This could be a costly operation (e.g. OCR), consider caching the result of the metadata extractor
         assert all(
             metadata_extractor(video).camera_name in map(lambda x: x.name, cameras) for video in videos
         ), "All videos must have a corresponding camera in the database"
 
     log.info("Tracking videos")
-    
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_tracker,
-        initargs=(yolo_model, engine, metadata_extractor, tracker_config),
+        initargs=(yolo_model, engine, metadata_extractor, tracker_config, n_gpus),
     ) as executor:
         list(tqdm(executor.map(track_and_store, videos), total=len(videos), desc="Tracking videos", unit="video"))
-    
-    log.info("Tracking complete")
-    print("--------------------")
+
+    with Session(engine) as session:
+        stmt = select(Video.filename)
+        video_filenames = session.execute(stmt).scalars().all()
+        assert len(video_filenames) == len(videos), "Not all videos were tracked"

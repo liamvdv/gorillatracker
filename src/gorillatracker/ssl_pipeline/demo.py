@@ -12,8 +12,8 @@ The pipeline consists of the following steps:
 4. 
 """
 
+import logging
 from pathlib import Path
-
 
 from tqdm import tqdm
 
@@ -21,37 +21,37 @@ from gorillatracker.ssl_pipeline.dataset_adapter import GorillaDatasetAdapter, S
 from gorillatracker.ssl_pipeline.video_tracker import multiprocess_video_tracker
 from gorillatracker.ssl_pipeline.visualizer import visualize_video
 
+log = logging.getLogger(__name__)
 
-def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest: Path) -> None:
+
+def visualize_pipeline(dataset_adapter: SSLDatasetAdapter, dest: Path, n_videos: int = 30) -> None:
     """
     Visualize the tracking results of the pipeline.
 
     Args:
-        videos (list[Path]): The videos to visualize.
         dataset_adapter (SSLDatasetAdapter): The dataset adapter to use.
-        engine (Engine): The database engine to use.
-        dest (Path): The destination to save the visualizations to.
+        dest (Path): The destination to save the visualizations.
+        n_videos (int, optional): The number of videos to visualize. Defaults to 20.
 
     Returns:
-        None, the visualizations are saved to the destination.
+        None, the visualizations are saved to the destination and to the SSLDatasetAdapter.
     """
 
     multiprocess_video_tracker(
         dataset_adapter.body_model,
-        dataset_adapter.videos[:30],
-        # [Path("video_data/R108_20230213_301.mp4")],
+        dataset_adapter.videos[:n_videos],
         dataset_adapter.tracker_config,
         dataset_adapter.metadata_extractor,
         dataset_adapter.engine,
     )
-    
-    print("Visualizing videos")
 
-    # for video in tqdm(dataset_adapter.videos, desc="Visualizing videos", unit="video"):
-    #     visualize_video(video, dataset_adapter.engine, dest)
+    log.info("Visualizing videos")
+    for video in list(tqdm(dataset_adapter.videos[:n_videos], desc="Visualizing videos", unit="video")):
+        visualize_video(video, dataset_adapter.engine, Path(dest, video.stem + ".mp4"))
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
-    # dataset_adapter.setup_database()
+    dataset_adapter.setup_database()
     visualize_pipeline(dataset_adapter, Path("/workspaces/gorillatracker/video_output"))
