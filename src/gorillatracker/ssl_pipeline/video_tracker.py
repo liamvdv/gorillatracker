@@ -80,6 +80,9 @@ def track_and_store(
     ):
         detections = result.boxes
         frame = relative_frame * vid_stride
+        # TODO remove
+        if frame > 1000:
+            break
         assert isinstance(detections, results.Boxes)
         for detection in detections:
             if detection.id is None:
@@ -88,8 +91,9 @@ def track_and_store(
             tracking_id = int(detection.id[0].int().item())
             x, y, w, h = detection.xywhn[0].tolist()
             confidence = detection.conf.item()
+            tracking = trackings[tracking_id]
             TrackingFrameFeature(
-                tracking=trackings[tracking_id],
+                tracking=tracking,
                 frame_nr=frame,
                 bbox_x_center=x,
                 bbox_y_center=y,

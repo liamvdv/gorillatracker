@@ -75,7 +75,7 @@ class Video(Base):
     @property
     def frame_step(self) -> int:
         """The number of frames to skip when sampling the video."""
-        return self.fps // self.sampled_fps 
+        return self.fps // self.sampled_fps
 
     @property
     def duration(self) -> timedelta:

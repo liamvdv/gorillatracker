@@ -1,12 +1,13 @@
 import logging
+import math
 from colorsys import hsv_to_rgb
 from concurrent.futures import ProcessPoolExecutor
 from itertools import groupby
 from pathlib import Path
-from shutil import copyfile
 from typing import Sequence, Tuple
 
 import cv2
+from attr import dataclass
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
@@ -17,26 +18,19 @@ from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, V
 log = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class TrackedFrame:
+    frame_nr: int
+    frame_features: list[TrackingFrameFeature]
+
+
 def id_to_color(track_id: int) -> Tuple[int, int, int]:
-    hash_value: int = ((track_id >> 16) ^ track_id) * 0x45D9F3B
-    hash_value = ((hash_value >> 16) ^ hash_value) * 0x45D9F3B
-    hash_value = (hash_value >> 16) ^ hash_value & 0xFFFFFFFF
+    hash_value = helpers.jenkins_hash(track_id)
     h = (hash_value % 360) / 360.0
     s = max(0.7, (hash_value // 360) % 2)
     v = 0.9
     r, g, b = hsv_to_rgb(h, s, v)
     return int(r * 255), int(g * 255), int(b * 255)
-
-
-def get_tracking_frame_features(session: Session, video: Video) -> Sequence[TrackingFrameFeature]:
-    stmt = (
-        select(TrackingFrameFeature)
-        .join(Tracking)
-        .where(Tracking.video_id == video.video_id)
-        .order_by(TrackingFrameFeature.frame_nr)
-    )
-    tracking_frame_features = session.scalars(stmt).all()
-    return tracking_frame_features
 
 
 def render_frame(
@@ -68,6 +62,33 @@ def render_frame(
         )
 
 
+def get_tracked_frames(session: Session, video: Video) -> list[TrackedFrame]:
+    tracked_frames: list[TrackedFrame] = []
+
+    stmt = (
+        select(TrackingFrameFeature)
+        .join(Tracking)
+        .where(Tracking.video_id == video.video_id)
+        .order_by(TrackingFrameFeature.frame_nr)
+    )
+    frame_feature_query = session.scalars(stmt).all()
+
+    if len(frame_feature_query) < 10:
+        log.warning(f"Video {video.filename} has less than 10 frames with tracked features")
+
+    frame_features_grouped = {
+        frame_nr: list(features) for frame_nr, features in groupby(frame_feature_query, key=lambda x: x.frame_nr)
+    }
+
+    for frame_nr in range(0, video.frames, video.frame_step):
+        frame_features = frame_features_grouped.get(frame_nr, [])
+        tracked_frame = TrackedFrame(frame_nr=frame_nr, frame_features=frame_features)
+        tracked_frames.append(tracked_frame)
+
+    assert len(tracked_frames) == math.ceil(video.frames / video.frame_step)
+    return tracked_frames
+
+
 def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
     assert video.exists()
 
@@ -75,34 +96,23 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
 
     with Session(engine) as session:
         video_tracking = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
-        tracking_frame_features = get_tracking_frame_features(session, video_tracking)
-
-        tracking_ids = set(f.tracking_id for f in tracking_frame_features)
+        tracked_frames = get_tracked_frames(session, video_tracking)
+        tracking_ids = set(feature.tracking_id for frame in tracked_frames for feature in frame.frame_features)
         tracking_id_map = {id: i + 1 for i, id in enumerate(tracking_ids)}
-        tracked_frames = [
-            (frame_nr, list(frame_features))
-            for frame_nr, frame_features in groupby(tracking_frame_features, key=lambda x: x.frame_nr)
-        ]  # NOTE(memben): There can be frames without any tracked features
-        assert all(next_frame[0] > frame[0] for frame, next_frame in zip(tracked_frames, tracked_frames[1:]))
-        if len(tracked_frames) < 2:
-            log.warning(
-                f"Video {video.name} has less than 2 frames with tracked features, saving the original video..."
-            )
-            copyfile(video, dest.parent / ("WARNING_" + dest.name))
-
-        # NOTE: tracked_video is the tracked version of source_video
+        # NOTE: video_tracking is the tracked version of source_video
         source_video = cv2.VideoCapture(str(video))
-        tracked_video = cv2.VideoWriter(str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height))
-        output_total_frames = video_tracking.fps * video_tracking.frames
-        for source_frame_idx, tracked_frame in zip(
-            range(0, output_total_frames, video_tracking.frame_step), tracked_frames
-        ):
-            output_frame_idx, frame_features = tracked_frame
-            assert source_frame_idx == output_frame_idx
-            source_video.set(cv2.CAP_PROP_POS_FRAMES, source_frame_idx)
+        tracked_video = cv2.VideoWriter(
+            str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
+        )
+        for tracked_frame in tracked_frames:
+            if tracked_frame.frame_nr > 1000:
+                break
+            source_video.set(cv2.CAP_PROP_POS_FRAMES, tracked_frame.frame_nr)
             success, frame = source_video.read()
             assert success
-            render_frame(frame, frame_features, video_tracking.width, video_tracking.height, tracking_id_map)
+            render_frame(
+                frame, tracked_frame.frame_features, video_tracking.width, video_tracking.height, tracking_id_map
+            )
             tracked_video.write(frame)
 
         tracked_video.release()
@@ -127,7 +137,6 @@ def _visualize_video_process(video: Path, dest_dir: Path) -> None:
 
 
 def multiprocess_visualize_video(videos: list[Path], engine: Engine, dest_dir: Path) -> None:
-
     with ProcessPoolExecutor(initializer=_init_visualizer, initargs=(engine,)) as executor:
         list(
             tqdm(

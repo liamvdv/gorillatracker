@@ -3,6 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def jenkins_hash(key: int) -> int:
+    hash_value = ((key >> 16) ^ key) * 0x45D9F3B
+    hash_value = ((hash_value >> 16) ^ hash_value) * 0x45D9F3B
+    hash_value = (hash_value >> 16) ^ hash_value & 0xFFFFFFFF
+    return hash_value
+
+
 @dataclass(frozen=True)
 class BoundingBox:
     x_top_left: int
