@@ -9,14 +9,14 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 
 # WARNING(memben): Changing the class may affect the database
 # The values of the enum are stored in the database.
-class VideoRelationshipType(enum.Enum):
+class VideoRelationshipType(str, enum.Enum):
     NEGATIVE = "negative"  # Implies that all Trackings in the left video are not in the right video and vice versa
     POSITIVE = "positive"  # Implies that one or more Trackings could be in both videos
 
 
 # WARNING(memben): Changing the class may affect the database
 # The values of the enum are stored in the database.
-class TrackingRelationshipType(enum.Enum):
+class TrackingRelationshipType(str, enum.Enum):
     NEGATIVE = "negative"  # Implies that the Trackings are not the same
     POSITIVE = "positive"  # Implies that the Trackings are the same (animal)
 

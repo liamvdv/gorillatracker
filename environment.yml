@@ -47,6 +47,7 @@ dependencies:
   - bokeh
   - colorcet
   - sqlalchemy
+  - shapely
 
   # Dev dependencies
   - black

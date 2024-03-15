@@ -10,6 +10,17 @@ from gorillatracker.ssl_pipeline.helpers import BoundingBox, TrackedBoundingBox,
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
 
+def single_phase_correlator(
+    tracked_boxes: list[TrackedBoundingBox], detected_boxes: list[BoundingBox]
+) -> list[TrackedBoundingBox]:
+    """Correlate tracked boxes with detected boxes using a single phase correlation algorithm."""
+    return tracked_boxes
+
+# def two_phase_correlator(
+#     tracked_boxes: list[TrackedBoundingBox], detected_boxes: list[BoundingBox]
+# ) -> list[TrackedBoundingBox]:
+
+
 def predict_correlate_store(
     video: Path,
     yolo_model: YOLO,
@@ -26,7 +37,8 @@ def predict_correlate_store(
 
         tracked_frames = get_tracked_frames(session, video_tracking, filter_by_type="body")
         predictions: Generator[results.Results, None, None] = yolo_model.predict(video, stream=True, **yolo_kwargs)
-        for prediction, tracked_frame in zip(predictions, tracked_frames, strict=True):
+        assert isinstance(predictions, Generator)
+        for prediction, tracked_frame in zip(predictions, tracked_frames):
             detections = prediction.boxes
             assert isinstance(detections, results.Boxes)
             boxes: list[BoundingBox] = []

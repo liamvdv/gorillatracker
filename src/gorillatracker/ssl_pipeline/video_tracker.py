@@ -58,7 +58,7 @@ def track_and_store(
     metadata = metadata_extractor(video)
     properties = video_properties_extractor(video)
     assert properties.fps % vid_stride == 0, "vid_stride must be a factor of the original fps"
-    tracked_video = Video(
+    video_tracking = Video(
         filename=video.name,
         start_time=metadata.start_time,
         width=properties.width,
@@ -68,7 +68,7 @@ def track_and_store(
         frames=properties.frames,
     )
 
-    trackings: defaultdict[int, Tracking] = defaultdict(lambda: Tracking(video=tracked_video))
+    trackings: defaultdict[int, Tracking] = defaultdict(lambda: Tracking(video=video_tracking))
     result: results.Results
     for relative_frame, result in enumerate(
         yolo_model.track(
@@ -100,9 +100,12 @@ def track_and_store(
                 type="body",  # NOTE(memben): Tracking will always be done using the body model
             )
 
+    if sum(len(tracking.frame_features) for tracking in trackings.values()) < 10:
+        log.warning(f"Video {video.name} has less than 10 frames with tracked features")
+
     with session_cls() as session:
         camera = session.execute(select(Camera).where(Camera.name == metadata.camera_name)).scalar_one()
-        camera.videos.append(tracked_video)
+        camera.videos.append(video_tracking)
         session.commit()
 
 
