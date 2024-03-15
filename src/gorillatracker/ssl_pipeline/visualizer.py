@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Sequence, Tuple
 
 import cv2
-from attr import dataclass
+from dataclasses import dataclass
 from sqlalchemy import Engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
 import gorillatracker.ssl_pipeline.helpers as helpers
@@ -89,12 +89,12 @@ def get_tracked_frames(session: Session, video: Video) -> list[TrackedFrame]:
     return tracked_frames
 
 
-def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
+def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path) -> None:
     assert video.exists()
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
-    with Session(engine) as session:
+    with session_cls() as session:
         video_tracking = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
         tracked_frames = get_tracked_frames(session, video_tracking)
         tracking_ids = set(feature.tracking_id for frame in tracked_frames for feature in frame.frame_features)
@@ -106,8 +106,8 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
         )
         for tracked_frame in tracked_frames:
             # TODO remove
-            # if tracked_frame.frame_nr > 1000:
-            #     break
+            if tracked_frame.frame_nr > 1000:
+                break
             source_video.set(cv2.CAP_PROP_POS_FRAMES, tracked_frame.frame_nr)
             success, frame = source_video.read()
             assert success
@@ -120,21 +120,21 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
         source_video.release()
 
 
-_engine = None
+_session_cls = None
 
 
 def _init_visualizer(engine: Engine) -> None:
-    global _engine
-    _engine = engine
-    _engine.dispose(
+    global _session_cls
+    engine.dispose(
         close=False
     )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
+    _session_cls = sessionmaker(bind=engine)
 
 
 def _visualize_video_process(video: Path, dest_dir: Path) -> None:
-    global _engine
-    assert _engine is not None, "Engine not initialized, call _init_visualizer first"
-    visualize_video(video, _engine, dest_dir / video.name)
+    global _session_cls
+    assert _session_cls is not None, "Engine not initialized, call _init_visualizer first"
+    visualize_video(video, _session_cls, dest_dir / video.name)
 
 
 def multiprocess_visualize_video(videos: list[Path], engine: Engine, dest_dir: Path) -> None:
