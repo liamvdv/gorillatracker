@@ -90,7 +90,7 @@ def track_and_store(
             confidence = detection.conf.item()
             tracking = trackings[tracking_id]
             TrackingFrameFeature(
-                tracking=tracking,
+                tracking=tracking,  # NOTE: needed for data model validation
                 frame_nr=frame,
                 bbox_x_center=x,
                 bbox_y_center=y,
