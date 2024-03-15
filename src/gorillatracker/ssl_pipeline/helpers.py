@@ -36,14 +36,6 @@ def video_generator(video: Path, frame_step: int) -> Generator[cv2.typing.MatLik
     cap.release()
 
 
-def assert_generator_exhausted(generator: Generator[Any, None, None]) -> None:
-    try:
-        next(generator)
-        raise AssertionError("Generator was not exhausted")
-    except StopIteration:
-        pass
-
-
 @dataclass(frozen=True)
 class BoundingBox:
     x_center_n: float
@@ -95,7 +87,7 @@ class TrackedFrame:
     frame_features: list[TrackingFrameFeature]
 
 
-def get_tracked_frames(session: Session, video: Video) -> list[TrackedFrame]:
+def get_tracked_frames(session: Session, video: Video, filter_by_type: str | None = None) -> list[TrackedFrame]:
     tracked_frames: list[TrackedFrame] = []
 
     stmt = (
@@ -104,6 +96,9 @@ def get_tracked_frames(session: Session, video: Video) -> list[TrackedFrame]:
         .where(Tracking.video_id == video.video_id)
         .order_by(TrackingFrameFeature.frame_nr)
     )
+    if filter_by_type:
+        stmt = stmt.where(TrackingFrameFeature.type == filter_by_type)
+
     frame_feature_query = session.scalars(stmt).all()
 
     if len(frame_feature_query) < 10:

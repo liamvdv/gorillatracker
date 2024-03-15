@@ -59,14 +59,13 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
             str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
         )
         source_video = helpers.video_generator(video, frame_step=video_tracking.frame_step)
-        for tracked_frame, source_frame in zip(tracked_frames, source_video):
+        for tracked_frame, source_frame in zip(tracked_frames, source_video, strict=True):
             render_frame(
                 source_frame,
                 tracked_frame.frame_features,
                 tracking_id_to_label_map,
             )
             tracked_video.write(source_frame)
-        helpers.assert_generator_exhausted(source_video)
         tracked_video.release()
 
 
