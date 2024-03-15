@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import Any, Generator
+from typing import Generator
 
 import cv2
 from sqlalchemy.orm import Session
@@ -37,11 +37,18 @@ def video_generator(video: Path, frame_step: int) -> Generator[cv2.typing.MatLik
 
 
 @dataclass(frozen=True)
+class TrackedBoundingBox:
+    id: int
+    bbox: BoundingBox
+
+
+@dataclass(frozen=True)
 class BoundingBox:
     x_center_n: float
     y_center_n: float
     width_n: float
     height_n: float
+    confidence: float
     image_width: int
     image_height: int
 
@@ -69,13 +76,14 @@ class BoundingBox:
     def bottom_right(self) -> tuple[int, int]:
         return self.x_bottom_right, self.y_bottom_right
 
-    @staticmethod
-    def from_tracking_frame_feature(frame_feature: TrackingFrameFeature) -> BoundingBox:
-        return BoundingBox(
+    @classmethod
+    def from_tracking_frame_feature(cls, frame_feature: TrackingFrameFeature) -> BoundingBox:
+        return cls(
             frame_feature.bbox_x_center,
             frame_feature.bbox_y_center,
             frame_feature.bbox_width,
             frame_feature.bbox_height,
+            frame_feature.confidence,
             frame_feature.tracking.video.width,
             frame_feature.tracking.video.height,
         )

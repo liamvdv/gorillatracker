@@ -7,14 +7,14 @@ from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
 
-# WARNING: Changing the class may affect the database
+# WARNING(memben): Changing the class may affect the database
 # The values of the enum are stored in the database.
 class VideoRelationshipType(enum.Enum):
     NEGATIVE = "negative"  # Implies that all Trackings in the left video are not in the right video and vice versa
     POSITIVE = "positive"  # Implies that one or more Trackings could be in both videos
 
 
-# WARNING: Changing the class may affect the database
+# WARNING(memben): Changing the class may affect the database
 # The values of the enum are stored in the database.
 class TrackingRelationshipType(enum.Enum):
     NEGATIVE = "negative"  # Implies that the Trackings are not the same
