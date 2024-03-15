@@ -166,7 +166,7 @@ class TrackingFrameFeature(Base):
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
 
-    # TODO(memben) ena __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),) # NOTE: Disable for debugging
+    __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
 
     @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
