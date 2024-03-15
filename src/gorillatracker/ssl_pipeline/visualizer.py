@@ -57,7 +57,7 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
 
     with session_cls() as session:
         video_tracking = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
-        tracked_frames = helpers.get_tracked_frames(session, video_tracking)
+        tracked_frames = helpers.load_tracked_frames(session, video_tracking)
         unique_tracking_ids = set(feature.tracking_id for frame in tracked_frames for feature in frame.frame_features)
         tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
         # NOTE: video_tracking is the tracked version of source_video

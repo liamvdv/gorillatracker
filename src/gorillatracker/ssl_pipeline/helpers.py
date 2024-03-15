@@ -139,7 +139,11 @@ class TrackedFrame:
     frame_features: list[TrackingFrameFeature]
 
 
-def get_tracked_frames(session: Session, video: Video, filter_by_type: str | None = None) -> list[TrackedFrame]:
+def load_video_tracking(session: Session, video_path: Path) -> Video:
+    return session.execute(select(Video).where(Video.filename == str(video_path.name))).scalar_one()
+
+
+def load_tracked_frames(session: Session, video: Video, filter_by_type: str | None = None) -> list[TrackedFrame]:
     """
     Retrieves a list of TrackedFrame objects for the given video.
 
