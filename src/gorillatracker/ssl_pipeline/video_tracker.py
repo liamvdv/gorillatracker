@@ -68,7 +68,9 @@ def track_and_store(
         frames=properties.frames,
     )
 
-    trackings: defaultdict[int, Tracking] = defaultdict(lambda: Tracking(video=video_tracking))
+    trackings: defaultdict[int, Tracking] = defaultdict(
+        lambda: Tracking(video=video_tracking)
+    )  # NOTE needed for data model validation and adding it implicitly to the DB
     result: results.Results
     for relative_frame, result in enumerate(
         yolo_model.track(

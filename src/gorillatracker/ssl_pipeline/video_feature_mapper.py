@@ -50,7 +50,7 @@ def predict_correlate_store(
 
         id_to_tracking = {tracking.tracking_id: tracking for tracking in video_tracking.trackings}
 
-        unresolved_boxes: list[BoundingBox] = []
+        unresolved_frame_boxes: list[tuple[int, list[BoundingBox]]] = []
         tracked_frames = get_tracked_frames(session, video_tracking, filter_by_type="body")
         prediction: results.Results
         # TODO(memben) change back to zip_longest
@@ -70,39 +70,15 @@ def predict_correlate_store(
                 for feature in tracked_frame.frame_features
             ]
             correlated_boxes, uncorrelated_boxes = correlate_features(tracked_boxes, boxes, threshold=0.1)
-            unresolved_boxes.extend(uncorrelated_boxes)
+            unresolved_frame_boxes.append((tracked_frame.frame_nr, uncorrelated_boxes))
 
             for correlated_box in correlated_boxes:
                 tracking_id = correlated_box.association
                 frame_nr = tracked_frame.frame_nr
                 bbox = correlated_box.bbox
-                TrackingFrameFeature(
-                    tracking=id_to_tracking[
-                        tracking_id
-                    ],  # NOTE needed for data model validation and adding it implicitly to the DB
-                    frame_nr=frame_nr,
-                    bbox_x_center=bbox.x_center_n,
-                    bbox_y_center=bbox.y_center_n,
-                    bbox_width=bbox.width_n,
-                    bbox_height=bbox.height_n,
-                    confidence=bbox.confidence,
-                    type=type,
-                )
-
-        log.info(f"Unresolved boxes: {len(unresolved_boxes)} with the type: {type} for video {video.name}")
-
-        if DANGER_activate_visual_debugging:
-            log.warning("DANGER: Introducing undefined state, accepting danger")
-            dummy_tracking = Tracking(
-                video=video_tracking,
-                tracking_id=(-1) * video_tracking.video_id,
-            )
-            for unresolved_box in unresolved_boxes:
-                frame_nr = tracked_frame.frame_nr
-                bbox = unresolved_box
                 session.add(
                     TrackingFrameFeature(
-                        tracking=dummy_tracking,
+                        tracking=id_to_tracking[tracking_id],  # NOTE needed for data model validation
                         frame_nr=frame_nr,
                         bbox_x_center=bbox.x_center_n,
                         bbox_y_center=bbox.y_center_n,
@@ -113,4 +89,31 @@ def predict_correlate_store(
                     )
                 )
 
+        log.info(
+            f"Unresolved boxes: {sum(len(boxes) for _, boxes in unresolved_frame_boxes)} in {sum(1 for _, boxes in unresolved_frame_boxes if boxes)} frames in video {video.name}, type {type}"
+        )
         session.commit()
+
+        if DANGER_activate_visual_debugging:
+            log.warning("DANGER: Introducing undefined state, accepting danger")
+            dummy_tracking = Tracking(
+                video=video_tracking,  # NOTE needed for data model validation
+                tracking_id=(-1) * video_tracking.video_id,
+            )
+            session.add(dummy_tracking)
+            for frame_nr, unresolved_boxes in unresolved_frame_boxes:
+                for unresolved_box in unresolved_boxes:
+                    bbox = unresolved_box
+                    session.add(
+                        TrackingFrameFeature(
+                            tracking=dummy_tracking,  # NOTE needed for data model validation
+                            frame_nr=frame_nr,
+                            bbox_x_center=bbox.x_center_n,
+                            bbox_y_center=bbox.y_center_n,
+                            bbox_width=bbox.width_n,
+                            bbox_height=bbox.height_n,
+                            confidence=bbox.confidence,
+                            type=type,
+                        )
+                    )
+            session.commit()
