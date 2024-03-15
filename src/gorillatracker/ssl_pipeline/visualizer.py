@@ -1,6 +1,7 @@
 import logging
 from colorsys import hsv_to_rgb
 from concurrent.futures import ProcessPoolExecutor
+from itertools import zip_longest
 from pathlib import Path
 from typing import Sequence
 
@@ -59,7 +60,9 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
             str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
         )
         with helpers.video(video, frame_step=video_tracking.frame_step) as source_video:
-            for tracked_frame, source_frame in zip(tracked_frames, source_video):
+            for tracked_frame, source_frame in zip_longest(tracked_frames, source_video):
+                assert tracked_frame is not None
+                assert source_frame is not None
                 render_frame(
                     source_frame,
                     tracked_frame.frame_features,

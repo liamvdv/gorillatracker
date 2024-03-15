@@ -1,5 +1,6 @@
+from itertools import zip_longest
 from pathlib import Path
-from typing import Any, Callable, Generator
+from typing import Any, Callable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -15,6 +16,7 @@ def single_phase_correlator(
 ) -> list[TrackedBoundingBox]:
     """Correlate tracked boxes with detected boxes using a single phase correlation algorithm."""
     return tracked_boxes
+
 
 # def two_phase_correlator(
 #     tracked_boxes: list[TrackedBoundingBox], detected_boxes: list[BoundingBox]
@@ -36,9 +38,13 @@ def predict_correlate_store(
         ), "vid_stride must match the frame_step of the body tracking"
 
         tracked_frames = get_tracked_frames(session, video_tracking, filter_by_type="body")
-        predictions: Generator[results.Results, None, None] = yolo_model.predict(video, stream=True, **yolo_kwargs)
-        assert isinstance(predictions, Generator)
-        for prediction, tracked_frame in zip(predictions, tracked_frames):
+        prediction: results.Results
+        for prediction, tracked_frame in zip_longest(
+            yolo_model.predict(video, stream=True, **yolo_kwargs), tracked_frames
+        ):
+            assert prediction is not None
+            assert tracked_frame is not None
+
             detections = prediction.boxes
             assert isinstance(detections, results.Boxes)
             boxes: list[BoundingBox] = []
@@ -67,4 +73,5 @@ def predict_correlate_store(
                         type=type,
                     )
                 )
+
         session.commit()

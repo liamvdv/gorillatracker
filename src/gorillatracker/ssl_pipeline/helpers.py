@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import functools
 import logging
 import math
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import Any, Callable, Generator
+from typing import Generator
 
 import cv2
 from shapely.geometry import Polygon
@@ -19,29 +18,6 @@ from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, V
 log = logging.getLogger(__name__)
 
 
-def ensure_generator_consumption(
-    func: Callable[..., Generator[Any, None, None]]
-) -> Callable[..., Generator[Any, None, None]]:
-    """Decorator to ensure that a generator is completely consumed"""
-
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Generator[Any, None, None]:
-        strict = kwargs.pop("strict", True)
-        generator = func(*args, **kwargs)
-        try:
-            yield from generator
-        finally:
-            if strict:
-                try:
-                    next(generator)
-                except StopIteration:
-                    pass
-                else:
-                    raise ValueError("Not all values were consumed from the generator")
-
-    return wrapper
-
-
 def jenkins_hash(key: int) -> int:
     hash_value = ((key >> 16) ^ key) * 0x45D9F3B
     hash_value = ((hash_value >> 16) ^ hash_value) * 0x45D9F3B
@@ -49,7 +25,6 @@ def jenkins_hash(key: int) -> int:
     return hash_value
 
 
-@ensure_generator_consumption
 def video_frame_iterator(
     cap: cv2.VideoCapture, frame_step: int, strict: bool = True
 ) -> Generator[cv2.typing.MatLike, None, None]:
