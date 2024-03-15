@@ -7,14 +7,18 @@ from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
 
+# WARNING: Changing the class may affect the database
+# The values of the enum are stored in the database.
 class VideoRelationshipType(enum.Enum):
-    NEGATIVE = -1  # Implies that all Trackings in the left video are not in the right video and vice versa
-    POSITIVE = 1  # Implies that one or more Trackings could be in both videos
+    NEGATIVE = "negative"  # Implies that all Trackings in the left video are not in the right video and vice versa
+    POSITIVE = "positive"  # Implies that one or more Trackings could be in both videos
 
 
+# WARNING: Changing the class may affect the database
+# The values of the enum are stored in the database.
 class TrackingRelationshipType(enum.Enum):
-    NEGATIVE = -1  # Implies that the Trackings are not the same
-    POSITIVE = 1  # Implies that the Trackings are the same (animal)
+    NEGATIVE = "negative"  # Implies that the Trackings are not the same
+    POSITIVE = "positive"  # Implies that the Trackings are the same (animal)
 
 
 class Base(DeclarativeBase):
@@ -187,7 +191,7 @@ class VideoRelationship(Base):
     video_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     left_video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
     right_video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
-    edge: Mapped[VideoRelationshipType]
+    edge: Mapped[str] = mapped_column(String(255))  # VideoRelationshipType
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
@@ -199,6 +203,17 @@ class VideoRelationship(Base):
         UniqueConstraint("left_video_id", "right_video_id", "reason", "created_by"),
     )
 
+    @property
+    def relationship(self) -> VideoRelationshipType:
+        return VideoRelationshipType(self.edge)
+
+    @validates("edge")
+    def validate_edge(self, key: str, edge: str) -> str:
+        allowed_values = [e.name for e in VideoRelationshipType]
+        if edge not in allowed_values:
+            raise ValueError(f"{key} must be one of {allowed_values}, not '{edge}'")
+        return edge
+
     def __repr__(self) -> str:
         return f"VideoRelationship(id={self.video_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
@@ -209,7 +224,7 @@ class TrackingRelationship(Base):
     tracking_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     left_tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
     right_tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
-    edge: Mapped[TrackingRelationshipType]
+    edge: Mapped[str] = mapped_column(String(255))  # TrackingRelationshipType
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
@@ -220,6 +235,17 @@ class TrackingRelationship(Base):
         CheckConstraint("left_tracking_id < right_tracking_id", name="left_tracking_id_lt_right_tracking_id"),
         UniqueConstraint("left_tracking_id", "right_tracking_id", "reason", "created_by"),
     )
+
+    @property
+    def relationship(self) -> TrackingRelationshipType:
+        return TrackingRelationshipType(self.edge)
+
+    @validates("edge")
+    def validate_edge(self, key: str, edge: str) -> str:
+        allowed_values = [e.name for e in TrackingRelationshipType]
+        if edge not in allowed_values:
+            raise ValueError(f"{key} must be one of {allowed_values}, not '{edge}'")
+        return edge
 
     def __repr__(self) -> str:
         return f"TrackingRelationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"

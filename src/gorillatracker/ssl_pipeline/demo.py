@@ -40,7 +40,7 @@ def visualize_pipeline(
     """
 
     random.seed(42)
-    # NOTE: This unprocessed_videos is not idempotent
+    # NOTE: unprocessed_videos is not idempotent
     videos = sorted(dataset_adapter.unprocessed_videos())
     to_track = random.sample(videos, n_videos)
 
