@@ -46,10 +46,28 @@ def assert_generator_exhausted(generator: Generator[Any, None, None]) -> None:
 
 @dataclass(frozen=True)
 class BoundingBox:
-    x_top_left: int
-    y_top_left: int
-    x_bottom_right: int
-    y_bottom_right: int
+    x_center_n: float
+    y_center_n: float
+    width_n: float
+    height_n: float
+    image_width: int
+    image_height: int
+
+    @property
+    def x_top_left(self) -> int:
+        return int((self.x_center_n - self.width_n / 2) * self.image_width)
+
+    @property
+    def y_top_left(self) -> int:
+        return int((self.y_center_n - self.height_n / 2) * self.image_height)
+
+    @property
+    def x_bottom_right(self) -> int:
+        return int((self.x_center_n + self.width_n / 2) * self.image_width)
+
+    @property
+    def y_bottom_right(self) -> int:
+        return int((self.y_center_n + self.height_n / 2) * self.image_height)
 
     @property
     def top_left(self) -> tuple[int, int]:
@@ -61,7 +79,7 @@ class BoundingBox:
 
     @staticmethod
     def from_tracking_frame_feature(frame_feature: TrackingFrameFeature) -> BoundingBox:
-        return BoundingBox.from_yolo(
+        return BoundingBox(
             frame_feature.bbox_x_center,
             frame_feature.bbox_y_center,
             frame_feature.bbox_width,
@@ -69,16 +87,6 @@ class BoundingBox:
             frame_feature.tracking.video.width,
             frame_feature.tracking.video.height,
         )
-
-    @staticmethod
-    def from_yolo(
-        x_center: float, y_center: float, width: float, height: float, image_width: int, image_height: int
-    ) -> BoundingBox:
-        x_top_left = int((x_center - width / 2) * image_width)
-        y_top_left = int((y_center - height / 2) * image_height)
-        x_bottom_right = int((x_center + width / 2) * image_width)
-        y_bottom_right = int((y_center + height / 2) * image_height)
-        return BoundingBox(x_top_left, y_top_left, x_bottom_right, y_bottom_right)
 
 
 @dataclass(frozen=True)

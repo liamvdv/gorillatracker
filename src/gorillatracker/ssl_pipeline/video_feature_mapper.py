@@ -20,3 +20,6 @@ def predict_correlate_store(
         assert video_tracking.frame_step == yolo_kwargs.get(
             "vid_stride", 1
         ), "vid_stride must match the frame_step in the database"
+
+    for result in yolo_model.predict(video, stream=True, **yolo_kwargs):
+        feature_correlator(result, video_tracking)
