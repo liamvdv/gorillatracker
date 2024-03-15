@@ -64,8 +64,8 @@ def video(
 
 
 @dataclass(frozen=True)
-class TrackedBoundingBox:
-    id: int
+class AssociatedBoundingBox:
+    association: int
     bbox: BoundingBox
 
 
