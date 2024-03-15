@@ -86,8 +86,9 @@ class BoundingBox:
         assert 0 <= self.height_n <= 1, "height_n must be in the range [0, 1]"
         assert 0 <= self.confidence <= 1, "confidence must be in the range [0, 1]"
 
-    def iou(self, other: BoundingBox) -> float:
-        return self.polygon.intersection(other.polygon).area / self.polygon.union(other.polygon).area
+    def intersection_over_smallest_area(self, other: BoundingBox) -> float:
+        intersection = self.polygon.intersection(other.polygon)
+        return intersection.area / min(self.polygon.area, other.polygon.area)
 
     @property
     def polygon(self) -> Polygon:

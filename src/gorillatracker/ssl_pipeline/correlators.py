@@ -20,7 +20,7 @@ class Correlator(Protocol):
             unassociated_boxes:
                 List of bounding boxes to be correlated with the `reference_boxes`.
             threshold:
-                Threshold for the intersection over union (IoU) metric.
+                Threshold for the intersection over smallest area metric [0, 1].
 
         Returns:
             A tuple containing two lists:
@@ -48,7 +48,7 @@ def build_intersection_graph(
 
     for r_box in reference_boxes:
         for u_box in unassociated_boxes:
-            if r_box.bbox.iou(u_box) > threshold:
+            if r_box.bbox.intersection_over_smallest_area(u_box) > threshold:
                 rtu[r_box].append(u_box)
                 utr[u_box].append(r_box)
     return rtu, utr

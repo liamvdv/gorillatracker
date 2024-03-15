@@ -17,12 +17,15 @@ log = logging.getLogger(__name__)
 
 
 def id_to_color(track_id: int) -> tuple[int, int, int]:
+    """Convert a tracking ID to a color. (BGR)"""
+    if track_id < 0:  # For debugging ONLY
+        return 0, 0, 255
     hash_value = helpers.jenkins_hash(track_id)
     h = (hash_value % 360) / 360.0
     s = max(0.7, (hash_value // 360) % 2)
     v = 0.9
     r, g, b = hsv_to_rgb(h, s, v)
-    return int(r * 255), int(g * 255), int(b * 255)
+    return int(b * 255), int(g * 255), int(r * 255)
 
 
 def render_frame(
