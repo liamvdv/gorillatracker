@@ -105,8 +105,9 @@ def visualize_video(video: Path, engine: Engine, dest: Path) -> None:
             str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
         )
         for tracked_frame in tracked_frames:
-            if tracked_frame.frame_nr > 1000:
-                break
+            # TODO remove
+            # if tracked_frame.frame_nr > 1000:
+            #     break
             source_video.set(cv2.CAP_PROP_POS_FRAMES, tracked_frame.frame_nr)
             success, frame = source_video.read()
             assert success

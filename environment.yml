@@ -23,7 +23,7 @@ dependencies:
   - evaluate
   - accelerate
   - sentencepiece
-  - ultralytics
+  - ultralytics=8.0.186 # NOTE(memben): prevent YOLO Tracking from breaking
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda

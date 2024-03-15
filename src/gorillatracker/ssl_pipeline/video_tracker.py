@@ -80,9 +80,6 @@ def track_and_store(
     ):
         detections = result.boxes
         frame = relative_frame * vid_stride
-        # TODO remove
-        if frame > 1000:
-            break
         assert isinstance(detections, results.Boxes)
         for detection in detections:
             if detection.id is None:
