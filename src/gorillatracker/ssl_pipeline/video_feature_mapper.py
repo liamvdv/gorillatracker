@@ -52,9 +52,13 @@ def predict_correlate_store(
 
         unresolved_frame_boxes: list[tuple[int, list[BoundingBox]]] = []
         tracked_frames = get_tracked_frames(session, video_tracking, filter_by_type="body")
+        tracked_frames = tracked_frames[
+            1:
+        ]  # NOTE(memben): YOLOv8 skips the 0th frame https://github.com/ultralytics/ultralytics/issues/8976
         prediction: results.Results
-        # TODO(memben) change back to zip_longest
-        for prediction, tracked_frame in zip(yolo_model.predict(video, stream=True, **yolo_kwargs), tracked_frames):
+        for prediction, tracked_frame in zip_longest(
+            yolo_model.predict(video, stream=True, **yolo_kwargs), tracked_frames
+        ):
             assert prediction is not None
             assert tracked_frame is not None
 
@@ -95,7 +99,7 @@ def predict_correlate_store(
         session.commit()
 
         if DANGER_activate_visual_debugging:
-            log.warning("DANGER: Introducing undefined state, accepting danger")
+            log.warning("DANGER: Visual Debugging flag set, introducing undefined state, accepting danger")
             dummy_tracking = Tracking(
                 video=video_tracking,  # NOTE needed for data model validation
                 tracking_id=(-1) * video_tracking.video_id,

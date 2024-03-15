@@ -37,6 +37,8 @@ def render_frame(
         bbox = helpers.BoundingBox.from_tracking_frame_feature(frame_feature)
         cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
         label = f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.type})"
+        if frame_feature.tracking_id < 0:  # For debugging ONLY
+            label = f"DEBUG ({frame_feature.type})"
         cv2.putText(
             frame,
             label,

@@ -78,7 +78,8 @@ def track_and_store(
             stream=True,
             tracker=tracker_config,
             **yolo_kwargs,
-        )
+        ),
+        start=1,  # NOTE(memben): YOLOv8 skips the 0th frame https://github.com/ultralytics/ultralytics/issues/8976
     ):
         detections = result.boxes
         frame = relative_frame * vid_stride
