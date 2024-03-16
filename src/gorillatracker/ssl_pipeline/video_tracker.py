@@ -16,6 +16,7 @@ from tqdm import tqdm
 from ultralytics import YOLO
 from ultralytics.engine import results
 
+from gorillatracker.ssl_pipeline.helpers import video_reader
 from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video
 
 log = logging.getLogger(__name__)
@@ -46,6 +47,34 @@ def video_properties_extractor(video: Path) -> VideoProperties:
     return VideoProperties(frames, width, height, fps)
 
 
+def process_prediction(
+    prediction: results.Results, video_tracking: Video, trackings: defaultdict[int, Tracking], frame_nr: int
+) -> None:
+    """Process the prediction and add the tracking frame features to the video, does not commit the session."""
+
+    assert isinstance(prediction.boxes, results.Boxes)
+    for detection in prediction.boxes:
+        if detection.id is None:
+            log.warning(
+                f"For video {video_tracking.filename}, frame {frame_nr}, no associated tracking id found, continuing..."
+            )
+            continue
+        tracking_id = int(detection.id[0].int().item())
+        x, y, w, h = detection.xywhn[0].tolist()
+        confidence = detection.conf.item()
+        tracking = trackings[tracking_id]
+        TrackingFrameFeature(
+            tracking=tracking,  # NOTE needed for data model validation and adding it implicitly to the DB
+            frame_nr=frame_nr,
+            bbox_x_center=x,
+            bbox_y_center=y,
+            bbox_width=w,
+            bbox_height=h,
+            confidence=confidence,
+            type="body",  # NOTE(memben): Tracking will always be done using the body model
+        )
+
+
 def track_and_store(
     video: Path,
     yolo_model: YOLO,
@@ -71,38 +100,15 @@ def track_and_store(
     trackings: defaultdict[int, Tracking] = defaultdict(
         lambda: Tracking(video=video_tracking)
     )  # NOTE needed for data model validation and adding it implicitly to the DB
-    result: results.Results
-    for relative_frame, result in enumerate(
-        yolo_model.track(
-            video,
-            stream=True,
-            tracker=tracker_config,
-            **yolo_kwargs,
-        ),
-        start=1,  # NOTE(memben): YOLOv8 skips the 0th frame https://github.com/ultralytics/ultralytics/issues/8976
-    ):
-        detections = result.boxes
-        frame = relative_frame * vid_stride
-        assert isinstance(detections, results.Boxes)
-        for detection in detections:
-            if detection.id is None:
-                log.warning(f"For video {video.name}, frame {frame}, no associated tracking id found, continuing...")
-                continue
-            tracking_id = int(detection.id[0].int().item())
-            x, y, w, h = detection.xywhn[0].tolist()
-            confidence = detection.conf.item()
-            TrackingFrameFeature(
-                tracking=trackings[
-                    tracking_id
-                ],  # NOTE needed for data model validation and adding it implicitly to the DB
-                frame_nr=frame,
-                bbox_x_center=x,
-                bbox_y_center=y,
-                bbox_width=w,
-                bbox_height=h,
-                confidence=confidence,
-                type="body",  # NOTE(memben): Tracking will always be done using the body model
+
+    # NOTE(memben): YOLOv8s video streaming has an error https://github.com/ultralytics/ultralytics/issues/8976, so we fix it internally
+    with video_reader(video, frame_step=vid_stride) as video_feed:
+        for video_frame in video_feed:
+            predictions: list[results.Results] = yolo_model.track(
+                video_frame.frame, tracker=tracker_config, **yolo_kwargs, persist=True
             )
+            assert len(predictions) == 1
+            process_prediction(predictions[0], video_tracking, trackings, video_frame.frame_nr)
 
     if sum(len(tracking.frame_features) for tracking in trackings.values()) < 10:
         log.warning(f"Video {video.name} has less than 10 frames with tracked features")

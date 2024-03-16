@@ -65,6 +65,7 @@ class SSLDatasetAdapter(ABC):
     def yolo_kwargs(self) -> dict[str, Any]:
         # full list of kwargs: https://docs.ultralytics.com/modes/predict/#inference-arguments
         # reduce compute time with vid_stride (sample every nth frame), half (half size)
+        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
         pass
 
     @property
@@ -116,12 +117,13 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
 
     @property
     def yolo_kwargs(self) -> dict[str, Any]:
+        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
         return {
             "vid_stride": 10,
             "half": True,
             "iou": 0.2,
             "conf": 0.7,
-            "verbose": False,
+            "verbose": True,
         }
 
     @property

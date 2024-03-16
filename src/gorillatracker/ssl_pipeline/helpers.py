@@ -18,6 +18,12 @@ from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, V
 log = logging.getLogger(__name__)
 
 
+@dataclass
+class VideoFrame:
+    frame_nr: int
+    frame: cv2.typing.MatLike
+
+
 def jenkins_hash(key: int) -> int:
     hash_value = ((key >> 16) ^ key) * 0x45D9F3B
     hash_value = ((hash_value >> 16) ^ hash_value) * 0x45D9F3B
@@ -27,21 +33,21 @@ def jenkins_hash(key: int) -> int:
 
 def video_frame_iterator(
     cap: cv2.VideoCapture, frame_step: int, strict: bool = True
-) -> Generator[cv2.typing.MatLike, None, None]:
+) -> Generator[VideoFrame, None, None]:
     frame_nr = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
         if frame_nr % frame_step == 0:
-            yield frame
+            yield VideoFrame(frame_nr, frame)
         frame_nr += 1
 
 
 @contextmanager
-def video(
+def video_reader(
     video_path: Path, frame_step: int, strict: bool = True
-) -> Generator[Generator[cv2.typing.MatLike, None, None], None, None]:
+) -> Generator[Generator[VideoFrame, None, None], None, None]:
     """
     Context manager for reading frames from a video file.
 

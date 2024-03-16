@@ -10,7 +10,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
-import gorillatracker.ssl_pipeline.helpers as helpers
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, jenkins_hash, load_tracked_frames, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
 log = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def id_to_color(track_id: int) -> tuple[int, int, int]:
     """Convert a tracking ID to a color. (BGR)"""
     if track_id < 0:  # For debugging ONLY
         return 0, 0, 255
-    hash_value = helpers.jenkins_hash(track_id)
+    hash_value = jenkins_hash(track_id)
     h = (hash_value % 360) / 360.0
     s = max(0.7, (hash_value // 360) % 2)
     v = 0.9
@@ -34,7 +34,7 @@ def render_frame(
     tracking_id_to_label_map: dict[int, int],
 ) -> None:
     for frame_feature in frame_features:
-        bbox = helpers.BoundingBox.from_tracking_frame_feature(frame_feature)
+        bbox = BoundingBox.from_tracking_frame_feature(frame_feature)
         cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
         label = f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.type})"
         if frame_feature.tracking_id < 0:  # For debugging ONLY
@@ -57,23 +57,24 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
 
     with session_cls() as session:
         video_tracking = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
-        tracked_frames = helpers.load_tracked_frames(session, video_tracking)
+        tracked_frames = load_tracked_frames(session, video_tracking)
         unique_tracking_ids = set(feature.tracking_id for frame in tracked_frames for feature in frame.frame_features)
         tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
         # NOTE: video_tracking is the tracked version of source_video
         tracked_video = cv2.VideoWriter(
             str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
         )
-        with helpers.video(video, frame_step=video_tracking.frame_step) as source_video:
+        with video_reader(video, frame_step=video_tracking.frame_step) as source_video:
             for tracked_frame, source_frame in zip_longest(tracked_frames, source_video):
                 assert tracked_frame is not None
                 assert source_frame is not None
+                assert tracked_frame.frame_nr == source_frame.frame_nr
                 render_frame(
-                    source_frame,
+                    source_frame.frame,
                     tracked_frame.frame_features,
                     tracking_id_to_label_map,
                 )
-                tracked_video.write(source_frame)
+                tracked_video.write(source_frame.frame)
             tracked_video.release()
 
 

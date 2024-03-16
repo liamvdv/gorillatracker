@@ -13,6 +13,7 @@ The pipeline consists of the following steps:
 """
 
 import logging
+import os
 import random
 from pathlib import Path
 
@@ -76,9 +77,10 @@ def visualize_pipeline(
 
 
 if __name__ == "__main__":
+    os.remove("test.db")
     logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
     dataset_adapter.setup_database()
     visualize_pipeline(
-        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=100, max_worker_per_gpu=12, gpus=[0]
+        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=4, max_worker_per_gpu=12, gpus=[0]
     )

@@ -18,6 +18,7 @@ from gorillatracker.ssl_pipeline.helpers import (
     TrackedFrame,
     load_tracked_frames,
     load_video_tracking,
+    video_reader,
 )
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
 
@@ -41,7 +42,7 @@ def convert_to_associated_bbox(tracked_frame: TrackedFrame) -> list[AssociatedBo
     ]
 
 
-def process_detections(prediction: results.Results, video_tracking: Video) -> list[BoundingBox]:
+def process_prediction(prediction: results.Results, video_tracking: Video) -> list[BoundingBox]:
     assert isinstance(prediction.boxes, results.Boxes)
     return [
         BoundingBox(x, y, w, h, c, video_tracking.width, video_tracking.height)
@@ -110,34 +111,36 @@ def predict_correlate_store(
 
         id_to_tracking = {tracking.tracking_id: tracking for tracking in video_tracking.trackings}
         framewise_unresolved_boxes: list[tuple[int, list[BoundingBox]]] = []
+        tracked_frames = load_tracked_frames(session, video_tracking, filter_by_type="body")
 
-        tracked_frames = load_tracked_frames(session, video_tracking, filter_by_type="body")[
-            1:
-        ]  # NOTE(memben): YOLOv8 skips the 0th frame https://github.com/ultralytics/ultralytics/issues/8976
+        # NOTE(memben): YOLOv8s video streaming has an error https://github.com/ultralytics/ultralytics/issues/8976, so we fix it internally
+        with video_reader(video, frame_step=video_tracking.frame_step) as video_feed:
+            for video_frame, tracked_frame in zip_longest(video_feed, tracked_frames):
+                assert video_frame is not None
+                assert tracked_frame is not None
+                assert video_frame.frame_nr == tracked_frame.frame_nr
+                predictions: list[results.Results] = yolo_model.predict(video_frame.frame, **yolo_kwargs)
+                assert len(predictions) == 1
+                feature_bboxes = process_prediction(predictions[0], video_tracking)
+                body_bboxes = convert_to_associated_bbox(tracked_frame)
+                correlated_boxes, uncorrelated_boxes = correlate(body_bboxes, feature_bboxes, threshold=0.1)
+                framewise_unresolved_boxes.append((tracked_frame.frame_nr, uncorrelated_boxes))
+                store_correlated_boxes(session, correlated_boxes, tracked_frame.frame_nr, type, id_to_tracking)
 
-        prediction: results.Results
-        for prediction, tracked_frame in zip_longest(
-            yolo_model.predict(video, stream=True, **yolo_kwargs), tracked_frames
-        ):
-            assert prediction is not None
-            assert tracked_frame is not None
-            feature_bboxes = process_detections(prediction, video_tracking)
-            body_bboxes = convert_to_associated_bbox(tracked_frame)
-            correlated_boxes, uncorrelated_boxes = correlate(body_bboxes, feature_bboxes, threshold=0.1)
-            framewise_unresolved_boxes.append((tracked_frame.frame_nr, uncorrelated_boxes))
-            store_correlated_boxes(session, correlated_boxes, tracked_frame.frame_nr, type, id_to_tracking)
-
-        total_unresolved_boxes = sum(len(boxes) for _, boxes in framewise_unresolved_boxes)
-        log.info(f"{total_unresolved_boxes} unresolved boxes of type {type} in video {video.name} ")
+            total_unresolved_boxes = sum(len(boxes) for _, boxes in framewise_unresolved_boxes)
+            log.info(f"{total_unresolved_boxes} unresolved boxes of type {type} in video {video.name} ")
         session.commit()
 
         if DANGER_activate_visual_debugging:
             log.warning("DANGER: Visual Debugging flag set, introducing undefined state, accepting danger")
-            dummy_tracking = Tracking(
-                video=video_tracking,
-                tracking_id=(-1) * video_tracking.video_id,
-            )
-            session.add(dummy_tracking)
+
+            dummy_tracking_id = (-1) * video_tracking.video_id
+            dummy_tracking = session.get(Tracking, dummy_tracking_id)
+
+            if dummy_tracking is None:
+                dummy_tracking = Tracking(video=video_tracking, tracking_id=dummy_tracking_id)
+                session.add(dummy_tracking)
+
             add_unresolved_boxes_for_debugging(session, framewise_unresolved_boxes, dummy_tracking, type)
             session.commit()
 
@@ -184,7 +187,15 @@ def _multiprocess_predict_correlate_store(video: Path) -> None:
     assert _type is not None, "Type is not initialized, use init_predictor instead"
     assert _session_cls is not None, "Session class is not initialized, use init_predictor instead"
     assert _correlate is not None, "Correlator is not initialized, use init_predictor instead"
-    predict_correlate_store(video, _yolo_model, _yolo_kwargs, _type, _session_cls, _correlate)
+    predict_correlate_store(
+        video,
+        _yolo_model,
+        _yolo_kwargs,
+        _type,
+        _session_cls,
+        _correlate,
+        "INTRODUCING UNDEFINED STATE, ACCEPTING DANGER",
+    )
 
 
 def multiproces_feature_mapping(
