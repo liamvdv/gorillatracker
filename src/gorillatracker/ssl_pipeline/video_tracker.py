@@ -199,7 +199,7 @@ def multiprocess_video_tracker(
         assert all(
             metadata_extractor(video).camera_name in map(lambda x: x.name, cameras) for video in videos
         ), "All videos must have a corresponding camera in the database"
-        # TODO(memben): This could be a costly operation (e.g. OCR), consider caching the result of the metadata extractor
+        # NOTE(memben): This could be a costly operation (e.g. OCR), consider caching the result of the metadata extractor
 
     log.info("Tracking videos...")
     gpu_queue: Queue[int] = Queue()

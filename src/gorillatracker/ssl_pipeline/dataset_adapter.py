@@ -82,7 +82,7 @@ class SSLDatasetAdapter(ABC):
 class GorillaDatasetAdapter(SSLDatasetAdapter):
     _yolo_base_kwargs = {
         "half": True,  # We found no difference in accuracy to False
-        "vid_stride": 10,
+        "vid_stride": 5,
         "verbose": False,
     }
 

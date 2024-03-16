@@ -72,7 +72,7 @@ def visualize_pipeline(
             gpus=gpus,
         )
 
-    multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
+    # multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
 
 
 if __name__ == "__main__":
@@ -80,5 +80,5 @@ if __name__ == "__main__":
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
     dataset_adapter.setup_database()
     visualize_pipeline(
-        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=30, max_worker_per_gpu=12, gpus=[0]
+        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=100, max_worker_per_gpu=12, gpus=[0,1]
     )

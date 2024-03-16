@@ -158,7 +158,7 @@ def _init_predictor(
     type: str,
     engine: Engine,
     correlate: Correlator,
-    # TODO(memben): figure out why it does fail
+    # TODO(memben): figure out why typing makes it fail
     gpu_queue: Queue,  # type: ignore
 ) -> None:
     log = logging.getLogger(__name__)
@@ -194,7 +194,6 @@ def _multiprocess_predict_correlate_store(video: Path) -> None:
         _type,
         _session_cls,
         _correlate,
-        "INTRODUCING UNDEFINED STATE, ACCEPTING DANGER",
     )
 
 
