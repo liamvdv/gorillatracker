@@ -80,6 +80,12 @@ class SSLDatasetAdapter(ABC):
 
 
 class GorillaDatasetAdapter(SSLDatasetAdapter):
+    _yolo_base_kwargs = {
+        "half": True,  # We found no difference in accuracy to False
+        "vid_stride": 10,
+        "verbose": False,
+    }
+
     def setup_database(self) -> None:
         Base.metadata.create_all(self._engine)
         self._setup_cameras()
@@ -95,8 +101,8 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [
-            (Path("models/yolov8n_gorilla_face_45.pt"), {"half": True}, one_to_one_correlator, "face_45"),
-            (Path("models/yolov8n_gorilla_face_90.pt"), {"half": True}, one_to_one_correlator, "face_90"),
+            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, "face_45"),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, "face_90"),
         ]
 
     @property
@@ -119,11 +125,9 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
     def yolo_kwargs(self) -> dict[str, Any]:
         # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
         return {
-            "vid_stride": 10,
-            "half": True,  # We found no difference in accuracy
+            **self._yolo_base_kwargs,
             "iou": 0.2,
             "conf": 0.7,
-            "verbose": True,
         }
 
     @property

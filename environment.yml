@@ -23,7 +23,7 @@ dependencies:
   - evaluate
   - accelerate
   - sentencepiece
-  - ultralytics=8.0.186 # NOTE(memben): prevent YOLO Tracking from breaking on newer versions
+  - ultralytics # NOTE(memben)If you run into issues with tracking pin to 8.0.186
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda

@@ -13,7 +13,6 @@ The pipeline consists of the following steps:
 """
 
 import logging
-import os
 import random
 from pathlib import Path
 
@@ -49,7 +48,6 @@ def visualize_pipeline(
     # NOTE: unprocessed_videos is not idempotent
     videos = sorted(dataset_adapter.unprocessed_videos())
     to_track = random.sample(videos, n_videos)
-    to_track = [Path("/workspaces/gorillatracker/video_data/R501_20220531_257.mp4")]
 
     multiprocess_video_tracker(
         dataset_adapter.body_model,
@@ -62,27 +60,25 @@ def visualize_pipeline(
         gpus=gpus,
     )
 
-    # for yolo_model, yolo_kwargs, correlator, type in dataset_adapter.feature_models():
-    #     multiproces_feature_mapping(
-    #         yolo_model,
-    #         yolo_kwargs,
-    #         type,
-    #         to_track,
-    #         dataset_adapter.engine,
-    #         correlator,
-    #         max_worker_per_gpu=max_worker_per_gpu,
-    #         gpus=gpus,
-    #     )
+    for yolo_model, yolo_kwargs, correlator, type in dataset_adapter.feature_models():
+        multiproces_feature_mapping(
+            yolo_model,
+            yolo_kwargs,
+            type,
+            to_track,
+            dataset_adapter.engine,
+            correlator,
+            max_worker_per_gpu=max_worker_per_gpu,
+            gpus=gpus,
+        )
 
     multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
 
 
 if __name__ == "__main__":
-    # Path("video_data/R501_20220531_257.mp4") good for off by ones
-    # os.remove("test.db")
     logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
     dataset_adapter.setup_database()
     visualize_pipeline(
-        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=4, max_worker_per_gpu=12, gpus=[0]
+        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=30, max_worker_per_gpu=12, gpus=[0]
     )
