@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
 
 
-def video_tracking_frame_features_query(video_id: int) -> Select:
+# TODO (memben): figure out how to type this
+def video_tracking_frame_features_query(video_id: int) -> Select:  # type: ignore
     return (
         select(TrackingFrameFeature)
         .select_from(Video)
