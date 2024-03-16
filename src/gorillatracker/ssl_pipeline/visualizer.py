@@ -10,7 +10,13 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, jenkins_hash, load_tracked_frames, video_reader, load_video_tracking
+from gorillatracker.ssl_pipeline.helpers import (
+    BoundingBox,
+    jenkins_hash,
+    load_tracked_frames,
+    load_video_tracking,
+    video_reader,
+)
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 log = logging.getLogger(__name__)

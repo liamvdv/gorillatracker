@@ -55,7 +55,7 @@ def process_prediction(
     assert isinstance(prediction.boxes, results.Boxes)
     for detection in prediction.boxes:
         if detection.id is None:
-            if frame_nr == 0: # NOTE(memben): IDs are never assigned in the first frame
+            if frame_nr == 0:  # NOTE(memben): IDs are never assigned in the first frame
                 continue
             log.warning(
                 f"For video {video_tracking.filename}, frame {frame_nr}, no associated tracking id found, continuing..."
