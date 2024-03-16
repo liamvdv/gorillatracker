@@ -55,6 +55,7 @@ class Video(Base):
     __tablename__ = "Video"
 
     video_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    # TODO(memben): Should this rather be a path than a filename?
     filename: Mapped[str] = mapped_column(String(255), unique=True)
     camera_id: Mapped[int] = mapped_column(ForeignKey("Camera.camera_id"))
     start_time: Mapped[datetime]

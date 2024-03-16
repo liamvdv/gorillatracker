@@ -43,7 +43,7 @@ def video_frame_iterator(cap: cv2.VideoCapture, frame_step: int) -> Generator[Vi
 
 
 @contextmanager
-def video_reader(video_path: Path, frame_step: int) -> Generator[Generator[VideoFrame, None, None], None, None]:
+def video_reader(video_path: Path, frame_step: int = 1) -> Generator[Generator[VideoFrame, None, None], None, None]:
     """
     Context manager for reading frames from a video file.
 
@@ -138,10 +138,6 @@ class BoundingBox:
 class TrackedFrame:
     frame_nr: int
     frame_features: list[TrackingFrameFeature]
-
-
-def load_video_tracking(session: Session, video_path: Path) -> Video:
-    return session.execute(select(Video).where(Video.filename == str(video_path.name))).scalar_one()
 
 
 def load_tracked_frames(session: Session, video: Video, filter_by_type: str | None = None) -> list[TrackedFrame]:
