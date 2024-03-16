@@ -134,6 +134,7 @@ def _init_tracker(
     _yolo_kwargs = yolo_kwargs
     _metadata_extractor = metadata_extractor
     _tracker_config = tracker_config
+
     assigned_gpu = gpu_queue.get()
     log.info(f"Tracker initialized on GPU {assigned_gpu}")
     if "device" in yolo_kwargs:

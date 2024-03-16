@@ -9,7 +9,7 @@ The pipeline consists of the following steps:
     c. The tracking is done using the tracker settings.
 3. Store the tracking results in a database. (models.py)
 4. (Optional) Add additional features to the tracking results. (video_feature_mapper.py)
-4. 
+5. ...
 """
 
 import logging
@@ -17,6 +17,7 @@ import random
 from pathlib import Path
 
 from gorillatracker.ssl_pipeline.dataset_adapter import GorillaDatasetAdapter, SSLDatasetAdapter
+from gorillatracker.ssl_pipeline.video_feature_mapper import multiproces_feature_mapping
 from gorillatracker.ssl_pipeline.video_tracker import multiprocess_video_tracker
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 
@@ -24,7 +25,11 @@ log = logging.getLogger(__name__)
 
 
 def visualize_pipeline(
-    dataset_adapter: SSLDatasetAdapter, dest_dir: Path, n_videos: int = 30, gpus: list[int] = [0]
+    dataset_adapter: SSLDatasetAdapter,
+    dest_dir: Path,
+    n_videos: int = 30,
+    max_worker_per_gpu: int = 8,
+    gpus: list[int] = [0],
 ) -> None:
     """
     Visualize the tracking results of the pipeline.
@@ -43,6 +48,7 @@ def visualize_pipeline(
     # NOTE: unprocessed_videos is not idempotent
     videos = sorted(dataset_adapter.unprocessed_videos())
     to_track = random.sample(videos, n_videos)
+    to_track = [Path("video_data/R501_20220531_257.mp4")]
 
     multiprocess_video_tracker(
         dataset_adapter.body_model,
@@ -55,7 +61,10 @@ def visualize_pipeline(
         gpus=gpus,
     )
 
-    log.info("Visualizing videos")
+    for yolo_model, yolo_kwargs, correlator, type in dataset_adapter.feature_models():
+        multiproces_feature_mapping(
+            yolo_model, yolo_kwargs, type, to_track, dataset_adapter.engine, correlator, gpus=gpus
+        )
 
     multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
 
@@ -64,4 +73,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
     dataset_adapter.setup_database()
-    visualize_pipeline(dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=1, gpus=[0])
+    visualize_pipeline(
+        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=100, max_worker_per_gpu=12, gpus=[0]
+    )

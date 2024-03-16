@@ -13,6 +13,7 @@ import pandas as pd
 from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
+from gorillatracker.ssl_pipeline.correlators import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video
 from gorillatracker.ssl_pipeline.video_tracker import VideoMetadata
 
@@ -31,6 +32,10 @@ class SSLDatasetAdapter(ABC):
             videos = session.scalars(stmt).all()
         log.info(f"Found {len(videos)} (processed) videos in the database")
         return [video for video in self.videos if video.name not in videos]
+
+    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
+        """Returns a list of feature models to use for adding features of interest (e.g. face detector)"""
+        return []
 
     @property
     @abstractmethod
@@ -86,6 +91,12 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
                 camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
                 session.add(camera)
             session.commit()
+
+    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
+        return [
+            (Path("models/yolov8n_gorilla_face_45.pt"), self.yolo_kwargs, one_to_one_correlator, "face_45"),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self.yolo_kwargs, one_to_one_correlator, "face_90"),
+        ]
 
     @property
     def videos(self) -> list[Path]:

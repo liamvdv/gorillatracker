@@ -1,9 +1,13 @@
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from itertools import zip_longest
+from multiprocessing import Queue
 from pathlib import Path
 from typing import Any, Literal
 
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
+from tqdm import tqdm
 from ultralytics import YOLO
 from ultralytics.engine import results
 
@@ -130,9 +134,89 @@ def predict_correlate_store(
         if DANGER_activate_visual_debugging:
             log.warning("DANGER: Visual Debugging flag set, introducing undefined state, accepting danger")
             dummy_tracking = Tracking(
-                video=video_tracking,  # NOTE needed for data model validation
+                video=video_tracking,
                 tracking_id=(-1) * video_tracking.video_id,
             )
             session.add(dummy_tracking)
             add_unresolved_boxes_for_debugging(session, framewise_unresolved_boxes, dummy_tracking, type)
             session.commit()
+
+
+_yolo_model = None
+_yolo_kwargs = None
+_type = None
+_session_cls = None
+_correlate = None
+
+
+def _init_predictor(
+    yolo_model: Path,
+    yolo_kwargs: dict[str, Any],
+    type: str,
+    engine: Engine,
+    correlate: Correlator,
+    # TODO(memben): figure out why it does fail
+    gpu_queue: Queue,  # type: ignore
+) -> None:
+    log = logging.getLogger(__name__)
+    global _yolo_model, _yolo_kwargs, _type, _session_cls, _correlate
+    _yolo_model = YOLO(yolo_model)
+    _yolo_kwargs = yolo_kwargs
+    _type = type
+    _correlate = correlate
+
+    assigned_gpu = gpu_queue.get()
+    log.info(f"Predictor initialized on GPU {assigned_gpu}")
+    if "device" in yolo_kwargs:
+        raise ValueError("device will be overwritten by the assigned GPU")
+    yolo_kwargs["device"] = f"cuda:{assigned_gpu}"
+
+    engine.dispose(
+        close=False
+    )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
+    _session_cls = sessionmaker(bind=engine)
+
+
+def _multiprocess_predict_correlate_store(video: Path) -> None:
+    global _yolo_model, _yolo_kwargs, _type, _session_cls, _correlate
+    assert _yolo_model is not None, "Predictor is not initialized, call init_predictor first"
+    assert _yolo_kwargs is not None, "YOLO kwargs are not initialized, use init_predictor instead"
+    assert _type is not None, "Type is not initialized, use init_predictor instead"
+    assert _session_cls is not None, "Session class is not initialized, use init_predictor instead"
+    assert _correlate is not None, "Correlator is not initialized, use init_predictor instead"
+    predict_correlate_store(video, _yolo_model, _yolo_kwargs, _type, _session_cls, _correlate)
+
+
+def multiproces_feature_mapping(
+    yolo_model: Path,
+    yolo_kwargs: dict[str, Any],
+    type: str,
+    videos: list[Path],
+    engine: Engine,
+    correlate: Correlator,
+    max_worker_per_gpu: int = 8,
+    gpus: list[int] = [0],
+) -> None:
+    with Session(engine) as session:
+        processed_videos = session.execute(select(Video.filename)).scalars().all()
+        assert all(video.name in list(processed_videos) for video in videos), "Not all videos have been processed yet"
+
+    gpu_queue: Queue[int] = Queue()
+    max_workers = len(gpus) * max_worker_per_gpu
+    for gpu in gpus:
+        for _ in range(max_worker_per_gpu):
+            gpu_queue.put(gpu)
+
+    with ProcessPoolExecutor(
+        max_workers=max_workers,
+        initializer=_init_predictor,
+        initargs=(yolo_model, yolo_kwargs, type, engine, correlate, gpu_queue),
+    ) as executor:
+        list(
+            tqdm(
+                executor.map(_multiprocess_predict_correlate_store, videos),
+                total=len(videos),
+                desc=f"Predicting and correlating {type}",
+                unit="video",
+            )
+        )
