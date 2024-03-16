@@ -28,11 +28,11 @@ def id_to_color(track_id: int) -> tuple[int, int, int]:
     return int(b * 255), int(g * 255), int(r * 255)
 
 
-def render_frame(
+def render_on_frame(
     frame: cv2.typing.MatLike,
     frame_features: Sequence[TrackingFrameFeature],
     tracking_id_to_label_map: dict[int, int],
-) -> None:
+) -> cv2.typing.MatLike:
     for frame_feature in frame_features:
         bbox = BoundingBox.from_tracking_frame_feature(frame_feature)
         cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
@@ -48,6 +48,7 @@ def render_frame(
             id_to_color(frame_feature.tracking_id),
             3,
         )
+    return frame
 
 
 def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path) -> None:
@@ -69,11 +70,12 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
                 assert tracked_frame is not None
                 assert source_frame is not None
                 assert tracked_frame.frame_nr == source_frame.frame_nr
-                render_frame(
+                render_on_frame(
                     source_frame.frame,
                     tracked_frame.frame_features,
                     tracking_id_to_label_map,
                 )
+
                 tracked_video.write(source_frame.frame)
             tracked_video.release()
 

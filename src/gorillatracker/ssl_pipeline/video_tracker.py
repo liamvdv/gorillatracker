@@ -106,7 +106,7 @@ def track_and_store(
         for video_frame in video_feed:
             predictions: list[results.Results] = yolo_model.track(
                 video_frame.frame, tracker=tracker_config, **yolo_kwargs, persist=True
-            )
+            )  # NOTE(memben): We are also facing little inconsistencies with track vs predict (compare frames [1200, 1300] in R501_20220531_257.mp4)
             assert len(predictions) == 1
             process_prediction(predictions[0], video_tracking, trackings, video_frame.frame_nr)
 

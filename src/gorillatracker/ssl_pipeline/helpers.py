@@ -31,9 +31,7 @@ def jenkins_hash(key: int) -> int:
     return hash_value
 
 
-def video_frame_iterator(
-    cap: cv2.VideoCapture, frame_step: int, strict: bool = True
-) -> Generator[VideoFrame, None, None]:
+def video_frame_iterator(cap: cv2.VideoCapture, frame_step: int) -> Generator[VideoFrame, None, None]:
     frame_nr = 0
     while cap.isOpened():
         ret, frame = cap.read()
@@ -45,26 +43,23 @@ def video_frame_iterator(
 
 
 @contextmanager
-def video_reader(
-    video_path: Path, frame_step: int, strict: bool = True
-) -> Generator[Generator[VideoFrame, None, None], None, None]:
+def video_reader(video_path: Path, frame_step: int) -> Generator[Generator[VideoFrame, None, None], None, None]:
     """
     Context manager for reading frames from a video file.
 
     Args:
         video_path (Path): The path to the video file.
         frame_step (int): The step size for reading frames.
-        strict (bool, optional): If True, raises an error if not all frames are consumed. Defaults to True.
+
 
     Yields:
-        Generator[cv2.typing.MatLike, None, None]: A generator that yields frames from the video.
+        Generator[VideoFrame, None, None]: A generator that yields VideoFrame objects.
 
-    Raises:
-        ValueError: If not all frames are consumed and strict is True.
     """
     cap = cv2.VideoCapture(str(video_path))
+    assert cap.isOpened(), f"Could not open video file: {video_path}"
     try:
-        yield video_frame_iterator(cap, frame_step, strict)
+        yield video_frame_iterator(cap, frame_step)
     finally:
         cap.release()
 
