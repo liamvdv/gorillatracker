@@ -48,7 +48,6 @@ def visualize_pipeline(
     # NOTE: unprocessed_videos is not idempotent
     videos = sorted(dataset_adapter.unprocessed_videos())
     to_track = random.sample(videos, n_videos)
-    to_track = [Path("video_data/R501_20220531_257.mp4")]
 
     multiprocess_video_tracker(
         dataset_adapter.body_model,
