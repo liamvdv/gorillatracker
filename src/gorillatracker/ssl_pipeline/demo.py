@@ -56,13 +56,20 @@ def visualize_pipeline(
         dataset_adapter.tracker_config,
         dataset_adapter.metadata_extractor,
         dataset_adapter.engine,
-        max_worker_per_gpu=12,
+        max_worker_per_gpu=max_worker_per_gpu,
         gpus=gpus,
     )
 
     for yolo_model, yolo_kwargs, correlator, type in dataset_adapter.feature_models():
         multiproces_feature_mapping(
-            yolo_model, yolo_kwargs, type, to_track, dataset_adapter.engine, correlator, gpus=gpus
+            yolo_model,
+            yolo_kwargs,
+            type,
+            to_track,
+            dataset_adapter.engine,
+            correlator,
+            max_worker_per_gpu=max_worker_per_gpu,
+            gpus=gpus,
         )
 
     multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
