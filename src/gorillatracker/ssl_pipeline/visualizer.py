@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Sequence
 
 import cv2
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, jenkins_hash, load_tracked_frames, video_reader
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, jenkins_hash, load_tracked_frames, video_reader, load_video_tracking
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
     with session_cls() as session:
-        video_tracking = session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
+        video_tracking = load_video_tracking(session, video)
         tracked_frames = load_tracked_frames(session, video_tracking)
         unique_tracking_ids = set(feature.tracking_id for frame in tracked_frames for feature in frame.frame_features)
         tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}

@@ -44,7 +44,7 @@ def visualize_pipeline(
         None, the visualizations are saved to the destination and to the SSLDatasetAdapter.
     """
 
-    random.seed(42)
+    # random.seed(42) # For reproducibility
     # NOTE: unprocessed_videos is not idempotent
     videos = sorted(dataset_adapter.unprocessed_videos())
     to_track = random.sample(videos, n_videos)
@@ -72,7 +72,7 @@ def visualize_pipeline(
             gpus=gpus,
         )
 
-    # multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
+    multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
 
 
 if __name__ == "__main__":
@@ -80,5 +80,9 @@ if __name__ == "__main__":
     dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
     dataset_adapter.setup_database()
     visualize_pipeline(
-        dataset_adapter, Path("/workspaces/gorillatracker/video_output"), n_videos=100, max_worker_per_gpu=12, gpus=[0,1]
+        dataset_adapter,
+        Path("/workspaces/gorillatracker/video_output"),
+        n_videos=10,
+        max_worker_per_gpu=12,
+        gpus=[0],
     )
