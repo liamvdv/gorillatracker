@@ -91,7 +91,7 @@ fi
 
 # --user $(id -u):$(id -g) \ # use root user instead
 
-docker run --rm -it --ipc=host \
+docker run --rm -it --ipc=host --network=host \
     -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
     -v "/scratch2/gorillatracker/data:/workspaces/gorillatracker/data:ro" \
     -v "/scratch2/gorillatracker/data/splits:/workspaces/gorillatracker/data/splits:ro" \
