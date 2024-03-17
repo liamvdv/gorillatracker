@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
 
 
 class Camera(Base):
-    __tablename__ = "Camera"
+    __tablename__ = "camera"
 
     camera_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True)
@@ -48,16 +48,16 @@ class Camera(Base):
         return value
 
     def __repr__(self) -> str:
-        return f"Camera(id={self.camera_id}, name={self.name}, latitude={self.latitude}, longitude={self.longitude})"
+        return f"camera(id={self.camera_id}, name={self.name}, latitude={self.latitude}, longitude={self.longitude})"
 
 
 class Video(Base):
-    __tablename__ = "Video"
+    __tablename__ = "video"
 
     video_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     # TODO(memben): Should this rather be a path than a filename?
     filename: Mapped[str] = mapped_column(String(255), unique=True)
-    camera_id: Mapped[int] = mapped_column(ForeignKey("Camera.camera_id"))
+    camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
     start_time: Mapped[datetime]
     width: Mapped[int]
     height: Mapped[int]
@@ -87,21 +87,21 @@ class Video(Base):
         return timedelta(seconds=self.frames / self.fps)
 
     def __repr__(self) -> str:
-        return f"Video(id={self.video_id}, filename={self.filename}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
+        return f"video(id={self.video_id}, filename={self.filename}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
 
 
 class VideoFeature(Base):
-    __tablename__ = "VideoFeature"
+    __tablename__ = "video_feature"
 
     feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
     type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
     video: Mapped[Video] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
-        return f"VideoFeature(id={self.feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
+        return f"video_feature(id={self.feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
 
 
 class Tracking(Base):
@@ -114,10 +114,10 @@ class Tracking(Base):
     There can be multiple trackings of the same animal.
     """
 
-    __tablename__ = "Tracking"
+    __tablename__ = "tracking"
 
     tracking_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
 
     video: Mapped[Video] = relationship(back_populates="trackings")
     features: Mapped[list[TrackingFeature]] = relationship(back_populates="tracking", cascade="all, delete-orphan")
@@ -133,30 +133,30 @@ class Tracking(Base):
         return timedelta(seconds=(end_frame - start_frame) / fps)
 
     def __repr__(self) -> str:
-        return f"Tracking(id={self.tracking_id}, video_id={self.video_id})"
+        return f"tracking(id={self.tracking_id}, video_id={self.video_id})"
 
 
 class TrackingFeature(Base):
-    __tablename__ = "TrackingFeature"
+    __tablename__ = "tracking_feature"
 
     tracking_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
+    tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
     type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
-        return f"TrackingFeature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, type={self.type}, value={self.value})"
+        return f"tracking_feature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, type={self.type}, value={self.value})"
 
 
 class TrackingFrameFeature(Base):
     """Represent the detected bounding box of a tracking feature in a frame."""
 
-    __tablename__ = "TrackingFrameFeature"
+    __tablename__ = "tracking_frame_feature"
 
     tracking_frame_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
+    tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
     frame_nr: Mapped[int]
     bbox_x_center: Mapped[float]
     bbox_y_center: Mapped[float]
@@ -183,15 +183,15 @@ class TrackingFrameFeature(Base):
         return frame_nr
 
     def __repr__(self) -> str:
-        return f"TrackingFrameFeature(id={self.tracking_frame_feature_id}, tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
+        return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
 
 
 class VideoRelationship(Base):
-    __tablename__ = "VideoRelationship"
+    __tablename__ = "video_relationship"
 
     video_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    left_video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
-    right_video_id: Mapped[int] = mapped_column(ForeignKey("Video.video_id"))
+    left_video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
+    right_video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
     edge: Mapped[str] = mapped_column(String(255))  # VideoRelationshipType
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
@@ -200,7 +200,7 @@ class VideoRelationship(Base):
 
     right_video: Mapped[Video] = relationship(foreign_keys=[right_video_id])
     __table_args__ = (
-        CheckConstraint("left_video_id < right_video_id", name="left_video_id_lt_right_video_id"),
+        CheckConstraint("left_video_id < right_video_id", name="left_video_id_lt_right_video_id"), # for the unique constraint
         UniqueConstraint("left_video_id", "right_video_id", "reason", "created_by"),
     )
 
@@ -216,15 +216,15 @@ class VideoRelationship(Base):
         return edge
 
     def __repr__(self) -> str:
-        return f"VideoRelationship(id={self.video_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
+        return f"video_relationship(id={self.video_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
 
 class TrackingRelationship(Base):
-    __tablename__ = "TrackingRelationship"
+    __tablename__ = "tracking_relationship"
 
     tracking_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    left_tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
-    right_tracking_id: Mapped[int] = mapped_column(ForeignKey("Tracking.tracking_id"))
+    left_tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
+    right_tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
     edge: Mapped[str] = mapped_column(String(255))  # TrackingRelationshipType
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
@@ -249,7 +249,7 @@ class TrackingRelationship(Base):
         return edge
 
     def __repr__(self) -> str:
-        return f"TrackingRelationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
+        return f"tracking_relationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
 
 if __name__ == "__main__":
