@@ -1,63 +1,18 @@
 import logging
-import random
-from abc import ABC
 from collections import deque
 from dataclasses import dataclass, field
-from itertools import groupby
 from pathlib import Path
 
 import cv2
-from sqlalchemy import Select, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
-from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.queries import load_video_by_filename, video_tracking_frame_features_query
+from gorillatracker.ssl_pipeline.queries import load_video_by_filename
+from gorillatracker.ssl_pipeline.sampling import Sampler
 
 log = logging.getLogger(__name__)
-
-
-def group_by_tracking_id(frame_features: list[TrackingFrameFeature]) -> dict[int, list[TrackingFrameFeature]]:
-    frame_features.sort(key=lambda x: x.tracking.tracking_id)
-    return {
-        tracking_id: list(features)
-        for tracking_id, features in groupby(frame_features, key=lambda x: x.tracking.tracking_id)
-    }
-
-
-class SamplingStrategy(ABC):
-    """Defines a sampling strategy for selecting a subset of TrackingFrameFeature instances to crop."""
-
-    def filter(self, video: Path, session: Session) -> list[TrackingFrameFeature]:
-        """Returns a subset of TrackingFrameFeature instances to crop, prefiltered by the sampling strategy."""
-        frames_features = list(session.execute(self.filter_query(video)).scalars().all())
-        return self.filter_features(frames_features)
-
-    def filter_query(self, video: Path) -> Select[tuple[TrackingFrameFeature]]:
-        """Filter query to select a subset of TrackingFrameFeature instances on the database."""
-        return video_tracking_frame_features_query(video)
-
-    def filter_features(self, frame_features: list[TrackingFrameFeature]) -> list[TrackingFrameFeature]:
-        """Defines how to filter a list of TrackingFrameFeature instances."""
-        return frame_features
-
-
-class RandomSampling(SamplingStrategy):
-    """Randomly samples a subset of TrackingFrameFeature instances to crop."""
-
-    def __init__(self, n_images_per_tracking: int, cutout_feature_types: list[str] = ["body"]):
-        self.n_images_per_tracking = n_images_per_tracking
-        self.cutout_feature_types = cutout_feature_types
-
-    def filter_features(self, frame_features: list[TrackingFrameFeature]) -> list[TrackingFrameFeature]:
-        tracking_id_grouped = group_by_tracking_id(frame_features)
-        sampled_features = []
-        for features in tracking_id_grouped.values():
-            filtered_features = [f for f in features if f.type in self.cutout_feature_types]
-            num_samples = min(len(filtered_features), self.n_images_per_tracking)
-            sampled_features.extend(random.sample(filtered_features, num_samples))
-        return sampled_features
 
 
 @dataclass(frozen=True, order=True)
@@ -74,13 +29,13 @@ def destination_path(base_path: Path, feature: TrackingFrameFeature) -> Path:
 def crop_from_video(
     video: Path,
     session_cls: sessionmaker[Session],
-    sampling_strategy: SamplingStrategy,
+    sampling_strategy: Sampler,
     dest_base_path: Path,
 ) -> None:
     with session_cls() as session:
         video_tracking = load_video_by_filename(session, video)
         dest_path = dest_base_path / video_tracking.camera.name / video_tracking.filename
-        frame_features = sampling_strategy.filter(video, session)
+        frame_features = sampling_strategy.sample(video, session)
         crop_tasks = [
             CropTask(
                 feature.frame_nr, destination_path(dest_path, feature), BoundingBox.from_tracking_frame_feature(feature)
@@ -105,3 +60,23 @@ def crop_from_video(
                 crop_task.dest.parent.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(str(crop_task.dest), cropped_frame)
         assert not crop_queue, "Not all crop tasks were completed"
+
+
+if __name__ == "__main__":
+
+    from sqlalchemy import create_engine
+
+    engine = create_engine("sqlite:///test.db")
+    # shutil.rmtree("cropped_images")
+
+    session_cls = sessionmaker(bind=engine)
+
+    with session_cls() as session:
+        videos = session.execute(select(Video)).scalars().all()
+
+    # for video in tqdm(videos):
+    #     crop_from_video(Path("video_data", video.filename), session_cls, RandomSampling(2), Path("cropped_images"))
+
+    # from gorillatracker.ssl_pipeline.visualizer import visualize_video
+    # p = Path("video_data/R033_20220403_392.mp4")
+    # visualize_video(p, session_cls, Path("R033_20220403_392.mp4"))
