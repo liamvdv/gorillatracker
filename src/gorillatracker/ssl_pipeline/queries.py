@@ -4,8 +4,9 @@ This module contains pre-defined database queries.
 
 from pathlib import Path
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, aliased
+from sqlalchemy.sql import lateral, true
 
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
 
@@ -59,23 +60,21 @@ def min_count_filter(
 
     ```
     """
-    tracking_frame_feature_alias = aliased(TrackingFrameFeature)
+    TrackingFrameFeatureAlias = aliased(TrackingFrameFeature)
+
     subquery = (
-        select(tracking_frame_feature_alias.tracking_id)
-        .select_from(query.subquery())
-        .join(TrackingFrameFeature, TrackingFrameFeature.tracking_id == query.subquery().c.tracking_id)
+        select(TrackingFrameFeatureAlias)
+        .where(TrackingFrameFeatureAlias.tracking_id == Tracking.tracking_id)
+        .having(func.count(TrackingFrameFeatureAlias.tracking_id) >= min_feature_count)
     )
 
     if feature_type is not None:
-        subquery = subquery.where(tracking_frame_feature_alias.type == feature_type)
+        subquery = subquery.where(TrackingFrameFeatureAlias.type == feature_type)
 
-    subquery = (
-        subquery.group_by(tracking_frame_feature_alias.tracking_id)
-        .having(func.count(tracking_frame_feature_alias.tracking_id) >= min_feature_count)
-        .alias()
-    )
+    subquery = subquery.group_by(TrackingFrameFeatureAlias.tracking_id)
+    subquery = subquery.subquery()
 
-    query = query.join(subquery, TrackingFrameFeature.tracking_id == subquery.c.tracking_id)
+    query = select(TrackingFrameFeatureAlias).join(lateral(subquery), true())
 
     return query
 
@@ -111,25 +110,18 @@ def random_sampling_filter(
             yield from random.sample(features, num_samples)
     ```
     """
+    TrackingFrameFeatureAlias = aliased(TrackingFrameFeature)
 
     subquery = (
-        select(TrackingFrameFeature.tracking_id, func.random(seed).label("random_value"))
-        .select_from(query.subquery())
-        .join(TrackingFrameFeature, TrackingFrameFeature.tracking_id == query.subquery().c.tracking_id)
+        select(TrackingFrameFeatureAlias)
+        .where(TrackingFrameFeatureAlias.tracking_id == Tracking.tracking_id)
+        .order_by(func.random())
+        .limit(10)
         .subquery()
     )
-    query = (
-        select(TrackingFrameFeature)
-        .join(
-            subquery,
-            and_(
-                TrackingFrameFeature.tracking_id == subquery.c.tracking_id,
-                TrackingFrameFeature.tracking_frame_feature_id == query.subquery().c.tracking_frame_feature_id,
-            ),
-        )
-        .order_by(subquery.c.random_value)
-        .limit(n_images_per_tracking)
-    )
+
+    query = select(TrackingFrameFeatureAlias).join(lateral(subquery), true())
+
     return query
 
 
