@@ -95,6 +95,9 @@ RUN apt-get update && apt-get install -y make
 RUN apt-get update && apt-get install bash-completion -y
 RUN echo "source /usr/share/bash-completion/bash_completion" >> /root/.bashrc
 
+# Install postgresql-client for database access
+RUN apt update && apt-get install -y postgresql-client
+
 USER $MAMBA_USER
 
 SHELL ["/usr/local/bin/_dockerfile_shell.sh"]

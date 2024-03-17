@@ -62,6 +62,7 @@ dependencies:
   - pip
   - pip:
       - pipx
+      - psycopg2-binary
       - warmup-scheduler
       - simple_parsing
       - print-on-steroids[exceptions]
