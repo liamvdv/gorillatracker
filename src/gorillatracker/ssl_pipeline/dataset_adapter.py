@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 class SSLDatasetAdapter(ABC):
     def __init__(self, db_uri: str) -> None:
-        engine = create_engine(db_uri)
+        engine = create_engine(db_uri, echo=True)
         self._engine = engine
 
     def unprocessed_videos(self) -> list[Path]:
@@ -85,6 +85,11 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
         "vid_stride": 5,
         "verbose": False,
     }
+    
+    DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
+    
+    def __init__(self, db_uri: str = DB_URI) -> None:
+        super().__init__(db_uri)
 
     def setup_database(self) -> None:
         Base.metadata.create_all(self._engine)
