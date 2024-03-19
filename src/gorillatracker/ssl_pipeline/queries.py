@@ -60,21 +60,16 @@ def min_count_filter(
 
     ```
     """
-    TrackingFrameFeatureAlias = aliased(TrackingFrameFeature)
-
     subquery = (
-        select(TrackingFrameFeatureAlias)
-        .where(TrackingFrameFeatureAlias.tracking_id == Tracking.tracking_id)
-        .having(func.count(TrackingFrameFeatureAlias.tracking_id) >= min_feature_count)
+        select(TrackingFrameFeature.tracking_id)
+        .group_by(TrackingFrameFeature.tracking_id)
+        .having(func.count(TrackingFrameFeature.tracking_id) >= min_feature_count)
     )
 
     if feature_type is not None:
-        subquery = subquery.where(TrackingFrameFeatureAlias.type == feature_type)
+        subquery = subquery.where(TrackingFrameFeature.type == feature_type)
 
-    subquery = subquery.group_by(TrackingFrameFeatureAlias.tracking_id)
-    subquery = subquery.subquery()
-
-    query = select(TrackingFrameFeatureAlias).join(lateral(subquery), true())
+    query = query.where(TrackingFrameFeature.tracking_id.in_(subquery))
 
     return query
 
@@ -119,6 +114,7 @@ def random_sampling_filter(
         .limit(10)
         .subquery()
     )
+
 
     query = select(TrackingFrameFeatureAlias).join(lateral(subquery), true())
 

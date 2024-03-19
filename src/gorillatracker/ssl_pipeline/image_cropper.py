@@ -41,6 +41,8 @@ def crop_from_video(
             )
             for feature in frame_features
         ]
+        print(len(crop_tasks))
+    return
 
     crop_queue = deque(sorted(crop_tasks))
 
@@ -77,15 +79,16 @@ if __name__ == "__main__":
     engine = create_engine("sqlite:///test.db")
 
     def sampling_strategy(
-        video: Path, n_images_per_tracking: int, seed: int | None = None
+        *, video: Path, min_n_images_per_tracking: int, crop_n_images_per_tracking: int, seed: int | None = None
     ) -> Select[tuple[TrackingFrameFeature]]:
         query = video_filter(video)
-        query = min_count_filter(query, n_images_per_tracking)
+        # query = min_count_filter(query, min_n_images_per_tracking)
         query = feature_type_filter(query, ["body"])
-        query = random_sampling_filter(query, n_images_per_tracking, seed)
+        query = random_sampling_filter(query, crop_n_images_per_tracking, seed)
+        print(query)
         return query
 
-    shutil.rmtree("cropped_images")
+    # shutil.rmtree("cropped_images")
 
     session_cls = sessionmaker(bind=engine)
 
@@ -94,7 +97,14 @@ if __name__ == "__main__":
         query = video_filter
 
     for video in tqdm(videos):
-        crop_from_video(Path("video_data", video.filename), session_cls, RandomSampling(2), Path("cropped_images"))
+        video_path = Path("video_data", video.filename)
+        crop_from_video(
+            video_path,
+            session_cls,
+            sampling_strategy(video=video_path, min_n_images_per_tracking=200, crop_n_images_per_tracking=1),
+            Path("cropped_images"),
+        )
+        break
 
     # from gorillatracker.ssl_pipeline.visualizer import visualize_video
     # p = Path("video_data/R033_20220403_392.mp4")

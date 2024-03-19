@@ -93,9 +93,8 @@ class GorillaDataset(SSLDataset):
 
     def setup_database(self) -> None:
         Base.metadata.create_all(self._engine)
-        self._setup_cameras()
 
-    def _setup_cameras(self) -> None:
+    def setup_cameras(self) -> None:
         df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
         df["Name"] = df["Name"].str.rstrip("x")
         with Session(self._engine) as session:

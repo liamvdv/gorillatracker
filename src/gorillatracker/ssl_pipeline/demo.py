@@ -2,7 +2,7 @@
 This is a demo file to show how to use the SSL pipeline to track any animal in a video.
 
 The pipeline consists of the following steps:
-1. Create a dataset adapter for the dataset of interest. (dataset_adapter.py)
+1. Create a dataset adapter for the dataset of interest. (dataset.py)
 2. Use a tracking model to track the animal in the video. (video_tracker.py) 
     a. This should in be a YOLOv8 model (single_cls) trained on the body of the animal of interest.
     b. A use case specific metadata extractor is used to extract the metadata from the video (camera, start time).
@@ -16,7 +16,7 @@ import logging
 import random
 from pathlib import Path
 
-from gorillatracker.ssl_pipeline.dataset_adapter import GorillaDatasetAdapter, SSLDatasetAdapter
+from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.video_feature_mapper import multiproces_feature_mapping
 from gorillatracker.ssl_pipeline.video_tracker import multiprocess_video_tracker
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 
 def visualize_pipeline(
-    dataset_adapter: SSLDatasetAdapter,
+    dataset_adapter: SSLDataset,
     dest_dir: Path,
     n_videos: int = 30,
     max_worker_per_gpu: int = 8,
@@ -35,7 +35,7 @@ def visualize_pipeline(
     Visualize the tracking results of the pipeline.
 
     Args:
-        dataset_adapter (SSLDatasetAdapter): The dataset adapter to use.
+        dataset (SSLDataset): The dataset to use.
         dest (Path): The destination to save the visualizations.
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
         gpus (list[int], optional): The GPUs to use for tracking. Defaults to [0].
@@ -77,10 +77,11 @@ def visualize_pipeline(
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    dataset_adapter = GorillaDatasetAdapter(db_uri="sqlite:///test.db")
-    dataset_adapter.setup_database()
+    dataset = GorillaDataset(db_uri="sqlite:///test.db")
+    dataset.setup_database()
+    dataset.setup_cameras()
     visualize_pipeline(
-        dataset_adapter,
+        dataset,
         Path("/workspaces/gorillatracker/video_output"),
         n_videos=10,
         max_worker_per_gpu=12,

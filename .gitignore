@@ -157,3 +157,5 @@ mnist/
 .gitconfig
 *.pt
 *.db
+*visualized.mp4
+cropped_images/*

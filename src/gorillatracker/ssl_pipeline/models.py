@@ -260,5 +260,30 @@ if __name__ == "__main__":
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
+    with session.begin():
+        camera = Camera(name="Test", latitude=0, longitude=0)
+        video = Video(
+            filename="test.mp4",
+            camera=camera,
+            start_time=datetime.now(),
+            width=1920,
+            height=1080,
+            fps=30,
+            sampled_fps=5,
+            frames=100,
+        )
+        tracking = Tracking(video=video)
+        tracking_frame_feature = TrackingFrameFeature(
+            tracking=tracking,
+            frame_nr=0,
+            bbox_x_center=0.5,
+            bbox_y_center=0.5,
+            bbox_width=0.5,
+            bbox_height=0.5,
+            confidence=0.5,
+            type="test",
+        )
+        session.add_all([camera, video, tracking, tracking_frame_feature])
+    
     session.close()
     Base.metadata.drop_all(engine)
