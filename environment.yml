@@ -23,7 +23,6 @@ dependencies:
   - evaluate
   - accelerate
   - sentencepiece
-  - ultralytics # NOTE(memben)If you run into issues with tracking pin to 8.0.186
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
@@ -66,9 +65,11 @@ dependencies:
       - warmup-scheduler
       - simple_parsing
       - print-on-steroids[exceptions]
-      - opencv-python-headless
-      - types-PyYAML
+      - ultralytics 
       - lapx>=0.5.2 # for ultralytics tracking
+      # - opencv-python-headless # NOTE(memben): 🚩 see end of dockerfile, needed to fix dependency hell
+      # https://github.com/ultralytics/ultralytics/issues/1270
+      - types-PyYAML
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
       - umap-learn
