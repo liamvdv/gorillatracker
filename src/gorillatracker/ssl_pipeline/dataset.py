@@ -80,9 +80,9 @@ class SSLDataset(ABC):
 
 
 class GorillaDataset(SSLDataset):
-    FACE_90 = "face_90" # angle of the face -90 to 90 degrees from the camera
-    FACE_45 = "face_45" # angle of the face -45 to 45 degrees from the camera
-    
+    FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
+    FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
+
     _yolo_base_kwargs = {
         "half": True,  # We found no difference in accuracy to False
         "vid_stride": 5,

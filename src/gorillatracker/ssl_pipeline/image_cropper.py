@@ -1,10 +1,11 @@
+from functools import partial
 import logging
 import random
 from collections import deque
 from dataclasses import dataclass, field
 from itertools import groupby
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 import cv2
 from sqlalchemy import Select, select
@@ -21,12 +22,13 @@ log = logging.getLogger(__name__)
 class Sampler:
     """Defines how to sample TrackingFrameFeature instances from the database."""
 
-    def __init__(self, query: Select[tuple[TrackingFrameFeature]]) -> None:
-        self.query = query
+    def __init__(self, query_builder: Callable[[Path], Select[tuple[TrackingFrameFeature]]]) -> None:
+        self.query_builder = query_builder
 
     def sample(self, video: Path, session: Session) -> Iterator[TrackingFrameFeature]:
         """Sample a subset of TrackingFrameFeature instances from the database. Defined by query and sampling strategy."""
-        return iter(session.execute(self.query).scalars().all())
+        query = self.query_builder(video)
+        return iter(session.execute(query).scalars().all())
 
     def group_by_tracking_id(self, frame_features: list[TrackingFrameFeature]) -> dict[int, list[TrackingFrameFeature]]:
         frame_features.sort(key=lambda x: x.tracking.tracking_id)
@@ -39,13 +41,16 @@ class Sampler:
 class RandomSampler(Sampler):
     """Randomly sample a subset of TrackingFrameFeature instances per tracking."""
 
-    def __init__(self, query: Select[tuple[TrackingFrameFeature]], n_samples: int, seed: int = 42) -> None:
-        super().__init__(query)
+    def __init__(
+        self, query_builder: Callable[[Path], Select[tuple[TrackingFrameFeature]]], n_samples: int, seed: int = 42
+    ) -> None:
+        super().__init__(query_builder)
         self.seed = seed
         self.n_samples = n_samples
 
     def sample(self, video: Path, session: Session) -> Iterator[TrackingFrameFeature]:
-        tracking_frame_features = list(session.execute(self.query).scalars().all())
+        query = self.query_builder(video)
+        tracking_frame_features = list(session.execute(query).scalars().all())
         tracking_id_grouped = self.group_by_tracking_id(tracking_frame_features)
         random.seed(self.seed)
         for features in tracking_id_grouped.values():
@@ -107,17 +112,11 @@ if __name__ == "__main__":
     from sqlalchemy import create_engine
     from tqdm import tqdm
 
-    from gorillatracker.ssl_pipeline.queries import (
-        feature_type_filter,
-        min_count_filter,
-        video_filter,
-    )
+    from gorillatracker.ssl_pipeline.queries import feature_type_filter, min_count_filter, video_filter
 
     engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
 
-    def sampling_strategy(
-        *, video: Path, min_n_images_per_tracking: int
-    ) -> Select[tuple[TrackingFrameFeature]]:
+    def sampling_strategy(video: Path, min_n_images_per_tracking: int) -> Select[tuple[TrackingFrameFeature]]:
         query = video_filter(video)
         query = min_count_filter(query, min_n_images_per_tracking)
         query = feature_type_filter(query, [GorillaDataset.FACE_90, GorillaDataset.FACE_45])
@@ -130,19 +129,14 @@ if __name__ == "__main__":
     with session_cls() as session:
         video_trackings = session.execute(select(Video)).scalars().all()
         videos = [Path("video_data", video.filename) for video in video_trackings]
-        
+
     random.shuffle(videos)
 
     for video in tqdm(videos):
-        query = sampling_strategy(video=video, min_n_images_per_tracking=200)
+        query = partial(sampling_strategy, min_n_images_per_tracking=10)
         crop_from_video(
             video,
-            RandomSampler(query, seed=42, n_samples=10),
+            RandomSampler(query_builder=query, seed=42, n_samples=10),
             session_cls,
             Path("cropped_images"),
         )
-        break
-
-    # from gorillatracker.ssl_pipeline.visualizer import visualize_video
-    # p = Path("video_data/R033_20220403_392.mp4")
-    # visualize_video(p, session_cls, Path("R033_20220403_392.mp4"))
