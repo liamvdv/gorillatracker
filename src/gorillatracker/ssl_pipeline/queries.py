@@ -5,13 +5,12 @@ This module contains pre-defined database queries.
 from pathlib import Path
 
 from sqlalchemy import Select, func, select
-from sqlalchemy.orm import Session, aliased
-from sqlalchemy.sql import lateral, true
+from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
 
 """
-The helper function `group_by_tracking_id` is not used in the codebase, but it is included here for completeness.
+The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
 
 ```python
 def group_by_tracking_id(frame_features: list[TrackingFrameFeature]) -> dict[int, list[TrackingFrameFeature]]:
@@ -87,37 +86,6 @@ def feature_type_filter(
     ```
     """
     query = query.where(TrackingFrameFeature.type.in_(feature_types))
-    return query
-
-
-def random_sampling_filter(
-    query: Select[tuple[TrackingFrameFeature]], n_images_per_tracking: int, seed: int | None = None
-) -> Select[tuple[TrackingFrameFeature]]:
-    """
-    Modifies the query to randomly sample a subset of TrackingFrameFeature instances per tracking.
-
-    Equivalent to python:
-    ```python
-    def filter(self, frame_features: Iterator[TrackingFrameFeature]) -> Iterator[TrackingFrameFeature]:
-        tracking_id_grouped = group_by_tracking_id(list(frame_features))
-        for features in tracking_id_grouped.values():
-            num_samples = min(len(features), self.n_images_per_tracking)
-            yield from random.sample(features, num_samples)
-    ```
-    """
-    TrackingFrameFeatureAlias = aliased(TrackingFrameFeature)
-
-    subquery = (
-        select(TrackingFrameFeatureAlias)
-        .where(TrackingFrameFeatureAlias.tracking_id == Tracking.tracking_id)
-        .order_by(func.random())
-        .limit(10)
-        .subquery()
-    )
-
-
-    query = select(TrackingFrameFeatureAlias).join(lateral(subquery), true())
-
     return query
 
 

@@ -77,13 +77,13 @@ def visualize_pipeline(
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDataset(db_uri="sqlite:///test.db")
+    dataset = GorillaDataset()
     dataset.setup_database()
     dataset.setup_cameras()
     visualize_pipeline(
         dataset,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=10,
+        n_videos=20,
         max_worker_per_gpu=12,
         gpus=[0],
     )

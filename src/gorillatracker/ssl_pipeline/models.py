@@ -200,7 +200,9 @@ class VideoRelationship(Base):
 
     right_video: Mapped[Video] = relationship(foreign_keys=[right_video_id])
     __table_args__ = (
-        CheckConstraint("left_video_id < right_video_id", name="left_video_id_lt_right_video_id"), # for the unique constraint
+        CheckConstraint(
+            "left_video_id < right_video_id", name="left_video_id_lt_right_video_id"
+        ),  # for the unique constraint
         UniqueConstraint("left_video_id", "right_video_id", "reason", "created_by"),
     )
 
@@ -284,6 +286,6 @@ if __name__ == "__main__":
             type="test",
         )
         session.add_all([camera, video, tracking, tracking_frame_feature])
-    
+
     session.close()
     Base.metadata.drop_all(engine)

@@ -1,17 +1,56 @@
 import logging
+import random
 from collections import deque
 from dataclasses import dataclass, field
+from itertools import groupby
 from pathlib import Path
+from typing import Iterator
 
 import cv2
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from gorillatracker.ssl_pipeline.dataset import GorillaDataset
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import load_video_by_filename
 
 log = logging.getLogger(__name__)
+
+
+class Sampler:
+    """Defines how to sample TrackingFrameFeature instances from the database."""
+
+    def __init__(self, query: Select[tuple[TrackingFrameFeature]]) -> None:
+        self.query = query
+
+    def sample(self, video: Path, session: Session) -> Iterator[TrackingFrameFeature]:
+        """Sample a subset of TrackingFrameFeature instances from the database. Defined by query and sampling strategy."""
+        return iter(session.execute(self.query).scalars().all())
+
+    def group_by_tracking_id(self, frame_features: list[TrackingFrameFeature]) -> dict[int, list[TrackingFrameFeature]]:
+        frame_features.sort(key=lambda x: x.tracking.tracking_id)
+        return {
+            tracking_id: list(features)
+            for tracking_id, features in groupby(frame_features, key=lambda x: x.tracking.tracking_id)
+        }
+
+
+class RandomSampler(Sampler):
+    """Randomly sample a subset of TrackingFrameFeature instances per tracking."""
+
+    def __init__(self, query: Select[tuple[TrackingFrameFeature]], n_samples: int, seed: int = 42) -> None:
+        super().__init__(query)
+        self.seed = seed
+        self.n_samples = n_samples
+
+    def sample(self, video: Path, session: Session) -> Iterator[TrackingFrameFeature]:
+        tracking_frame_features = list(session.execute(self.query).scalars().all())
+        tracking_id_grouped = self.group_by_tracking_id(tracking_frame_features)
+        random.seed(self.seed)
+        for features in tracking_id_grouped.values():
+            num_samples = min(len(features), self.n_samples)
+            yield from random.sample(features, num_samples)
 
 
 @dataclass(frozen=True, order=True)
@@ -27,23 +66,22 @@ def destination_path(base_path: Path, feature: TrackingFrameFeature) -> Path:
 
 def crop_from_video(
     video: Path,
-    session_cls: sessionmaker[Session],
-    sampling_query: Select[tuple[TrackingFrameFeature]],
+    sampler: Sampler,
+    session_cls: sessionmaker,
     dest_base_path: Path,
 ) -> None:
     with session_cls() as session:
         video_tracking = load_video_by_filename(session, video)
         dest_path = dest_base_path / video_tracking.camera.name / video_tracking.filename
-        frame_features = session.execute(sampling_query).scalars().all()
+        frame_features = sampler.sample(video, session)
         crop_tasks = [
             CropTask(
                 feature.frame_nr, destination_path(dest_path, feature), BoundingBox.from_tracking_frame_feature(feature)
             )
             for feature in frame_features
         ]
-        print(len(crop_tasks))
-    return
 
+    print(len(crop_tasks))
     crop_queue = deque(sorted(crop_tasks))
 
     if not crop_queue:
@@ -72,36 +110,35 @@ if __name__ == "__main__":
     from gorillatracker.ssl_pipeline.queries import (
         feature_type_filter,
         min_count_filter,
-        random_sampling_filter,
         video_filter,
     )
 
-    engine = create_engine("sqlite:///test.db")
+    engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
 
     def sampling_strategy(
-        *, video: Path, min_n_images_per_tracking: int, crop_n_images_per_tracking: int, seed: int | None = None
+        *, video: Path, min_n_images_per_tracking: int
     ) -> Select[tuple[TrackingFrameFeature]]:
         query = video_filter(video)
-        # query = min_count_filter(query, min_n_images_per_tracking)
-        query = feature_type_filter(query, ["body"])
-        query = random_sampling_filter(query, crop_n_images_per_tracking, seed)
-        print(query)
+        query = min_count_filter(query, min_n_images_per_tracking)
+        query = feature_type_filter(query, [GorillaDataset.FACE_90, GorillaDataset.FACE_45])
         return query
 
-    # shutil.rmtree("cropped_images")
+    shutil.rmtree("cropped_images")
 
     session_cls = sessionmaker(bind=engine)
 
     with session_cls() as session:
-        videos = session.execute(select(Video)).scalars().all()
-        query = video_filter
+        video_trackings = session.execute(select(Video)).scalars().all()
+        videos = [Path("video_data", video.filename) for video in video_trackings]
+        
+    random.shuffle(videos)
 
     for video in tqdm(videos):
-        video_path = Path("video_data", video.filename)
+        query = sampling_strategy(video=video, min_n_images_per_tracking=200)
         crop_from_video(
-            video_path,
+            video,
+            RandomSampler(query, seed=42, n_samples=10),
             session_cls,
-            sampling_strategy(video=video_path, min_n_images_per_tracking=200, crop_n_images_per_tracking=1),
             Path("cropped_images"),
         )
         break

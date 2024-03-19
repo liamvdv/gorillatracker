@@ -29,7 +29,7 @@
         // "--pid=host",
         // DO NOT COMMIT THIS ENABLED TO REMOTE.
         // "--gpus",
-        // "device=0",
+        // "device=1",
         "-u",
         "0"
     ],
@@ -81,7 +81,6 @@
             "extensions": [
                 "ms-python.python",
                 "VisualStudioExptTeam.vscodeintellicode",
-                "ms-python.vscode-pylance",
                 "github.copilot",
                 "kevinrose.vsc-python-indent",
                 "ms-python.black-formatter",

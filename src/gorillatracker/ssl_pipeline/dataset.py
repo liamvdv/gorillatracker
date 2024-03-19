@@ -80,14 +80,17 @@ class SSLDataset(ABC):
 
 
 class GorillaDataset(SSLDataset):
+    FACE_90 = "face_90" # angle of the face -90 to 90 degrees from the camera
+    FACE_45 = "face_45" # angle of the face -45 to 45 degrees from the camera
+    
     _yolo_base_kwargs = {
         "half": True,  # We found no difference in accuracy to False
         "vid_stride": 5,
         "verbose": False,
     }
-    
+
     DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
-    
+
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
 
@@ -105,8 +108,8 @@ class GorillaDataset(SSLDataset):
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [
-            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, "face_45"),
-            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, "face_90"),
+            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
         ]
 
     @property
