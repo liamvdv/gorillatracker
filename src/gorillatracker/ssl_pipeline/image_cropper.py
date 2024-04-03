@@ -112,7 +112,12 @@ if __name__ == "__main__":
     from sqlalchemy import create_engine
     from tqdm import tqdm
 
-    from gorillatracker.ssl_pipeline.queries import feature_type_filter, min_count_filter, video_filter, confidence_filter
+    from gorillatracker.ssl_pipeline.queries import (
+        confidence_filter,
+        feature_type_filter,
+        min_count_filter,
+        video_filter,
+    )
 
     engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
 

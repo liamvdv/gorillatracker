@@ -88,6 +88,7 @@ def feature_type_filter(
     query = query.where(TrackingFrameFeature.type.in_(feature_types))
     return query
 
+
 def confidence_filter(
     query: Select[tuple[TrackingFrameFeature]], min_confidence: float
 ) -> Select[tuple[TrackingFrameFeature]]:
@@ -102,6 +103,7 @@ def confidence_filter(
     """
     query = query.where(TrackingFrameFeature.confidence >= min_confidence)
     return query
+
 
 def load_video_by_filename(session: Session, video: Path) -> Video:
     return session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
