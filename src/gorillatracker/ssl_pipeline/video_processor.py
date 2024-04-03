@@ -3,24 +3,39 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
-from datetime import datetime
-from multiprocessing import Queue, process
+from multiprocessing import Queue
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Literal, Optional
 
-import cv2
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 from ultralytics import YOLO
 from ultralytics.engine import results
 
 from gorillatracker.ssl_pipeline.helpers import video_reader
-from gorillatracker.ssl_pipeline.models import Camera, ProcessedVideoFrameFeature, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import ProcessedVideoFrameFeature, Tracking, TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import load_video
 
 log = logging.getLogger(__name__)
+
+
+def process_detection(
+    box: results.Boxes, video_tracking: Video, tracking: Optional[Tracking], frame_nr: int, type: str
+) -> None:
+    x, y, w, h = box.xywhn[0].tolist()
+    confidence = box.conf.item()
+    TrackingFrameFeature(
+        tracking=tracking,
+        video=video_tracking,
+        frame_nr=frame_nr,
+        bbox_x_center=x,
+        bbox_y_center=y,
+        bbox_width=w,
+        bbox_height=h,
+        confidence=confidence,
+        type=type,
+    )
 
 
 def process_prediction(prediction: results.Results, video_tracking: Video, frame_nr: int, type: str) -> None:
@@ -28,44 +43,19 @@ def process_prediction(prediction: results.Results, video_tracking: Video, frame
 
     assert isinstance(prediction.boxes, results.Boxes)
     for detection in prediction.boxes:
-        x, y, w, h = detection.xywhn[0].tolist()
-        confidence = detection.conf.item()
-
-        TrackingFrameFeature(
-            video=video_tracking,
-            frame_nr=frame_nr,
-            bbox_x_center=x,
-            bbox_y_center=y,
-            bbox_width=w,
-            bbox_height=h,
-            confidence=confidence,
-            type=type,
-        )
+        process_detection(detection, video_tracking, None, frame_nr, type)
 
 
 def process_tracking(
     prediction: results.Results, video_tracking: Video, trackings: defaultdict[int, Tracking], frame_nr: int, type: str
 ) -> None:
     """Process the prediction and add the tracking frame features to the video, does not commit the session."""
-
     assert isinstance(prediction.boxes, results.Boxes)
     for detection in prediction.boxes:
-        x, y, w, h = detection.xywhn[0].tolist()
-        confidence = detection.conf.item()
         # NOTE(memben): sometimes the ID is None, this is a bug in the tracker
         tracking_id = int(detection.id[0].int().item()) if detection.id is not None else None
         tracking = trackings[tracking_id] if tracking_id is not None else None
-        TrackingFrameFeature(
-            tracking=tracking,
-            video=video_tracking,
-            frame_nr=frame_nr,
-            bbox_x_center=x,
-            bbox_y_center=y,
-            bbox_width=w,
-            bbox_height=h,
-            confidence=confidence,
-            type=type,
-        )
+        process_detection(detection, video_tracking, tracking, frame_nr, type)
 
 
 def predict_and_store(
@@ -87,13 +77,7 @@ def predict_and_store(
 
         if len(video_tracking.tracking_frame_features) < 10:
             log.warning(f"Video {video.name} has less than 10 tracking frame features for {type}")
-
-        video_tracking.processed_video_frame_features.append(
-            ProcessedVideoFrameFeature(
-                type=type,
-            )
-        )
-
+        video_tracking.processed_video_frame_features.append(ProcessedVideoFrameFeature(type=type))
         session.commit()
 
 
@@ -121,13 +105,7 @@ def track_and_store(
 
         if len(video_tracking.tracking_frame_features) < 10:
             log.warning(f"Video {video.name} has less than 10 tracking frame features for {type}")
-
-        video_tracking.processed_video_frame_features.append(
-            ProcessedVideoFrameFeature(
-                type=type,
-            )
-        )
-
+        video_tracking.processed_video_frame_features.append(ProcessedVideoFrameFeature(type=type))
         session.commit()
 
 
@@ -224,7 +202,7 @@ def _multiprocess_video_processor(
             tqdm(
                 executor.map(_multiprocess_process_and_store, videos),
                 total=len(videos),
-                desc="Tracking videos",
+                desc="Processing videos",
                 unit="video",
             )
         )

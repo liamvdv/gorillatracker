@@ -73,5 +73,6 @@ def preprocess_videos(
     metadata_extractor: Callable[[Path], VideoMetadata],
 ) -> None:
     session_cls = sessionmaker(bind=engine)
+    assert all(video.exists() for video in videos), "All videos must exist"
     for video in tqdm(videos, desc="Preprocessing videos"):
         preprocess_and_store(video, version, sampled_fps, session_cls, metadata_extractor)
