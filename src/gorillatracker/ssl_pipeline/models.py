@@ -57,7 +57,7 @@ class Video(Base):
 
     video_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     version: Mapped[str]
-    path: Mapped[str] # absolute path to the video file
+    path: Mapped[str]  # absolute path to the video file
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
     start_time: Mapped[datetime]
     width: Mapped[int]
@@ -68,13 +68,20 @@ class Video(Base):
 
     camera: Mapped[Camera] = relationship(back_populates="videos")
     features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
+    processed_video_frame_features: Mapped[list[ProcessedVideoFrameFeature]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
     tracking_frame_features: Mapped[list[TrackingFrameFeature]] = relationship(
         back_populates="video", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"), UniqueConstraint("path", "version"))
-    
+    __table_args__ = (
+        CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),
+        UniqueConstraint("path", "version"),
+    )
+
     @validates("version")
     def validate_version(self, key: str, value: str) -> str:
         try:
@@ -82,8 +89,8 @@ class Video(Base):
         except ValueError:
             raise ValueError(f"{key} must be in the format 'YYYY-MM-DD', is {value}")
         return value
-    
-    @validates("path")  
+
+    @validates("path")
     def validate_path(self, key: str, value: str) -> str:
         if not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
@@ -108,6 +115,16 @@ class Video(Base):
 
     def __repr__(self) -> str:
         return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
+
+
+class ProcessedVideoFrameFeature(Base):
+    __tablename__ = "processed_video_frame_feature"
+
+    processed_video_features_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
+    type: Mapped[str] = mapped_column(String(255))
+
+    video: Mapped[Video] = relationship(back_populates="processed_video_frame_features")
 
 
 class VideoFeature(Base):
@@ -176,8 +193,8 @@ class TrackingFrameFeature(Base):
     __tablename__ = "tracking_frame_feature"
 
     tracking_frame_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id")) # NOTE(memben): Denormalized
-    tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True) 
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))  # NOTE(memben): Denormalized
+    tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True)
     frame_nr: Mapped[int]
     bbox_x_center: Mapped[float]
     bbox_y_center: Mapped[float]
