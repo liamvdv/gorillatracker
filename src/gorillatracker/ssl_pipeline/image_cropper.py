@@ -1,8 +1,8 @@
-from functools import partial
 import logging
 import random
 from collections import deque
 from dataclasses import dataclass, field
+from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Callable, Iterator
@@ -72,7 +72,7 @@ def destination_path(base_path: Path, feature: TrackingFrameFeature) -> Path:
 def crop_from_video(
     video: Path,
     sampler: Sampler,
-    session_cls: sessionmaker,
+    session_cls: sessionmaker[Session],
     dest_base_path: Path,
 ) -> None:
     with session_cls() as session:
@@ -112,14 +112,16 @@ if __name__ == "__main__":
     from sqlalchemy import create_engine
     from tqdm import tqdm
 
-    from gorillatracker.ssl_pipeline.queries import feature_type_filter, min_count_filter, video_filter
+    from gorillatracker.ssl_pipeline.queries import feature_type_filter, min_count_filter, video_filter, confidence_filter
 
     engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
 
     def sampling_strategy(video: Path, min_n_images_per_tracking: int) -> Select[tuple[TrackingFrameFeature]]:
         query = video_filter(video)
         query = min_count_filter(query, min_n_images_per_tracking)
-        query = feature_type_filter(query, [GorillaDataset.FACE_90, GorillaDataset.FACE_45])
+        query = feature_type_filter(query, [GorillaDataset.FACE_90])
+        query = confidence_filter(query, 0.7)
+        query = min_count_filter(query, 10)
         return query
 
     shutil.rmtree("cropped_images")
@@ -132,7 +134,7 @@ if __name__ == "__main__":
 
     random.shuffle(videos)
 
-    for video in tqdm(videos):
+    for video in tqdm(videos[:5]):
         query = partial(sampling_strategy, min_n_images_per_tracking=10)
         crop_from_video(
             video,
