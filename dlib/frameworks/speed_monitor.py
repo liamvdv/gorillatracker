@@ -2,7 +2,6 @@
 Adapted from lit-gpt by Konstantin Dobler.
 """
 
-
 from collections import deque
 from contextlib import nullcontext
 from typing import Any, Callable, Deque, Dict, Optional

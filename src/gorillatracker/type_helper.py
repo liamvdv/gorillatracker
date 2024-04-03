@@ -3,6 +3,7 @@ from typing import Any, Callable, Tuple, Union
 import cv2.typing as cvt
 import torch
 
+# Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
 Image = cvt.MatLike
 
@@ -14,11 +15,15 @@ BatchLabel = Tuple[Label]
 BatchTripletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel]
 BatchTripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
+LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+
 BatchQuadletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel, BatchLabel]
 BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
 BatchTripletDataLoader = torch.utils.data.DataLoader[Tuple[BatchTripletValue, BatchTripletLabel]]
 BatchQuadletDataLoader = torch.utils.data.DataLoader[Tuple[BatchQuadletValue, BatchQuadletLabel]]
+# BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
+BatchSimpleDataLoader = Any
 
 BatchNletDataLoader = Union[BatchTripletDataLoader, BatchQuadletDataLoader]
 

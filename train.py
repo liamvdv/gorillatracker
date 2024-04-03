@@ -27,9 +27,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
                 f"Requested {args.num_devices} GPUs but {num_available_gpus} are available.",
                 f"Using first {args.num_devices} GPUs. You should set CUDA_VISIBLE_DEVICES or the docker --gpus flag to the desired GPU ids.",
             )
-        if not torch.cuda.is_available():
-            logger.error("CUDA is not available, you should change the accelerator with --accelerator cpu|tpu|mps.")
-            exit(1)
+        # if not torch.cuda.is_available():
+        #     logger.error("CUDA is not available, you should change the accelerator with --accelerator cpu|tpu|mps.")
+        #     exit(1)
     if current_process_rank == 0 and args.debug:
         wait_for_debugger()  # TODO: look into debugger usage
 
@@ -38,6 +38,21 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     ############# Construct W&B Logger ##############
     wandb_logging_module = WandbLoggingModule(args)
     wandb_logger = wandb_logging_module.construct_logger()
+
+    #################### Construct dataloaders #################
+    model_cls = get_model_cls(args.model_name_or_path)
+    model_transforms = model_cls.get_tensor_transforms()
+    if args.data_resize_transform is not None:
+        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    dm = get_data_module(
+        args.dataset_class,
+        str(args.data_dir),
+        args.batch_size,
+        args.loss_mode,
+        args.video_data,
+        model_transforms,
+        model_cls.get_training_transforms(),  # type: ignore
+    )
 
     ################# Construct model ##############
 
@@ -56,11 +71,27 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         initial_lr=args.initial_lr,
         start_lr=args.start_lr,
         end_lr=args.end_lr,
+        stepwise_schedule=args.stepwise_schedule,
+        lr_interval=args.val_check_interval,
         margin=args.margin,
         loss_mode=args.loss_mode,
         embedding_size=args.embedding_size,
+        batch_size=args.batch_size,
+        s=args.s,
+        delta_t=args.delta_t,
+        mem_bank_start_epoch=args.mem_bank_start_epoch,
+        lambda_membank=args.lambda_membank,
+        num_classes=(
+            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
+            if not args.video_data
+            else (-1, -1, -1)
+        ),
+        dropout_p=args.dropout_p,
+        accelerator=args.accelerator,
+        l2_alpha=args.l2_alpha,
+        l2_beta=args.l2_beta,
+        path_to_pretrained_weights=args.path_to_pretrained_weights,
     )
-    model_cls = get_model_cls(args.model_name_or_path)
 
     if args.saved_checkpoint_path is not None:
         args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
@@ -97,6 +128,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         str(args.data_dir),
         args.batch_size,
         args.loss_mode,
+        args.video_data,
         model_transforms,
         model.get_training_transforms(),
     )
@@ -121,7 +153,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss_epoch",
+        monitor="val/loss",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
@@ -140,6 +172,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     # Initialize trainer
     trainer = Trainer(
         max_epochs=args.max_epochs,
+        val_check_interval=args.val_check_interval,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),
@@ -148,6 +181,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         callbacks=callbacks,
         precision=args.precision,
         gradient_clip_val=args.grad_clip,
+        log_every_n_steps=24,
         # accumulate_grad_batches=args.gradient_accumulation_steps,
         fast_dev_run=args.fast_dev_run,
         profiler=args.profiler,
@@ -185,20 +219,21 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
 
-        logger.info("Collecting PL checkpoint for wandb...")
-        artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
-        artifact.add_file(save_path, name="model.ckpt")
+        if args.save_model_to_wandb:
+            logger.info("Collecting PL checkpoint for wandb...")
+            artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
+            artifact.add_file(save_path, name="model.ckpt")
 
-        logger.info("Pushing to wandb...")
-        aliases = ["train_end", "latest"]
-        wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
+            logger.info("Pushing to wandb...")
+            aliases = ["train_end", "latest"]
+            wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
-        logger.success("Saving finished!")
+            logger.success("Saving finished!")
 
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/efficientnet_cxl.yml"
+    config_path = "./cfgs/swinv2_cxl.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments
