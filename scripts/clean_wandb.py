@@ -1,7 +1,7 @@
 """
 - A run is always kept if 'keep', 'proof' or 'baseline' is in the tags. 
 - All runs that match a filter condition are scheduled for deletion. Deletion is scheduled 7 days after the run was started.
-- All runs before 2024-02-07 are ignored. One may lower this date to sort through 
+- All runs before 2024-04-07 are ignored. One may lower this date to sort through 
   older runs and either fix the naming or delete unnecessary runs.
 
 Usage:
@@ -27,7 +27,7 @@ Run = Any
 
 ENTITY = "gorillas"
 
-ENFORCE_AFTER = "2024-02-07"
+ENFORCE_AFTER = "2024-04-07"
 
 
 def keep(run) -> bool:
