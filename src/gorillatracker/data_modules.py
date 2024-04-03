@@ -6,7 +6,8 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader
+from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader, VideoTripletDataLoader
+from gorillatracker.type_helper import BatchNletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,15 +57,19 @@ class NletDataModule(L.LightningDataModule):
             raise ValueError(f"unknown stage '{stage}'")
 
     def train_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("fit")
         return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("validate")
         return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("test")
         return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False)
 
     def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("predict")
         # return self.get_dataloader()(self.predict, batch_size=self.batch_size, shuffle=False)
         raise NotImplementedError("predict_dataloader not implemented")
 
@@ -89,6 +94,13 @@ class NletDataModule(L.LightningDataModule):
 class TripletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
+
+
+class VideoTripletDataModule(TripletDataModule):
+    def train_dataloader(self) -> BatchNletDataLoader:
+        return VideoTripletDataLoader(
+            self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
+        )
 
 
 class QuadletDataModule(NletDataModule):
