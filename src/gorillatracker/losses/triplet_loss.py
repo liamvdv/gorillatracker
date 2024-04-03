@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Literal, Union
+from typing import Any, Callable, Dict, List, Literal, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -327,7 +327,17 @@ class TripletLossOffline(nn.Module):
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
         return triplet_margin_loss_with_distances(anchors, positives, negatives, margin=self.margin)
 
-def triplet_margin_loss_with_distances(anchor: torch.Tensor, positive: torch.Tensor, negative: torch.Tensor, margin: float = 1.0, p: float = 2, eps: float = 1e-6, swap: bool = False, reduction: str = "mean") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+
+def triplet_margin_loss_with_distances(
+    anchor: torch.Tensor,
+    positive: torch.Tensor,
+    negative: torch.Tensor,
+    margin: float = 1.0,
+    p: float = 2,
+    eps: float = 1e-6,
+    swap: bool = False,
+    reduction: str = "mean",
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     positive_distances = F.pairwise_distance(anchor, positive, p, eps)
     negative_distances = F.pairwise_distance(anchor, negative, p, eps)
 
@@ -339,8 +349,10 @@ def triplet_margin_loss_with_distances(anchor: torch.Tensor, positive: torch.Ten
 
     return loss, torch.mean(positive_distances), torch.mean(negative_distances)
 
+
 def round_tensor(tensor: torch.Tensor, decimal_places: int = 3) -> torch.Tensor:
-    return torch.round(tensor * 10 ** decimal_places) / (10 ** decimal_places)
+    return torch.round(tensor * 10**decimal_places) / (10**decimal_places)
+
 
 class TripletLossOfflineNative(nn.Module):
     """
@@ -359,12 +371,14 @@ class TripletLossOfflineNative(nn.Module):
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
         loss = self.loss(anchors, positives, negatives)
-    
+
         # NOTE(liamvdv): This code is used to validate our custom implementation.
         # TODO(liamvdv): Shift all offline/native to offline after 2024-02-24.
         check_loss, _, _ = triplet_margin_loss_with_distances(anchors, positives, negatives, margin=self.margin)
-        assert round_tensor(loss, 3) == round_tensor(check_loss, 3), f"Torch native loss {loss} does not match our custom loss {check_loss}" # NOTE(liamvdv): reach out to me 
-        
+        assert round_tensor(loss, 3) == round_tensor(
+            check_loss, 3
+        ), f"Torch native loss {loss} does not match our custom loss {check_loss}"  # NOTE(liamvdv): reach out to me
+
         NO_VALUE = torch.tensor([-1], dtype=torch.float32)
         return loss, NO_VALUE, NO_VALUE
 
