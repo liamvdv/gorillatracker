@@ -263,7 +263,7 @@ class GorillaVideoTracker:
         # iterate over frames in video
         for frame_data in VideoData(data["labels"]):  # type: ignore
             # iterate over bounding boxes and delete colliding ones
-            bboxes = [BBox(bbox) for bbox in frame_data if bbox["class"] == body_class]
+            bboxes = [bbox for bbox in frame_data if bbox["class"] == body_class]
             colliding_bboxes = [
                 bbox1
                 for bbox1 in bboxes
