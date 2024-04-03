@@ -20,9 +20,9 @@ from gorillatracker.ssl_pipeline.video_tracker import VideoMetadata
 log = logging.getLogger(__name__)
 
 
-class SSLDatasetAdapter(ABC):
+class SSLDataset(ABC):
     def __init__(self, db_uri: str) -> None:
-        engine = create_engine(db_uri)
+        engine = create_engine(db_uri, echo=True)
         self._engine = engine
 
     def unprocessed_videos(self) -> list[Path]:
@@ -79,18 +79,25 @@ class SSLDatasetAdapter(ABC):
         pass
 
 
-class GorillaDatasetAdapter(SSLDatasetAdapter):
+class GorillaDataset(SSLDataset):
+    FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
+    FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
+
     _yolo_base_kwargs = {
         "half": True,  # We found no difference in accuracy to False
         "vid_stride": 5,
         "verbose": False,
     }
 
+    DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
+
+    def __init__(self, db_uri: str = DB_URI) -> None:
+        super().__init__(db_uri)
+
     def setup_database(self) -> None:
         Base.metadata.create_all(self._engine)
-        self._setup_cameras()
 
-    def _setup_cameras(self) -> None:
+    def setup_cameras(self) -> None:
         df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
         df["Name"] = df["Name"].str.rstrip("x")
         with Session(self._engine) as session:
@@ -101,8 +108,8 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [
-            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, "face_45"),
-            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, "face_90"),
+            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
         ]
 
     @property
@@ -115,7 +122,7 @@ class GorillaDatasetAdapter(SSLDatasetAdapter):
 
     @property
     def metadata_extractor(self) -> Callable[[Path], VideoMetadata]:
-        return GorillaDatasetAdapter.get_video_metadata
+        return GorillaDataset.get_video_metadata
 
     @property
     def tracker_config(self) -> Path:

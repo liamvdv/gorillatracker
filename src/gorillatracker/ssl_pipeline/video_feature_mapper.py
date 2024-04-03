@@ -17,10 +17,10 @@ from gorillatracker.ssl_pipeline.helpers import (
     BoundingBox,
     TrackedFrame,
     load_tracked_frames,
-    load_video_tracking,
     video_reader,
 )
 from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.queries import load_video_by_filename
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def predict_correlate_store(
     DANGER_activate_visual_debugging: DEBUG = None,
 ) -> None:
     with session_cls() as session:
-        video_tracking = load_video_tracking(session, video)
+        video_tracking = load_video_by_filename(session, video)
         assert video_tracking.frame_step == yolo_kwargs.get(
             "vid_stride", 1
         ), "vid_stride must match the frame_step of the body tracking"
