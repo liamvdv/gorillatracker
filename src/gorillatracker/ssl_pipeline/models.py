@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime, timedelta
+from typing import Optional
 
 from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
@@ -55,8 +56,8 @@ class Video(Base):
     __tablename__ = "video"
 
     video_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    # TODO(memben): Should this rather be a path than a filename?
-    filename: Mapped[str] = mapped_column(String(255), unique=True)
+    version: Mapped[str]
+    path: Mapped[str] # absolute path to the video file
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
     start_time: Mapped[datetime]
     width: Mapped[int]
@@ -68,8 +69,27 @@ class Video(Base):
     camera: Mapped[Camera] = relationship(back_populates="videos")
     features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
+    tracking_frame_features: Mapped[list[TrackingFrameFeature]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
 
-    __table_args__ = (CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),)
+    __table_args__ = (CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"), UniqueConstraint("path", "version"))
+    
+    @validates("version")
+    def validate_version(self, key: str, value: str) -> str:
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError(f"{key} must be in the format 'YYYY-MM-DD', is {value}")
+        return value
+    
+    @validates("path")  
+    def validate_path(self, key: str, value: str) -> str:
+        if not value.startswith("/"):
+            raise ValueError(f"{key} must be an absolute path, is {value}")
+        if not value.endswith(".mp4"):
+            raise ValueError(f"{key} must end with '.mp4', is {value}")
+        return value
 
     @validates("width", "height", "fps", "sampled_fps", "frames")
     def validate_positive(self, key: str, value: int) -> int:
@@ -87,7 +107,7 @@ class Video(Base):
         return timedelta(seconds=self.frames / self.fps)
 
     def __repr__(self) -> str:
-        return f"video(id={self.video_id}, filename={self.filename}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
+        return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
 
 
 class VideoFeature(Base):
@@ -156,7 +176,8 @@ class TrackingFrameFeature(Base):
     __tablename__ = "tracking_frame_feature"
 
     tracking_frame_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id")) # NOTE(memben): Denormalized
+    tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True) 
     frame_nr: Mapped[int]
     bbox_x_center: Mapped[float]
     bbox_y_center: Mapped[float]
@@ -166,6 +187,7 @@ class TrackingFrameFeature(Base):
     type: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
+    video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
 
     __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
 
@@ -183,7 +205,7 @@ class TrackingFrameFeature(Base):
         return frame_nr
 
     def __repr__(self) -> str:
-        return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
+        return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
 
 
 class VideoRelationship(Base):
@@ -265,7 +287,8 @@ if __name__ == "__main__":
     with session.begin():
         camera = Camera(name="Test", latitude=0, longitude=0)
         video = Video(
-            filename="test.mp4",
+            path="/absolute/path/to/test.mp4",
+            version="2024-04-03",
             camera=camera,
             start_time=datetime.now(),
             width=1920,
@@ -277,6 +300,7 @@ if __name__ == "__main__":
         tracking = Tracking(video=video)
         tracking_frame_feature = TrackingFrameFeature(
             tracking=tracking,
+            video=video,
             frame_nr=0,
             bbox_x_center=0.5,
             bbox_y_center=0.5,
