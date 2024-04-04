@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import logging
-import math
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Sequence
 
 import cv2
 from shapely.geometry import Polygon
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import select
 
-from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 log = logging.getLogger(__name__)
 
@@ -129,56 +127,16 @@ class BoundingBox:
             frame_feature.bbox_width,
             frame_feature.bbox_height,
             frame_feature.confidence,
-            frame_feature.tracking.video.width,
-            frame_feature.tracking.video.height,
+            frame_feature.video.width,
+            frame_feature.video.height,
         )
 
 
-@dataclass(frozen=True)
-class TrackedFrame:
-    frame_nr: int
-    frame_features: list[TrackingFrameFeature]
-
-
-def load_tracked_frames(session: Session, video: Video, filter_by_type: str | None = None) -> list[TrackedFrame]:
-    """
-    Retrieves a list of TrackedFrame objects for the given video.
-
-    Args:
-        session (Session): The SQLAlchemy session object used to execute database queries.
-        video (Video): The Video object representing the video for which to retrieve tracked frames.
-        filter_by_type (str | None, optional): Optional filter to retrieve only tracked frames with a specific type.
-            If None, all tracked frames are retrieved. Defaults to None.
-
-    Returns:
-        list[TrackedFrame]: A list of TrackedFrame objects representing the tracked frames for the given video.
-            - Each TrackedFrame object contains the frame number and a list of TrackingFrameFeature objects for that frame.
-            - The list of TrackedFrame objects covers all sampled frames of the video, with a frame step determined by video.frame_step.
-            - The length of the returned list is equal to ```math.ceil(video.frames / video.frame_step)```.
-            - Note: Some TrackedFrame objects may have an empty list of frame_features if no features were tracked for that frame.
-
-    """
-    tracked_frames: list[TrackedFrame] = []
-
-    stmt = (
-        select(TrackingFrameFeature)
-        .join(Tracking)
-        .where(Tracking.video_id == video.video_id)
-        .order_by(TrackingFrameFeature.frame_nr)
-    )
-    if filter_by_type:
-        stmt = stmt.where(TrackingFrameFeature.type == filter_by_type)
-
-    frame_feature_query = session.scalars(stmt).all()
-
-    frame_features_grouped = {
-        frame_nr: list(features) for frame_nr, features in groupby(frame_feature_query, key=lambda x: x.frame_nr)
-    }
-
-    for frame_nr in range(0, video.frames, video.frame_step):
-        frame_features = frame_features_grouped.get(frame_nr, [])
-        tracked_frame = TrackedFrame(frame_nr=frame_nr, frame_features=frame_features)
-        tracked_frames.append(tracked_frame)
-
-    assert len(tracked_frames) == math.ceil(video.frames / video.frame_step)
-    return tracked_frames
+def groupby_frame(
+    tracking_frame_features: Sequence[TrackingFrameFeature],
+) -> defaultdict[int, list[TrackingFrameFeature]]:
+    sorted_features = sorted(tracking_frame_features, key=lambda x: x.frame_nr)
+    frame_features = defaultdict(list)
+    for frame_nr, features in groupby(sorted_features, key=lambda x: x.frame_nr):
+        frame_features[frame_nr] = list(features)
+    return frame_features

@@ -26,20 +26,23 @@ def process_detection(
     x, y, w, h = box.xywhn[0].tolist()
     confidence = box.conf.item()
     session.add(
-    TrackingFrameFeature(
-        tracking=tracking,
-        video=video_tracking,
-        frame_nr=frame_nr,
-        bbox_x_center=x,
-        bbox_y_center=y,
-        bbox_width=w,
-        bbox_height=h,
-        confidence=confidence,
-        type=type,
-    ))
+        TrackingFrameFeature(
+            tracking=tracking,
+            video=video_tracking,
+            frame_nr=frame_nr,
+            bbox_x_center=x,
+            bbox_y_center=y,
+            bbox_width=w,
+            bbox_height=h,
+            confidence=confidence,
+            type=type,
+        )
+    )
 
 
-def process_prediction(prediction: results.Results, video_tracking: Video, frame_nr: int, type: str, session: Session) -> None:
+def process_prediction(
+    prediction: results.Results, video_tracking: Video, frame_nr: int, type: str, session: Session
+) -> None:
     """Process the prediction and add the tracking frame features to the video, does not commit the session."""
 
     assert isinstance(prediction.boxes, results.Boxes)
@@ -48,7 +51,12 @@ def process_prediction(prediction: results.Results, video_tracking: Video, frame
 
 
 def process_tracking(
-    prediction: results.Results, video_tracking: Video, trackings: defaultdict[int, Tracking], frame_nr: int, type: str, session: Session
+    prediction: results.Results,
+    video_tracking: Video,
+    trackings: defaultdict[int, Tracking],
+    frame_nr: int,
+    type: str,
+    session: Session,
 ) -> None:
     """Process the prediction and add the tracking frame features to the video, does not commit the session."""
     assert isinstance(prediction.boxes, results.Boxes)

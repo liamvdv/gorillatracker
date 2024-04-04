@@ -10,9 +10,9 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, jenkins_hash, load_tracked_frames, video_reader
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, groupby_frame, jenkins_hash, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
-from gorillatracker.ssl_pipeline.queries import load_video
+from gorillatracker.ssl_pipeline.queries import load_video, video_filter
 
 log = logging.getLogger(__name__)
 
@@ -56,19 +56,16 @@ def render_on_frame(
 
 def visualize_video(video: Path, version: str, session_cls: sessionmaker[Session], dest: Path) -> None:
     assert video.exists()
-    if dest.exists():
-        log.warning(f"Skipping {video.name}, already exists, might have the same name as another video.")
-        return
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
     with session_cls() as session:
         video_tracking = load_video(session, video, version)
-        tracked_frames = load_tracked_frames(session, video_tracking)
+        tracked_frames = groupby_frame(session.scalars(video_filter(video_tracking.video_id)).all())
         unique_tracking_ids = {
             feature.tracking_id
-            for frame in tracked_frames
-            for feature in frame.frame_features
+            for frame in tracked_frames.values()
+            for feature in frame
             if feature.tracking_id is not None
         }
         tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
@@ -77,17 +74,9 @@ def visualize_video(video: Path, version: str, session_cls: sessionmaker[Session
             str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
         )
         with video_reader(video, frame_step=video_tracking.frame_step) as source_video:
-            for tracked_frame, source_frame in zip_longest(tracked_frames, source_video):
-                assert tracked_frame is not None
-                assert source_frame is not None
-                assert tracked_frame.frame_nr == source_frame.frame_nr
-                render_on_frame(
-                    source_frame.frame,
-                    tracked_frame.frame_features,
-                    tracking_id_to_label_map,
-                )
-
-                tracked_video.write(source_frame.frame)
+            for frame in source_video:
+                render_on_frame(frame.frame, tracked_frames[frame.frame_nr], tracking_id_to_label_map)
+                tracked_video.write(frame.frame)
             tracked_video.release()
 
 

@@ -24,18 +24,17 @@ def group_by_tracking_id(frame_features: list[TrackingFrameFeature]) -> dict[int
 """
 
 
-def video_filter(video: Path) -> Select[tuple[TrackingFrameFeature]]:
+def video_filter(video_id: int) -> Select[tuple[TrackingFrameFeature]]:
     """
     Filters the query to include only TrackingFrameFeature instances from the specified video.
 
     Equivalent to python:
     ```python
-    def filter(self, video: Path) -> Iterator[TrackingFrameFeature]:
-        return filter(lambda x: x.tracking.video.filename == video.name, frame_features)
+    def filter(self, video_id: int) -> Iterator[TrackingFrameFeature]:
+        return filter(lambda x: x.tracking.video_id == video_id, frame_features)
     ```
     """
-    # return select(TrackingFrameFeature).join(Tracking).join(Video).where(Video.filename == str(video.name))
-    raise NotImplementedError
+    return select(TrackingFrameFeature).where(TrackingFrameFeature.video_id == video_id)
 
 
 def min_count_filter(
