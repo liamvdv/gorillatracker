@@ -216,9 +216,8 @@ class TrackingFrameFeature(Base):
 
     @validates("frame_nr")
     def validate_frame_nr(self, key: str, frame_nr: int) -> int:
-        video = self.tracking.video
-        if frame_nr % (video.frame_step) != 0:
-            raise ValueError(f"frame_nr must be a multiple of {video.frame_step}, is {frame_nr}")
+        if frame_nr % (self.video.frame_step) != 0:
+            raise ValueError(f"frame_nr must be a multiple of {self.video.frame_step}, is {frame_nr}")
         return frame_nr
 
     def __repr__(self) -> str:

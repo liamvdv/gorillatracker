@@ -34,7 +34,8 @@ def video_filter(video: Path) -> Select[tuple[TrackingFrameFeature]]:
         return filter(lambda x: x.tracking.video.filename == video.name, frame_features)
     ```
     """
-    return select(TrackingFrameFeature).join(Tracking).join(Video).where(Video.filename == str(video.name))
+    # return select(TrackingFrameFeature).join(Tracking).join(Video).where(Video.filename == str(video.name))
+    raise NotImplementedError
 
 
 def min_count_filter(
@@ -105,5 +106,5 @@ def confidence_filter(
     return query
 
 
-def load_video_by_filename(session: Session, video: Path) -> Video:
-    return session.execute(select(Video).where(Video.filename == str(video.name))).scalar_one()
+def load_video(session: Session, video: Path, version: str) -> Video:
+    return session.execute(select(Video).where(Video.path == str(video), Video.version == version)).scalar_one()

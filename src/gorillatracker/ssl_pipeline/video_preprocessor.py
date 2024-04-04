@@ -49,7 +49,7 @@ def preprocess_and_store(
     properties = video_properties_extractor(video)
     assert properties.fps % sampled_fps == 0, "Sampled FPS must be a factor of the original FPS"
     video_tracking = Video(
-        filename=video.name,
+        path=str(video),
         version=version,
         start_time=metadata.start_time,
         width=properties.width,

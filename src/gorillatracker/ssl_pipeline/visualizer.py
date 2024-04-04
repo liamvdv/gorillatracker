@@ -12,14 +12,14 @@ from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, jenkins_hash, load_tracked_frames, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
-from gorillatracker.ssl_pipeline.queries import load_video_by_filename
+from gorillatracker.ssl_pipeline.queries import load_video
 
 log = logging.getLogger(__name__)
 
 
-def id_to_color(track_id: int) -> tuple[int, int, int]:
+def id_to_color(track_id: int | None) -> tuple[int, int, int]:
     """Convert a tracking ID to a color. (BGR)"""
-    if track_id < 0:  # For debugging ONLY
+    if track_id is None:
         return 0, 0, 255
     hash_value = jenkins_hash(track_id)
     h = (hash_value % 360) / 360.0
@@ -37,9 +37,11 @@ def render_on_frame(
     for frame_feature in frame_features:
         bbox = BoundingBox.from_tracking_frame_feature(frame_feature)
         cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
-        label = f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.type})"
-        if frame_feature.tracking_id < 0:  # For debugging ONLY
-            label = f"DEBUG ({frame_feature.type})"
+        label = (
+            f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.type})"
+            if frame_feature.tracking_id is not None
+            else f"UNRESOLVED ({frame_feature.type})"
+        )
         cv2.putText(
             frame,
             label,
@@ -52,15 +54,23 @@ def render_on_frame(
     return frame
 
 
-def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path) -> None:
+def visualize_video(video: Path, version: str, session_cls: sessionmaker[Session], dest: Path) -> None:
     assert video.exists()
+    if dest.exists():
+        log.warning(f"Skipping {video.name}, already exists, might have the same name as another video.")
+        return
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
     with session_cls() as session:
-        video_tracking = load_video_by_filename(session, video)
+        video_tracking = load_video(session, video, version)
         tracked_frames = load_tracked_frames(session, video_tracking)
-        unique_tracking_ids = set(feature.tracking_id for frame in tracked_frames for feature in frame.frame_features)
+        unique_tracking_ids = {
+            feature.tracking_id
+            for frame in tracked_frames
+            for feature in frame.frame_features
+            if feature.tracking_id is not None
+        }
         tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
         # NOTE: video_tracking is the tracked version of source_video
         tracked_video = cv2.VideoWriter(
@@ -81,11 +91,13 @@ def visualize_video(video: Path, session_cls: sessionmaker[Session], dest: Path)
             tracked_video.release()
 
 
+_version = None
 _session_cls = None
 
 
-def _init_visualizer(engine: Engine) -> None:
-    global _session_cls
+def _init_visualizer(engine: Engine, version: str) -> None:
+    global _version, _session_cls
+    _version = version
     engine.dispose(
         close=False
     )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
@@ -93,13 +105,14 @@ def _init_visualizer(engine: Engine) -> None:
 
 
 def _visualize_video_process(video: Path, dest_dir: Path) -> None:
-    global _session_cls
+    global _version, _session_cls
     assert _session_cls is not None, "Engine not initialized, call _init_visualizer first"
-    visualize_video(video, _session_cls, dest_dir / video.name)
+    assert _version is not None, "Version not initialized, call _init_visualizer instead"
+    visualize_video(video, _version, _session_cls, dest_dir / video.name)
 
 
-def multiprocess_visualize_video(videos: list[Path], engine: Engine, dest_dir: Path) -> None:
-    with ProcessPoolExecutor(initializer=_init_visualizer, initargs=(engine,)) as executor:
+def multiprocess_visualize_video(videos: list[Path], version: str, engine: Engine, dest_dir: Path) -> None:
+    with ProcessPoolExecutor(initializer=_init_visualizer, initargs=(engine, version)) as executor:
         list(
             tqdm(
                 executor.map(_visualize_video_process, videos, [dest_dir] * len(videos)),

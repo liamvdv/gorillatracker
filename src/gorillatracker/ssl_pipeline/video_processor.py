@@ -21,10 +21,11 @@ log = logging.getLogger(__name__)
 
 
 def process_detection(
-    box: results.Boxes, video_tracking: Video, tracking: Optional[Tracking], frame_nr: int, type: str
+    box: results.Boxes, video_tracking: Video, tracking: Optional[Tracking], frame_nr: int, type: str, session: Session
 ) -> None:
     x, y, w, h = box.xywhn[0].tolist()
     confidence = box.conf.item()
+    session.add(
     TrackingFrameFeature(
         tracking=tracking,
         video=video_tracking,
@@ -35,19 +36,19 @@ def process_detection(
         bbox_height=h,
         confidence=confidence,
         type=type,
-    )
+    ))
 
 
-def process_prediction(prediction: results.Results, video_tracking: Video, frame_nr: int, type: str) -> None:
+def process_prediction(prediction: results.Results, video_tracking: Video, frame_nr: int, type: str, session: Session) -> None:
     """Process the prediction and add the tracking frame features to the video, does not commit the session."""
 
     assert isinstance(prediction.boxes, results.Boxes)
     for detection in prediction.boxes:
-        process_detection(detection, video_tracking, None, frame_nr, type)
+        process_detection(detection, video_tracking, None, frame_nr, type, session)
 
 
 def process_tracking(
-    prediction: results.Results, video_tracking: Video, trackings: defaultdict[int, Tracking], frame_nr: int, type: str
+    prediction: results.Results, video_tracking: Video, trackings: defaultdict[int, Tracking], frame_nr: int, type: str, session: Session
 ) -> None:
     """Process the prediction and add the tracking frame features to the video, does not commit the session."""
     assert isinstance(prediction.boxes, results.Boxes)
@@ -55,7 +56,7 @@ def process_tracking(
         # NOTE(memben): sometimes the ID is None, this is a bug in the tracker
         tracking_id = int(detection.id[0].int().item()) if detection.id is not None else None
         tracking = trackings[tracking_id] if tracking_id is not None else None
-        process_detection(detection, video_tracking, tracking, frame_nr, type)
+        process_detection(detection, video_tracking, tracking, frame_nr, type, session)
 
 
 def predict_and_store(
@@ -73,7 +74,7 @@ def predict_and_store(
             for video_frame in video_feed:
                 predictions: list[results.Results] = yolo_model.predict(video_frame.frame, **yolo_kwargs)
                 assert len(predictions) == 1
-                process_prediction(predictions[0], video_tracking, video_frame.frame_nr, type)
+                process_prediction(predictions[0], video_tracking, video_frame.frame_nr, type, session)
 
         if len(video_tracking.tracking_frame_features) < 10:
             log.warning(f"Video {video.name} has less than 10 tracking frame features for {type}")
@@ -101,7 +102,7 @@ def track_and_store(
                     video_frame.frame, tracker=tracker_config, **yolo_kwargs, persist=True
                 )
                 assert len(predictions) == 1
-                process_tracking(predictions[0], video_tracking, trackings, video_frame.frame_nr, type)
+                process_tracking(predictions[0], video_tracking, trackings, video_frame.frame_nr, type, session)
 
         if len(video_tracking.tracking_frame_features) < 10:
             log.warning(f"Video {video.name} has less than 10 tracking frame features for {type}")

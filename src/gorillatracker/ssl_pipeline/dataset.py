@@ -15,23 +15,15 @@ from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.correlators import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video
-from gorillatracker.ssl_pipeline.video_tracker import VideoMetadata
+from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
 
 log = logging.getLogger(__name__)
 
 
 class SSLDataset(ABC):
     def __init__(self, db_uri: str) -> None:
-        engine = create_engine(db_uri, echo=True)
+        engine = create_engine(db_uri) # , echo=True)
         self._engine = engine
-
-    def unprocessed_videos(self) -> list[Path]:
-        """Returns a list of videos that have not been processed, this function is not Idempotent."""
-        with Session(self._engine) as session:
-            stmt = select(Video.filename)
-            videos = session.scalars(stmt).all()
-        log.info(f"Found {len(videos)} (processed) videos in the database")
-        return [video for video in self.videos if video.name not in videos]
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         """Returns a list of feature models to use for adding features of interest (e.g. face detector)"""
@@ -114,7 +106,7 @@ class GorillaDataset(SSLDataset):
 
     @property
     def videos(self) -> list[Path]:
-        return list(Path("video_data").glob("*.mp4"))
+        return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
 
     @property
     def body_model(self) -> Path:

@@ -17,17 +17,19 @@ import random
 from pathlib import Path
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
-from gorillatracker.ssl_pipeline.video_feature_mapper import multiproces_feature_mapping
-from gorillatracker.ssl_pipeline.video_tracker import multiprocess_video_tracker
+from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
+from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict_and_store, multiprocess_track_and_store
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 
 log = logging.getLogger(__name__)
 
 
 def visualize_pipeline(
-    dataset_adapter: SSLDataset,
+    dataset: SSLDataset,
+    version: str,
     dest_dir: Path,
     n_videos: int = 30,
+    sampled_fps: int = 10,
     max_worker_per_gpu: int = 8,
     gpus: list[int] = [0],
 ) -> None:
@@ -38,52 +40,59 @@ def visualize_pipeline(
         dataset (SSLDataset): The dataset to use.
         dest (Path): The destination to save the visualizations.
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
+        sampled_fps (int, optional): The FPS to sample the video at. Defaults to 10.
+        max_worker_per_gpu (int, optional): The maximum number of workers per GPU. Defaults to 8.
         gpus (list[int], optional): The GPUs to use for tracking. Defaults to [0].
 
     Returns:
-        None, the visualizations are saved to the destination and to the SSLDatasetAdapter.
+        None, the visualizations are saved to the destination and to the SSLDataset.
     """
 
-    # random.seed(42) # For reproducibility
-    # NOTE: unprocessed_videos is not idempotent
-    videos = sorted(dataset_adapter.unprocessed_videos())
+    random.seed(42) # For reproducibility
+    videos = sorted(dataset.videos)
     to_track = random.sample(videos, n_videos)
 
-    multiprocess_video_tracker(
-        dataset_adapter.body_model,
-        dataset_adapter.yolo_kwargs,
+    preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
+
+    multiprocess_track_and_store(
+        version,
+        dataset.body_model,
+        dataset.yolo_kwargs,
         to_track,
-        dataset_adapter.tracker_config,
-        dataset_adapter.metadata_extractor,
-        dataset_adapter.engine,
+        dataset.tracker_config,
+        dataset.engine,
+        "body",  # NOTE(memben): Tracking will always be done on bodies
         max_worker_per_gpu=max_worker_per_gpu,
         gpus=gpus,
     )
 
-    for yolo_model, yolo_kwargs, correlator, type in dataset_adapter.feature_models():
-        multiproces_feature_mapping(
+    for yolo_model, yolo_kwargs, correlator, type in dataset.feature_models():
+        multiprocess_predict_and_store(
+            version,
             yolo_model,
             yolo_kwargs,
-            type,
             to_track,
-            dataset_adapter.engine,
-            correlator,
+            dataset.engine,
+            type,
             max_worker_per_gpu=max_worker_per_gpu,
             gpus=gpus,
         )
 
-    multiprocess_visualize_video(to_track, dataset_adapter.engine, dest_dir)
+    multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
 
 
 if __name__ == "__main__":
+    import os
+    os.remove("test.db")
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDataset()
+    dataset = GorillaDataset("sqlite:///test.db")
     dataset.setup_database()
     dataset.setup_cameras()
     visualize_pipeline(
         dataset,
+        "2024-04-03",
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
+        n_videos=5,
         max_worker_per_gpu=12,
         gpus=[0],
     )
