@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pandas as pd
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.correlators import Correlator, one_to_one_correlator
-from gorillatracker.ssl_pipeline.models import Base, Camera, Video
+from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
+from gorillatracker.ssl_pipeline.models import Base, Camera
 from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
 
 log = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 class SSLDataset(ABC):
     def __init__(self, db_uri: str) -> None:
-        engine = create_engine(db_uri) # , echo=True)
+        engine = create_engine(db_uri)  # , echo=True)
         self._engine = engine
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
@@ -31,7 +31,7 @@ class SSLDataset(ABC):
 
     @property
     @abstractmethod
-    def videos(self) -> list[Path]:
+    def video_paths(self) -> list[Path]:
         """The videos to track."""
         pass
 
@@ -105,7 +105,7 @@ class GorillaDataset(SSLDataset):
         ]
 
     @property
-    def videos(self) -> list[Path]:
+    def video_paths(self) -> list[Path]:
         return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
 
     @property
@@ -134,14 +134,14 @@ class GorillaDataset(SSLDataset):
         return self._engine
 
     @staticmethod
-    def get_video_metadata(video: Path) -> VideoMetadata:
-        camera_name = video.stem.split("_")[0]
-        _, date_str, _ = video.stem.split("_")
+    def get_video_metadata(video_path: Path) -> VideoMetadata:
+        camera_name = video_path.stem.split("_")[0]
+        _, date_str, _ = video_path.stem.split("_")
         timestamps_path = "data/derived_data/timestamps.json"
         with open(timestamps_path, "r") as f:
             timestamps = json.load(f)
         date = datetime.strptime(date_str, "%Y%m%d")
-        timestamp = timestamps[video.stem]
+        timestamp = timestamps[video_path.stem]
         daytime = datetime.strptime(timestamp, "%I:%M %p")
         date = datetime.combine(date, daytime.time())
         return VideoMetadata(camera_name, date)

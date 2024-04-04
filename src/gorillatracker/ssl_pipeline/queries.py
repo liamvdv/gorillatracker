@@ -3,6 +3,7 @@ This module contains pre-defined database queries.
 """
 
 from pathlib import Path
+from typing import Sequence
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -35,6 +36,13 @@ def video_filter(video_id: int) -> Select[tuple[TrackingFrameFeature]]:
     ```
     """
     return select(TrackingFrameFeature).where(TrackingFrameFeature.video_id == video_id)
+
+
+def associated_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[TrackingFrameFeature]]:
+    """
+    Filters the query to include only TrackingFrameFeature instances that are associated with a tracking.
+    """
+    return query.where(TrackingFrameFeature.tracking_id.isnot(None))
 
 
 def min_count_filter(
@@ -105,5 +113,27 @@ def confidence_filter(
     return query
 
 
-def load_video(session: Session, video: Path, version: str) -> Video:
-    return session.execute(select(Video).where(Video.path == str(video), Video.version == version)).scalar_one()
+def load_features(session: Session, video_id: int, feature_types: list[str]) -> Sequence[TrackingFrameFeature]:
+    stmt = feature_type_filter(video_filter(video_id), feature_types)
+    return session.execute(stmt).scalars().all()
+
+
+def load_tracked_features(session: Session, video_id: int, feature_types: list[str]) -> Sequence[TrackingFrameFeature]:
+    stmt = feature_type_filter(associated_filter(video_filter(video_id)), feature_types)
+    return session.execute(stmt).scalars().all()
+
+
+def load_video(session: Session, video_path: Path, version: str) -> Video:
+    return session.execute(select(Video).where(Video.path == str(video_path), Video.version == version)).scalar_one()
+
+
+def load_videos(session: Session, video_paths: list[Path], version: str) -> Sequence[Video]:
+    return (
+        session.execute(
+            select(Video).where(
+                Video.path.in_([str(video_path) for video_path in video_paths]), Video.version == version
+            )
+        )
+        .scalars()
+        .all()
+    )

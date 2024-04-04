@@ -29,8 +29,8 @@ class VideoProperties:
     fps: int
 
 
-def video_properties_extractor(video: Path) -> VideoProperties:
-    cap = cv2.VideoCapture(str(video))
+def video_properties_extractor(video_path: Path) -> VideoProperties:
+    cap = cv2.VideoCapture(str(video_path))
     frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -39,17 +39,17 @@ def video_properties_extractor(video: Path) -> VideoProperties:
 
 
 def preprocess_and_store(
-    video: Path,
+    video_path: Path,
     version: str,
     sampled_fps: int,
     session_cls: sessionmaker[Session],
     metadata_extractor: Callable[[Path], VideoMetadata],
 ) -> None:
-    metadata = metadata_extractor(video)
-    properties = video_properties_extractor(video)
+    metadata = metadata_extractor(video_path)
+    properties = video_properties_extractor(video_path)
     assert properties.fps % sampled_fps == 0, "Sampled FPS must be a factor of the original FPS"
-    video_tracking = Video(
-        path=str(video),
+    video = Video(
+        path=str(video_path),
         version=version,
         start_time=metadata.start_time,
         width=properties.width,
@@ -61,18 +61,18 @@ def preprocess_and_store(
 
     with session_cls() as session:
         camera = session.execute(select(Camera).where(Camera.name == metadata.camera_name)).scalar_one()
-        camera.videos.append(video_tracking)
+        camera.videos.append(video)
         session.commit()
 
 
 def preprocess_videos(
-    videos: list[Path],
+    video_paths: list[Path],
     version: str,
     sampled_fps: int,
     engine: Engine,
     metadata_extractor: Callable[[Path], VideoMetadata],
 ) -> None:
     session_cls = sessionmaker(bind=engine)
-    assert all(video.exists() for video in videos), "All videos must exist"
-    for video in tqdm(videos, desc="Preprocessing videos"):
-        preprocess_and_store(video, version, sampled_fps, session_cls, metadata_extractor)
+    assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
+    for video_path in tqdm(video_paths, desc="Preprocessing videos"):
+        preprocess_and_store(video_path, version, sampled_fps, session_cls, metadata_extractor)
