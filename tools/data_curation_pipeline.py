@@ -216,10 +216,20 @@ class CurationPipeline:
         return pd.concat([source_df.iloc[deduplicated_indices], embedding_df[embedding_df["partition"] != source]])
 
 
+class SSLCurationPipeline:
+    def __init__(self) -> None:
+        pass
+
+    def load_tracking_data(self, source: str) -> pd.DataFrame:
+        pass
+
+
 if __name__ == "__main__":
-    cur = CurationPipeline(embedding_model_path="./models/efficient_net_pretrained.ckpt")
-    cur.curate_patitioned_dataset(
-        source="./data/splits/derived_data-spac_gorillas_converted_labels_cropped_faces-train-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15",
-        # source="./data/splits/ground_truth-cxl-face_image_detection_90degree-anno-seed-42-train-70-val-15-test-15",
-        destination="./data/embeddings/talk-to-kajo-test",
-    )
+    # cur = CurationPipeline(embedding_model_path="./models/efficient_net_pretrained.ckpt")
+    # cur.curate_patitioned_dataset(
+    #     source="./data/splits/derived_data-spac_gorillas_converted_labels_cropped_faces-train-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15",
+    #     # source="./data/splits/ground_truth-cxl-face_image_detection_90degree-anno-seed-42-train-70-val-15-test-15",
+    #     destination="./data/embeddings/talk-to-kajo-test",
+    # )
+    ssl_cur = SSLCurationPipeline()
+    ssl_cur.load_tracking_data(source="./data/derived_data/tracking_data.csv")
