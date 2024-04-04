@@ -7,8 +7,11 @@ import numpy as np
 import networkx as nx
 import logging
 import pandas as pd
+import hashlib
 import gorillatracker.model as model
 import gorillatracker.datasets.cxl as cxl
+
+from typing import Literal
 
 logger = logging.getLogger("GT-CurationPipeline")
 logger.setLevel(logging.INFO)
@@ -41,7 +44,7 @@ class CurationPipeline:
     https://arxiv.org/pdf/2304.07193.pdf
     """
 
-    def __init__(self, embedding_model_path: pathlib.Path, embedding_model=model.EfficientNetV2Wrapper):
+    def __init__(self, embedding_model_path: str, embedding_model=model.EfficientNetV2Wrapper):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dataset_class = cxl.CXLDataset
 
@@ -50,10 +53,14 @@ class CurationPipeline:
         self.num_workers = 8
 
         # curation settings
+        self.cache_dir = pathlib.Path("./data/embeddings")
+
         self.k_nearest_neighbors = 8  # number of nearest neighbors to consider for clustering
-        self.similarity_threshold_self = 0.17  # similarity threshold for self dedublication
-        self.number_of_representatives = 1  # number of representatives to keep from each cluster
-        self.similarity_threshold_relative = 0.2  # similarity threshold for relative dedublication
+        self.similarity_threshold_self = (
+            0.15  # similarity threshold for self dedublication. Higher values will result in more images being removed
+        )
+        self.number_of_representatives = 3  # number of representatives to keep from each cluster. Higher values will result in less images being removed
+        self.similarity_threshold_relative = 0.17  # similarity threshold for relative dedublication.  Higher values will result in more images being removed
 
         # setup embedding model
         self.embedding_model_path = embedding_model_path
@@ -67,41 +74,56 @@ class CurationPipeline:
 
     def curate_patitioned_dataset(self, source: str, destination: str) -> None:
         logger.info("Curating dataset from source: %s to destination: %s", source, destination)
-        partitions = ["test", "val"]  # TODO: replace with ["train", "val", "test"]
+        partitions = ["train", "val", "test"]
 
-        embeddings_by_partition = self._get_embeddings_by_partition(source=source, partitions=partitions)
-        embeddings_test_df = pd.DataFrame(embeddings_by_partition["test"])
-        embeddings_val_df = pd.DataFrame(embeddings_by_partition["val"])
-        # embeddings_train_df = pd.DataFrame(embeddings_by_partition["train"])
-        embeddings_test_df.to_csv(pathlib.Path(destination) / "test_partition_df.csv.", index=False)
-        embeddings_train_df.to_csv(pathlib.Path(destination) / "train_partition_df.csv.", index=False)
-        embeddings_val_df.to_csv(pathlib.Path(destination) / "val_partition_df.csv.", index=False)
+        embeddings_df = self._get_embeddings_by_partition(source=source, partitions=partitions)
+        dedublicated_embeddings_df = self._self_dedublication_by_partition(embeddings_df, partitions)
+        relative_deduplicated_embeddings_df = self._relative_dedublication(
+            dedublicated_embeddings_df, source="train", reference="test"
+        )
 
-        print(embeddings_test_df.shape)
+        print(embeddings_df["partition"].value_counts())
+        print(dedublicated_embeddings_df["partition"].value_counts())
+        print(relative_deduplicated_embeddings_df["partition"].value_counts())
+
+        dedublicated_embeddings_df.to_pickle(destination + "/deduplicated_embeddings.pkl")
+        relative_deduplicated_embeddings_df.to_pickle(destination + "/relative_embeddings.pkl")
 
     def _get_embeddings_by_partition(
-        self, source: str, destination: str, partitions: list[str], use_cache: bool = True, save_embeddings: bool = True
-    ) -> dict[str, list]:
-        """Retrieves the embeddigns for all partitions given from the source path"""
-        embeddings_by_partition = {}
+        self,
+        source: str,
+        partitions: list[str],
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
+        """Retrieves the embeddigns for all partitions given from the source path
+
+        Returns:
+            DataFrame in the format {"embedding": torch.Tensor, "path": str}
+        """
+        cache_destination = (
+            self.cache_dir
+            / f"{hashlib.sha256((source + str(self.embedding_model_path) + str(partitions)).encode()).hexdigest()}.pkl"
+        )
+        if use_cache and cache_destination.exists():
+            return pd.read_pickle(cache_destination)
+
+        embeddings_df_list = []
         for partition in partitions:
             logger.info("Gathering embeddings for partion: %s", partition)
-            cache_destination = pathlib.Path(destination) / f"{partition}_partition_df.csv"
 
-            if use_cache and cache_destination.exists():
-                embeddings_df = pd.read_csv(cache_destination)
-            else:
-                dataset = self.dataset_class(
-                    data_dir=source, partition=partition, transform=self.dataset_class.get_transforms()
-                )
-                embeddings, paths = self._get_embeddings(dataset)
-                embeddings_for_df = []
-                for embedding, path in zip(embeddings, paths):
-                    embeddings_for_df.append({"embedding": embedding, "path": path})
-                embeddings_df = pd.DataFrame(embeddings_for_df)
-                embeddings_df.to_csv(cache_destination, index=False)
+            dataset = self.dataset_class(
+                data_dir=source, partition=partition, transform=self.dataset_class.get_transforms()
+            )
+            embeddings, paths = self._get_embeddings(dataset)
 
-        return embeddings_by_partition
+            for embedding, path in zip(embeddings, paths):
+                embeddings_df_list.append({"partition": partition, "embedding": embedding.numpy(), "path": str(path)})
+
+        embeddings_df = pd.DataFrame(embeddings_df_list)
+        logger.info(f"Loaded embeddings for {len(embeddings_df)} images.")
+        embeddings_df.to_pickle(cache_destination)
+
+        return embeddings_df
 
     @torch.no_grad()
     def _get_embeddings(self, dataset: data_utils.Dataset) -> tuple[torch.Tensor, list[str]]:
@@ -111,14 +133,23 @@ class CurationPipeline:
         )
         embeddings = []
         for batch in tqdm.tqdm(dataloader):
-            embeddings.append(self.embedding_model(batch[0].to(self.device)))
+            embeddings.append(self.embedding_model(batch[0].to(self.device)).cpu())
 
         return torch.cat(embeddings, dim=0), dataset.samples
 
-    def _self_dedublication(self, embeddings: torch.Tensor) -> tuple[list[int], torch.Tensor]:
-        """Removes images that are too similar to each other"""
+    def _self_dedublication_by_partition(self, embedding_df: pd.DataFrame, partitions: Literal[str]) -> pd.DataFrame:
+        """Removes images that are too similar to each other within the same partition"""
+        deduplicated_embeddings_df = []
+        for partition in partitions:
+            logger.info("Deduplicating partition: %s", partition)
+            partition_df = embedding_df[embedding_df["partition"] == partition]
+            representatives_idx, _ = self._self_dedublication(np.vstack(partition_df["embedding"].to_numpy()))
+            deduplicated_embeddings_df.append(partition_df.iloc[representatives_idx])
 
-        embeddings = embeddings.cpu().numpy()
+        return pd.concat(deduplicated_embeddings_df)
+
+    def _self_dedublication(self, embeddings: np.ndarray) -> tuple[list[int], list[torch.Tensor]]:
+        """Removes images that are too similar to each other"""
         faiss.normalize_L2(embeddings)
 
         dimension = embeddings.shape[1]
@@ -128,7 +159,7 @@ class CurationPipeline:
         D, I = index.search(embeddings, self.k_nearest_neighbors + 1)
 
         G = nx.Graph()
-        for idx, distances in enumerate(D):
+        for idx, distances in enumerate(tqdm.tqdm(D)):
             for neighbor_idx, distance in zip(I[idx], distances):
                 if distance < self.similarity_threshold_self:
                     G.add_edge(idx, neighbor_idx)
@@ -137,7 +168,7 @@ class CurationPipeline:
         representatives = self._gather_representative_idxs(connected_components, self.number_of_representatives)
         deduplicated_embeddings = embeddings[representatives]
 
-        return representatives, torch.Tensor(deduplicated_embeddings)
+        return representatives, deduplicated_embeddings
 
     @staticmethod
     def _gather_representative_idxs(connected_components: list[set[int]], num_representatives: int) -> list[int]:
@@ -148,12 +179,15 @@ class CurationPipeline:
 
     def _relative_dedublication(
         self,
-        source_embeddings: torch.Tensor,
-        reference_embeddings: torch.Tensor,
-    ) -> tuple[list[int], torch.Tensor]:
+        embedding_df: pd.DataFrame,
+        source: Literal["train", "val", "test"],
+        reference: Literal["train", "val", "test"],
+    ) -> pd.DataFrame:
         """Removes images from source that are too similar to images from reference"""
-        source_embeddings = source_embeddings.cpu().numpy()
-        reference_embeddings = reference_embeddings.cpu().numpy()
+        source_df = embedding_df[embedding_df["partition"] == source]
+        reference_df = embedding_df[embedding_df["partition"] == reference]
+        source_embeddings = np.vstack(source_df["embedding"].to_list())
+        reference_embeddings = np.vstack(reference_df["embedding"].to_list())
         faiss.normalize_L2(source_embeddings)
         faiss.normalize_L2(reference_embeddings)
 
@@ -167,7 +201,7 @@ class CurationPipeline:
 
         G = nx.Graph()
         num_source_images = source_embeddings.shape[0]
-        for idx, similarities in enumerate(D):
+        for idx, similarities in enumerate(tqdm.tqdm(D)):
             for neighbor_idx, similarity in zip(I[idx], similarities):
                 if similarity < self.similarity_threshold_relative and neighbor_idx >= num_source_images:
                     G.add_edge(idx, neighbor_idx)
@@ -178,19 +212,14 @@ class CurationPipeline:
                 to_discard.update(component)
 
         deduplicated_indices = [i for i in range(num_source_images) if i not in to_discard]
-        relatively_deduplicated_embeddings = source_embeddings[deduplicated_indices]
 
-        return deduplicated_indices, torch.Tensor(relatively_deduplicated_embeddings)
-
-    def _self_supervised_sample_based_image_retrieval(self, embeddings: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError()
-
-    def _self_supervised_cluster_based_image_retrieval(self, embeddings: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError()
+        return pd.concat([source_df.iloc[deduplicated_indices], embedding_df[embedding_df["partition"] != source]])
 
 
-cur = CurationPipeline(embedding_model_path="./models/efficient_net_pretrained.ckpt")
-cur.curate_patitioned_dataset(
-    source="./data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
-    destination="./data/splits/talk-to-kajo-test",
-)
+if __name__ == "__main__":
+    cur = CurationPipeline(embedding_model_path="./models/efficient_net_pretrained.ckpt")
+    cur.curate_patitioned_dataset(
+        source="./data/splits/derived_data-spac_gorillas_converted_labels_cropped_faces-train-openset-reid-val-10-test-10-mintraincount-3-seed-42-train-70-val-15-test-15",
+        # source="./data/splits/ground_truth-cxl-face_image_detection_90degree-anno-seed-42-train-70-val-15-test-15",
+        destination="./data/embeddings/talk-to-kajo-test",
+    )

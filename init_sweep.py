@@ -48,26 +48,6 @@ sweeps = [
             "weight_decay": {"values": [0.2, 0.5]},
         },
     },
-    {
-        "project_name": "Embedding-ConvNeXtV2-CXL-Open",
-        "entity": "gorillas",
-        "config_path": "./cfgs/convnextv2_cxl.yml",
-        "parameters": {
-            "loss_mode": {"values": ["offline/native", "online/soft"]},
-            "embedding_size": {"values": [128, 256]},
-            "weight_decay": {"values": [0.2, 0.5]},
-        },
-    },
-    {
-        "project_name": "Embedding-ViT-CXL-OpenSet",
-        "entity": "gorillas",
-        "config_path": "./cfgs/visiontransformer_cxl.yml",
-        "parameters": {
-            "loss_mode": {"values": ["offline/native", "online/soft"]},
-            "embedding_size": {"values": [128, 256]},
-            "weight_decay": {"values": [0.2, 0.5]},
-        },
-    },
 ]
 
 check_sweep_configs(sweeps)
