@@ -3,12 +3,12 @@ This module contains pre-defined database queries.
 """
 
 from pathlib import Path
-from typing import Sequence
+from typing import Optional, Sequence
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -46,7 +46,7 @@ def associated_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tupl
 
 
 def min_count_filter(
-    query: Select[tuple[TrackingFrameFeature]], min_feature_count: int, feature_type: str | None = None
+    query: Select[tuple[TrackingFrameFeature]], min_feature_count: int, feature_type: Optional[str] = None
 ) -> Select[tuple[TrackingFrameFeature]]:
     """
     Filters the query to include only TrackingFrameFeature instances that belong to trackings with at least `min_feature_count` features of the specified `feature_type`.

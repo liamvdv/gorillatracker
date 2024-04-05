@@ -1,9 +1,8 @@
 import logging
 from colorsys import hsv_to_rgb
 from concurrent.futures import ProcessPoolExecutor
-from itertools import zip_longest
 from pathlib import Path
-from typing import Sequence
+from typing import Optional, Sequence
 
 import cv2
 from sqlalchemy import Engine
@@ -17,7 +16,7 @@ from gorillatracker.ssl_pipeline.queries import load_video, video_filter
 log = logging.getLogger(__name__)
 
 
-def id_to_color(track_id: int | None) -> tuple[int, int, int]:
+def id_to_color(track_id: Optional[int]) -> tuple[int, int, int]:
     """Convert a tracking ID to a color. (BGR)"""
     if track_id is None:
         return 0, 0, 255
