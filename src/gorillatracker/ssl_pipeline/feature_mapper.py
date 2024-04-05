@@ -1,6 +1,6 @@
-from itertools import product
 import logging
 from dataclasses import dataclass
+from itertools import product
 from pathlib import Path
 from typing import Protocol, Sequence
 
