@@ -147,10 +147,10 @@ if __name__ == "__main__":
         query = min_count_filter(query, 10)
         return query
 
-    # shutil.rmtree("cropped_images")
+    shutil.rmtree("cropped_images")
 
     session_cls = sessionmaker(bind=engine)
-    version = "TODO"  # TODO(memben)
+    version = "2024-04-03"  # TODO(memben)
 
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()
