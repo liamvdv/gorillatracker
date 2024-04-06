@@ -93,8 +93,8 @@ def feature_type_filter(
         return filter(lambda x: x.type in self.feature_types, frame_features)
     ```
     """
-    query = query.where(TrackingFrameFeature.type.in_(feature_types))
-    return query
+    return query.where(TrackingFrameFeature.type.in_(feature_types))
+
 
 
 def confidence_filter(

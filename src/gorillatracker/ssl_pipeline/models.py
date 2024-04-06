@@ -221,7 +221,7 @@ class TrackingFrameFeature(Base):
         return frame_nr
 
     def __hash__(self) -> int:
-        return hash((self.tracking_id, self.frame_nr, self.type))
+        return hash(self.tracking_frame_feature_id)
 
     def __repr__(self) -> str:
         return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
