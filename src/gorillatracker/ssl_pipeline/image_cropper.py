@@ -78,7 +78,7 @@ def create_crop_tasks(
     sampler: Sampler,
     session_cls: sessionmaker[Session],
     dest_base_path: Path,
-) -> deque[CropTask]:
+) -> list[CropTask]:
     with session_cls() as session:
         video = load_video(session, video_path, version)
         dest_path = dest_base_path / version / video.camera.name / video_path.name
@@ -89,22 +89,22 @@ def create_crop_tasks(
             )
             for feature in frame_features
         ]
+    return crop_tasks
+
+
+def crop_from_video(video_path: Path, crop_tasks: list[CropTask]) -> None:
     crop_queue = deque(sorted(crop_tasks))
-    return crop_queue
-
-
-def crop_from_video(video_path: Path, crop_tasks: deque[CropTask]) -> None:
     with video_reader(video_path) as video_feed:
         for video_frame in video_feed:
-            while crop_tasks and video_frame.frame_nr == crop_tasks[0].frame_nr:
-                crop_task = crop_tasks.popleft()
+            while crop_queue and video_frame.frame_nr == crop_queue[0].frame_nr:
+                crop_task = crop_queue.popleft()
                 cropped_frame = video_frame.frame[
                     crop_task.bounding_box.y_top_left : crop_task.bounding_box.y_bottom_right,
                     crop_task.bounding_box.x_top_left : crop_task.bounding_box.x_bottom_right,
                 ]
                 crop_task.dest.parent.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(str(crop_task.dest), cropped_frame)
-        assert not crop_tasks, "Not all crop tasks were completed"
+        assert not crop_queue, "Not all crop tasks were completed"
 
 
 def crop(
