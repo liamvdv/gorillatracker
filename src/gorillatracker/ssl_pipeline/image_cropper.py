@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import random
 from collections import deque
@@ -14,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.queries import load_video
 
 log = logging.getLogger(__name__)
 
@@ -69,17 +72,16 @@ def destination_path(base_path: Path, feature: TrackingFrameFeature) -> Path:
     return Path(base_path, str(feature.tracking.tracking_id), f"{feature.frame_nr}.png")
 
 
-def crop_from_video(
-    video: Video,
+def create_crop_tasks(
+    video_path: Path,
+    version: str,
     sampler: Sampler,
     session_cls: sessionmaker[Session],
     dest_base_path: Path,
-) -> None:
-
+) -> deque[CropTask]:
     with session_cls() as session:
-        session.add(video)
-        video_path = Path(video.path)
-        dest_path = dest_base_path / video.camera.name / video_path.name
+        video = load_video(session, video_path, version)
+        dest_path = dest_base_path / version / video.camera.name / video_path.name
         frame_features = sampler.sample(video.video_id, session)
         crop_tasks = [
             CropTask(
@@ -87,25 +89,38 @@ def crop_from_video(
             )
             for feature in frame_features
         ]
-
-    print(len(crop_tasks))
     crop_queue = deque(sorted(crop_tasks))
+    return crop_queue
 
-    if not crop_queue:
-        log.warning(f"No frames to crop for video: {video}")
-        return
 
+def crop_from_video(video_path: Path, crop_tasks: deque[CropTask]) -> None:
     with video_reader(video_path) as video_feed:
         for video_frame in video_feed:
-            while crop_queue and video_frame.frame_nr == crop_queue[0].frame_nr:
-                crop_task = crop_queue.popleft()
+            while crop_tasks and video_frame.frame_nr == crop_tasks[0].frame_nr:
+                crop_task = crop_tasks.popleft()
                 cropped_frame = video_frame.frame[
                     crop_task.bounding_box.y_top_left : crop_task.bounding_box.y_bottom_right,
                     crop_task.bounding_box.x_top_left : crop_task.bounding_box.x_bottom_right,
                 ]
                 crop_task.dest.parent.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(str(crop_task.dest), cropped_frame)
-        assert not crop_queue, "Not all crop tasks were completed"
+        assert not crop_tasks, "Not all crop tasks were completed"
+
+
+def crop(
+    video_path: Path,
+    version: str,
+    sampler: Sampler,
+    session_cls: sessionmaker[Session],
+    dest_base_path: Path,
+) -> None:
+    crop_tasks = create_crop_tasks(video_path, version, sampler, session_cls, dest_base_path)
+
+    if not crop_tasks:
+        log.warning(f"No frames to crop for video: {video_path}")
+        return
+
+    crop_from_video(video_path, crop_tasks)
 
 
 if __name__ == "__main__":
@@ -135,14 +150,17 @@ if __name__ == "__main__":
     # shutil.rmtree("cropped_images")
 
     session_cls = sessionmaker(bind=engine)
+    version = "TODO"  # TODO(memben)
 
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()
+        video_paths = [Path(video.path) for video in videos]
 
-    for video in tqdm(videos):
+    for video_path in tqdm(video_paths):
         query = partial(sampling_strategy, min_n_images_per_tracking=10)
-        crop_from_video(
-            video,
+        crop(
+            video_path,
+            version,
             RandomSampler(query_builder=query, seed=42, n_samples=10),
             session_cls,
             Path("cropped_images"),

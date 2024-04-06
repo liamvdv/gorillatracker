@@ -96,7 +96,6 @@ def feature_type_filter(
     return query.where(TrackingFrameFeature.type.in_(feature_types))
 
 
-
 def confidence_filter(
     query: Select[tuple[TrackingFrameFeature]], min_confidence: float
 ) -> Select[tuple[TrackingFrameFeature]]:
