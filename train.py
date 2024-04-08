@@ -104,8 +104,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             # we will resume via trainer.fit(ckpt_path=...)
         else:  # load only weights
             model = model_cls(**model_args)  # type: ignore
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
-            model.load_state_dict(torch_load["state_dict"], strict=False)
+            # torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
+            # model.load_state_dict(torch_load["state_dict"], strict=False)
     else:
         model = model_cls(**model_args)  # type: ignore
 
@@ -153,7 +153,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         every_n_epochs=int(args.save_interval),
     )
 
-    early_stopping = EarlyStopping(
+    early_stopping = EarlyStopping( 
         monitor="val/loss",
         mode="min",
         min_delta=args.min_delta,
@@ -216,12 +216,12 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
-        # # delete everything in model except model.model
+        #delete everything in model except model.model
         # for k in list(model.__dict__.keys()):
         #     if k != "model" and not k.startswith("_"):
         #         del model.__dict__[k]
         # # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
-        # torch.save(model.state_dict(), "swin_base.pth")
+        # torch.save(model.state_dict(), "inceptionv3.pth")
         
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
@@ -241,7 +241,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/config.yml"
+    config_path = "./cfgs/inceptionv3_cxl.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments

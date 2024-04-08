@@ -39,13 +39,14 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
 
 sweeps = [
     {
-        "project_name": "Embedding-ResNet152-CXL-Open",
+        "project_name": "Dante-Sweep-Embedding-Size",
         "entity": "gorillas",
-        "config_path": "./cfgs/resnet152_cxl.yml",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
         "parameters": {
-            "initial_lr": {"values": [1e-3, 1e-4, 1e-5, 1e-6]},
-            "l2_alpha": {"values": [1e-2, 1e-3, 1e-4, 1e-5]},
-            "l2_beta": {"values": [1e-2, 1e-3, 1e-4]},
+            "embedding_size": {'values': [16, 32, 64, 128, 256, 512, 1024]},
+            # "initial_lr": {"values": [1e-3, 1e-4, 1e-5, 1e-6]},
+            # "l2_alpha": {"values": [1e-2, 1e-3, 1e-4]},
+            # "l2_beta": {"values": [1e-2, 1e-3, 1e-4]},
         },
     },
 ]
