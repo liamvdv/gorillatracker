@@ -76,6 +76,7 @@ dependencies:
       - colorcet
       - grad-cam
       - facenet_pytorch
+      - typer
 
 
 # Non-standard section listing target platforms for conda-lock:
