@@ -16,8 +16,11 @@ import logging
 import random
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import correlate_videos
+from gorillatracker.ssl_pipeline.queries import load_processed_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict_and_store, multiprocess_track_and_store
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
@@ -50,8 +53,16 @@ def visualize_pipeline(
         None, the visualizations are saved to the destination and to the SSLDataset.
     """
 
-    random.seed(42)  # For reproducibility
     videos = sorted(dataset.video_paths)
+
+    # NOTE(memben): For the production pipeline we should do this for every step
+    # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
+    with Session(dataset.engine) as session:
+        preprocessed_videos = load_processed_videos(session, version, [])
+        preprocessed_video_paths = [Path(v.path) for v in preprocessed_videos]
+        videos = [v for v in videos if v not in preprocessed_video_paths]
+
+    random.seed(42)  # For reproducibility
     to_track = random.sample(videos, n_videos)
 
     preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
@@ -68,7 +79,7 @@ def visualize_pipeline(
         gpus=gpus,
     )
 
-    for yolo_model, yolo_kwargs, correlator, type in dataset.feature_models():
+    for yolo_model, yolo_kwargs, _, type in dataset.feature_models():
         multiprocess_predict_and_store(
             version,
             yolo_model,
@@ -79,6 +90,8 @@ def visualize_pipeline(
             max_worker_per_gpu=max_worker_per_gpu,
             gpus=gpus,
         )
+
+    for _, _, correlator, type in dataset.feature_models():
         correlate_videos(
             version,
             to_track,
@@ -93,13 +106,15 @@ def visualize_pipeline(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
-    dataset.setup_database()
-    dataset.setup_cameras()
+    # NOTE(memben): for setup only once
+    if False:
+        dataset.setup_database()
+        dataset.setup_cameras()
     visualize_pipeline(
         dataset,
-        "2024-04-03",
+        "2024-04-09",
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=40,
+        n_videos=20,
         max_worker_per_gpu=12,
         gpus=[0],
     )

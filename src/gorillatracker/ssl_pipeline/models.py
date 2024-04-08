@@ -126,6 +126,8 @@ class ProcessedVideoFrameFeature(Base):
 
     video: Mapped[Video] = relationship(back_populates="processed_video_frame_features")
 
+    __table_args__ = (UniqueConstraint("video_id", "type"),)
+
 
 class VideoFeature(Base):
     __tablename__ = "video_feature"

@@ -8,7 +8,7 @@ from typing import Optional, Sequence
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import ProcessedVideoFrameFeature, TrackingFrameFeature, Video
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -136,3 +136,15 @@ def load_videos(session: Session, video_paths: list[Path], version: str) -> Sequ
         .scalars()
         .all()
     )
+
+
+def load_processed_videos(session: Session, version: str, required_feature_types: list[str]) -> Sequence[Video]:
+    stmt = select(Video).where(Video.version == version)
+    if required_feature_types:
+        stmt = (
+            stmt.join(ProcessedVideoFrameFeature)
+            .where(ProcessedVideoFrameFeature.type.in_(required_feature_types))
+            .group_by(Video.video_id)
+            .having(func.count(ProcessedVideoFrameFeature.type.distinct()) == len(required_feature_types))
+        )
+    return session.execute(stmt).scalars().all()

@@ -1,4 +1,5 @@
 import logging
+import os
 from colorsys import hsv_to_rgb
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -55,6 +56,7 @@ def render_on_frame(
 
 def visualize_video(video_path: Path, version: str, session_cls: sessionmaker[Session], dest: Path) -> None:
     assert video_path.exists()
+    os.makedirs(dest.parent, exist_ok=True)
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
