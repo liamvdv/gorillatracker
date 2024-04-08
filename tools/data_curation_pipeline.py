@@ -10,6 +10,7 @@ import pandas as pd
 import hashlib
 import gorillatracker.model as model
 import gorillatracker.datasets.cxl as cxl
+import gorillatracker.datasets.spac_videos as spac_videos
 
 from typing import Literal
 
@@ -72,7 +73,7 @@ class CurationPipeline:
 
         logger.info("CurationPipeline successfully initialized!")
 
-    def curate_patitioned_dataset(self, source: str, destination: str) -> None:
+    def curate_patitioned_dataset(self, source: str, destination: str) ->                                                                                                                                                                                                                                      :
         logger.info("Curating dataset from source: %s to destination: %s", source, destination)
         partitions = ["train", "val", "test"]
 
@@ -216,12 +217,15 @@ class CurationPipeline:
         return pd.concat([source_df.iloc[deduplicated_indices], embedding_df[embedding_df["partition"] != source]])
 
 
-class SSLCurationPipeline:
-    def __init__(self) -> None:
-        pass
-
-    def load_tracking_data(self, source: str) -> pd.DataFrame:
-        pass
+class SSLCurationPipeline(CurationPipeline):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.dataset_class = spac_videos.SPACVideosDataset
+    
+    def curate_patitioned_dataset(self, source: str, destination: str) -> None:
+        return super().curate_patitioned_dataset(source, destination)
+    
+    
 
 
 if __name__ == "__main__":
@@ -231,5 +235,10 @@ if __name__ == "__main__":
     #     # source="./data/splits/ground_truth-cxl-face_image_detection_90degree-anno-seed-42-train-70-val-15-test-15",
     #     destination="./data/embeddings/talk-to-kajo-test",
     # )
-    ssl_cur = SSLCurationPipeline()
-    ssl_cur.load_tracking_data(source="./data/derived_data/tracking_data.csv")
+
+    samples = spac_videos.get_samples_video(
+        pathlib.Path("./data/derived_data/spac_gorillas_converted_labels_cropped_faces/train")
+    )
+    print(len(samples))
+    # ssl_cur = SSLCurationPipeline()
+    # ssl_cur.load_tracking_data(source="./data/derived_data/tracking_data.csv")
