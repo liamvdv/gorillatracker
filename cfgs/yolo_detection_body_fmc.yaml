@@ -1,0 +1,10 @@
+# fmc for female, male and child
+path: /workspaces/gorillatracker/data/splits/ground_truth-cxl-body_image_detection_female_male_child-anno-seed-42-train-70-val-15-test-15
+train: train
+val: val
+test: test
+
+names:
+  0: female
+  1: male
+  2: child

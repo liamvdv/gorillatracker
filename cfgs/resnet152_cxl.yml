@@ -12,7 +12,7 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ResNet152-CXL-OpenSet" # WandB project name
-run_name: "115-run-exploratory-sweeps-low-learning-rate-different-modes" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "180-add-dates-l2sp-loss" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["sweep"]            # WandB tags for experiment tracking
 model_name_or_path: "ResNet152"  # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
@@ -33,12 +33,17 @@ beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
+# L2SP Arguments
+l2_alpha: 0.1                       # Alpha for the l2sp loss
+l2_beta: 0.01                       # Beta for the l2sp loss
+path_to_pretrained_weights: "./models/resnet152_pretrained.ckpt"    # Path to the pretrained weights for the l2sp loss
+
 margin: 1.0                   # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "online/soft/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 
 lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 

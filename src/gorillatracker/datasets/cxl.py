@@ -60,6 +60,8 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
 
         self.transform = transform
 
+        self.partition = partition
+
     def __len__(self) -> int:
         return len(self.samples)
 
@@ -68,6 +70,11 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
+
+        # save img
+        # img2 = transforms.ToPILImage()(img)
+        # img2.save(f"img_{self.partition}.png")
+
         return img, label
 
     @classmethod
