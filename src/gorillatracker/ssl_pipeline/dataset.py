@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.models import Base, Camera
 from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
+from gorillatracker.ssl_pipeline.helpers import read_timestamp
 
 log = logging.getLogger(__name__)
 
@@ -137,11 +138,7 @@ class GorillaDataset(SSLDataset):
     def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
-        timestamps_path = "data/derived_data/timestamps.json"
-        with open(timestamps_path, "r") as f:
-            timestamps = json.load(f)
         date = datetime.strptime(date_str, "%Y%m%d")
-        timestamp = timestamps[video_path.stem]
-        daytime = datetime.strptime(timestamp, "%I:%M %p")
-        date = datetime.combine(date, daytime.time())
+        daytime = read_timestamp(video_path)
+        date = datetime.combine(date, daytime)
         return VideoMetadata(camera_name, date)
