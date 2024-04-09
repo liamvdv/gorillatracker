@@ -4,14 +4,13 @@ import logging
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import time
 from itertools import groupby
 from pathlib import Path
 from typing import Generator, Sequence
 
-from datetime import time
-import easyocr
-
 import cv2
+import easyocr
 from shapely.geometry import Polygon
 
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
@@ -150,7 +149,9 @@ def remove_processed_videos(video_paths: list[Path], processed_videos: list[Vide
     return [v for v in video_paths if v not in processed_video_paths]
 
 
-def read_timestamp(video_path: Path, left: float = 0.61, top: float = 0.9, right: float = 0.75, bottom: float = 1.0) -> time:
+def read_timestamp(
+    video_path: Path, left: float = 0.61, top: float = 0.9, right: float = 0.75, bottom: float = 1.0
+) -> time:
     """
     Extracts the time stamp from the video file.
     Args:

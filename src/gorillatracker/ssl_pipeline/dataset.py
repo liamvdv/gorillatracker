@@ -14,9 +14,9 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
+from gorillatracker.ssl_pipeline.helpers import read_timestamp
 from gorillatracker.ssl_pipeline.models import Base, Camera
 from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
-from gorillatracker.ssl_pipeline.helpers import read_timestamp
 
 log = logging.getLogger(__name__)
 
