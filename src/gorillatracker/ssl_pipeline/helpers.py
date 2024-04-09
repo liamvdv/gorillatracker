@@ -11,7 +11,7 @@ from typing import Generator, Sequence
 import cv2
 from shapely.geometry import Polygon
 
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
 log = logging.getLogger(__name__)
 
@@ -140,3 +140,8 @@ def groupby_frame(
     for frame_nr, features in groupby(sorted_features, key=lambda x: x.frame_nr):
         frame_features[frame_nr] = list(features)
     return frame_features
+
+
+def remove_processed_videos(video_paths: list[Path], processed_videos: list[Video]) -> list[Path]:
+    processed_video_paths = [Path(v.path) for v in processed_videos]
+    return [v for v in video_paths if v not in processed_video_paths]

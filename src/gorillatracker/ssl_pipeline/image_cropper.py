@@ -150,7 +150,7 @@ if __name__ == "__main__":
     shutil.rmtree("cropped_images")
 
     session_cls = sessionmaker(bind=engine)
-    version = "2024-04-03"  # TODO(memben)
+    version = "2024-04-09"  # TODO(memben)
 
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import correlate_videos
+from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.queries import load_processed_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict_and_store, multiprocess_track_and_store
@@ -53,17 +54,16 @@ def visualize_pipeline(
         None, the visualizations are saved to the destination and to the SSLDataset.
     """
 
-    videos = sorted(dataset.video_paths)
+    video_paths = sorted(dataset.video_paths)
 
     # NOTE(memben): For the production pipeline we should do this for every step
     # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
     with Session(dataset.engine) as session:
-        preprocessed_videos = load_processed_videos(session, version, [])
-        preprocessed_video_paths = [Path(v.path) for v in preprocessed_videos]
-        videos = [v for v in videos if v not in preprocessed_video_paths]
+        preprocessed_videos = list(load_processed_videos(session, version, []))
+        video_paths = remove_processed_videos(video_paths, preprocessed_videos)
 
     random.seed(42)  # For reproducibility
-    to_track = random.sample(videos, n_videos)
+    to_track = random.sample(video_paths, n_videos)
 
     preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
 
