@@ -93,8 +93,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         metrics = {
             "knn5": partial(knn, k=5),
             "knn": partial(knn, k=1),
-            "pca": pca,
-            "tsne": tsne,
+            "pca": lambda *args, **kwargs: wandb.Image(pca(*args, **kwargs)),
+            "tsne": lambda *args, **kwargs: wandb.Image(tsne(*args, **kwargs)),
             "fc_layer": fc_layer,
         }
         metrics |= (
@@ -553,8 +553,8 @@ if __name__ == "__main__":
         data=data,
         embedding_name="run_MNISTTest5-2023-11-11-15-17-17_epoch_10:v0",
         metrics={
-            "pca": pca,
-            "tsne": tsne,
+            "pca": lambda *args, **kwargs: wandb.Image(pca(*args, **kwargs)),
+            "tsne": lambda *args, **kwargs: wandb.Image(tsne(*args, **kwargs)),
             "knn": knn,
             "flda": flda_metric,
             "fc_layer": fc_layer,

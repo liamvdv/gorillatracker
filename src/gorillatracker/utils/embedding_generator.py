@@ -188,6 +188,8 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
             "loss_mode",
             "weight_decay",
             "lr_schedule",
+            "stepwise_schedule",
+            "lr_interval",
             "warmup_mode",
             "warmup_epochs",
             "max_epochs",
@@ -196,6 +198,9 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
             "end_lr",
             "beta1",
             "beta2",
+            "l2_alpha",
+            "l2_beta",
+            "path_to_pretrained_weights"
             # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }
