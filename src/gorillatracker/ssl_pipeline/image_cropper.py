@@ -3,15 +3,15 @@ from __future__ import annotations
 import logging
 import random
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Callable, Iterator
-from concurrent.futures import ProcessPoolExecutor
 
 import cv2
-from sqlalchemy import Select, select, Engine
+from sqlalchemy import Engine, Select, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset
@@ -106,20 +106,21 @@ def crop_from_video(video_path: Path, crop_tasks: list[CropTask]) -> None:
                 crop_task.dest.parent.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(str(crop_task.dest), cropped_frame)
         assert not crop_queue, "Not all crop tasks were completed"
-    
+
+
 _version = None
 _session_cls = None
 _sampler = None
+
 
 def _init_cropper(engine: Engine, version: str, sampler: Sampler) -> None:
     global _version, _session_cls, _sampler
     _version = version
     _sampler = sampler
-    engine.dispose(
-        close = False
-    )
+    engine.dispose(close=False)
     _session_cls = sessionmaker(bind=engine)
-    
+
+
 def _multiprocess_crop(
     video_path: Path,
     dest_base_path: Path,
@@ -135,9 +136,14 @@ def _multiprocess_crop(
         return
 
     crop_from_video(video_path, crop_tasks)
-    
-def multipricess_crop_from_video(video_paths: list[Path], version: str, sampler: Sampler, engine: Engine, dest_base_path: Path) -> None:
-    with ProcessPoolExecutor(initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=10) as executor:
+
+
+def multipricess_crop_from_video(
+    video_paths: list[Path], version: str, sampler: Sampler, engine: Engine, dest_base_path: Path
+) -> None:
+    with ProcessPoolExecutor(
+        initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=10
+    ) as executor:
         list(
             tqdm(
                 executor.map(_multiprocess_crop, video_paths, [dest_base_path] * len(video_paths)),
@@ -146,6 +152,7 @@ def multipricess_crop_from_video(video_paths: list[Path], version: str, sampler:
                 unit="video",
             )
         )
+
 
 if __name__ == "__main__":
     import shutil
@@ -180,7 +187,7 @@ if __name__ == "__main__":
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()
         video_paths = [Path(video.path) for video in videos]
-        
+
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = RandomSampler(query_builder=query, n_samples=10)
     multipricess_crop_from_video(video_paths[:20], version, sampler, engine, Path("cropped_images"))
