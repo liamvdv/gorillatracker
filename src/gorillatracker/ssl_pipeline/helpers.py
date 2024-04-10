@@ -163,35 +163,52 @@ def read_timestamp(
     Returns:
         time: time stamp as time object
     """
-    # open the video file
-    assert video_path.exists(), f"Video file {video_path} does not exist"
+    frame = _get_first_frame(video_path)
+    cropped_frame = _crop_frame(frame, left, top, right, bottom)
+    time_stamp = _extract_time_stamp(cropped_frame)
+    return time_stamp
+
+
+def _get_first_frame(video_path: Path) -> cv2.typing.MatLike:
+    """ Reads the first frame from the video file."""
     cap = cv2.VideoCapture(str(video_path))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    x_left, y_top, x_right, y_bottom = int(left * width), int(top * height), int(right * width), int(bottom * height)
-    crop_area = (x_left, y_top, x_right, y_bottom)
-    # read and crop frame
-    frame = cap.read()[1]
-    cropped_frame = frame[crop_area[1] : crop_area[3], crop_area[0] : crop_area[2]]
-    cropped_frame_rgb = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB)
-    reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-    # extract timestamp
-    extracted_time_stamp_raw = reader.readtext(cropped_frame_rgb)
-    time_stamp = "".join([text[1] for text in extracted_time_stamp_raw])
-    # clean up timestamp
-    time_stamp = time_stamp.replace(" ", "")
-    time_stamp = time_stamp.replace(":", "")
-    time_stamp = time_stamp.replace("O", "0")
-    time_stamp = time_stamp.replace("o", "0")
+    assert cap.isOpened(), f"Could not open video file: {video_path}"
+    ret, frame = cap.read()
     cap.release()
+    assert ret, f"Could not read first frame from video file: {video_path}"
+    return frame
+
+def _crop_frame(frame: cv2.typing.MatLike, left: float = 0.61, top: float = 0.9, right: float = 0.75, bottom: float = 1.0):
+    """crop the frame to the specified area in % of the frame size."""
+    width = frame.shape[1]
+    height = frame.shape[0]
+    x_left, y_top, x_right, y_bottom = int(left * width), int(top * height), int(right * width), int(bottom * height)
+    cropped_frame = frame[y_top:y_bottom, x_left:x_right]
+    return cropped_frame
+
+def _extract_time_stamp(cropped_frame: cv2.typing.MatLike) -> time:
+    """Extracts the time stamp from the cropped frame."""
+    rgb_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB)
+    reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+    extracted_time_stamp_raw = reader.readtext(rgb_frame)
+    time_stamp = "".join([text[1] for text in extracted_time_stamp_raw])
+    time_stamp = _clean_time_stamp(time_stamp)
     try:
         h = int(time_stamp[:2])
         m = int(time_stamp[2:4])
         am = True if time_stamp[4:6].lower() == "am" else False
     except ValueError:
-        raise ValueError(f"Could not extract time stamp from {video_path}")
+        raise ValueError(f"Could not extract time stamp from frame")
     if not am and h < 12:
         h += 12
     if am and h == 12:
         h = 0
     return time(h, m)
+
+def _clean_time_stamp(time_stamp:str) -> str:
+    """Cleans the extracted time stamp for ocr errors."""
+    time_stamp = time_stamp.replace(" ", "")
+    time_stamp = time_stamp.replace(":", "")
+    time_stamp = time_stamp.replace("O", "0")
+    time_stamp = time_stamp.replace("o", "0")
+    return time_stamp
