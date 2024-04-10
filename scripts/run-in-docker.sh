@@ -91,12 +91,12 @@ fi
 
 # --user $(id -u):$(id -g) \ # use root user instead
 
-docker run --rm -it --ipc=host \
+docker run --rm -it --ipc=host --network=host \
     -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
     -v "/scratch2/gorillatracker/data:/workspaces/gorillatracker/data:ro" \
     -v "/scratch2/gorillatracker/data/splits:/workspaces/gorillatracker/data/splits:ro" \
     -v "/scratch2/gorillatracker/models:/workspaces/gorillatracker/models" \
-    -v "/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", \
+    -v "/scratch1/wildlife_conservation_data/spac_gorillas_converted:/workspaces/gorillatracker/video_data:ro" \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
     --gpus=\"device=${gpus}\" \
