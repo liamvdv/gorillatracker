@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple, Union
 
-import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -70,7 +69,7 @@ class SPACVideosDataset(Dataset[Tuple[Image.Image, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str]:
+    def __getitem__(self, idx: int) -> Tuple[Image.Image, str]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
