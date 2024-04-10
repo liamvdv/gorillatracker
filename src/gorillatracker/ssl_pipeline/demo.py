@@ -19,7 +19,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
-from gorillatracker.ssl_pipeline.feature_mapper import correlate_videos
+from gorillatracker.ssl_pipeline.feature_mapper import _multiprocess_correlate_videos
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.queries import load_processed_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
@@ -92,7 +92,7 @@ def visualize_pipeline(
         )
 
     for _, _, correlator, type in dataset.feature_models():
-        correlate_videos(
+        _multiprocess_correlate_videos(
             version,
             to_track,
             dataset.engine,
