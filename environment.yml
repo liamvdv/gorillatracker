@@ -60,6 +60,7 @@ dependencies:
   - pip
   - pip:
       - pipx
+       # NOTE(memben): 🚩 see end of dockerfile, needed to fix dependency hell, https://github.com/ultralytics/ultralytics/issues/1270
       - opencv-python-headless
       - psycopg2-binary
       - sqlalchemy
@@ -68,8 +69,6 @@ dependencies:
       - print-on-steroids[exceptions]
       - ultralytics 
       - lapx>=0.5.2 # for ultralytics tracking
-      # - opencv-python-headless # NOTE(memben): 🚩 see end of dockerfile, needed to fix dependency hell
-      # https://github.com/ultralytics/ultralytics/issues/1270
       - types-PyYAML
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
