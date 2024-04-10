@@ -136,8 +136,8 @@ def _multiprocess_crop(
 
     crop_from_video(video_path, crop_tasks)
     
-def multipricess_crop_from_video(video_paths: list[Path], version: str, sampler: Sampler, session_cls: sessionmaker[Session], dest_base_path: Path) -> None:
-    with ProcessPoolExecutor(initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=4) as executor:
+def multipricess_crop_from_video(video_paths: list[Path], version: str, sampler: Sampler, engine: Engine, dest_base_path: Path) -> None:
+    with ProcessPoolExecutor(initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=10) as executor:
         list(
             tqdm(
                 executor.map(_multiprocess_crop, video_paths, [dest_base_path] * len(video_paths)),
@@ -146,22 +146,6 @@ def multipricess_crop_from_video(video_paths: list[Path], version: str, sampler:
                 unit="video",
             )
         )
-
-def crop(
-    video_path: Path,
-    version: str,
-    sampler: Sampler,
-    session_cls: sessionmaker[Session],
-    dest_base_path: Path,
-) -> None:
-    crop_tasks = create_crop_tasks(video_path, version, sampler, session_cls, dest_base_path)
-
-    if not crop_tasks:
-        log.warning(f"No frames to crop for video: {video_path}")
-        return
-
-    crop_from_video(video_path, crop_tasks)
-
 
 if __name__ == "__main__":
     import shutil
@@ -199,14 +183,4 @@ if __name__ == "__main__":
         
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = RandomSampler(query_builder=query, n_samples=10)
-    multipricess_crop_from_video(video_paths[:20], version, sampler, session_cls, Path("cropped_images"))
-
-    # for video_path in tqdm(video_paths):
-    #     query = partial(sampling_strategy, min_n_images_per_tracking=10)
-    #     crop(
-    #         video_path,
-    #         version,
-    #         RandomSampler(query_builder=query, seed=42, n_samples=10),
-    #         session_cls,
-    #         Path("cropped_images"),
-    #     )
+    multipricess_crop_from_video(video_paths[:20], version, sampler, engine, Path("cropped_images"))
