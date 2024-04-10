@@ -123,6 +123,7 @@ def crop(
     crop_from_video(video_path, crop_tasks)
 
 
+# TODO(memben): cleanup 
 if __name__ == "__main__":
     import shutil
 
@@ -150,7 +151,7 @@ if __name__ == "__main__":
     shutil.rmtree("cropped_images")
 
     session_cls = sessionmaker(bind=engine)
-    version = "2024-04-09"  # TODO(memben)
+    version = "2024-04-09"  
 
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()

@@ -29,7 +29,6 @@ from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 log = logging.getLogger(__name__)
 
 
-# TODO(memben): allow disrupting the pipeline at any point and resuming from that point
 def visualize_pipeline(
     dataset: SSLDataset,
     version: str,
