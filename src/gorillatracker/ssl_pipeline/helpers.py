@@ -145,3 +145,11 @@ def groupby_frame(
 def remove_processed_videos(video_paths: list[Path], processed_videos: list[Video]) -> list[Path]:
     processed_video_paths = [Path(v.path) for v in processed_videos]
     return [v for v in video_paths if v not in processed_video_paths]
+
+def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLike:
+    """Crops a frame according to the bounding box."""
+    cropped_frame = frame[
+        bbox.y_top_left : bbox.y_bottom_right,
+        bbox.x_top_left : bbox.x_bottom_right,
+    ]
+    return cropped_frame
