@@ -2,17 +2,19 @@ import pathlib
 import torch
 import torch.utils.data as data_utils
 import tqdm
+import json
 import faiss
 import numpy as np
 import networkx as nx
 import logging
 import pandas as pd
+import shutil
 import hashlib
 import gorillatracker.model as model
 import gorillatracker.datasets.cxl as cxl
 import gorillatracker.datasets.spac_videos as spac_videos
 
-from typing import Literal
+from typing import Literal, Tuple
 
 logger = logging.getLogger("GT-CurationPipeline")
 logger.setLevel(logging.INFO)
@@ -34,7 +36,13 @@ embedding_model_settings = {
     "max_epochs": 20,
     "beta1": 0.9,
     "beta2": 0.999,
-    "embedding_size": 256,
+    "embedding_size": 128,
+    "stepwise_schedule": False,
+    "lr_interval": 1.0,
+    "l2_alpha": 0.1,
+    "l2_beta": 0.01,
+    "path_to_pretrained_weights": "./models/swin_base_untrained.ckpt",
+    "margin": 1.0,
 }
 
 
@@ -58,27 +66,41 @@ class CurationPipeline:
 
         self.k_nearest_neighbors = 8  # number of nearest neighbors to consider for clustering
         self.similarity_threshold_self = (
-            0.15  # similarity threshold for self dedublication. Higher values will result in more images being removed
+            0.08  # similarity threshold for self dedublication. Higher values will result in more images being removed
         )
-        self.number_of_representatives = 3  # number of representatives to keep from each cluster. Higher values will result in less images being removed
-        self.similarity_threshold_relative = 0.17  # similarity threshold for relative dedublication.  Higher values will result in more images being removed
+        self.number_of_representatives = 5  # number of representatives to keep from each cluster. Higher values will result in less images being removed
+        self.similarity_threshold_relative = 0.12  # similarity threshold for relative dedublication.  Higher values will result in more images being removed
 
         # setup embedding model
         self.embedding_model_path = embedding_model_path
         self.embedding_model = embedding_model(
             model_name_or_path=self.embedding_model_path, **embedding_model_settings
         ).to(self.device)
-        self.embedding_model.load_state_dict(torch.load(self.embedding_model_path)["state_dict"])
+        state_dict = torch.load(self.embedding_model_path)["state_dict"]
+        state_dict.pop("loss_module_val.prototypes")
+        state_dict.pop("loss_module_train.prototypes")
+        self.embedding_model.load_state_dict(state_dict)
         self.embedding_model.eval()
 
         logger.info("CurationPipeline successfully initialized!")
 
-    def curate_patitioned_dataset(self, source: str, destination: str) ->                                                                                                                                                                                                                                      :
+    def curate_patitioned_dataset(self, source: str, destination: str):
         logger.info("Curating dataset from source: %s to destination: %s", source, destination)
         partitions = ["train", "val", "test"]
 
         embeddings_df = self._get_embeddings_by_partition(source=source, partitions=partitions)
-        dedublicated_embeddings_df = self._self_dedublication_by_partition(embeddings_df, partitions)
+        curated_df = self._curate_dataframe(embeddings_df, source, destination)
+
+        for _, row in tqdm.tqdm(curated_df.iterrows(), total=len(curated_df)):
+            source_path = pathlib.Path(row["path"])
+            relative_path = source_path.relative_to(pathlib.Path(source))
+            destination_path = pathlib.Path(destination) / relative_path
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(source_path, destination_path)
+
+    def _curate_dataframe(self, dataframe: pd.DataFrame, source: str, destination: str) -> pd.DataFrame:
+        embeddings_df = dataframe
+        dedublicated_embeddings_df = self._self_dedublication_by_partition(embeddings_df, ["train"])
         relative_deduplicated_embeddings_df = self._relative_dedublication(
             dedublicated_embeddings_df, source="train", reference="test"
         )
@@ -87,8 +109,7 @@ class CurationPipeline:
         print(dedublicated_embeddings_df["partition"].value_counts())
         print(relative_deduplicated_embeddings_df["partition"].value_counts())
 
-        dedublicated_embeddings_df.to_pickle(destination + "/deduplicated_embeddings.pkl")
-        relative_deduplicated_embeddings_df.to_pickle(destination + "/relative_embeddings.pkl")
+        return relative_deduplicated_embeddings_df
 
     def _get_embeddings_by_partition(
         self,
@@ -115,10 +136,12 @@ class CurationPipeline:
             dataset = self.dataset_class(
                 data_dir=source, partition=partition, transform=self.dataset_class.get_transforms()
             )
-            embeddings, paths = self._get_embeddings(dataset)
+            embeddings, paths, labels = self._get_embeddings(dataset)
 
-            for embedding, path in zip(embeddings, paths):
-                embeddings_df_list.append({"partition": partition, "embedding": embedding.numpy(), "path": str(path)})
+            for embedding, path, labels in zip(embeddings, paths, labels):
+                embeddings_df_list.append(
+                    {"partition": partition, "embedding": embedding.numpy(), "path": str(path), "label": labels}
+                )
 
         embeddings_df = pd.DataFrame(embeddings_df_list)
         logger.info(f"Loaded embeddings for {len(embeddings_df)} images.")
@@ -127,7 +150,7 @@ class CurationPipeline:
         return embeddings_df
 
     @torch.no_grad()
-    def _get_embeddings(self, dataset: data_utils.Dataset) -> tuple[torch.Tensor, list[str]]:
+    def _get_embeddings(self, dataset: data_utils.Dataset) -> tuple[torch.Tensor, list[str], list[str]]:
         """Returns embeddings and path to the image files"""
         dataloader = data_utils.DataLoader(
             dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers
@@ -135,8 +158,8 @@ class CurationPipeline:
         embeddings = []
         for batch in tqdm.tqdm(dataloader):
             embeddings.append(self.embedding_model(batch[0].to(self.device)).cpu())
-
-        return torch.cat(embeddings, dim=0), dataset.samples
+        paths, labels = zip(*dataset.samples)
+        return torch.cat(embeddings, dim=0), paths, labels
 
     def _self_dedublication_by_partition(self, embedding_df: pd.DataFrame, partitions: Literal[str]) -> pd.DataFrame:
         """Removes images that are too similar to each other within the same partition"""
@@ -221,11 +244,65 @@ class SSLCurationPipeline(CurationPipeline):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.dataset_class = spac_videos.SPACVideosDataset
-    
-    def curate_patitioned_dataset(self, source: str, destination: str) -> None:
-        return super().curate_patitioned_dataset(source, destination)
-    
-    
+        self.min_negative_count = 1
+
+    def curate_patitioned_dataset(self, source: str, destination: str):
+        logger.info("Curating dataset from source: %s to destination: %s", source, destination)
+        partitions = ["train", "val", "test"]
+
+        embeddings_df = self._get_embeddings_by_partition(source=source, partitions=partitions)
+        curated_df, leftover_negatives = self._curate_dataframe(embeddings_df, source, destination)
+
+        print(curated_df["partition"].value_counts())
+
+        pathlib.Path(destination + "/train").mkdir(parents=True, exist_ok=True)
+        json.dump(leftover_negatives, open(destination + "/train/negatives.json", "w"))
+
+        for _, row in tqdm.tqdm(curated_df.iterrows(), total=len(curated_df)):
+            source_path = pathlib.Path(row["path"])
+            relative_path = source_path.relative_to(pathlib.Path(source))
+            destination_path = pathlib.Path(destination) / relative_path
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(source_path, destination_path)
+
+    def _curate_dataframe(self, dataframe: pd.DataFrame, source: str, destination: str) -> Tuple[pd.DataFrame, dict]:
+        """
+        Assumes directory structure:
+            data_dir/
+                train/
+                    video_data
+                    negatives.json
+                val/
+                    cxl_data
+                test/
+                    cxl_data
+        """
+        negatives = json.load(open(source + "/train/negatives.json"))
+
+        curated_df = super()._curate_dataframe(dataframe, source, destination)
+        curated_df.to_pickle(destination + "/temp.pkl")
+
+        ids_to_keep = curated_df["label"]
+        ids_to_keep_in_train = curated_df[curated_df["partition"] == "train"]["label"]
+        additional_ids_to_keep = []
+        negative_counter_for_ids_to_keep = {id: 0 for id in ids_to_keep_in_train}
+
+        # record how many negatives each individual has in the dataset
+        for id in ids_to_keep_in_train:
+            negative_ids = negatives[id]
+            for negative_id in negative_ids:
+                if negative_id in negative_counter_for_ids_to_keep:
+                    negative_counter_for_ids_to_keep[negative_id] += 1
+
+        # expand the dataset with negatives so search id to keep has at least n negatives
+        for id, count in negative_counter_for_ids_to_keep.items():
+            if count < self.min_negative_count:
+                additional_ids_to_keep.extend(negatives[id][: min(self.min_negative_count - count, len(negatives[id]))])
+
+        leftover_negatives = {id: negatives[id] for id in ids_to_keep_in_train}
+        ids_to_keep = list(ids_to_keep) + additional_ids_to_keep
+
+        return dataframe[dataframe["label"].isin(ids_to_keep)], leftover_negatives
 
 
 if __name__ == "__main__":
@@ -236,9 +313,12 @@ if __name__ == "__main__":
     #     destination="./data/embeddings/talk-to-kajo-test",
     # )
 
-    samples = spac_videos.get_samples_video(
-        pathlib.Path("./data/derived_data/spac_gorillas_converted_labels_cropped_faces/train")
+    # samples = spac_videos.get_samples_video(
+    #     pathlib.Path("./data/derived_data/spac_gorillas_converted_labels_cropped_faces/train")
+    # )
+
+    ssl_cur = SSLCurationPipeline(embedding_model_path="./models/efficient_net_pretrained.ckpt")
+    ssl_cur.curate_patitioned_dataset(
+        source="./data/derived_data/spac_gorillas_converted_labels_cropped_faces",
+        destination="./data/embeddings/talk-to-kajo-test",
     )
-    print(len(samples))
-    # ssl_cur = SSLCurationPipeline()
-    # ssl_cur.load_tracking_data(source="./data/derived_data/tracking_data.csv")

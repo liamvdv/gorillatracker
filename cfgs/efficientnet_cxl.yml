@@ -5,17 +5,17 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 4                      # Number of workers for data loading
+workers: 16                      # Number of workers for data loading
 
 
 # Model and Training Arguments
-project_name: "CompareLoss-All-CXL-OpenSet" # WandB project name
+project_name: "Embedding-EfficientNet-CXL-OpenSet" # WandB project name
 run_name: "efficientnet_l-arcface-prec16-improvedembed-p0.32-strongwd"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["pure-openset"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: True             # Enable fast development run
+fast_dev_run: False             # Enable fast development run
 profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
@@ -47,14 +47,15 @@ end_lr: 1e-5                    # End learning rate (for the learning rate sched
 
 max_epochs: 20                  # Number of training epochs (should be > warmup_epochs)
 
-batch_size: 5                  # Training batch size
+batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-save_interval: 5                # Model checkpoint save interval as a fraction of total steps
+save_interval: 25               # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 5      # Embedding save interval
+save_model_to_wandb: True       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
