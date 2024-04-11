@@ -108,7 +108,7 @@ class UnionGraph(Generic[T]):
     """A graph that keeps track of the relationships between groups of vertices."""
 
     def __init__(self, vertices: list[T]):
-        self.union_find = UnionFind[T](vertices)
+        self.union_find = UnionFind(vertices)
         self.groups = {i: {i} for i in vertices}
         self.negative_relations: dict[T, set[T]] = {i: set[T]() for i in vertices}
 
