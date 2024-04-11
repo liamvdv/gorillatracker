@@ -415,12 +415,18 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
 
     # Find the indices of the closest embeddings for each embedding
     classification_matrix = torch.zeros((len(val_embeddings), k))
-    for i in range(k):
-        closest_indices = torch.argmin(distance_matrix, dim=1)
-        closest_labels = val_labels[closest_indices]
-        # Set the distance to the closest embedding to a large value so it is ignored
-        distance_matrix[torch.arange(len(distance_matrix)), closest_indices] = float("inf")
-        classification_matrix[:, i] = closest_labels
+    
+    _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True)
+    assert closest_indices.shape == (len(val_embeddings), k)
+
+    closest_labels = val_labels[closest_indices]
+    assert closest_labels.shape == closest_indices.shape
+
+    classification_matrix = torch.zeros((len(val_embeddings), num_classes))
+    for i in range(num_classes):
+        classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
+    assert classification_matrix.shape == (len(val_embeddings), num_classes)
+    
 
     accuracy = tm.functional.accuracy(
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
