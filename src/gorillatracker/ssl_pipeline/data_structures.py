@@ -128,9 +128,11 @@ class UnionGraph(Generic[T]):
 
     def _merge_groups(self, u: T, v: T) -> None:
         root_u, root_v = self.union_find.find(u), self.union_find.find(v)
+        if root_u == root_v:  # prevent poppping the same key
+            return
         self.union_find.union(u, v)
         root = self.union_find.find(u)
-        self.groups[root] = self.groups.pop(root_u) | self.groups.pop(root_v, set())
+        self.groups[root] = self.groups.pop(root_u) | self.groups.pop(root_v)
 
     def _add_negative_relationship(self, u: T, v: T) -> None:
         root_u, root_v = self.union_find.find(u), self.union_find.find(v)
