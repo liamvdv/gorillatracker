@@ -49,8 +49,3 @@ def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLi
                     bbox.x_top_left : bbox.x_bottom_right,
                 ]
     return cropped_frame
-
-if __name__ == "__main__":
-    video_path = Path("/workspaces/gorillatracker/video_data/R185_20221026_054.mp4")
-    time_stamp = read_timestamp(video_path)
-    print(time_stamp)
