@@ -1,5 +1,6 @@
 import base64
 from io import BytesIO
+from typing import Any
 
 import colorcet as cc
 import numpy as np
@@ -12,7 +13,7 @@ from sklearn.manifold import MDS, TSNE, Isomap, LocallyLinearEmbedding, Spectral
 
 
 class EmbeddingProjector:
-    def __init__(self):
+    def __init__(self) -> None:
         self.algorithms = {
             "tsne": TSNE(n_components=2),
             "isomap": Isomap(n_components=2),
@@ -23,8 +24,7 @@ class EmbeddingProjector:
             "umap": umap.UMAP(),
         }
 
-    def reduce_dimensions(self, embeddings, method="tsne"):
-        # handle --fast_dev_run where there is a reduced number of embeddings
+    def reduce_dimensions(self, embeddings: "pd.Series[Any]", method: str = "tsne") -> "np.ndarray[Any, Any]":
         assert len(embeddings) > 2
         algorithm = TSNE(n_components=2, perplexity=1)
         if len(embeddings) > 30:
@@ -32,8 +32,14 @@ class EmbeddingProjector:
         return algorithm.fit_transform(embeddings)
 
     def plot_clusters(
-        self, low_dim_embeddings, labels, og_labels, images, title="Embedding Projector", figsize=(12, 10)
-    ):
+        self,
+        low_dim_embeddings: "np.ndarray[Any, Any]",
+        labels: "pd.Series[Any]",
+        og_labels: "pd.Series[Any]",
+        images: "pd.Series[Any]",
+        title: str = "Embedding Projector",
+        figsize: tuple[int, int] = (12, 10),
+    ) -> None:
         color_names = cc.glasbey
         color_lst = [color_names[label * 2] for label in labels]
         data = {
@@ -68,9 +74,9 @@ def visualize_embeddings(
     label_string_column: str = "label_string",
     embedding_column: str = "embedding",
     image_column: str = "input",
-    figsize: tuple = (12, 10),
+    figsize: tuple[int, int] = (12, 10),
     dimension_reduce_method: str = "tsne",
-):
+) -> None:
     embeddings = df[embedding_column].to_numpy()
     embeddings = np.stack(embeddings)
 
@@ -86,3 +92,7 @@ def visualize_embeddings(
     ep.plot_clusters(
         low_dim_embeddings, df[label_column], df[label_string_column], images, title="Embeddings", figsize=(12, 10)
     )
+
+
+if __name__ == "__main__":
+    ec = EmbeddingProjector()
