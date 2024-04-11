@@ -267,7 +267,6 @@ class TripletLossOnline(nn.Module):
         labels = convert_labels_to_tensor(labels)
 
         mask = get_triplet_mask(labels)
-
         if self.mode == "hard":  # take only the hardest negative as a negative per anchor
             neg_mask = get_distance_mask(labels, valid="neg")  # get all valid negatives
 
@@ -276,9 +275,17 @@ class TripletLossOnline(nn.Module):
                 neg_mask == 0, float("inf")
             )  # fill all invalid negatives with inf so they are not considered in the min
             _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1)
+            # print(neg_min_indices)
+
+            pos_mask = get_distance_mask(labels, valid="pos")  # get all valid positives
+            masked_anchor_positive_dists = anchor_positive_dists.squeeze(2).masked_fill(
+                pos_mask == 0, float("-inf")
+            )  # fill all invalid positives with inf so they are not considered in the min
+            _, pos_max_indices = torch.max(masked_anchor_positive_dists, dim=1)
+            # print(pos_max_indices)
 
             hard_mask = torch.zeros(len(labels), len(labels), len(labels))
-            hard_mask[torch.arange(len(labels)), :, neg_min_indices] = 1
+            hard_mask[torch.arange(len(labels)), pos_max_indices, neg_min_indices] = 1
             hard_mask = hard_mask.to(mask.device)
             # combine with base mask
             mask = torch.logical_and(mask, hard_mask)

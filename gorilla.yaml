@@ -1,6 +1,0 @@
-path: /workspaces/gorillatracker/data/splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15
-train: train
-val: val
-test: test
-names: 
-  0: 'gorilla'
