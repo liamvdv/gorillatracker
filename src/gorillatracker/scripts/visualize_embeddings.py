@@ -1,13 +1,15 @@
-from sklearn.manifold import Isomap, LocallyLinearEmbedding, MDS, SpectralEmbedding, TSNE
-from sklearn.decomposition import PCA
-import umap.umap_ as umap
-import numpy as np
-from io import BytesIO
 import base64
-from bokeh.plotting import figure, output_file, save
-from bokeh.models import ColumnDataSource, HoverTool
+from io import BytesIO
+
 import colorcet as cc
+import numpy as np
 import pandas as pd
+import umap.umap_ as umap
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh.plotting import figure, output_file, save
+from sklearn.decomposition import PCA
+from sklearn.manifold import MDS, TSNE, Isomap, LocallyLinearEmbedding, SpectralEmbedding
+
 
 class EmbeddingProjector:
     def __init__(self):
@@ -56,12 +58,19 @@ class EmbeddingProjector:
         hover = HoverTool(tooltips='<img src="data:image/jpeg;base64,@image" width="128" height="128">')
         fig.add_tools(hover)
 
-        output_file(filename = "embedding.html")
+        output_file(filename="embedding.html")
         save(fig)
 
 
-def visualize_embeddings(df: pd.DataFrame, label_column: str = "label", label_string_column: str = "label_string",
-                        embedding_column: str = "embedding", image_column: str = "input", figsize: tuple = (12, 10)):
+def visualize_embeddings(
+    df: pd.DataFrame,
+    label_column: str = "label",
+    label_string_column: str = "label_string",
+    embedding_column: str = "embedding",
+    image_column: str = "input",
+    figsize: tuple = (12, 10),
+    dimension_reduce_method: str = "tsne",
+):
     embeddings = df[embedding_column].to_numpy()
     embeddings = np.stack(embeddings)
 
@@ -73,7 +82,7 @@ def visualize_embeddings(df: pd.DataFrame, label_column: str = "label", label_st
         images.append(image_byte)
 
     ep = EmbeddingProjector()
-    low_dim_embeddings = ep.reduce_dimensions(embeddings, method="tsne")
+    low_dim_embeddings = ep.reduce_dimensions(embeddings, method=dimension_reduce_method)
     ep.plot_clusters(
         low_dim_embeddings, df[label_column], df[label_string_column], images, title="Embeddings", figsize=(12, 10)
     )
