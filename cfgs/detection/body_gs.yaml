@@ -1,0 +1,9 @@
+# gs for gorilla and silverback
+path: /workspaces/gorillatracker/data/splits/ground_truth-cxl-body_image_detection_gorilla_silverback-anno-seed-42-train-70-val-15-test-15
+train: train
+val: val
+test: test
+
+names:
+  0: Gorilla # without Silverback
+  1: Silverback 

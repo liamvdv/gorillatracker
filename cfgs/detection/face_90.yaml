@@ -1,0 +1,8 @@
+# face 90 for max. 90 degree compared to camera
+path: /workspaces/gorillatracker/data/splits/ground_truth-cxl-face_image_detection_90degree-anno-seed-42-train-70-val-15-test-15
+train: train
+val: val
+test: test
+
+names:
+  0: Gorilla Face
