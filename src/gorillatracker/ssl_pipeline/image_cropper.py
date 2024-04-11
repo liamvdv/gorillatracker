@@ -121,14 +121,16 @@ def crop(
         return
 
     crop_from_video(video_path, crop_tasks)
-    
+
+
 def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLike:
     """Crops a frame according to the bounding box."""
     cropped_frame = frame[
-                    bbox.y_top_left : bbox.y_bottom_right,
-                    bbox.x_top_left : bbox.x_bottom_right,
-                ]
+        bbox.y_top_left : bbox.y_bottom_right,
+        bbox.x_top_left : bbox.x_bottom_right,
+    ]
     return cropped_frame
+
 
 if __name__ == "__main__":
     import shutil

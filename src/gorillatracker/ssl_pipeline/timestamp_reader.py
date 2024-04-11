@@ -1,8 +1,10 @@
-from pathlib import Path
-import easyocr
 from datetime import time
+from pathlib import Path
+
 import cv2
-from gorillatracker.ssl_pipeline.helpers import video_reader, BoundingBox
+import easyocr
+
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader
 
 
 def read_timestamp(
@@ -21,6 +23,7 @@ def read_timestamp(
     cropped_frame = crop_frame(frame, bbox)
     time_stamp = _extract_time_stamp(cropped_frame)
     return time_stamp
+
 
 def _extract_time_stamp(cropped_frame: cv2.typing.MatLike) -> time:
     """Extracts the time stamp from the cropped frame."""
@@ -42,10 +45,11 @@ def _extract_time_stamp(cropped_frame: cv2.typing.MatLike) -> time:
         h = 0
     return time(h, m)
 
+
 def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLike:
     """Crops a frame according to the bounding box."""
     cropped_frame = frame[
-                    bbox.y_top_left : bbox.y_bottom_right,
-                    bbox.x_top_left : bbox.x_bottom_right,
-                ]
+        bbox.y_top_left : bbox.y_bottom_right,
+        bbox.x_top_left : bbox.x_bottom_right,
+    ]
     return cropped_frame
