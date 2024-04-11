@@ -113,15 +113,17 @@ class UnionGraph(Generic[T]):
         self.negative_relations: dict[T, set[T]] = {i: set[T]() for i in vertices}
 
     def add_edge(self, u: T, v: T, type: EdgeType) -> None:
-        assert u != v, "Invalid edge"
+        assert u != v, "Self loops are not allowed."
         if type == EdgeType.POSITIVE:
-            assert not self.has_group_negative_edge(u, v)
+            assert not self.has_group_negative_edge(
+                u, v
+            ), "Cannot add positive edge between negatively connected groups."
             root_u = self.union_find.find(u)
             root_v = self.union_find.find(v)
             self.union_find.union(u, v)
             self._merge_groups(root_u, root_v)
         elif type == EdgeType.NEGATIVE:
-            assert not self.is_same_group(u, v)
+            assert not self.is_same_group(u, v), "Cannot add negative edge between positively connected groups."
             self._add_negative_edge(u, v)
 
     def get_group(self, vertex: T) -> set[T]:
