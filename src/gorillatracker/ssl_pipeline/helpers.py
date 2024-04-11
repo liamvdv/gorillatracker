@@ -146,6 +146,7 @@ def remove_processed_videos(video_paths: list[Path], processed_videos: list[Vide
     processed_video_paths = [Path(v.path) for v in processed_videos]
     return [v for v in video_paths if v not in processed_video_paths]
 
+
 def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLike:
     """Crops a frame according to the bounding box."""
     cropped_frame = frame[

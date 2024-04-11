@@ -4,7 +4,7 @@ from pathlib import Path
 import cv2.typing
 import easyocr
 
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader, crop_frame
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
 
 
 def read_timestamp(
