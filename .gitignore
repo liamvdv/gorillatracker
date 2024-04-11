@@ -157,3 +157,5 @@ mnist/
 .gitconfig
 *.pt
 *.ckpt
+*.pth
+.devcontainer/
