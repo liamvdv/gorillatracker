@@ -110,41 +110,36 @@ class UnionGraph(Generic[T]):
     def __init__(self, vertices: list[T]):
         self.union_find = UnionFind(vertices)
         self.groups = {i: {i} for i in vertices}
-        self.negative_relations: dict[T, set[T]] = {i: set[T]() for i in vertices}
+        self.negative_relations = {i: set[T]() for i in vertices}
 
-    def add_edge(self, u: T, v: T, type: EdgeType) -> None:
+    def add_edge(self, u: T, v: T, edge_type: EdgeType) -> None:
         assert u != v, "Self loops are not allowed."
-        if type == EdgeType.POSITIVE:
-            assert not self.has_group_negative_edge(
+        if edge_type is EdgeType.POSITIVE:
+            assert not self.has_negative_relationship(
                 u, v
-            ), "Cannot add positive edge between negatively connected groups."
-            root_u = self.union_find.find(u)
-            root_v = self.union_find.find(v)
-            self.union_find.union(u, v)
-            self._merge_groups(root_u, root_v)
-        elif type == EdgeType.NEGATIVE:
-            assert not self.is_same_group(u, v), "Cannot add negative edge between positively connected groups."
-            self._add_negative_edge(u, v)
+            ), "Cannot add positive relationship between negatively connected groups."
+            self._merge_groups(u, v)
+        elif edge_type is EdgeType.NEGATIVE:
+            assert not self.is_same_group(u, v), "Cannot add negative relationship between positively connected groups."
+            self._add_negative_relationship(u, v)
 
-    def get_group(self, vertex: T) -> set[T]:
+    def get_entities_in_group(self, vertex: T) -> set[T]:
         return self.groups[self.union_find.find(vertex)]
 
-    def _merge_groups(self, root_u: T, root_v: T) -> None:
-        root = self.union_find.find(root_u)
-        self.groups[root] = self.groups[root_u] | self.groups[root_v]
-        if root_u != root:
-            del self.groups[root_u]
-        if root_v != root:
-            del self.groups[root_v]
+    def _merge_groups(self, u: T, v: T) -> None:
+        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
+        self.union_find.union(u, v)
+        root = self.union_find.find(u)
+        self.groups[root] = self.groups.pop(root_u) | self.groups.pop(root_v, set())
 
-    def _add_negative_edge(self, u: T, v: T) -> None:
+    def _add_negative_relationship(self, u: T, v: T) -> None:
         root_u, root_v = self.union_find.find(u), self.union_find.find(v)
         self.negative_relations[root_u].add(root_v)
         self.negative_relations[root_v].add(root_u)
 
-    def has_group_negative_edge(self, u: T, v: T) -> bool:
+    def has_negative_relationship(self, u: T, v: T) -> bool:
         root_u, root_v = self.union_find.find(u), self.union_find.find(v)
-        return root_v in self.negative_relations[root_u] or root_u in self.negative_relations[root_v]
+        return root_v in self.negative_relations[root_u]
 
     def is_same_group(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
