@@ -89,28 +89,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_embeddings, train_labels = (
             self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
         )
-        # also sort train embeddings by label (train_embeddings - tensor, train_labels - tensor)
-        # combined_data = list(zip(train_labels, train_embeddings))
-        # combined_data = sorted(combined_data, key=lambda x: torch.norm(x[1], dim=-1))
-        # train_labels, train_embeddings = zip(*combined_data)
-        # train_labels = torch.tensor(train_labels)
-        # train_embeddings = torch.stack(train_embeddings)
-        
-        
-        # train_labels, indices = torch.sort(torch.tensor(train_labels))
-        # train_embeddings = train_embeddings[indices]
-        
-        
-        # order embeddings_table by label
-        # embeddings_table = embeddings_table.sort_values(axis=0, by="embedding", key=lambda col: torch.norm(torch.tensor(col), dim=-1), ascending=True)
-        # embeddings_table = embeddings_table.sort_values(axis=0, by="label")
         
         metrics = {
             "knn5": partial(knn, k=5),
             "knn": partial(knn, k=1),
             "pca": pca,
             "tsne": tsne,
-            "fc_layer": fc_layer,
+            # "fc_layer": fc_layer,
         }
         metrics |= (
             {
@@ -395,6 +380,7 @@ def knn_with_train(
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
+
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
@@ -435,13 +421,6 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
         # Set the distance to the closest embedding to a large value so it is ignored
         distance_matrix[torch.arange(len(distance_matrix)), closest_indices] = float("inf")
         classification_matrix[:, i] = closest_labels
-    # Calculate the most common label for each embedding
-    # transform classification_matrix of shape (n,k) to (n,num_classes) where num_classes is the number of unique labels
-    # the idea is that in the end the classification_matrix contains the probability for each class for each embedding
-    classification_matrix_cpy = classification_matrix.clone()
-    classification_matrix = torch.zeros((len(classification_matrix), num_classes))
-    for i in range(num_classes):
-        classification_matrix[:, i] = torch.sum(classification_matrix_cpy == i, dim=1) / k
 
     accuracy = tm.functional.accuracy(
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"

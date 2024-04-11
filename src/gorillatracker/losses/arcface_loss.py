@@ -30,12 +30,14 @@ class ArcFaceLoss(torch.nn.Module):
         self.cos_m = math.cos(margin)
         self.sin_m = math.sin(margin)
         self.num_classes = num_classes
+        
         if accelerator == "cuda":
             self.prototypes = torch.nn.Parameter(torch.zeros((num_classes, embedding_size), device="cuda", dtype=torch.float32))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
 
-        torch.nn.init.xavier_uniform_(self.prototypes)
+        tmp_rng = torch.Generator(device=accelerator)
+        torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
         self.ce = torch.nn.CrossEntropyLoss()
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
