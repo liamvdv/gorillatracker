@@ -31,7 +31,6 @@ from model_miew import GeM
 from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper
 from gorillatracker.model_miewid import load_miewid_model
 
-
 def warmup_lr(
     warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
     epoch: int,
@@ -302,8 +301,10 @@ class BaseModule(L.LightningModule):
             
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
             for label in range(num_classes):
+                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()
+                class_embeddings = np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
                 class_weights[label] = torch.tensor(
-                    self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()
+                    class_embeddings
                 ).mean(dim=0)
                 if torch.isnan(class_weights[label]).any():
                     class_weights[label] = 0.0
@@ -342,6 +343,12 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
+        
+        # optimizer = torch.optim.RMSprop(
+        #     self.model.parameters(),
+        #     lr=self.initial_lr,
+        #     weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
+        # )
 
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(

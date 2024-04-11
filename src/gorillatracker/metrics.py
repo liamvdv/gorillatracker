@@ -16,9 +16,9 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
-from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
+from sklearn.preprocessing import LabelEncoder
 
 import gorillatracker.type_helper as gtypes
 
@@ -89,7 +89,22 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_embeddings, train_labels = (
             self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
         )
-
+        # also sort train embeddings by label (train_embeddings - tensor, train_labels - tensor)
+        # combined_data = list(zip(train_labels, train_embeddings))
+        # combined_data = sorted(combined_data, key=lambda x: torch.norm(x[1], dim=-1))
+        # train_labels, train_embeddings = zip(*combined_data)
+        # train_labels = torch.tensor(train_labels)
+        # train_embeddings = torch.stack(train_embeddings)
+        
+        
+        # train_labels, indices = torch.sort(torch.tensor(train_labels))
+        # train_embeddings = train_embeddings[indices]
+        
+        
+        # order embeddings_table by label
+        # embeddings_table = embeddings_table.sort_values(axis=0, by="embedding", key=lambda col: torch.norm(torch.tensor(col), dim=-1), ascending=True)
+        # embeddings_table = embeddings_table.sort_values(axis=0, by="label")
+        
         metrics = {
             "knn5": partial(knn, k=5),
             "knn": partial(knn, k=1),
@@ -284,10 +299,10 @@ def fc_layer(
                 optimizer.step()
                 loss_sum += loss.item()
 
-            loss_mean = loss_sum / (len(embeddings_copy) / batch_size)
+            # loss_mean = loss_sum / (len(embeddings_copy) / batch_size)
             loss_sum = 0.0
-            if epoch % 100 == 0:
-                print(f"Loss: {loss_mean} in Epoch {epoch}")
+            # if epoch % 100 == 0:
+            #     print(f"Loss: {loss_mean} in Epoch {epoch}")
 
     final_outputs = None
     embeddings = torch.tensor(embeddings)
@@ -317,7 +332,7 @@ def knn(
     train_labels: Optional[gtypes.MergedLabels] = None,
 ) -> Dict[str, Any]:
     if use_train_embeddings:
-        print("Using train embeddings for knn")
+        # print("Using train embeddings for knn")
         return knn_with_train(
             val_embeddings,
             val_labels,
@@ -348,13 +363,14 @@ def knn_with_train(
     """
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels)
-    train_embeddings = torch.tensor(train_embeddings)  # type: ignore
-    train_labels = torch.tensor(train_labels)
+    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
+    train_embeddings = train_embeddings.clone().detach()  # type: ignore
+    train_labels = torch.tensor(train_labels.tolist())  # type: ignore
 
     combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)  # type: ignore
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
 
+    # num_classes = 117
     num_classes: int = torch.max(combined_labels).item() + 1  # type: ignore
     assert num_classes == len(np.unique(combined_labels))
     if num_classes < k:
@@ -364,7 +380,7 @@ def knn_with_train(
 
     distance_matrix.fill_diagonal_(float("inf"))
 
-    _, closest_indices = torch.topk(distance_matrix, k, largest=False)
+    _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True, )
     assert closest_indices.shape == (len(combined_embeddings), k)
 
     closest_labels = combined_labels[closest_indices]
@@ -393,7 +409,6 @@ def knn_with_train(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
     assert f1 is not None
-    print("knn done")
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
@@ -405,15 +420,15 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
 
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels)
-
+    val_labels = torch.tensor(val_labels.tolist())
+    
     distance_matrix = pairwise_euclidean_distance(val_embeddings)
 
     # Ensure distances on the diagonal are set to a large value so they are ignored
     distance_matrix.fill_diagonal_(float("inf"))
 
     # Find the indices of the closest embeddings for each embedding
-    classification_matrix = torch.zeros((len(distance_matrix), k))
+    classification_matrix = torch.zeros((len(val_embeddings), k))
     for i in range(k):
         closest_indices = torch.argmin(distance_matrix, dim=1)
         closest_labels = val_labels[closest_indices]
@@ -442,7 +457,7 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
     assert f1 is not None
-    print("knn done")
+    # print("knn done")
     return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
 
 
@@ -467,7 +482,7 @@ def pca(
     plot.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.0)
     # plot.figure.savefig("pca.png")
     plot = wandb.Image(plot.figure)
-    print("pca done")
+    # print("pca done")
     return plot
 
 
@@ -504,7 +519,7 @@ def tsne(
     plot.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.0)
     # plot.figure.savefig("tnse.png")
     plot = wandb.Image(plot.figure)
-    print("tsne done")
+    # print("tsne done")
     return plot
 
 

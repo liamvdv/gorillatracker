@@ -31,7 +31,7 @@ class ArcFaceLoss(torch.nn.Module):
         self.sin_m = math.sin(margin)
         self.num_classes = num_classes
         if accelerator == "cuda":
-            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
+            self.prototypes = torch.nn.Parameter(torch.zeros((num_classes, embedding_size), device="cuda", dtype=torch.float32))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
 
@@ -109,7 +109,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         self.lambda_membank = lambda_membank
         self.mem_bank_start_epoch = mem_bank_start_epoch
         if accelerator == "cuda":
-            self.prototypes = torch.nn.Parameter(torch.cuda.FloatTensor(num_classes, embedding_size))  # type: ignore
+            self.prototypes = torch.nn.Parameter(torch.zeros((num_classes, embedding_size), device="cuda", dtype=torch.float32))  # type: ignore
         else:
             self.prototypes = torch.nn.Parameter(torch.FloatTensor(num_classes, embedding_size))
         torch.nn.init.xavier_uniform_(self.prototypes)

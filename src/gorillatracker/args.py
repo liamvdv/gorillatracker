@@ -87,6 +87,7 @@ class TrainingArgs:
     gradient_accumulation_steps: int = field(default=1)
     max_epochs: int = field(default=300)
     val_check_interval: float = field(default=1.0)
+    check_val_every_n_epoch: int = field(default=1)
     val_before_training: bool = field(default=False)
     only_val: bool = field(default=False)
     save_interval: float = field(default=10)

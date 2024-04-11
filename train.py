@@ -1,4 +1,5 @@
 from pathlib import Path
+import warnings
 
 import torch
 import wandb
@@ -14,6 +15,10 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+
+warnings.filterwarnings("ignore", ".*does not have many workers.*")
+warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
+warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
 
 def main(args: TrainingArgs) -> None:  # noqa: C901
@@ -172,8 +177,10 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     # Initialize trainer
     trainer = Trainer(
+        num_sanity_val_steps=0,
         max_epochs=args.max_epochs,
         val_check_interval=args.val_check_interval,
+        check_val_every_n_epoch=args.check_val_every_n_epoch,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),
@@ -201,8 +208,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info(f"Rank {current_process_rank} | Validation before training...")
-        val_result = trainer.validate(model, dm)
-        print(val_result)
+        trainer.validate(model, dm)
+        
         if args.only_val:
             exit(0)
 
@@ -222,6 +229,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         #         del model.__dict__[k]
         # # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
         # torch.save(model.state_dict(), "inceptionv3.pth")
+        # logger.info("Model saved")
         
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
@@ -237,6 +245,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
             logger.success("Saving finished!")
+    else:
+        logger.info("Rank is not 0, skipping checkpoint saving...")
 
 
 if __name__ == "__main__":

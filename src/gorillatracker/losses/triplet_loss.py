@@ -25,7 +25,7 @@ def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
     """
     if isinstance(labels, torch.Tensor):
         return labels
-
+    
     le = LabelEncoder()
     labels = le.fit_transform(labels)
 
