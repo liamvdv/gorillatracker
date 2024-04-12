@@ -113,7 +113,9 @@ class UnionGraph(Generic[T]):
             ), "Cannot add positive relationship between negatively connected groups."
             self._merge_groups(u, v)
         elif edge_type is EdgeType.NEGATIVE:
-            assert not self.has_positive_relationship(u, v), "Cannot add negative relationship between positively connected groups."
+            assert not self.has_positive_relationship(
+                u, v
+            ), "Cannot add negative relationship between positively connected groups."
             self._add_negative_relationship(u, v)
 
     def get_entities_in_group(self, vertex: T) -> set[T]:
