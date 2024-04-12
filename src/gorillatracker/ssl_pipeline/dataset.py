@@ -142,6 +142,6 @@ class GorillaDataset(SSLDataset):
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
         date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path, GorillaDataset.time_stamp_box)
+        daytime = read_timestamp(video_path, GorillaDataset.time_stamp_box) # NOTE(joschaSchroff): add easyocr.Reader here, currently set as default in read_timestamp
         date = datetime.combine(date, daytime)
         return VideoMetadata(camera_name, date)
