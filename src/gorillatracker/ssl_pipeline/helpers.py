@@ -172,9 +172,10 @@ def read_timestamp(video_path: Path, bbox: BoundingBox, ocr_reader: Optional[eas
     """
     with video_reader(video_path) as video_feed:
         frame = next(video_feed).frame
-        cropped_frame = crop_frame(frame, bbox)
-        ocr_reader = ocr_reader or easyocr.Reader(["en"], gpu=False, verbose=False)
-        time_stamp = _extract_time_stamp(cropped_frame, ocr_reader)
+        
+    cropped_frame = crop_frame(frame, bbox)
+    ocr_reader = ocr_reader or easyocr.Reader(["en"], gpu=False, verbose=False)
+    time_stamp = _extract_time_stamp(cropped_frame, ocr_reader)
 
     return time_stamp
 
