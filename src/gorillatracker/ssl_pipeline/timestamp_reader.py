@@ -27,7 +27,7 @@ def read_timestamp(
 
 def _extract_time_stamp(cropped_frame: cv2.typing.MatLike) -> time:
     """Extracts the time stamp from the cropped frame."""
-    allow_list = "0123456789A:PMapm"
+    allow_list = "0123456789A:PM"
     rgb_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB)
     reader = easyocr.Reader(["en"], gpu=True, verbose=False)
     extracted_time_stamp_raw = reader.readtext(rgb_frame, allowlist=allow_list)
