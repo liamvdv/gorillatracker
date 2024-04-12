@@ -13,7 +13,6 @@ import cv2
 import easyocr
 from shapely.geometry import Polygon
 
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
 log = logging.getLogger(__name__)
@@ -187,7 +186,7 @@ def _extract_time_stamp(cropped_frame: cv2.typing.MatLike, reader: easyocr.Reade
     return _extract_time(time_stamp)
 
 
-def _extract_time(time_stamp) -> time:
+def _extract_time(time_stamp: str) -> time:
     try:
         time_obj = datetime.strptime(time_stamp, "%I%M%p")
         return time_obj.time()
