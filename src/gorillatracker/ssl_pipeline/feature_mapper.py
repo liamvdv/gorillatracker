@@ -76,33 +76,6 @@ def correlate_and_update(
         association.unassociated.tracking_id = association.reference.tracking_id
 
 
-def correlate_videos(
-    version: str,
-    video_paths: list[Path],
-    engine: Engine,
-    correlator: Correlator,
-    untracked_type: str,
-    threshold: float = 0.7,
-    tracked_type: str = "body",
-) -> None:
-    assert 0 <= threshold <= 1, "Threshold must be between 0 and 1"
-    session_cls = sessionmaker(bind=engine)
-
-    with session_cls() as session:
-        videos = load_videos(session, video_paths, version)
-        processed_videos = load_processed_videos(session, version, [tracked_type, untracked_type])
-        assert all(
-            video in processed_videos for video in videos
-        ), f"Not all videos have been processed for {tracked_type} or {untracked_type}"
-
-        for video in tqdm(videos, desc="Correlating videos"):
-            tracked_features = load_tracked_features(session, video.video_id, [tracked_type])
-            untracked_features = load_features(session, video.video_id, [untracked_type])
-            correlate_and_update(list(tracked_features), list(untracked_features), correlator, threshold)
-
-        session.commit()
-
-
 _session_cls = None
 _tracked_type = None
 _untracked_type = None
