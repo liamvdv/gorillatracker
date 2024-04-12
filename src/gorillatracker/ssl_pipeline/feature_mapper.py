@@ -113,7 +113,7 @@ def _multiprocess_correlate(video: Video) -> None:
         session.commit()
 
 
-def _multiprocess_correlate_videos(
+def multiprocess_correlate_videos(
     version: str,
     video_paths: list[Path],
     engine: Engine,
