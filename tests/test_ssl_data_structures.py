@@ -28,12 +28,12 @@ def test_union_find_union_and_find(setup_union_find: UnionFind[int]) -> None:
 
 def test_union_graph_group_relationship(setup_union_graph: UnionGraph[int]) -> None:
     u_graph = setup_union_graph
-    assert u_graph.is_same_group(0, 1), "UnionGraph positive relationship check failed."
+    assert u_graph.has_positive_relationship(0, 1), "UnionGraph positive relationship check failed."
     assert not u_graph.has_negative_relationship(0, 1), "UnionGraph positive relationship check failed."
-    assert not u_graph.is_same_group(0, 3), "UnionGraph negative relationship check failed."
+    assert not u_graph.has_positive_relationship(0, 3), "UnionGraph negative relationship check failed."
     assert u_graph.has_negative_relationship(0, 3), "UnionGraph negative relationship check failed."
 
-    assert not u_graph.is_same_group(0, 4), "UnionGraph negative relationship check failed."
+    assert not u_graph.has_positive_relationship(0, 4), "UnionGraph negative relationship check failed."
 
     assert u_graph.get_entities_in_group(0) == set([0, 1, 2]), "UnionGraph group relationship check failed."
     assert u_graph.get_entities_in_group(1) == set([0, 1, 2]), "UnionGraph group relationship check failed."
@@ -44,9 +44,9 @@ def test_union_graph_group_relationship(setup_union_graph: UnionGraph[int]) -> N
 
 def test_union_merge_groups(setup_union_graph: UnionGraph[int]) -> None:
     u_graph = setup_union_graph
-    assert not u_graph.is_same_group(0, 4), "UnionGraph negative relationship check failed."
+    assert not u_graph.has_positive_relationship(0, 4), "UnionGraph negative relationship check failed."
     u_graph.add_edge(1, 4, EdgeType.POSITIVE)
-    assert u_graph.is_same_group(0, 4), "UnionGraph merge groups failed."
+    assert u_graph.has_positive_relationship(0, 4), "UnionGraph merge groups failed."
 
 
 def test_union_graph_fails_invalid_edge(setup_union_graph: UnionGraph[int]) -> None:

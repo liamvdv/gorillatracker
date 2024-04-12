@@ -24,7 +24,6 @@ it does not imply that A and C are negatively connected.
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
 from enum import Enum
 from typing import Generic, Protocol, TypeVar
 
@@ -98,12 +97,6 @@ class EdgeType(Enum):
     NEGATIVE = -1
 
 
-@dataclass(frozen=True)
-class Edge:
-    vertex: int
-    type: EdgeType
-
-
 class UnionGraph(Generic[T]):
     """A graph that keeps track of the relationships between groups of vertices."""
 
@@ -120,7 +113,7 @@ class UnionGraph(Generic[T]):
             ), "Cannot add positive relationship between negatively connected groups."
             self._merge_groups(u, v)
         elif edge_type is EdgeType.NEGATIVE:
-            assert not self.is_same_group(u, v), "Cannot add negative relationship between positively connected groups."
+            assert not self.has_positive_relationship(u, v), "Cannot add negative relationship between positively connected groups."
             self._add_negative_relationship(u, v)
 
     def get_entities_in_group(self, vertex: T) -> set[T]:
@@ -143,5 +136,5 @@ class UnionGraph(Generic[T]):
         root_u, root_v = self.union_find.find(u), self.union_find.find(v)
         return root_v in self.negative_relations[root_u]
 
-    def is_same_group(self, u: T, v: T) -> bool:
+    def has_positive_relationship(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
