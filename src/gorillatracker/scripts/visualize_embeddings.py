@@ -1,9 +1,9 @@
 import base64
 from io import BytesIO
-import numpy.typing as npt
 
 import colorcet as cc
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import umap.umap_ as umap
 from bokeh.models import ColumnDataSource, HoverTool
@@ -36,16 +36,18 @@ class EmbeddingProjector:
         low_dim_embeddings: npt.NDArray[np.float_],
         labels: pd.Series,
         og_labels: pd.Series,
-        images: list[str],  # base64.b64encode(buffer.getvalue()).decode("utf-8") --> buffer is a JPEG image inside of a BytesIO object
+        images: list[
+            str
+        ],  # base64.b64encode(buffer.getvalue()).decode("utf-8") --> buffer is a JPEG image inside of a BytesIO object
         title: str = "Embedding Projector",
         figsize: tuple[int, int] = (12, 10),
     ) -> figure:
         """
         after calling this use:
-        
+
         if in notebook:
         show(fig)
-        
+
         if in script:
         output_file(filename="embedding.html")
         save(fig)
