@@ -4,17 +4,19 @@ Contains adapter classes for different datasets.
 
 import json
 import logging
+import os
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
 import pandas as pd
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
-from gorillatracker.ssl_pipeline.models import Base, Camera
+from gorillatracker.ssl_pipeline.models import Base, Camera, Video, VideoFeature
 from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
 
 log = logging.getLogger(__name__)
@@ -98,6 +100,20 @@ class GorillaDataset(SSLDataset):
                 session.add(camera)
             session.commit()
 
+    def setup_social_groups(self) -> None:
+        df = pd.read_csv("data/ground_truth/cxl/misc/VideosGO_SPAC.csv", sep=",")
+        with Session(self._engine) as session:
+            for _, row in df.iterrows():
+                if self.check_valid_social_group(row["Group"]):
+                    social_group = self.extract_social_group(row["Group"])
+                    video_name = os.path.splitext(row["File"])[0] + ".mp4"  # csv has .MP4 instead of .mp4
+                    video_id = session.execute(select(Video.video_id).where(Video.path.endswith(video_name))).scalar()
+                    if video_id is None:
+                        continue
+                    video_feature = VideoFeature(video_id=video_id, type="Social Group", value=social_group)
+                    session.add(video_feature)
+            session.commit()
+
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [
             (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
@@ -145,3 +161,13 @@ class GorillaDataset(SSLDataset):
         daytime = datetime.strptime(timestamp, "%I:%M %p")
         date = datetime.combine(date, daytime.time())
         return VideoMetadata(camera_name, date)
+
+    @staticmethod
+    def check_valid_social_group(group_name: str) -> bool:
+        pattern = r"Group_[A-Z]{2}$"
+        return bool(re.match(pattern, group_name))
+
+    @staticmethod
+    def extract_social_group(group_name: str) -> str:
+        social_group = group_name.split("_")[1]
+        return social_group
