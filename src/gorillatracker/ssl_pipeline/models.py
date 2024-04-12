@@ -132,7 +132,7 @@ class ProcessedVideoFrameFeature(Base):
 class VideoFeature(Base):
     __tablename__ = "video_feature"
 
-    feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    video_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
     type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
@@ -140,7 +140,9 @@ class VideoFeature(Base):
     video: Mapped[Video] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
-        return f"video_feature(id={self.feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
+        return (
+            f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
+        )
 
 
 class Tracking(Base):
