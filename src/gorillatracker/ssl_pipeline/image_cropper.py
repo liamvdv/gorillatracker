@@ -14,7 +14,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader, crop_frame
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import load_video
 
@@ -98,10 +98,7 @@ def crop_from_video(video_path: Path, crop_tasks: list[CropTask]) -> None:
         for video_frame in video_feed:
             while crop_queue and video_frame.frame_nr == crop_queue[0].frame_nr:
                 crop_task = crop_queue.popleft()
-                cropped_frame = video_frame.frame[
-                    crop_task.bounding_box.y_top_left : crop_task.bounding_box.y_bottom_right,
-                    crop_task.bounding_box.x_top_left : crop_task.bounding_box.x_bottom_right,
-                ]
+                cropped_frame = crop_frame(video_frame.frame, crop_task.bounding_box)
                 crop_task.dest.parent.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(str(crop_task.dest), cropped_frame)
         assert not crop_queue, "Not all crop tasks were completed"
