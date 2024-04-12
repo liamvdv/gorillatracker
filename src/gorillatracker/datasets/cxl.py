@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple, Union
 
-import torch
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder
@@ -65,7 +64,7 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> Tuple[Image.Image, int]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
