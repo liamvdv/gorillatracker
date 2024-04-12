@@ -177,7 +177,7 @@ def _multiprocess_video_processor(
     version: str,
     mode: Literal["tracking", "prediction"],
     type: str,
-    yolo_model: Path,
+    yolo_model_path: Path,
     yolo_kwargs: dict[str, Any],
     video_paths: list[Path],
     engine: Engine,
@@ -203,7 +203,7 @@ def _multiprocess_video_processor(
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=_init_processor,
-        initargs=(version, mode, type, yolo_model, yolo_kwargs, engine, tracker_config, gpu_queue),
+        initargs=(version, mode, type, yolo_model_path, yolo_kwargs, engine, tracker_config, gpu_queue),
     ) as executor:
         list(
             tqdm(
@@ -217,7 +217,7 @@ def _multiprocess_video_processor(
 
 def multiprocess_track_and_store(
     version: str,
-    yolo_model: Path,
+    yolo_model_path: Path,
     yolo_kwargs: dict[str, Any],
     video_paths: list[Path],
     tracker_config: Path,
@@ -230,7 +230,7 @@ def multiprocess_track_and_store(
         version,
         "tracking",
         type,
-        yolo_model,
+        yolo_model_path,
         yolo_kwargs,
         video_paths,
         engine,
@@ -242,7 +242,7 @@ def multiprocess_track_and_store(
 
 def multiprocess_predict_and_store(
     version: str,
-    yolo_model: Path,
+    yolo_model_path: Path,
     yolo_kwargs: dict[str, Any],
     video_paths: list[Path],
     engine: Engine,
@@ -251,5 +251,5 @@ def multiprocess_predict_and_store(
     gpus: list[int] = [0],
 ) -> None:
     _multiprocess_video_processor(
-        version, "prediction", type, yolo_model, yolo_kwargs, video_paths, engine, max_worker_per_gpu, gpus=gpus
+        version, "prediction", type, yolo_model_path, yolo_kwargs, video_paths, engine, max_worker_per_gpu, gpus=gpus
     )
