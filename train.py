@@ -91,6 +91,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         l2_alpha=args.l2_alpha,
         l2_beta=args.l2_beta,
         path_to_pretrained_weights=args.path_to_pretrained_weights,
+        use_wildme_model=args.use_wildme_model,
     )
 
     if args.saved_checkpoint_path is not None:
@@ -233,7 +234,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/swinv2_cxl.yml"
+    config_path = "./cfgs/config.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments

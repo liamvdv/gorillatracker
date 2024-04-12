@@ -27,6 +27,7 @@ from transformers import ResNetModel
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import get_loss
+from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 
 
 def warmup_lr(
@@ -967,6 +968,76 @@ class FaceNetWrapper(BaseModule):
         )
 
 
+class MiewIdNetWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        is_from_scratch = kwargs.get("from_scratch", False)
+        use_wildme_model = kwargs.get("use_wildme_model", False)
+
+        if use_wildme_model:
+            logger.info("Using WildMe model")
+            self.model = load_miewid_model()
+            # fix model
+            for param in self.model.parameters():
+                param.requires_grad = False
+
+            # self.model.global_pool = nn.Identity()
+            # self.model.bn = nn.Identity()
+            self.classifier = torch.nn.Sequential(
+                # torch.nn.BatchNorm1d(2152),
+                torch.nn.Dropout(p=self.dropout_p),
+                torch.nn.Linear(in_features=2152, out_features=self.embedding_size),
+                torch.nn.BatchNorm1d(self.embedding_size),
+            )
+            self.set_losses(self.model, **kwargs)
+            return
+
+        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
+        in_features = self.model.classifier.in_features
+
+        self.model.global_pool = nn.Identity()  # NOTE: GeM = Generalized Mean Pooling
+        self.model.classifier = nn.Identity()
+
+        # TODO(rob2u): load wildme model weights here then initialize the classifier and get loss modes -> change the transforms accordingly (normalize, etc.)
+        self.classifier = torch.nn.Sequential(
+            GeM(),
+            torch.nn.Flatten(),
+            torch.nn.BatchNorm1d(in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.blocks[-1][-1].conv_pwl
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model(x)
+        x = self.classifier(x)
+        return x
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        # return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # TODO (rob2u): might be necessary to remove this for wildme model finetuning
+        return lambda x: x
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(440, scale=(0.75, 1.0)),
+            ]
+        )
+
+
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {
     "EfficientNetV2_Large": EfficientNetV2Wrapper,
@@ -984,6 +1055,7 @@ custom_model_cls = {
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
+    "MiewIdNet": MiewIdNetWrapper,
 }
 
 
