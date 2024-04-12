@@ -156,6 +156,7 @@ MNIST/
 mnist/
 .gitconfig
 *.pt
+*.ckpt
 *.db
 *visualized.mp4
 cropped_images/*

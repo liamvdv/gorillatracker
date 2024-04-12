@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import random
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from functools import partial
 from itertools import groupby
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 import cv2
-from sqlalchemy import Select, select
+from sqlalchemy import Engine, Select, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset
@@ -107,14 +108,28 @@ def crop_from_video(video_path: Path, crop_tasks: list[CropTask]) -> None:
         assert not crop_queue, "Not all crop tasks were completed"
 
 
-def crop(
+_version = None
+_session_cls = None
+_sampler = None
+
+
+def _init_cropper(engine: Engine, version: str, sampler: Sampler) -> None:
+    global _version, _session_cls, _sampler
+    _version = version
+    _sampler = sampler
+    engine.dispose(close=False)
+    _session_cls = sessionmaker(bind=engine)
+
+
+def _multiprocess_crop(
     video_path: Path,
-    version: str,
-    sampler: Sampler,
-    session_cls: sessionmaker[Session],
     dest_base_path: Path,
 ) -> None:
-    crop_tasks = create_crop_tasks(video_path, version, sampler, session_cls, dest_base_path)
+    global _version, _session_cls, _sampler
+    assert _session_cls is not None, "Engine not initialized, call _init_cropper first"
+    assert _version is not None, "Version not initialized, call _init_cropper instead"
+    assert _sampler is not None, "Sampler not initialized, call _init_cropper instead"
+    crop_tasks = create_crop_tasks(video_path, _version, _sampler, _session_cls, dest_base_path)
 
     if not crop_tasks:
         log.warning(f"No frames to crop for video: {video_path}")
@@ -123,7 +138,22 @@ def crop(
     crop_from_video(video_path, crop_tasks)
 
 
-# TODO(memben): cleanup
+def multipricess_crop_from_video(
+    video_paths: list[Path], version: str, sampler: Sampler, engine: Engine, dest_base_path: Path
+) -> None:
+    with ProcessPoolExecutor(
+        initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=10
+    ) as executor:
+        list(
+            tqdm(
+                executor.map(_multiprocess_crop, video_paths, [dest_base_path] * len(video_paths)),
+                total=len(video_paths),
+                desc="Cropping images from videos",
+                unit="video",
+            )
+        )
+
+
 if __name__ == "__main__":
     import shutil
 
@@ -149,20 +179,15 @@ if __name__ == "__main__":
         return query
 
     shutil.rmtree("cropped_images")
+    Path("cropped_images").mkdir(parents=True, exist_ok=True)
 
     session_cls = sessionmaker(bind=engine)
-    version = "2024-04-09"
+    version = "2024-04-09"  # TODO(memben)
 
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()
         video_paths = [Path(video.path) for video in videos]
 
-    for video_path in tqdm(video_paths):
-        query = partial(sampling_strategy, min_n_images_per_tracking=10)
-        crop(
-            video_path,
-            version,
-            RandomSampler(query_builder=query, seed=42, n_samples=10),
-            session_cls,
-            Path("cropped_images"),
-        )
+    query = partial(sampling_strategy, min_n_images_per_tracking=10)
+    sampler = RandomSampler(query_builder=query, n_samples=10)
+    multipricess_crop_from_video(video_paths[:20], version, sampler, engine, Path("cropped_images"))
