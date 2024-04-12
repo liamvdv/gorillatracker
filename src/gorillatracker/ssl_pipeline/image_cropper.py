@@ -14,7 +14,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, video_reader, crop_frame
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import load_video
 

@@ -4,19 +4,17 @@ import logging
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, time
 from itertools import groupby
 from pathlib import Path
 from typing import Generator, Sequence
 
 import cv2
+import easyocr
 from shapely.geometry import Polygon
 
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-
-from datetime import datetime, time
-import easyocr
-
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
 log = logging.getLogger(__name__)
 
@@ -160,6 +158,7 @@ def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLi
     ]
     return cropped_frame
 
+
 def read_timestamp(
     video_path: Path, bbox: BoundingBox, reader: easyocr.Reader = easyocr.Reader(["en"], gpu=False, verbose=False)
 ) -> time:
@@ -186,6 +185,7 @@ def _extract_time_stamp(cropped_frame: cv2.typing.MatLike, reader: easyocr.Reade
     time_stamp = "".join([text[1] for text in extracted_time_stamp_raw])
     time_stamp = time_stamp.replace(":", "")
     return _extract_time(time_stamp)
+
 
 def _extract_time(time_stamp) -> time:
     try:
