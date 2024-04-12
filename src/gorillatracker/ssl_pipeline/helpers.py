@@ -13,6 +13,11 @@ from shapely.geometry import Polygon
 
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 
+from datetime import datetime, time
+import easyocr
+
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
+
 log = logging.getLogger(__name__)
 
 
@@ -154,3 +159,37 @@ def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLi
         bbox.x_top_left : bbox.x_bottom_right,
     ]
     return cropped_frame
+
+def read_timestamp(
+    video_path: Path, bbox: BoundingBox, reader: easyocr.Reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+) -> time:
+    """
+    Extracts the time stamp from the video file.
+    Args:
+        video_path (Path): path to the video file
+        bbox (BoundingBox): bounding box for the time stamp
+    Returns:
+        time: time stamp as time object
+    """
+    with video_reader(video_path) as video_feed:
+        frame = next(video_feed).frame
+    cropped_frame = crop_frame(frame, bbox)
+    time_stamp = _extract_time_stamp(cropped_frame, reader)
+    return time_stamp
+
+
+def _extract_time_stamp(cropped_frame: cv2.typing.MatLike, reader: easyocr.Reader) -> time:
+    """Extracts the time stamp from the cropped frame."""
+    allow_list = "0123456789A:PM"
+    rgb_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB)
+    extracted_time_stamp_raw = reader.readtext(rgb_frame, allowlist=allow_list)
+    time_stamp = "".join([text[1] for text in extracted_time_stamp_raw])
+    time_stamp = time_stamp.replace(":", "")
+    return _extract_time(time_stamp)
+
+def _extract_time(time_stamp) -> time:
+    try:
+        time_obj = datetime.strptime(time_stamp, "%I%M%p")
+        return time_obj.time()
+    except ValueError:
+        raise ValueError(f"Could not extract time stamp from frame")

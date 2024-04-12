@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.models import Base, Camera
-from gorillatracker.ssl_pipeline.timestamp_reader import read_timestamp
 from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +82,8 @@ class GorillaDataset(SSLDataset):
     }
 
     DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
+    
+    time_stamp_box: BoundingBox = BoundingBox(0.674036, 0.977824, 0.0980, 0.0296, 1, 1920, 1080) # default where time stamp is located
 
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
@@ -138,6 +140,6 @@ class GorillaDataset(SSLDataset):
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
         date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path)
+        daytime = read_timestamp(video_path, GorillaDataset.time_stamp_box)
         date = datetime.combine(date, daytime)
         return VideoMetadata(camera_name, date)
