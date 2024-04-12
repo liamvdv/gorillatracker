@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from itertools import groupby
 from pathlib import Path
-from typing import Generator, Sequence
+from typing import Generator, Optional, Sequence
 
 import cv2
 import easyocr
@@ -158,37 +158,38 @@ def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLi
     return cropped_frame
 
 
-def read_timestamp(
-    video_path: Path, bbox: BoundingBox, reader: easyocr.Reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-) -> time:
+def read_timestamp(video_path: Path, bbox: BoundingBox, ocr_reader: Optional[easyocr.Reader] = None) -> time:
     """
     Extracts the time stamp from the video file.
+
     Args:
         video_path (Path): path to the video file
         bbox (BoundingBox): bounding box for the time stamp
+        ocr_reader (Optional[easyocr.Reader]): OCR reader
+
     Returns:
         time: time stamp as time object
     """
     with video_reader(video_path) as video_feed:
         frame = next(video_feed).frame
-    cropped_frame = crop_frame(frame, bbox)
-    time_stamp = _extract_time_stamp(cropped_frame, reader)
+        cropped_frame = crop_frame(frame, bbox)
+        ocr_reader = ocr_reader or easyocr.Reader(["en"], gpu=False, verbose=False)
+        time_stamp = _extract_time_stamp(cropped_frame, ocr_reader)
+
     return time_stamp
 
 
 def _extract_time_stamp(cropped_frame: cv2.typing.MatLike, reader: easyocr.Reader) -> time:
     """Extracts the time stamp from the cropped frame."""
-    allow_list = "0123456789A:PM"
+    TIMESTAMP_CHARS = "0123456789APM:"
     rgb_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB)
-    extracted_time_stamp_raw = reader.readtext(rgb_frame, allowlist=allow_list)
-    time_stamp = "".join([text[1] for text in extracted_time_stamp_raw])
-    time_stamp = time_stamp.replace(":", "")
+    extracted_time_stamp_raw = reader.readtext(rgb_frame, allowlist=TIMESTAMP_CHARS)
+    time_stamp = "".join(text[1] for text in extracted_time_stamp_raw).replace(":", "")
     return _extract_time(time_stamp)
 
 
 def _extract_time(time_stamp: str) -> time:
     try:
-        time_obj = datetime.strptime(time_stamp, "%I%M%p")
-        return time_obj.time()
+        return datetime.strptime(time_stamp, "%I%M%p").time()
     except ValueError:
-        raise ValueError(f"Could not extract time stamp from frame")
+        raise ValueError("Could not extract time stamp from frame")
