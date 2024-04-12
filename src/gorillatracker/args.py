@@ -25,6 +25,7 @@ class TrainingArgs:
     run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
     model_name_or_path: str = field(default="EfficientNetV2")
+    use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
     fast_dev_run: bool = field(default=True)
