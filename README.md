@@ -119,7 +119,8 @@ Note that `gpuserver2` is my ssh host alias for the remote host, change it to
 whatever you have named it.
 
 2. Login 
-The credentials are not currently known and will be added as soon as they are provided.
+student
+AIisthebest
 
 
 

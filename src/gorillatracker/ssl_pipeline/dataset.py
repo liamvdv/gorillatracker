@@ -2,7 +2,6 @@
 Contains adapter classes for different datasets.
 """
 
-import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -38,7 +37,7 @@ class SSLDataset(ABC):
 
     @property
     @abstractmethod
-    def body_model(self) -> Path:
+    def body_model_path(self) -> Path:
         """The body model (YOLOv8) to use for tracking."""
         pass
 
@@ -110,7 +109,7 @@ class GorillaDataset(SSLDataset):
         return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
 
     @property
-    def body_model(self) -> Path:
+    def body_model_path(self) -> Path:
         return Path("models/yolov8n_gorilla_body.pt")
 
     @property
