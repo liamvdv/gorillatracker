@@ -157,5 +157,11 @@ mnist/
 .gitconfig
 *.pt
 *.ckpt
+
 *.pth
 .devcontainer/
+
+*.db
+*visualized.mp4
+cropped_images/*
+

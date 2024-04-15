@@ -22,28 +22,28 @@ def get_dataset_config(dataset_key: str, training_name: str) -> BaseConfig:
     datasets = {
         "fmcb": BaseConfig(
             project="Detection-YOLOv8-CXLBodyFemaleMaleChild-ClosedSet",
-            data="/workspaces/gorillatracker/cfgs/yolo_detection_body_fmc.yaml",
+            data="/workspaces/gorillatracker/cfgs/detection/body_fmc.yaml",
             training_name=training_name,
         ),
         "gsb": BaseConfig(
             project="Detection-YOLOv8-CXLBodyGorillaSilverback-ClosedSet",
-            data="/workspaces/gorillatracker/cfgs/yolo_detection_body_gs.yaml",
+            data="/workspaces/gorillatracker/cfgs/detection/body_gs.yaml",
             training_name=training_name,
         ),
         "gb": BaseConfig(
             project="Detection-YOLOv8-CXLBodyGorilla-ClosedSet",
-            data="/workspaces/gorillatracker/cfgs/yolo_detection_body_gs.yaml",
+            data="/workspaces/gorillatracker/cfgs/detection/body_gs.yaml",
             training_name=training_name,
             single_cls=True,
         ),
         "gf90": BaseConfig(
             project="Detection-YOLOv8-CXLFace90DegreeGorilla-ClosedSet",
-            data="/workspaces/gorillatracker/cfgs/yolo_detection_face_90.yaml",
+            data="/workspaces/gorillatracker/cfgs/detection/face_90.yaml",
             training_name=training_name,
         ),
         "gf45": BaseConfig(
             project="Detection-YOLOv8-CXLFace45DegreeGorilla-ClosedSet",
-            data="/workspaces/gorillatracker/cfgs/yolo_detection_face_45.yaml",
+            data="/workspaces/gorillatracker/cfgs/detection/face_45.yaml",
             training_name=training_name,
         ),
     }

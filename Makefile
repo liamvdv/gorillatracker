@@ -7,7 +7,7 @@ format:
 
 .PHONY: lint
 lint:
-	ruff $(sources)
+	ruff check $(sources)
 	isort $(sources) --check-only --df
 	black $(sources) --check --diff
 
