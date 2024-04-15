@@ -13,13 +13,14 @@ The pipeline consists of the following steps:
 """
 
 import logging
+import os
 import random
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
-from gorillatracker.ssl_pipeline.feature_mapper import correlate_videos
+from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate_videos
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.queries import load_processed_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
@@ -29,7 +30,6 @@ from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 log = logging.getLogger(__name__)
 
 
-# TODO(memben): allow disrupting the pipeline at any point and resuming from that point
 def visualize_pipeline(
     dataset: SSLDataset,
     version: str,
@@ -44,7 +44,8 @@ def visualize_pipeline(
 
     Args:
         dataset (SSLDataset): The dataset to use.
-        dest (Path): The destination to save the visualizations.
+        version (str): The version of the pipeline.
+        dest_dir (Path): The destination to save the visualizations.
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
         sampled_fps (int, optional): The FPS to sample the video at. Defaults to 10.
         max_worker_per_gpu (int, optional): The maximum number of workers per GPU. Defaults to 8.
@@ -69,7 +70,7 @@ def visualize_pipeline(
 
     multiprocess_track_and_store(
         version,
-        dataset.body_model,
+        dataset.body_model_path,
         dataset.yolo_kwargs,
         to_track,
         dataset.tracker_config,
@@ -92,7 +93,7 @@ def visualize_pipeline(
         )
 
     for _, _, correlator, type in dataset.feature_models():
-        correlate_videos(
+        multiprocess_correlate_videos(
             version,
             to_track,
             dataset.engine,
@@ -107,7 +108,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
     # NOTE(memben): for setup only once
-    if False:
+    if not os.path.exists("test.db"):
         dataset.setup_database()
         dataset.setup_cameras()
     visualize_pipeline(

@@ -113,6 +113,9 @@ class Video(Base):
     def duration(self) -> timedelta:
         return timedelta(seconds=self.frames / self.fps)
 
+    def __hash__(self) -> int:
+        return self.video_id
+
     def __repr__(self) -> str:
         return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
 
@@ -132,7 +135,7 @@ class ProcessedVideoFrameFeature(Base):
 class VideoFeature(Base):
     __tablename__ = "video_feature"
 
-    feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    video_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
     type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
@@ -140,7 +143,9 @@ class VideoFeature(Base):
     video: Mapped[Video] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
-        return f"video_feature(id={self.feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
+        return (
+            f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
+        )
 
 
 class Tracking(Base):
@@ -170,6 +175,9 @@ class Tracking(Base):
         start_frame = min(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         end_frame = max(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         return timedelta(seconds=(end_frame - start_frame) / fps)
+
+    def __hash__(self) -> int:
+        return self.tracking_id
 
     def __repr__(self) -> str:
         return f"tracking(id={self.tracking_id}, video_id={self.video_id})"
@@ -223,7 +231,7 @@ class TrackingFrameFeature(Base):
         return frame_nr
 
     def __hash__(self) -> int:
-        return hash(self.tracking_frame_feature_id)
+        return self.tracking_frame_feature_id
 
     def __repr__(self) -> str:
         return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"

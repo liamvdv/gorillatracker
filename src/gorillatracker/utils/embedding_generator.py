@@ -196,6 +196,11 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
             "end_lr",
             "beta1",
             "beta2",
+            "stepwise_schedule",
+            "lr_interval",
+            "l2_alpha",
+            "l2_beta",
+            "path_to_pretrained_weights",
             # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }
@@ -294,11 +299,11 @@ def get_embedding_from_frame(
 
     # convert to pil image
     img = cv2.cvtColor(frame_cropped, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(img)
-    img = model_transforms(img)
+    img = Image.fromarray(img)  # type: ignore
+    transformed_image: torch.Tensor = model_transforms(img)
 
     model.eval()
-    embedding = model(img.unsqueeze(0))
+    embedding = model(transformed_image.unsqueeze(0))
     return embedding
 
 
