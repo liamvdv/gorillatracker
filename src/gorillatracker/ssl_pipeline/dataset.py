@@ -128,7 +128,7 @@ class GorillaDataset(SSLDataset):
                     session.add(video_feature)
                     try:
                         session.commit()
-                    except IntegrityError as e:
+                    except IntegrityError:
                         log.error(
                             f"Failed to add social group {social_group} for video {video_name} due to entry with video_id:{video_id} type:{feature_type} already in DB"
                         )
