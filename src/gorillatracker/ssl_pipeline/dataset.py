@@ -2,23 +2,24 @@
 Contains adapter classes for different datasets.
 """
 
-import json
 import logging
 import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Optional
 
+import easyocr
 import pandas as pd
 from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video, VideoFeature
-from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
+from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class SSLDataset(ABC):
 
     @property
     @abstractmethod
-    def metadata_extractor(self) -> Callable[[Path], VideoMetadata]:
+    def metadata_extractor(self) -> MetadataExtractor:
         """Function to extract metadata from video."""
         pass
 
@@ -77,10 +78,18 @@ class SSLDataset(ABC):
 class GorillaDataset(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
     FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
+    TIME_STAMP_BOX: BoundingBox = BoundingBox(
+        x_center_n=0.672969,
+        y_center_n=0.978102,
+        width_n=0.134167,
+        height_n=0.043796,
+        confidence=1,
+        image_width=1920,
+        image_height=1080,
+    )  # default where time stamp is located
 
     _yolo_base_kwargs = {
         "half": True,  # We found no difference in accuracy to False
-        "vid_stride": 5,
         "verbose": False,
     }
 
@@ -140,7 +149,7 @@ class GorillaDataset(SSLDataset):
         return Path("models/yolov8n_gorilla_body.pt")
 
     @property
-    def metadata_extractor(self) -> Callable[[Path], VideoMetadata]:
+    def metadata_extractor(self) -> MetadataExtractor:
         return GorillaDataset.get_video_metadata
 
     @property
@@ -161,16 +170,12 @@ class GorillaDataset(SSLDataset):
         return self._engine
 
     @staticmethod
-    def get_video_metadata(video_path: Path) -> VideoMetadata:
+    def get_video_metadata(video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
-        timestamps_path = "data/derived_data/timestamps.json"
-        with open(timestamps_path, "r") as f:
-            timestamps = json.load(f)
         date = datetime.strptime(date_str, "%Y%m%d")
-        timestamp = timestamps[video_path.stem]
-        daytime = datetime.strptime(timestamp, "%I:%M %p")
-        date = datetime.combine(date, daytime.time())
+        daytime = read_timestamp(video_path, GorillaDataset.TIME_STAMP_BOX, ocr_reader=ocr_reader)
+        date = datetime.combine(date, daytime)
         return VideoMetadata(camera_name, date)
 
     @staticmethod
