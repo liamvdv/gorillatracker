@@ -95,6 +95,9 @@ RUN apt-get update && apt-get install -y make
 RUN apt-get update && apt-get install bash-completion -y
 RUN echo "source /usr/share/bash-completion/bash_completion" >> /root/.bashrc
 
+# Install postgresql-client for database access
+RUN apt update && apt-get install -y postgresql-client
+
 USER $MAMBA_USER
 
 SHELL ["/usr/local/bin/_dockerfile_shell.sh"]
@@ -141,6 +144,9 @@ RUN micromamba config set show_banner false --env
 
 # Install optional tricky pip dependencies that do not work with conda-lock
 # RUN micromamba run -n research pip install example-dependency --no-deps --no-cache-dir
+
+# Fix opencv problems
+RUN micromamba run -n research pip install opencv-python-headless --force --no-deps --no-cache-dir
 
 # Use our environment `research` as default
 ENV ENV_NAME=research

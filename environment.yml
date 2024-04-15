@@ -23,7 +23,6 @@ dependencies:
   - evaluate
   - accelerate
   - sentencepiece
-  - ultralytics=8.0.186
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
@@ -46,7 +45,7 @@ dependencies:
   - ipykernel
   - bokeh
   - colorcet
-  - ipywidgets
+  - shapely
 
   # Dev dependencies
   - black
@@ -55,22 +54,27 @@ dependencies:
   - mypy
   - pytest
   - typer
+  - ipywidgets
 
   # pip dependencies
   - pip
   - pip:
       - pipx
+       # NOTE(memben): 🚩 see end of dockerfile, needed to fix dependency hell, https://github.com/ultralytics/ultralytics/issues/1270
+      - opencv-python-headless
+      - psycopg2-binary
+      - sqlalchemy
       - warmup-scheduler
       - simple_parsing
       - print-on-steroids[exceptions]
-      - opencv-python-headless
+      - ultralytics 
+      - lapx>=0.5.2 # for ultralytics tracking
       - types-PyYAML
       - git+https://github.com/facebookresearch/segment-anything.git
       - easyocr
       - umap-learn
       - bokeh
       - colorcet
-      - ipywidgets
       - grad-cam
       - facenet_pytorch
       - typer
