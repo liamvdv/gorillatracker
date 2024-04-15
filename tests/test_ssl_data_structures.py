@@ -35,11 +35,11 @@ def test_union_graph_group_relationship(setup_union_graph: CliqueGraph[int]) -> 
 
     assert not u_graph.is_connected(0, 4), "CliqueGraph negative relationship check failed."
 
-    assert u_graph.get_clique(0)[1] == {0, 1, 2}, "CliqueGraph group relationship check failed."
-    assert u_graph.get_clique(1)[1] == {0, 1, 2}, "CliqueGraph group relationship check failed."
-    assert u_graph.get_clique(2)[1] == {0, 1, 2}, "CliqueGraph group relationship check failed."
-    assert u_graph.get_clique(3)[1] == {3}, "CliqueGraph group relationship check failed."
-    assert u_graph.get_clique(4)[1] == {4}, "CliqueGraph group relationship check failed."
+    assert u_graph.get_clique(0) == {0, 1, 2}, "CliqueGraph group relationship check failed."
+    assert u_graph.get_clique(1) == {0, 1, 2}, "CliqueGraph group relationship check failed."
+    assert u_graph.get_clique(2) == {0, 1, 2}, "CliqueGraph group relationship check failed."
+    assert u_graph.get_clique(3) == {3}, "CliqueGraph group relationship check failed."
+    assert u_graph.get_clique(4) == {4}, "CliqueGraph group relationship check failed."
 
 
 def test_union_merge_groups(setup_union_graph: CliqueGraph[int]) -> None:

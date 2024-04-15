@@ -102,6 +102,7 @@ class CliqueGraph(Generic[T]):
     def __init__(self, vertices: list[T]) -> None:
         assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.union_find = UnionFind(vertices)
+        # NOTE(memben): the key is always the root of a set in union find
         self.negative_connections = {v: set[T]() for v in vertices}
 
     def add_relationship(self, u: T, v: T, relation: CliqueRelation) -> None:
@@ -119,14 +120,15 @@ class CliqueGraph(Generic[T]):
     def is_connected(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
 
-    def get_clique(self, v: T) -> tuple[T, set[T]]:
-        root_v = self.union_find.find(v)
-        members = self.union_find.get_members(v)
-        return root_v, members
+    def get_clique_representative(self, v: T) -> T:
+        return self.union_find.find(v)
+
+    def get_clique(self, v: T) -> set[T]:
+        return self.union_find.get_members(v)
 
     def get_adjacent_negative_cliques(self, v: T) -> dict[T, set[T]]:
-        negative_roots = self._get_separations(v)
-        return {negative_root: self.union_find.get_members(negative_root) for negative_root in negative_roots}
+        negative_representatives = self._get_separations(v)
+        return {r: self.get_clique(r) for r in negative_representatives}
 
     def _get_separations(self, v: T) -> set[T]:
         root_v = self.union_find.find(v)
@@ -163,17 +165,12 @@ class IndexedCliqueGraph(CliqueGraph[K]):
             self.vertices[i] < self.vertices[i + 1] for i in range(len(self.vertices) - 1)
         ), "Verticies must have an unique order"
 
-    def get_clique(self, v: K) -> tuple[K, set[K]]:
-        members = self.union_find.get_members(v)
-        return min(members), members
+    def get_clique_representative(self, v: K) -> K:
+        return min(self.get_clique(v))
 
     def get_adjacent_negative_cliques(self, v: K) -> dict[K, set[K]]:
-        negative_roots = self._get_separations(v)
-        return {
-            min(members): members
-            for negative_root in negative_roots
-            if (members := self.union_find.get_members(negative_root))
-        }
+        negative_representatives = self._get_separations(v)
+        return {min(clique): clique for r in negative_representatives if (clique := self.get_clique(r))}
 
     def __getitem__(self, key: int) -> K:
         return self.vertices[key]
