@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -9,7 +10,7 @@ from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.data_structures import DirectedBipartiteGraph
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, groupby_frame
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import load_features, load_processed_videos, load_tracked_features, load_videos
 
 log = logging.getLogger(__name__)
@@ -75,7 +76,44 @@ def correlate_and_update(
         association.unassociated.tracking_id = association.reference.tracking_id
 
 
-def correlate_videos(
+_session_cls = None
+_tracked_type = None
+_untracked_type = None
+_correlator = None
+_threshold = None
+
+
+def _init_correlate_videos(
+    engine: Engine, tracked_type: str, untracked_type: str, correlator: Correlator, threshold: float
+) -> None:
+    global _session_cls, _tracked_type, _untracked_type, _correlator, _threshold
+    _tracked_type = tracked_type
+    _untracked_type = untracked_type
+    _correlator = correlator
+    _threshold = threshold
+
+    engine.dispose(
+        close=False
+    )  # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork
+    _session_cls = sessionmaker(bind=engine)
+
+
+def _multiprocess_correlate(video: Video) -> None:
+    global _session_cls, _tracked_type, _untracked_type, _correlator, _threshold
+    assert _session_cls is not None, "Session class is not initialized, call init_processor instead"
+    assert _tracked_type is not None, "Tracked type is not initialized, call init_processor instead"
+    assert _untracked_type is not None, "Untracked type is not initialized, call init_processor instead"
+    assert _correlator is not None, "Correlator is not initialized, use init_processor instead"
+    assert _threshold is not None, "Threshold is not initialized, use init_processor instead"
+
+    with _session_cls() as session:
+        tracked_features = load_tracked_features(session, video.video_id, [_tracked_type])
+        untracked_features = load_features(session, video.video_id, [_untracked_type])
+        correlate_and_update(list(tracked_features), list(untracked_features), _correlator, _threshold)
+        session.commit()
+
+
+def multiprocess_correlate_videos(
     version: str,
     video_paths: list[Path],
     engine: Engine,
@@ -94,9 +132,14 @@ def correlate_videos(
             video in processed_videos for video in videos
         ), f"Not all videos have been processed for {tracked_type} or {untracked_type}"
 
-        for video in tqdm(videos, desc="Correlating videos"):
-            tracked_features = load_tracked_features(session, video.video_id, [tracked_type])
-            untracked_features = load_features(session, video.video_id, [untracked_type])
-            correlate_and_update(list(tracked_features), list(untracked_features), correlator, threshold)
-
-        session.commit()
+    with ProcessPoolExecutor(
+        initializer=_init_correlate_videos, initargs=(engine, tracked_type, untracked_type, correlator, threshold)
+    ) as executor:
+        list(
+            tqdm(
+                executor.map(_multiprocess_correlate, videos),
+                total=len(videos),
+                desc="Correlating videos",
+                unit="video",
+            )
+        )

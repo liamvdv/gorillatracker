@@ -5,10 +5,10 @@ This module contains pre-defined database queries.
 from pathlib import Path
 from typing import Optional, Sequence
 
-from sqlalchemy import Select, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import Select, alias, func, select
+from sqlalchemy.orm import Session, aliased
 
-from gorillatracker.ssl_pipeline.models import ProcessedVideoFrameFeature, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import ProcessedVideoFrameFeature, Tracking, TrackingFrameFeature, Video
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -148,3 +148,52 @@ def load_processed_videos(session: Session, version: str, required_feature_types
             .having(func.count(ProcessedVideoFrameFeature.type.distinct()) == len(required_feature_types))
         )
     return session.execute(stmt).scalars().all()
+
+
+def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tracking]]:
+    subquery = (
+        select(
+            TrackingFrameFeature.tracking_id,
+            func.min(TrackingFrameFeature.frame_nr).label("min_frame_nr"),
+            func.max(TrackingFrameFeature.frame_nr).label("max_frame_nr"),
+            TrackingFrameFeature.video_id,
+        )
+        .where(TrackingFrameFeature.tracking_id.isnot(None))
+        .group_by(TrackingFrameFeature.tracking_id)
+    ).subquery()
+
+    left_subquery = alias(subquery)
+    right_subquery = alias(subquery)
+
+    left_tracking = aliased(Tracking)
+    right_tracking = aliased(Tracking)
+
+    stmt = (
+        select(left_tracking, right_tracking)
+        .join(left_subquery, left_tracking.tracking_id == left_subquery.c.tracking_id)
+        .join(right_subquery, right_tracking.tracking_id == right_subquery.c.tracking_id)
+        .where(
+            (left_subquery.c.min_frame_nr <= right_subquery.c.max_frame_nr)
+            & (right_subquery.c.min_frame_nr <= left_subquery.c.max_frame_nr)
+            & (left_subquery.c.video_id == right_subquery.c.video_id)
+            & (left_subquery.c.tracking_id < right_subquery.c.tracking_id)
+        )
+    )
+
+    overlapping_trackings = session.execute(stmt).fetchall()
+    return [(row[0], row[1]) for row in overlapping_trackings]
+
+
+if __name__ == "__main__":
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    engine = create_engine("sqlite:///test.db")
+
+    session_cls = sessionmaker(bind=engine)
+
+    # find first video_id in the database and then find overlapping trackings for that video and print them
+    with session_cls() as session:
+        overlapping_trackings = find_overlapping_trackings(session)
+        for left_tracking, right_tracking in overlapping_trackings:
+            print(left_tracking.tracking_id, right_tracking.tracking_id)
