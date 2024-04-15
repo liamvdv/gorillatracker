@@ -1,20 +1,21 @@
+import hashlib
+import json
+import logging
 import pathlib
+import shutil
+from typing import Literal, Tuple
+
+import faiss
+import networkx as nx
+import numpy as np
+import pandas as pd
 import torch
 import torch.utils.data as data_utils
 import tqdm
-import json
-import faiss
-import numpy as np
-import networkx as nx
-import logging
-import pandas as pd
-import shutil
-import hashlib
-import gorillatracker.model as model
+
 import gorillatracker.datasets.cxl as cxl
 import gorillatracker.datasets.spac_videos as spac_videos
-
-from typing import Literal, Tuple
+import gorillatracker.model as model
 
 logger = logging.getLogger("GT-CurationPipeline")
 logger.setLevel(logging.INFO)
