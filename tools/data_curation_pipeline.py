@@ -36,7 +36,7 @@ embedding_model_settings = {
     "max_epochs": 20,
     "beta1": 0.9,
     "beta2": 0.999,
-    "embedding_size": 128,
+    "embedding_size": 256,
     "stepwise_schedule": False,
     "lr_interval": 1.0,
     "l2_alpha": 0.1,
@@ -77,8 +77,6 @@ class CurationPipeline:
             model_name_or_path=self.embedding_model_path, **embedding_model_settings
         ).to(self.device)
         state_dict = torch.load(self.embedding_model_path)["state_dict"]
-        state_dict.pop("loss_module_val.prototypes")
-        state_dict.pop("loss_module_train.prototypes")
         self.embedding_model.load_state_dict(state_dict)
         self.embedding_model.eval()
 
