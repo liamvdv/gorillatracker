@@ -102,7 +102,7 @@ class CliqueGraph(Generic[T]):
     def __init__(self, vertices: list[T]) -> None:
         assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.union_find = UnionFind(vertices)
-        # NOTE(memben): the key is always the root of a set in union find
+        # NOTE(memben): the key and values are always the root of a set in union find
         self.negative_connections = {v: set[T]() for v in vertices}
 
     def add_relationship(self, u: T, v: T, relation: CliqueRelation) -> None:
@@ -115,7 +115,8 @@ class CliqueGraph(Generic[T]):
             self._add_separation(u, v)
 
     def is_separated(self, u: T, v: T) -> bool:
-        return self.union_find.find(u) in self.negative_connections[self.union_find.find(v)]
+        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
+        return root_u in self.negative_connections[root_v]
 
     def is_connected(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
@@ -142,11 +143,11 @@ class CliqueGraph(Generic[T]):
         root = self.union_find.union(u, v)
         old_root = root_v if root == root_u else root_u
         # transfer negative edges from the old clique root to the new clique root
-        old_root_negative_neighbors = self.negative_connections.pop(old_root)
-        for neighbor in old_root_negative_neighbors:
-            self.negative_connections[neighbor].remove(old_root)
-            self.negative_connections[neighbor].add(root)
-        self.negative_connections[root] |= old_root_negative_neighbors
+        old_negatives = self.negative_connections.pop(old_root)
+        for root_n in old_negatives:
+            self.negative_connections[root_n].remove(old_root)
+            self.negative_connections[root_n].add(root)
+        self.negative_connections[root] |= old_negatives
 
     def _add_separation(self, u: T, v: T) -> None:
         root_u, root_v = self.union_find.find(u), self.union_find.find(v)
