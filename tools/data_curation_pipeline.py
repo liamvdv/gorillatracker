@@ -221,7 +221,12 @@ class CurationPipeline:
         index.add(combined_embeddings)
 
         D, I = index.search(source_embeddings, self.k_nearest_neighbors + 1)
-
+        
+        deduplicated_indices = self._find_deduplicated_indices(source_embeddings, D, I)
+        
+        return pd.concat([source_df.iloc[deduplicated_indices], embedding_df[embedding_df["partition"] != source]])
+    
+    def _find_deduplicated_indices(self, source_embeddings: np.ndarray, D, I) -> set:
         G = nx.Graph()
         num_source_images = source_embeddings.shape[0]
         for idx, similarities in enumerate(tqdm.tqdm(D)):
@@ -233,10 +238,11 @@ class CurationPipeline:
         for component in nx.connected_components(G):
             if any(idx >= num_source_images for idx in component):
                 to_discard.update(component)
-
+                
         deduplicated_indices = [i for i in range(num_source_images) if i not in to_discard]
-
-        return pd.concat([source_df.iloc[deduplicated_indices], embedding_df[embedding_df["partition"] != source]])
+                
+        return deduplicated_indices
+        
 
 
 class SSLCurationPipeline(CurationPipeline):
@@ -279,7 +285,6 @@ class SSLCurationPipeline(CurationPipeline):
         negatives = json.load(open(source + "/train/negatives.json"))
 
         curated_df = super()._curate_dataframe(dataframe, source, destination)
-        curated_df.to_pickle(destination + "/temp.pkl")
 
         ids_to_keep = curated_df["label"]
         ids_to_keep_in_train = curated_df[curated_df["partition"] == "train"]["label"]
