@@ -107,7 +107,7 @@ class GorillaDataset(SSLDataset):
                 if self.check_valid_social_group(row["Group"]):
                     social_group = self.extract_social_group(row["Group"])
                     video_name = os.path.splitext(row["File"])[0] + ".mp4"  # csv has .MP4 instead of .mp4
-                    video_id = session.execute(select(Video.video_id).where(Video.path.endswith(video_name))).scalar()
+                    video_id = session.execute(select(Video.video_id).where(Video.path.endswith(video_name))).scalar_one()
                     if video_id is None:
                         continue
                     video_feature = VideoFeature(video_id=video_id, type="Social Group", value=social_group)
