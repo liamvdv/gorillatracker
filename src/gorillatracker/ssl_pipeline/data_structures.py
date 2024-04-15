@@ -6,8 +6,7 @@ and edges only connect nodes from different sets.
 
 ### Union Graph
 
-TLDR: Reduce the number of labelling by utilizing the graph's structure to infer
-as much as possible about the relationships between nodes before adding new labels.
+TLDR: Clique which can be unioned and can have negative edges between other cliques
 
 We're dealing with a graph where nodes represent entities and edges represent relationships
 between these entities. Edges can represent a positive or negative relationship
@@ -84,6 +83,7 @@ class UnionFind(Generic[T]):
     def __init__(self, vertices: list[T]) -> None:
         self.root = {i: i for i in vertices}
         self.rank = {i: 1 for i in vertices}
+        self.members = {i: {i} for i in vertices}
 
     def find(self, x: T) -> T:
         if x == self.root[x]:
@@ -91,18 +91,20 @@ class UnionFind(Generic[T]):
         self.root[x] = self.find(self.root[x])
         return self.root[x]
 
-    def union(self, x: T, y: T) -> None:
-        rootX = self.find(x)
-        rootY = self.find(y)
+    def union(self, x: T, y: T) -> T:
+        root_x, root_y = self.find(x), self.find(y)
+        if root_x == root_y:
+            return root_y
+        if self.rank[root_x] > self.rank[root_y]:
+            root_x, root_y = root_y, root_x
+        if self.rank[root_x] == self.rank[root_y]:
+            self.rank[root_y] += 1
+        self.root[root_x] = root_y
+        self.members[root_y] |= self.members.pop(root_x)
+        return root_y
 
-        if rootX != rootY:
-            if self.rank[rootX] > self.rank[rootY]:
-                self.root[rootY] = rootX
-            elif self.rank[rootX] < self.rank[rootY]:
-                self.root[rootX] = rootY
-            else:
-                self.root[rootY] = rootX
-                self.rank[rootX] += 1
+    def get_members(self, x: T) -> set[T]:
+        return self.members[self.find(x)]
 
 
 class EdgeType(Enum):
@@ -111,13 +113,10 @@ class EdgeType(Enum):
 
 
 class UnionGraph(Generic[T]):
-    """A graph that keeps track of the relationships between groups of vertices."""
-
-    def __init__(self, vertices: list[T]):
+    def __init__(self, vertices: list[T]) -> None:
         assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.union_find = UnionFind(vertices)
-        self.groups = {i: {i} for i in vertices}
-        self.negative_relations = {i: set[T]() for i in vertices}
+        self.negative_edges: defaultdict[T, set[T]] = defaultdict(set)  # negative relationships between root of groups
 
     def add_edge(self, u: T, v: T, edge_type: EdgeType) -> None:
         assert u != v, "Self loops are not allowed."
@@ -125,41 +124,74 @@ class UnionGraph(Generic[T]):
             assert not self.has_negative_relationship(
                 u, v
             ), "Cannot add positive relationship between negatively connected groups."
-            self._merge_groups(u, v)
+            self._add_positive_edge(u, v)
         elif edge_type is EdgeType.NEGATIVE:
             assert not self.has_positive_relationship(
                 u, v
             ), "Cannot add negative relationship between positively connected groups."
-            self._add_negative_relationship(u, v)
-
-    def get_entities_in_group(self, vertex: T) -> set[T]:
-        return self.groups[self.union_find.find(vertex)]
-
-    def _merge_groups(self, u: T, v: T) -> None:
-        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
-        if root_u == root_v:  # prevent poppping the same key
-            return
-        self.union_find.union(u, v)
-        root = self.union_find.find(u)
-        self.groups[root] = self.groups.pop(root_u) | self.groups.pop(root_v)
-
-    def _add_negative_relationship(self, u: T, v: T) -> None:
-        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
-        self.negative_relations[root_u].add(root_v)
-        self.negative_relations[root_v].add(root_u)
+            self._add_negative_edge(u, v)
 
     def has_negative_relationship(self, u: T, v: T) -> bool:
-        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
-        return root_v in self.negative_relations[root_u]
+        return self.union_find.find(u) in self.negative_edges[self.union_find.find(v)]
 
     def has_positive_relationship(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
 
+    def get_entities_in_group(self, v: T) -> set[T]:
+        return self.union_find.get_members(v)
 
-class IndexableUnionGraph(UnionGraph[K]):
+    def get_adjacent_negative_groups(self, v: T) -> dict[T, set[T]]:
+        negative_roots = self._get_negative_edges(v)
+        return {negative_root: self.union_find.get_members(negative_root) for negative_root in negative_roots}
+
+    def _get_negative_edges(self, v: T) -> set[T]:
+        root_v = self.union_find.find(v)
+        return self.negative_edges[root_v]
+
+    def _add_positive_edge(self, u: T, v: T) -> None:
+        # we are merging groups
+        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
+        if root_u == root_v:  # prevent poppping the same key
+            return
+        root = self.union_find.union(u, v)
+        old_root = root_v if root == root_u else root_u
+        # transfer negative edges from the old group root to the new group root
+        old_root_negative_neighbors = self.negative_edges.pop(old_root)
+        for neighbor in old_root_negative_neighbors:
+            self.negative_edges[neighbor].remove(old_root)
+            self.negative_edges[neighbor].add(root)
+        self.negative_edges[root] |= old_root_negative_neighbors
+
+    def _add_negative_edge(self, u: T, v: T) -> None:
+        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
+        self.negative_edges[root_u].add(root_v)
+        self.negative_edges[root_v].add(root_u)
+
+
+class IndexedUnionGraph(UnionGraph[K]):
+    """UnionGraph with reproducible group identifiers and order of verticies
+    independent of the edge insertion order."""
+
     def __init__(self, vertices: list[K]) -> None:
         super().__init__(vertices)
         self.index = sorted(vertices)
+        assert all(
+            self.index[i] < self.index[i + 1] for i in range(len(self.index) - 1)
+        ), "Verticies must have an unique order"
 
-    def get_index(self, vertex: K) -> int:
-        return self.index.index(vertex)
+    def get_group_key(self, v: K) -> K:
+        return min(self.get_entities_in_group(v))
+
+    def get_adjacent_negative_groups(self, v: K) -> dict[K, set[K]]:
+        negative_roots = self._get_negative_edges(v)
+        return {
+            min(members): members
+            for negative_root in negative_roots
+            if (members := self.union_find.get_members(negative_root))
+        }
+
+    def __getitem__(self, key: int) -> K:
+        return self.index[key]
+
+    def __len__(self) -> int:
+        return len(self.index)
