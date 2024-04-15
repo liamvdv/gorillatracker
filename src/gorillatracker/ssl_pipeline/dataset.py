@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 import pandas as pd
 from sqlalchemy import Engine, create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
@@ -102,17 +103,27 @@ class GorillaDataset(SSLDataset):
 
     def setup_social_groups(self) -> None:
         df = pd.read_csv("data/ground_truth/cxl/misc/VideosGO_SPAC.csv", sep=",")
+        feature_type = "Social Group"
         with Session(self._engine) as session:
             for _, row in df.iterrows():
                 if self.check_valid_social_group(row["Group"]):
                     social_group = self.extract_social_group(row["Group"])
                     video_name = os.path.splitext(row["File"])[0] + ".mp4"  # csv has .MP4 instead of .mp4
-                    video_id = session.execute(select(Video.video_id).where(Video.path.endswith(video_name))).scalar_one()
-                    if video_id is None:
+                    try:
+                        video_id = session.execute(
+                            select(Video.video_id).where(Video.path.endswith(video_name))
+                        ).scalar_one()
+                    except Exception:
                         continue
-                    video_feature = VideoFeature(video_id=video_id, type="Social Group", value=social_group)
+                    video_feature = VideoFeature(video_id=video_id, type=feature_type, value=social_group)
                     session.add(video_feature)
-            session.commit()
+                    try:
+                        session.commit()
+                    except IntegrityError as e:
+                        log.error(
+                            f"Failed to add social group {social_group} for video {video_name} due to entry with video_id:{video_id} type:{feature_type} already in DB"
+                        )
+                        session.rollback()
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [

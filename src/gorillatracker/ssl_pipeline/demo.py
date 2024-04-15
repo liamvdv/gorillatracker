@@ -119,6 +119,6 @@ if __name__ == "__main__":
         max_worker_per_gpu=12,
         gpus=[0],
     )
-    if False:
+    if True:
         # needs to be executed after the tracking results are stored in the database
         dataset.setup_social_groups()

@@ -142,6 +142,8 @@ class VideoFeature(Base):
 
     video: Mapped[Video] = relationship(back_populates="features")
 
+    __table_args__ = (UniqueConstraint("video_id", "type"),)
+
     def __repr__(self) -> str:
         return (
             f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
