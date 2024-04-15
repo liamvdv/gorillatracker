@@ -5,7 +5,7 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 16                      # Number of workers for data loading
+workers: 2                      # Number of workers for data loading
 
 
 # Model and Training Arguments

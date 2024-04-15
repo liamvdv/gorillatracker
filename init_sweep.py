@@ -45,10 +45,13 @@ sweeps = [
         "parameters": {
             # "embedding_size": {'values': [16, 32, 64, 128, 256, 512, 1024]},
             # "initial_lr": {"values": [1e-3, 1e-4]},
-            "l2_alpha": {"values": [5.0, 1.0, 5e-3, 1e-4]},
-            "l2_beta": {"values": [5.0, 1.0, 5e-3, 1e-4]},
-            # "batch_size": {"values": [16, 32]},
-            "loss_mode": {"values": ["online/soft/l2sp", "softmax/arcface/l2sp"]},
+            "l2_alpha": {"values": [1e-4, 1e-5]},
+            "l2_beta": {"values": [1e-4, 1e-5]},
+            # "batch_size": {"values": [8, 16]},
+            "start_lr": {"values": [1e-4, 1e-5]},
+            "margin": {"values": [0.5, 1.0]},
+            "dropout_p": {"values": [0.5, 0.25]},
+            # "loss_mode": {"values": ["online/soft/l2sp", "softmax/arcface/l2sp"]},
         },
     },
 ]
