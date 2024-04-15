@@ -294,11 +294,11 @@ def get_embedding_from_frame(
 
     # convert to pil image
     img = cv2.cvtColor(frame_cropped, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(img)
-    img = model_transforms(img)
+    img = Image.fromarray(img)  # type: ignore
+    transformed_image: torch.Tensor = model_transforms(img)
 
     model.eval()
-    embedding = model(img.unsqueeze(0))
+    embedding = model(transformed_image.unsqueeze(0))
     return embedding
 
 
