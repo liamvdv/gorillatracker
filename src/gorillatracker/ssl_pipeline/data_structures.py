@@ -87,72 +87,67 @@ class UnionFind(Generic[T]):
 
 
 class CliqueRelation(Enum):
-    CONNECT = 1
-    SEPARATE = -1
+    MERGE = 1
+    PARTITION = -1
 
 
 class CliqueGraph(Generic[T]):
-    """A graph consisting of cliques, allowing operations to connect two cliques
-    or establish a clear separation between them.
-
-    This graph supports:
-    - Merging cliques through connection relationships.
-    - Defining explicit separations that prevent cliques from merging."""
+    """A graph consisting of cliques, allowing operations to merge two cliques
+    or establish a clear separation between them."""
 
     def __init__(self, vertices: list[T]) -> None:
         assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.union_find = UnionFind(vertices)
         # NOTE(memben): the key and values are always the root of a set in union find
-        self.negative_connections = {v: set[T]() for v in vertices}
+        self.cut_edges = {v: set[T]() for v in vertices}
 
     def add_relationship(self, u: T, v: T, relation: CliqueRelation) -> None:
         assert u != v, "Self loops are not allowed."
-        if relation is CliqueRelation.CONNECT:
-            assert not self.is_separated(u, v), "Cannot add a connection between negatively connected cliques"
-            self._add_connection(u, v)
-        elif relation is CliqueRelation.SEPARATE:
-            assert not self.is_connected(u, v), "Cannot separate a clique"
-            self._add_separation(u, v)
+        if relation is CliqueRelation.MERGE:
+            assert not self.is_partitioned(u, v), "Cannot merge partitioned cliques"
+            self._merge(u, v)
+        elif relation is CliqueRelation.PARTITION:
+            assert not self.is_connected(u, v), "Cannot partition a clique"
+            self._partition(u, v)
 
-    def is_separated(self, u: T, v: T) -> bool:
-        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
-        return root_u in self.negative_connections[root_v]
+    def is_partitioned(self, u: T, v: T) -> bool:
+        root_u, root_v = self._find_root(u), self._find_root(v)
+        return root_u in self.cut_edges[root_v]
 
     def is_connected(self, u: T, v: T) -> bool:
-        return self.union_find.find(u) == self.union_find.find(v)
-
-    def get_clique_representative(self, v: T) -> T:
-        return self.union_find.find(v)
+        return self._find_root(u) == self._find_root(v)
 
     def get_clique(self, v: T) -> set[T]:
         return self.union_find.get_members(v)
 
-    def get_adjacent_negative_cliques(self, v: T) -> dict[T, set[T]]:
-        negative_representatives = self._get_separations(v)
-        return {r: self.get_clique(r) for r in negative_representatives}
+    def get_adjacent_cliques(self, v: T) -> dict[T, set[T]]:
+        adjacent_clique_roots = self._get_adjacent_partitions(v)
+        return {r: self.get_clique(r) for r in adjacent_clique_roots}
 
-    def _get_separations(self, v: T) -> set[T]:
-        root_v = self.union_find.find(v)
-        return self.negative_connections[root_v]
+    def _find_root(self, v: T) -> T:
+        return self.union_find.find(v)
 
-    def _add_connection(self, u: T, v: T) -> None:
-        # we are merging cliques
-        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
+    def _get_adjacent_partitions(self, v: T) -> set[T]:
+        root_v = self._find_root(v)
+        return self.cut_edges[root_v]
+
+    def _merge(self, u: T, v: T) -> None:
+        root_u, root_v = self._find_root(u), self._find_root(v)
         if root_u == root_v:  # prevent poppping the same key
             return
         root = self.union_find.union(u, v)
         old_root = root_v if root == root_u else root_u
-        # transfer negative edges from the old clique root to the new clique root
-        old_negatives = self.negative_connections.pop(old_root)
-        for root_n in old_negatives:
-            self.negative_connections[root_n].remove(old_root)
-            self.negative_connections[root_n].add(root)
-        self.negative_connections[root] |= old_negatives
+        # transfer cut edges from the old clique root to the new clique root
+        old_partitions = self.cut_edges.pop(old_root)
+        for root_p in old_partitions:
+            self.cut_edges[root_p].remove(old_root)
+            self.cut_edges[root_p].add(root)
+        self.cut_edges[root] |= old_partitions
 
-    def _add_separation(self, u: T, v: T) -> None:
-        root_u, root_v = self.union_find.find(u), self.union_find.find(v)
-        self.negative_connections[root_u].add(root_v)
-        self.negative_connections[root_v].add(root_u)
+    def _partition(self, u: T, v: T) -> None:
+        root_u, root_v = self._find_root(u), self._find_root(v)
+        self.cut_edges[root_u].add(root_v)
+        self.cut_edges[root_v].add(root_u)
 
 
 class IndexedCliqueGraph(CliqueGraph[K]):
@@ -169,9 +164,9 @@ class IndexedCliqueGraph(CliqueGraph[K]):
     def get_clique_representative(self, v: K) -> K:
         return min(self.get_clique(v))
 
-    def get_adjacent_negative_cliques(self, v: K) -> dict[K, set[K]]:
-        negative_representatives = self._get_separations(v)
-        return {min(clique): clique for r in negative_representatives if (clique := self.get_clique(r))}
+    def get_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+        adjacent_clique_roots = self._get_adjacent_partitions(v)
+        return {min(clique): clique for r in adjacent_clique_roots if (clique := self.get_clique(r))}
 
     def __getitem__(self, key: int) -> K:
         return self.vertices[key]
