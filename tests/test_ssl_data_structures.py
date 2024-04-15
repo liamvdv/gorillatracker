@@ -35,11 +35,11 @@ def test_union_graph_group_relationship(setup_union_graph: UnionGraph[int]) -> N
 
     assert not u_graph.has_positive_relationship(0, 4), "UnionGraph negative relationship check failed."
 
-    assert u_graph.get_entities_in_group(0) == set([0, 1, 2]), "UnionGraph group relationship check failed."
-    assert u_graph.get_entities_in_group(1) == set([0, 1, 2]), "UnionGraph group relationship check failed."
-    assert u_graph.get_entities_in_group(2) == set([0, 1, 2]), "UnionGraph group relationship check failed."
-    assert u_graph.get_entities_in_group(3) == set([3]), "UnionGraph group relationship check failed."
-    assert u_graph.get_entities_in_group(4) == set([4]), "UnionGraph group relationship check failed."
+    assert u_graph.get_group(0)[1] == {0, 1, 2}, "UnionGraph group relationship check failed."
+    assert u_graph.get_group(1)[1] == {0, 1, 2}, "UnionGraph group relationship check failed."
+    assert u_graph.get_group(2)[1] == {0, 1, 2}, "UnionGraph group relationship check failed."
+    assert u_graph.get_group(3)[1] == {3}, "UnionGraph group relationship check failed."
+    assert u_graph.get_group(4)[1] == {4}, "UnionGraph group relationship check failed."
 
 
 def test_union_merge_groups(setup_union_graph: UnionGraph[int]) -> None:

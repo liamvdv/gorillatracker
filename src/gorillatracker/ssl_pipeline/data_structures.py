@@ -116,7 +116,7 @@ class UnionGraph(Generic[T]):
     def __init__(self, vertices: list[T]) -> None:
         assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.union_find = UnionFind(vertices)
-        self.negative_edges: defaultdict[T, set[T]] = defaultdict(set)  # negative relationships between root of groups
+        self.negative_edges = {v: set[T]() for v in vertices}
 
     def add_edge(self, u: T, v: T, edge_type: EdgeType) -> None:
         assert u != v, "Self loops are not allowed."
@@ -137,8 +137,10 @@ class UnionGraph(Generic[T]):
     def has_positive_relationship(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
 
-    def get_entities_in_group(self, v: T) -> set[T]:
-        return self.union_find.get_members(v)
+    def get_group(self, v: T) -> tuple[T, set[T]]:
+        root_v = self.union_find.find(v)
+        members = self.union_find.get_members(v)
+        return root_v, members
 
     def get_adjacent_negative_groups(self, v: T) -> dict[T, set[T]]:
         negative_roots = self._get_negative_edges(v)
@@ -179,8 +181,9 @@ class IndexedUnionGraph(UnionGraph[K]):
             self.index[i] < self.index[i + 1] for i in range(len(self.index) - 1)
         ), "Verticies must have an unique order"
 
-    def get_group_key(self, v: K) -> K:
-        return min(self.get_entities_in_group(v))
+    def get_group(self, v: K) -> tuple[K, set[K]]:
+        members = self.union_find.get_members(v)
+        return min(members), members
 
     def get_adjacent_negative_groups(self, v: K) -> dict[K, set[K]]:
         negative_roots = self._get_negative_edges(v)
