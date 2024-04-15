@@ -23,6 +23,8 @@ meaning if node A is connected to node B with a negative edge, and node B is con
 it does not imply that A and C are negatively connected.
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
 from enum import Enum
 from typing import Generic, Protocol, TypeVar
@@ -32,7 +34,18 @@ class Hashable(Protocol):
     def __hash__(self) -> int: ...
 
 
+CT = TypeVar("CT")
+
+
+class Comparable(Protocol):
+    def __lt__(self: CT, other: CT) -> bool: ...
+
+
+class HashableComparable(Hashable, Comparable): ...
+
+
 T = TypeVar("T", bound=Hashable)
+K = TypeVar("K", bound=HashableComparable)
 
 
 class DirectedBipartiteGraph(Generic[T]):
@@ -101,6 +114,7 @@ class UnionGraph(Generic[T]):
     """A graph that keeps track of the relationships between groups of vertices."""
 
     def __init__(self, vertices: list[T]):
+        assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.union_find = UnionFind(vertices)
         self.groups = {i: {i} for i in vertices}
         self.negative_relations = {i: set[T]() for i in vertices}
@@ -140,3 +154,12 @@ class UnionGraph(Generic[T]):
 
     def has_positive_relationship(self, u: T, v: T) -> bool:
         return self.union_find.find(u) == self.union_find.find(v)
+
+
+class IndexableUnionGraph(UnionGraph[K]):
+    def __init__(self, vertices: list[K]) -> None:
+        super().__init__(vertices)
+        self.index = sorted(vertices)
+
+    def get_index(self, vertex: K) -> int:
+        return self.index.index(vertex)
