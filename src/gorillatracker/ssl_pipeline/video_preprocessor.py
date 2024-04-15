@@ -80,6 +80,6 @@ def preprocess_videos(
 ) -> None:
     session_cls = sessionmaker(bind=engine)
     assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
-    ocr_reader = easyocr.Reader(["en"])
+    ocr_reader = easyocr.Reader(["en"], gpu=True, verbose=False)
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
         preprocess_and_store(video_path, version, sampled_fps, session_cls, metadata_extractor, ocr_reader)
