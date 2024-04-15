@@ -298,7 +298,7 @@ def get_embedding_from_frame(
     img = model_transforms(img)
 
     model.eval()
-    embedding = model(img.unsqueeze(0))  # type: ignore
+    embedding = model(img.unsqueeze(0))
     return embedding
 
 
