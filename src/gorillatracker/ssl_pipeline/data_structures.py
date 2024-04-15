@@ -107,10 +107,10 @@ class CliqueGraph(Generic[T]):
     def add_relationship(self, u: T, v: T, relation: CliqueRelation) -> None:
         assert u != v, "Self loops are not allowed."
         if relation is CliqueRelation.CONNECT:
-            assert not self.is_separated(u, v), "Cannot add a positive edge between negatively connected cliques"
+            assert not self.is_separated(u, v), "Cannot add a connection between negatively connected cliques"
             self._add_connection(u, v)
         elif relation is CliqueRelation.SEPARATE:
-            assert not self.is_connected(u, v), "Cannot add a negative edge in a clique"
+            assert not self.is_connected(u, v), "Cannot separate a clique"
             self._add_separation(u, v)
 
     def is_separated(self, u: T, v: T) -> bool:
