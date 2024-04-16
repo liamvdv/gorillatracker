@@ -105,6 +105,7 @@ def visualize_pipeline(
 
 
 if __name__ == "__main__":
+    version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
     # NOTE(memben): for setup only once
@@ -113,7 +114,7 @@ if __name__ == "__main__":
         dataset.setup_cameras()
     visualize_pipeline(
         dataset,
-        "2024-04-09",
+        version,
         Path("/workspaces/gorillatracker/video_output"),
         n_videos=20,
         max_worker_per_gpu=12,
@@ -121,4 +122,4 @@ if __name__ == "__main__":
     )
     if True:
         # needs to be executed after the tracking results are stored in the database
-        dataset.setup_social_groups()
+        dataset.setup_social_groups(version)
