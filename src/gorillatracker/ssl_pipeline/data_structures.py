@@ -138,11 +138,11 @@ class CliqueGraph(Generic[T]):
         root = self.union_find.union(u, v)
         old_root = root_v if root == root_u else root_u
         # transfer cut edges from the old clique root to the new clique root
-        old_partitions = self.cut_edges.pop(old_root)
-        for root_p in old_partitions:
+        old_cut_edges = self.cut_edges.pop(old_root)
+        for root_p in old_cut_edges:
             self.cut_edges[root_p].remove(old_root)
             self.cut_edges[root_p].add(root)
-        self.cut_edges[root] |= old_partitions
+        self.cut_edges[root] |= old_cut_edges
 
     def _partition(self, u: T, v: T) -> None:
         root_u, root_v = self._find_root(u), self._find_root(v)
