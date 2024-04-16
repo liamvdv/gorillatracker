@@ -86,11 +86,6 @@ class UnionFind(Generic[T]):
         return self.members[self.find(x)]
 
 
-class CliqueRelation(Enum):
-    MERGE = 1
-    PARTITION = -1
-
-
 class CliqueGraph(Generic[T]):
     """A graph consisting of cliques, allowing operations to merge two cliques
     or establish a clear separation between them."""
@@ -100,15 +95,6 @@ class CliqueGraph(Generic[T]):
         self.union_find = UnionFind(vertices)
         # NOTE(memben): the key and values are always the root of a set in union find
         self.cut_edges = {v: set[T]() for v in vertices}
-
-    def add_relationship(self, u: T, v: T, relation: CliqueRelation) -> None:
-        assert u != v, "Self loops are not allowed."
-        if relation is CliqueRelation.MERGE:
-            assert not self.is_partitioned(u, v), "Cannot merge partitioned cliques"
-            self._merge(u, v)
-        elif relation is CliqueRelation.PARTITION:
-            assert not self.is_connected(u, v), "Cannot partition a clique"
-            self._partition(u, v)
 
     def is_partitioned(self, u: T, v: T) -> bool:
         root_u, root_v = self._find_root(u), self._find_root(v)
@@ -124,30 +110,33 @@ class CliqueGraph(Generic[T]):
         adjacent_clique_roots = self._get_adjacent_partitions(v)
         return {r: self.get_clique(r) for r in adjacent_clique_roots}
 
-    def _find_root(self, v: T) -> T:
-        return self.union_find.find(v)
-
-    def _get_adjacent_partitions(self, v: T) -> set[T]:
-        root_v = self._find_root(v)
-        return self.cut_edges[root_v]
-
-    def _merge(self, u: T, v: T) -> None:
+    def merge(self, u: T, v: T) -> None:
+        assert u != v, "Self loops are not allowed."
+        assert not self.is_partitioned(u, v), "Cannot merge partitioned cliques"
         root_u, root_v = self._find_root(u), self._find_root(v)
-        if root_u == root_v:  # prevent poppping the same key
+        if root_u == root_v:
             return
         root = self.union_find.union(u, v)
         old_root = root_v if root == root_u else root_u
-        # transfer cut edges from the old clique root to the new clique root
         old_cut_edges = self.cut_edges.pop(old_root)
         for root_p in old_cut_edges:
             self.cut_edges[root_p].remove(old_root)
             self.cut_edges[root_p].add(root)
         self.cut_edges[root] |= old_cut_edges
 
-    def _partition(self, u: T, v: T) -> None:
+    def partition(self, u: T, v: T) -> None:
+        assert u != v, "Self loops are not allowed."
+        assert not self.is_connected(u, v), "Cannot partition a clique"
         root_u, root_v = self._find_root(u), self._find_root(v)
         self.cut_edges[root_u].add(root_v)
         self.cut_edges[root_v].add(root_u)
+
+    def _find_root(self, v: T) -> T:
+        return self.union_find.find(v)
+
+    def _get_adjacent_partitions(self, v: T) -> set[T]:
+        root_v = self._find_root(v)
+        return self.cut_edges[root_v]
 
 
 class IndexedCliqueGraph(CliqueGraph[K]):
@@ -166,7 +155,11 @@ class IndexedCliqueGraph(CliqueGraph[K]):
 
     def get_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
         adjacent_clique_roots = self._get_adjacent_partitions(v)
-        return {min(clique): clique for r in adjacent_clique_roots if (clique := self.get_clique(r))}
+        adjacent_cliques = {}
+        for r in adjacent_clique_roots:
+            clique = self.get_clique(r)
+            adjacent_cliques[min(clique)] = clique
+        return adjacent_cliques
 
     def __getitem__(self, key: int) -> K:
         return self.vertices[key]
