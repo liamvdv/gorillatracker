@@ -69,6 +69,7 @@ only_val: False                 # Perform only validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
+save_model_to_wandb: False      # Save the model to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking

@@ -13,15 +13,16 @@ Usage:
     
 """
 
-from pydantic import BaseModel, field_serializer
-from datetime import datetime, timezone, timedelta
-from typing import List, Generator, Any, Optional
-import re
-from pathlib import Path
 import json
-import wandb
-import typer
 import os
+import re
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Generator, List, Optional
+
+import typer
+import wandb
+from pydantic import BaseModel, field_serializer
 
 Run = Any
 

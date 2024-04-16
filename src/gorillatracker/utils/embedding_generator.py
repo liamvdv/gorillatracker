@@ -196,6 +196,11 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
             "end_lr",
             "beta1",
             "beta2",
+            "stepwise_schedule",
+            "lr_interval",
+            "l2_alpha",
+            "l2_beta",
+            "path_to_pretrained_weights",
             # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }

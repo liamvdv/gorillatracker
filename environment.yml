@@ -78,6 +78,7 @@ dependencies:
       - grad-cam
       - facenet_pytorch
       - typer
+      - opencv-contrib-python
 
 
 # Non-standard section listing target platforms for conda-lock:
