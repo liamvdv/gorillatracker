@@ -1,6 +1,6 @@
 import pytest
 
-from gorillatracker.ssl_pipeline.data_structures import CliqueGraph, CliqueRelation, UnionFind
+from gorillatracker.ssl_pipeline.data_structures import CliqueGraph, UnionFind
 
 
 @pytest.fixture
@@ -11,10 +11,10 @@ def setup_union_find() -> UnionFind[int]:
 @pytest.fixture
 def setup_union_graph() -> CliqueGraph[int]:
     union_graph = CliqueGraph(list(range(5)))
-    union_graph.add_relationship(0, 1, CliqueRelation.MERGE)
-    union_graph.add_relationship(1, 2, CliqueRelation.MERGE)
-    union_graph.add_relationship(2, 3, CliqueRelation.PARTITION)
-    union_graph.add_relationship(3, 4, CliqueRelation.PARTITION)
+    union_graph.merge(0, 1)
+    union_graph.merge(1, 2)
+    union_graph.partition(2, 3)
+    union_graph.partition(3, 4)
     return union_graph
 
 
@@ -45,15 +45,15 @@ def test_union_graph_group_relationship(setup_union_graph: CliqueGraph[int]) -> 
 def test_union_merge_groups(setup_union_graph: CliqueGraph[int]) -> None:
     u_graph = setup_union_graph
     assert not u_graph.is_connected(0, 4), "CliqueGraph negative relationship check failed."
-    u_graph.add_relationship(1, 4, CliqueRelation.MERGE)
+    u_graph.merge(1, 4)
     assert u_graph.is_connected(0, 4), "CliqueGraph merge groups failed."
 
 
 def test_union_graph_fails_invalid_edge(setup_union_graph: CliqueGraph[int]) -> None:
     u_graph = setup_union_graph
     with pytest.raises(AssertionError):
-        u_graph.add_relationship(0, 0, CliqueRelation.PARTITION)
+        u_graph.partition(0, 0)
     with pytest.raises(AssertionError):
-        u_graph.add_relationship(0, 1, CliqueRelation.PARTITION)
+        u_graph.partition(0, 1)
     with pytest.raises(AssertionError):
-        u_graph.add_relationship(0, 3, CliqueRelation.MERGE)
+        u_graph.merge(0, 3)
