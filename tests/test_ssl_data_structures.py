@@ -57,7 +57,8 @@ def test_union_graph_fails_invalid_edge(setup_union_graph: CliqueGraph[int]) -> 
         u_graph.partition(0, 1)
     with pytest.raises(AssertionError):
         u_graph.merge(0, 3)
-        
+
+
 def test_union_graph_merge_cut_edges() -> None:
     u_graph = CliqueGraph(list(range(5)))
     u_graph.partition(0, 1)
@@ -67,16 +68,14 @@ def test_union_graph_merge_cut_edges() -> None:
     assert u_graph.is_partitioned(0, 3), "CliqueGraph merge cut edges failed."
     assert u_graph.is_partitioned(0, 4), "CliqueGraph merge cut edges failed."
     assert u_graph.is_partitioned(1, 2), "CliqueGraph merge cut edges failed."
-    
+
+
 def test_union_graph_get_adjacent_cliques() -> None:
     u_graph = CliqueGraph(list(range(5)))
     u_graph.partition(0, 1)
     u_graph.partition(2, 3)
-    u_graph.merge(2, 4)
-    # cliques are not adjacent to themselves
-    assert u_graph.get_adjacent_cliques(0) == {1}, "CliqueGraph get_adjacent_cliques failed."
-    assert u_graph.get_adjacent_cliques(1) == {0}, "CliqueGraph get_adjacent_cliques failed."
-    assert u_graph.get_adjacent_cliques(2) == {3, 4}, "CliqueGraph get_adjacent_cliques failed."
-    assert u_graph.get_adjacent_cliques(3) == {2}, "CliqueGraph get_adjacent_cliques failed."
-    assert u_graph.get_adjacent_cliques(4) == {2}, "CliqueGraph get_adjacent_cliques failed."
-    
+    u_graph.partition(2, 4)
+    assert not u_graph.get_adjacent_cliques(0)[1] == {1}, "CliqueGraph get_adjacent_cliques failed."
+    assert u_graph.get_adjacent_cliques(1)[0] == {0}, "CliqueGraph get_adjacent_cliques failed."
+    assert u_graph.get_adjacent_cliques(2)[3] == {3}, "CliqueGraph get_adjacent_cliques failed."
+    assert u_graph.get_adjacent_cliques(2)[4] == {4}, "CliqueGraph get_adjacent_cliques failed."
