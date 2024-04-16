@@ -13,7 +13,7 @@ from typing import Any, Optional
 import easyocr
 import pandas as pd
 from sqlalchemy import Engine, create_engine, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
@@ -110,7 +110,7 @@ class GorillaDataset(SSLDataset):
                 session.add(camera)
             session.commit()
 
-    def setup_social_groups(self) -> None:
+    def setup_social_groups(self, version: str) -> None:
         df = pd.read_csv("data/ground_truth/cxl/misc/VideosGO_SPAC.csv", sep=",")
         feature_type = "Social Group"
         with Session(self._engine) as session:
@@ -120,10 +120,13 @@ class GorillaDataset(SSLDataset):
                     video_name = os.path.splitext(row["File"])[0] + ".mp4"  # csv has .MP4 instead of .mp4
                     try:
                         video_id = session.execute(
-                            select(Video.video_id).where(Video.path.endswith(video_name))
+                            select(Video.video_id).where((Video.version == version) & (Video.path.endswith(video_name)))
                         ).scalar_one()
-                    except Exception:
+                    except NoResultFound:
                         continue
+                    except MultipleResultsFound as e:
+                        log.error(f"Multiple videos found in DB for {video_name} with version: {version}")
+                        raise e
                     video_feature = VideoFeature(video_id=video_id, type=feature_type, value=social_group)
                     session.add(video_feature)
                     try:
