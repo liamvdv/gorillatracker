@@ -104,6 +104,8 @@ class CliqueGraph(Generic[T]):
 
     def get_clique(self, v: T) -> set[T]:
         return self.union_find.get_members(v)
+    
+    # TODO: get_all_cliques
 
     def get_adjacent_cliques(self, v: T) -> dict[T, set[T]]:
         adjacent_clique_roots = self._get_adjacent_partitions(v)
