@@ -115,6 +115,88 @@ class GorillaDataset(SSLDataset):
 
     @property
     def video_paths(self) -> list[Path]:
+        #TODO: change to the correct paths for new data
+        return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
+
+    @property
+    def body_model_path(self) -> Path:
+        return Path("models/yolov8n_gorilla_body.pt")
+
+    @property
+    def metadata_extractor(self) -> MetadataExtractor:
+        return GorillaDataset.get_video_metadata
+
+    @property
+    def tracker_config(self) -> Path:
+        return Path("cfgs/tracker/botsort.yaml")
+
+    @property
+    def yolo_kwargs(self) -> dict[str, Any]:
+        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
+        return {
+            **self._yolo_base_kwargs,
+            "iou": 0.2,
+            "conf": 0.7,
+        }
+
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
+    @staticmethod
+    def get_video_metadata(video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata:
+        camera_name = video_path.stem.split("_")[0]
+        _, date_str, _ = video_path.stem.split("_")
+        #TODO
+        date = datetime.strptime(date_str, "%Y%m%d")
+        daytime = read_timestamp(video_path, GorillaDataset.TIME_STAMP_BOX, ocr_reader=ocr_reader)
+        date = datetime.combine(date, daytime)
+        return VideoMetadata(camera_name, date)
+
+
+class GorillaDatasetOld(SSLDataset):
+    FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
+    FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
+    TIME_STAMP_BOX: BoundingBox = BoundingBox(
+        x_center_n=0.672969,
+        y_center_n=0.978102,
+        width_n=0.134167,
+        height_n=0.043796,
+        confidence=1,
+        image_width=1920,
+        image_height=1080,
+    )  # default where time stamp is located
+
+    _yolo_base_kwargs = {
+        "half": True,  # We found no difference in accuracy to False
+        "verbose": False,
+    }
+
+    DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
+
+    def __init__(self, db_uri: str = DB_URI) -> None:
+        super().__init__(db_uri)
+
+    def setup_database(self) -> None:
+        Base.metadata.create_all(self._engine)
+
+    def setup_cameras(self) -> None:
+        df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
+        df["Name"] = df["Name"].str.rstrip("x")
+        with Session(self._engine) as session:
+            for _, row in df.iterrows():
+                camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
+                session.add(camera)
+            session.commit()
+
+    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
+        return [
+            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
+        ]
+
+    @property
+    def video_paths(self) -> list[Path]:
         return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
 
     @property
