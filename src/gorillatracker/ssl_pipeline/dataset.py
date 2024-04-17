@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import easyocr
+import re
 import pandas as pd
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
@@ -91,6 +92,7 @@ class GorillaDataset(SSLDataset):
     }
 
     DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
+    VIDEO_PATH = "/workspace/gorillatracker/video_data"
 
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
@@ -106,6 +108,10 @@ class GorillaDataset(SSLDataset):
                 camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
                 session.add(camera)
             session.commit()
+            
+    def setup_social_groups(self, version:str) -> None:
+        video_groups = GorillaDataset.get_video_groups(self.VIDEO_PATH)    
+           
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [
@@ -115,7 +121,7 @@ class GorillaDataset(SSLDataset):
 
     @property
     def video_paths(self) -> list[Path]:
-        return GorillaDataset.get_video_paths("/workspace/gorillatracker/video_data")
+        return GorillaDataset.get_video_paths(self.VIDEO_PATH)
 
     @property
     def body_model_path(self) -> Path:
@@ -161,9 +167,29 @@ class GorillaDataset(SSLDataset):
                     if not video.is_dir():
                         continue
                     for video_clip in video.iterdir():
-                        if video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi":
+                        if (video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi") and not video_clip.name.startswith("."):
                             videos.append(video_clip)
         return videos
+    
+    @staticmethod
+    def get_video_groups(video_dir: str) -> list[(str, str)]:
+        video_group_list = []
+        for d in Path(video_dir).iterdir():
+            if not d.is_dir():
+                continue
+            for cam in d.iterdir():
+                if not cam.is_dir():
+                    continue
+                for video in cam.iterdir():
+                    if not video.is_dir():
+                        continue
+                    if not re.match(r"^.*?_\d+\s[A-Z]{2}$", video.name):
+                        continue
+                    group_id = video.name.split(" ")[1]
+                    for video_clip in video.iterdir():
+                        if (video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi") and not video_clip.name.startswith("."):
+                            video_group_list.append((video_clip, group_id))
+        return video_group_list
                 
 
 
