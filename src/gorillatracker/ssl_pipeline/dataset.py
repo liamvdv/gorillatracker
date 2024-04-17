@@ -14,7 +14,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp, extract_meta_data_time
 from gorillatracker.ssl_pipeline.models import Base, Camera
 from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
 
@@ -115,8 +115,7 @@ class GorillaDataset(SSLDataset):
 
     @property
     def video_paths(self) -> list[Path]:
-        #TODO: change to the correct paths for new data
-        return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
+        return GorillaDataset.get_video_paths("/workspace/gorillatracker/video_data")
 
     @property
     def body_model_path(self) -> Path:
@@ -144,14 +143,28 @@ class GorillaDataset(SSLDataset):
         return self._engine
 
     @staticmethod
-    def get_video_metadata(video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata:
+    def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
-        _, date_str, _ = video_path.stem.split("_")
-        #TODO
-        date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path, GorillaDataset.TIME_STAMP_BOX, ocr_reader=ocr_reader)
-        date = datetime.combine(date, daytime)
+        date = extract_meta_data_time(video_path)
         return VideoMetadata(camera_name, date)
+    
+    @staticmethod
+    def get_video_paths(video_dir: str) -> list[Path]:
+        videos = []
+        for d in Path(video_dir).iterdir():
+            if not d.is_dir():
+                continue
+            for cam in d.iterdir():
+                if not cam.is_dir():
+                    continue
+                for video in cam.iterdir():
+                    if not video.is_dir():
+                        continue
+                    for video_clip in video.iterdir():
+                        if video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi":
+                            videos.append(video_clip)
+        return videos
+                
 
 
 class GorillaDatasetOld(SSLDataset):
@@ -205,7 +218,7 @@ class GorillaDatasetOld(SSLDataset):
 
     @property
     def metadata_extractor(self) -> MetadataExtractor:
-        return GorillaDataset.get_video_metadata
+        return GorillaDatasetOld.get_video_metadata
 
     @property
     def tracker_config(self) -> Path:
@@ -229,6 +242,6 @@ class GorillaDatasetOld(SSLDataset):
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
         date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path, GorillaDataset.TIME_STAMP_BOX, ocr_reader=ocr_reader)
+        daytime = read_timestamp(video_path, GorillaDatasetOld.TIME_STAMP_BOX, ocr_reader=ocr_reader)
         date = datetime.combine(date, daytime)
         return VideoMetadata(camera_name, date)
