@@ -393,13 +393,24 @@ def knn_with_train(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
     assert f1 is not None
-    precision = tm.functional.precision(val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro")
+    precision = tm.functional.precision(
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
+    )
     assert precision is not None
-    recall = tm.functional.recall(val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro")
+    recall = tm.functional.recall(
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
+    )
     assert recall is not None
-    
+
     print("knn done")
-    return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item(), "precision": precision.item(), "recall": recall.item()}
+    return {
+        "accuracy": accuracy.item(),
+        "accuracy_top5": accuracy_top5.item(),
+        "auroc": auroc.item(),
+        "f1": f1.item(),
+        "precision": precision.item(),
+        "recall": recall.item(),
+    }
 
 
 def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, Any]:
@@ -447,13 +458,24 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
     assert f1 is not None
-    precision = tm.functional.precision(classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro")
+    precision = tm.functional.precision(
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
+    )
     assert precision is not None
-    recall = tm.functional.recall(classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro")
+    recall = tm.functional.recall(
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
+    )
     assert recall is not None
-    
+
     print("knn done")
-    return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item(), "precision": precision.item(), "recall": recall.item()}
+    return {
+        "accuracy": accuracy.item(),
+        "accuracy_top5": accuracy_top5.item(),
+        "auroc": auroc.item(),
+        "f1": f1.item(),
+        "precision": precision.item(),
+        "recall": recall.item(),
+    }
 
 
 def pca(
