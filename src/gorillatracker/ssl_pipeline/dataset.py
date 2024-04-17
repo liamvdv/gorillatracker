@@ -3,21 +3,22 @@ Contains adapter classes for different datasets.
 """
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import easyocr
-import re
 import pandas as pd
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, select
+from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp, extract_meta_data_time
-from gorillatracker.ssl_pipeline.models import Base, Camera
-from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
+from gorillatracker.ssl_pipeline.helpers import BoundingBox, extract_meta_data_time, read_timestamp
+from gorillatracker.ssl_pipeline.models import Base, Camera, Video, VideoFeature
+from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, OldMetadataExtractor, VideoMetadata
 
 log = logging.getLogger(__name__)
 
@@ -108,10 +109,30 @@ class GorillaDataset(SSLDataset):
                 camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
                 session.add(camera)
             session.commit()
-            
-    def setup_social_groups(self, version:str) -> None:
-        video_groups = GorillaDataset.get_video_groups(self.VIDEO_PATH)    
-           
+
+    def setup_social_groups(self, version: str) -> None:
+        feature_type = "social_group"
+        video_groups = GorillaDataset.get_video_groups(self.VIDEO_PATH)
+        with Session(self._engine) as session:
+            for video_name, group_id in video_groups:
+                try:
+                    video_id = session.execute(
+                        select(Video.video_id).where((Video.version == version) & (Video.path.endswith(video_name)))
+                    ).scalar_one()
+                except NoResultFound:
+                    continue
+                except MultipleResultsFound as e:
+                    log.error(f"Multiple videos found in DB for {video_name} with version: {version}")
+                    raise e
+                video_feature = VideoFeature(video_id=video_id, type=feature_type, value=group_id)
+                session.add(video_feature)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    log.error(
+                        f"Failed to add social group {group_id} for video {video_name} due to entry with video_id:{video_id} type:{feature_type} already in DB"
+                    )
+                    session.rollback()
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         return [
@@ -152,8 +173,11 @@ class GorillaDataset(SSLDataset):
     def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
         date = extract_meta_data_time(video_path)
+        if date is None:
+            log.error(f"Could not extract date from video {video_path}")
+            raise ValueError(f"Could not extract date from video {video_path}")
         return VideoMetadata(camera_name, date)
-    
+
     @staticmethod
     def get_video_paths(video_dir: str) -> list[Path]:
         videos = []
@@ -167,12 +191,14 @@ class GorillaDataset(SSLDataset):
                     if not video.is_dir():
                         continue
                     for video_clip in video.iterdir():
-                        if (video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi") and not video_clip.name.startswith("."):
+                        if (
+                            video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi"
+                        ) and not video_clip.name.startswith("."):
                             videos.append(video_clip)
         return videos
-    
+
     @staticmethod
-    def get_video_groups(video_dir: str) -> list[(str, str)]:
+    def get_video_groups(video_dir: str) -> list[Tuple[str, str]]:
         video_group_list = []
         for d in Path(video_dir).iterdir():
             if not d.is_dir():
@@ -186,11 +212,14 @@ class GorillaDataset(SSLDataset):
                     if not re.match(r"^.*?_\d+\s[A-Z]{2}$", video.name):
                         continue
                     group_id = video.name.split(" ")[1]
+                    if group_id == "XX":
+                        continue
                     for video_clip in video.iterdir():
-                        if (video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi") and not video_clip.name.startswith("."):
-                            video_group_list.append((video_clip, group_id))
+                        if (
+                            video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi"
+                        ) and not video_clip.name.startswith("."):
+                            video_group_list.append((video_clip.name, group_id))
         return video_group_list
-                
 
 
 class GorillaDatasetOld(SSLDataset):
@@ -243,7 +272,7 @@ class GorillaDatasetOld(SSLDataset):
         return Path("models/yolov8n_gorilla_body.pt")
 
     @property
-    def metadata_extractor(self) -> MetadataExtractor:
+    def metadata_extractor(self) -> OldMetadataExtractor:
         return GorillaDatasetOld.get_video_metadata
 
     @property

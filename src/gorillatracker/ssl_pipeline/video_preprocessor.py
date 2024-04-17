@@ -14,8 +14,12 @@ from tqdm import tqdm
 from gorillatracker.ssl_pipeline.models import Camera, Video
 
 
-class MetadataExtractor(Protocol):
+class OldMetadataExtractor(Protocol):
     def __call__(self, video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata: ...
+
+
+class MetadataExtractor(Protocol):
+    def __call__(self, video_path: Path) -> VideoMetadata: ...
 
 
 @dataclass(frozen=True)
