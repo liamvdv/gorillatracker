@@ -394,13 +394,9 @@ def knn_with_train(
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
     assert precision is not None
-    recall = tm.functional.recall(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
-    )
-    assert recall is not None
 
     print("knn done")
     return {
@@ -409,7 +405,6 @@ def knn_with_train(
         "auroc": auroc.item(),
         "f1": f1.item(),
         "precision": precision.item(),
-        "recall": recall.item(),
     }
 
 
@@ -459,13 +454,9 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
     assert precision is not None
-    recall = tm.functional.recall(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="macro"
-    )
-    assert recall is not None
 
     print("knn done")
     return {
@@ -474,7 +465,6 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
         "auroc": auroc.item(),
         "f1": f1.item(),
         "precision": precision.item(),
-        "recall": recall.item(),
     }
 
 
