@@ -13,11 +13,11 @@ from typing import Callable, Iterator
 import cv2
 from sqlalchemy import Engine, Select, select, update
 from sqlalchemy.orm import Session, sessionmaker
+from tqdm import tqdm
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDataset
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.queries import associated_filter, load_video, video_filter
+from gorillatracker.ssl_pipeline.queries import load_video
 
 log = logging.getLogger(__name__)
 
@@ -83,9 +83,7 @@ def create_crop_tasks(
     with session_cls() as session:
         video = load_video(session, video_path, version)
         dest_path = dest_base_path / version / video.camera.name / video_path.name
-        query = video_filter(video.video_id)
-        query = associated_filter(query)
-        frame_features = session.execute(query).scalars().all()
+        frame_features = sampler.sample(video.video_id, session)
         crop_tasks = [
             CropTask(
                 feature.frame_nr,
@@ -114,20 +112,22 @@ def update_cache_paths(crop_tasks: list[CropTask], session_cls: sessionmaker[Ses
     with session_cls() as session:
         for crop_task in crop_tasks:
             session.execute(
-                update(TrackingFrameFeature).
-                where(TrackingFrameFeature.tracking_frame_feature_id == crop_task.tracking_frame_feature_id).
-                values(cropped_image_path=str(crop_task.dest))
+                update(TrackingFrameFeature)
+                .where(TrackingFrameFeature.tracking_frame_feature_id == crop_task.tracking_frame_feature_id)
+                .values(cache_path=str(crop_task.dest))
             )
         session.commit()
 
 
 _version = None
 _session_cls = None
+_sampler = None
 
 
-def _init_cropper(engine: Engine, version: str) -> None:
-    global _version, _session_cls
+def _init_cropper(engine: Engine, version: str, sampler: Sampler) -> None:
+    global _version, _session_cls, _sampler
     _version = version
+    _sampler = sampler
     engine.dispose(close=False)
     _session_cls = sessionmaker(bind=engine)
 
@@ -136,9 +136,10 @@ def _multiprocess_crop(
     video_path: Path,
     dest_base_path: Path,
 ) -> None:
-    global _version, _session_cls
+    global _version, _session_cls, _sampler
     assert _session_cls is not None, "Engine not initialized, call _init_cropper first"
     assert _version is not None, "Version not initialized, call _init_cropper instead"
+    assert _sampler is not None, "Sampler not initialized, call _init_cropper instead"
     crop_tasks = create_crop_tasks(video_path, _version, _session_cls, dest_base_path)
 
     if not crop_tasks:
@@ -149,8 +150,12 @@ def _multiprocess_crop(
     update_cache_paths(crop_tasks, _session_cls)
 
 
-def multipricess_crop_from_video(video_paths: list[Path], version: str, engine: Engine, dest_base_path: Path) -> None:
-    with ProcessPoolExecutor(initializer=_init_cropper, initargs=(engine, version), max_workers=10) as executor:
+def multipricess_crop_from_video(
+    video_paths: list[Path], version: str, engine: Engine, sampler: Sampler, dest_base_path: Path, max_workers: int
+) -> None:
+    with ProcessPoolExecutor(
+        initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=max_workers
+    ) as executor:
         list(
             tqdm(
                 executor.map(_multiprocess_crop, video_paths, [dest_base_path] * len(video_paths)),
@@ -165,24 +170,16 @@ if __name__ == "__main__":
     import shutil
 
     from sqlalchemy import create_engine
-    from tqdm import tqdm
 
-    # from gorillatracker.ssl_pipeline.queries import (
-    #     confidence_filter,
-    #     feature_type_filter,
-    #     min_count_filter,
-    #     video_filter,
-    # )
+    from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter
+
     # engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
     engine = create_engine("sqlite:///test.db")
 
-    # def sampling_strategy(video_id: int, min_n_images_per_tracking: int) -> Select[tuple[TrackingFrameFeature]]:
-    # query = video_filter(video_id)
-    # query = min_count_filter(query, min_n_images_per_tracking)
-    #     query = feature_type_filter(query, [GorillaDataset.FACE_90])
-    #     query = confidence_filter(query, 0.7)
-    #     query = min_count_filter(query, 10)
-    #     return query
+    def sampling_strategy(video_id: int, min_n_images_per_tracking: int) -> Select[tuple[TrackingFrameFeature]]:
+        query = video_filter(video_id)
+        query = associated_filter(query)
+        return query
 
     shutil.rmtree("cropped_images")
     Path("cropped_images").mkdir(parents=True, exist_ok=True)
@@ -194,7 +191,7 @@ if __name__ == "__main__":
         videos = session.execute(select(Video)).scalars().all()
         video_paths = [Path(video.path) for video in videos]
 
-    # query = partial(sampling_strategy, min_n_images_per_tracking=10)
-    # sampler = RandomSampler(query_builder=query, n_samples=10)
+    query = partial(sampling_strategy, min_n_images_per_tracking=10)
+    sampler = Sampler(query_builder=query)
 
-    multipricess_crop_from_video(video_paths[:20], version, engine, Path("cropped_images"))
+    multipricess_crop_from_video(video_paths[:20], version, engine, sampler, Path("cropped_images"), max_workers=10)
