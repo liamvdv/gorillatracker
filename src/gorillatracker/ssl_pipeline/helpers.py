@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -194,3 +196,43 @@ def _extract_time(time_stamp: str) -> time:
         return datetime.strptime(time_stamp, "%I%M%p").time()
     except ValueError:
         raise ValueError("Could not extract time stamp from frame")
+
+
+def extract_meta_data_time(video_path: Path) -> Optional[datetime]:
+    """
+    Extracts the creation time of the video from the metadata.
+    """
+    time_stamp = _extract_iso_timestamp(video_path)
+    if time_stamp is None:
+        return None
+    return datetime.fromisoformat(time_stamp.replace("Z", "+00:00"))
+
+
+def _extract_iso_timestamp(video_path: Path) -> Optional[str]:
+    ffprobe_command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_entries",
+        "format_tags=creation_time",
+        video_path,
+    ]
+
+    try:
+        result = subprocess.run(ffprobe_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)  # type: ignore
+        metadata = json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        log.error(f"ffprobe execution failed: {e.stderr}")
+        raise
+    except json.JSONDecodeError:
+        log.error("Failed to decode JSON from ffprobe output.")
+        raise
+
+    try:
+        creation_time = metadata["format"]["tags"]["creation_time"]
+        return creation_time
+    except KeyError:
+        log.error(f"Creation time not found in video metadata for {video_path}")
+        return None

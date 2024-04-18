@@ -2,19 +2,19 @@
 Contains adapter classes for different datasets.
 """
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-import easyocr
 import pandas as pd
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp
+from gorillatracker.ssl_pipeline.helpers import BoundingBox
 from gorillatracker.ssl_pipeline.models import Base, Camera
 from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
 
@@ -143,10 +143,15 @@ class GorillaDataset(SSLDataset):
         return self._engine
 
     @staticmethod
-    def get_video_metadata(video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata:
+    def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
         date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path, GorillaDataset.TIME_STAMP_BOX, ocr_reader=ocr_reader)
-        date = datetime.combine(date, daytime)
+        timestamps_path = "data/derived_data/timestamps.json"
+        with open(timestamps_path, "r") as f:
+            timestamps = json.load(f)
+        date = datetime.strptime(date_str, "%Y%m%d")
+        timestamp = timestamps[video_path.stem]
+        daytime = datetime.strptime(timestamp, "%I:%M %p")
+        date = datetime.combine(date, daytime.time())
         return VideoMetadata(camera_name, date)
