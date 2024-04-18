@@ -45,16 +45,17 @@
     // ],
     "mounts": [
         "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,ro", // NOTE(memben): this is to get access to github 
-        "source=${localEnv:HOME}/.netrc,target=/home/mamba/.netrc,type=bind", // this is to get WANDB_API_KEY from .netrc
-        "source=${localEnv:HOME}/.gitconfig,target=/home/mamba/.gitconfig,type=bind", // this is to get git credentials
-        "source=${localEnv:HOME}/.cache,target=/home/mamba/.cache,type=bind", // general cache directory
+        "source=${localEnv:HOME}/YOURNAME/.netrc,target=/home/mamba/.netrc,type=bind", // this is to get WANDB_API_KEY from .netrc
+        "source=${localEnv:HOME}/YOURNAME/.gitconfig,target=/home/mamba/.gitconfig,type=bind", // this is to get git credentials
+        "source=${localEnv:HOME}/YOURNAME/.cache,target=/home/mamba/.cache,type=bind", // general cache directory
         // GorillaTracker specific mounts.
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.
-        "source=/scratch2/gorillatracker/data,target=/workspaces/gorillatracker/data,type=bind,ro",
-        "source=/scratch2/gorillatracker/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
-        "source=/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", // cannot mount into data
+        "source=${localEnv:HOME}/data,target=/workspaces/gorillatracker/data,type=bind,ro",
+        "source=${localEnv:HOME}/data/embeddings,target=/workspaces/gorillatracker/data/embeddings,type=bind",
+        "source=${localEnv:HOME}/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
+        // "source=/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", // cannot mount into data
         // NOTE(liamvdv): Allow write.
-        "source=/scratch2/gorillatracker/models/,target=/workspaces/gorillatracker/models,type=bind"
+        "source=${localEnv:HOME}/models/,target=/workspaces/gorillatracker/models,type=bind"
     ],
     "remoteEnv": {
         "WANDB_API_KEY": "${localEnv:WANDB_API_KEY}",
