@@ -19,7 +19,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetSmall, GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate_videos
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.queries import load_processed_videos
@@ -103,10 +103,9 @@ def visualize_pipeline(
 
     multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
 
-
-if __name__ == "__main__":
+def gpu2_demo():
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDataset("sqlite:///test.db")
+    dataset = GorillaDatasetSmall("sqlite:///test.db")
     # NOTE(memben): for setup only once
     if not os.path.exists("test.db"):
         dataset.setup_database()
@@ -119,3 +118,24 @@ if __name__ == "__main__":
         max_worker_per_gpu=12,
         gpus=[0],
     )
+
+def kisz_demo():
+    logging.basicConfig(level=logging.INFO)
+    dataset = GorillaDataset("sqlite:///test.db")
+    # NOTE(memben): for setup only once
+    if not os.path.exists("test.db"):
+        dataset.setup_database()
+        dataset.setup_cameras()
+    visualize_pipeline(
+        dataset,
+        "2024-04-18",
+        Path("/workspaces/gorillatracker/video_output"),
+        n_videos=20,
+        max_worker_per_gpu=12,
+        gpus=[0],
+    )
+    dataset.setup_social_groups()
+
+
+if __name__ == "__main__":
+    kisz_demo()

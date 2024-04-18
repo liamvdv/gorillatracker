@@ -94,8 +94,8 @@ class Video(Base):
     def validate_path(self, key: str, value: str) -> str:
         if not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
-        if not value.endswith(".mp4"):
-            raise ValueError(f"{key} must end with '.mp4', is {value}")
+        if not (value.lower().endswith(".mp4") or value.lower().endswith(".avi")):
+            raise ValueError(f"{key} must end with '.mp4', '.avi', '.MP4' or '.AVI', is {value}")
         return value
 
     @validates("width", "height", "fps", "sampled_fps", "frames")
