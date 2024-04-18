@@ -8,7 +8,7 @@ from typing import Optional, Sequence
 from sqlalchemy import Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
 
-from gorillatracker.ssl_pipeline.models import ProcessedVideoFrameFeature, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import Task, TaskStatus, Tracking, TrackingFrameFeature, Video
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -138,14 +138,14 @@ def load_videos(session: Session, video_paths: list[Path], version: str) -> Sequ
     )
 
 
-def load_processed_videos(session: Session, version: str, required_feature_types: list[str]) -> Sequence[Video]:
+def load_processed_videos(session: Session, version: str, required_completed_tasks: list[str]) -> Sequence[Video]:
     stmt = select(Video).where(Video.version == version)
-    if required_feature_types:
+    if required_completed_tasks:
         stmt = (
-            stmt.join(ProcessedVideoFrameFeature)
-            .where(ProcessedVideoFrameFeature.type.in_(required_feature_types))
+            stmt.join(Task)
+            .where(Task.type.in_(required_completed_tasks) & Task.status == TaskStatus.COMPLETED)
             .group_by(Video.video_id)
-            .having(func.count(ProcessedVideoFrameFeature.type.distinct()) == len(required_feature_types))
+            .having(func.count(Task.type.distinct()) == len(required_completed_tasks))
         )
     return session.execute(stmt).scalars().all()
 
