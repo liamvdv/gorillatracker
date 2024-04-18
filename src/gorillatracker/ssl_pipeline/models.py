@@ -212,6 +212,7 @@ class TrackingFrameFeature(Base):
     bbox_height: Mapped[float]
     confidence: Mapped[float]
     type: Mapped[str] = mapped_column(String(255))
+    cache_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
