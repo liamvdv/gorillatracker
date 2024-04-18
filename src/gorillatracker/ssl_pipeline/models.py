@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import datetime as dt
 import enum
-import select
-from datetime import datetime, timedelta
 from typing import Generic, Optional, Type, TypeVar
 
 import sqlalchemy.types as types
-from sqlalchemy import CheckConstraint, Dialect, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Dialect, ForeignKey, String, UniqueConstraint, event
+from sqlalchemy.engine.base import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
+from sqlalchemy.orm.mapper import Mapper
 
 
 # WARNING(memben): Changing the class may affect the database
@@ -27,8 +28,8 @@ class TrackingRelationshipType(enum.Enum):
 # WARNING(memben): Changing the class may affect the database
 # The values of the enum are stored in the database.
 class TaskStatus(enum.Enum):
-    PENDING = "pending"
-    RUNNING = "running"
+    QUEUED = "queued"
+    PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -91,7 +92,7 @@ class Video(Base):
     version: Mapped[str]
     path: Mapped[str]  # absolute path to the video file
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
-    start_time: Mapped[datetime]
+    start_time: Mapped[dt.datetime]
     width: Mapped[int]
     height: Mapped[int]
     fps: Mapped[int]  # of the original video
@@ -115,7 +116,7 @@ class Video(Base):
     @validates("version")
     def validate_version(self, key: str, value: str) -> str:
         try:
-            datetime.strptime(value, "%Y-%m-%d")
+            dt.datetime.strptime(value, "%Y-%m-%d")
         except ValueError:
             raise ValueError(f"{key} must be in the format 'YYYY-MM-DD', is {value}")
         return value
@@ -140,14 +141,15 @@ class Video(Base):
         return self.fps // self.sampled_fps
 
     @property
-    def duration(self) -> timedelta:
-        return timedelta(seconds=self.frames / self.fps)
+    def duration(self) -> dt.timedelta:
+        return dt.timedelta(seconds=self.frames / self.fps)
 
     def __hash__(self) -> int:
         return self.video_id
 
     def __repr__(self) -> str:
-        return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
+        return f"""video(id={self.video_id}, version={self.version}, path={self.path}, 
+                camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"""
 
 
 class VideoFeature(Base):
@@ -155,15 +157,13 @@ class VideoFeature(Base):
 
     video_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    type: Mapped[str] = mapped_column(String(255))
+    feature_type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
     video: Mapped[Video] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
-        return (
-            f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
-        )
+        return f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, feature_type={self.feature_type}, value={self.value})"
 
 
 class Tracking(Base):
@@ -188,11 +188,11 @@ class Tracking(Base):
     )
 
     @property
-    def tracking_duration(self) -> timedelta:
+    def tracking_duration(self) -> dt.timedelta:
         fps = self.video.fps
         start_frame = min(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         end_frame = max(self.frame_features, key=lambda x: x.frame_nr).frame_nr
-        return timedelta(seconds=(end_frame - start_frame) / fps)
+        return dt.timedelta(seconds=(end_frame - start_frame) / fps)
 
     def __hash__(self) -> int:
         return self.tracking_id
@@ -206,13 +206,13 @@ class TrackingFeature(Base):
 
     tracking_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
-    type: Mapped[str] = mapped_column(String(255))
+    feature_type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="features")
 
     def __repr__(self) -> str:
-        return f"tracking_feature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, type={self.type}, value={self.value})"
+        return f"tracking_feature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, feature_type={self.feature_type}, value={self.value})"
 
 
 class TrackingFrameFeature(Base):
@@ -229,12 +229,12 @@ class TrackingFrameFeature(Base):
     bbox_width: Mapped[float]
     bbox_height: Mapped[float]
     confidence: Mapped[float]
-    type: Mapped[str] = mapped_column(String(255))
+    feature_type: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
 
-    __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
+    __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "feature_type"),)
 
     @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
@@ -255,7 +255,9 @@ class TrackingFrameFeature(Base):
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id
 
     def __repr__(self) -> str:
-        return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
+        return f"""tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, 
+        frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, 
+        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type})"""
 
 
 class VideoRelationship(Base):
@@ -301,7 +303,8 @@ class TrackingRelationship(Base):
     )
 
     def __repr__(self) -> str:
-        return f"tracking_relationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
+        return f"""tracking_relationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, 
+    edge={self.edge}, reason={self.reason}, created_by={self.created_by})"""
 
 
 class Task(Base):
@@ -309,21 +312,25 @@ class Task(Base):
 
     task_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    type: Mapped[str] = mapped_column(String(255))
-    status: Mapped[TaskStatus] = mapped_column(ExtensibleEnum(TaskStatus))
-    last_modified: Mapped[datetime]
+    task_type: Mapped[str] = mapped_column(String(255))
+    status: Mapped[TaskStatus] = mapped_column(ExtensibleEnum(TaskStatus), default=TaskStatus.QUEUED)
+    retries: Mapped[int] = mapped_column(default=0)
+    updated_at: Mapped[dt.datetime] = mapped_column(default=dt.datetime.now(dt.timezone.utc))
 
     video: Mapped[Video] = relationship(back_populates="tasks")
 
-    __table_args__ = (UniqueConstraint("video_id", "type"),)
+    __table_args__ = (UniqueConstraint("video_id", "task_type"),)
 
     def __repr__(self) -> str:
-        return f"task(id={self.task_id}, video_id={self.video_id}, type={self.type}, status={self.status}, last_modified={self.last_modified})"
+        return f"task(id={self.task_id}, video_id={self.video_id}, task_type={self.task_type}, status={self.status}, last_modified={self.updated_at})"
+
+
+@event.listens_for(Task, "before_update")
+def task_before_update(mapper: Mapper, connection: Connection, target: Task):
+    target.updated_at = dt.datetime.now(dt.timezone.utc)
 
 
 if __name__ == "__main__":
-    import datetime as dt
-
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
@@ -336,7 +343,7 @@ if __name__ == "__main__":
             path="/absolute/path/to/test.mp4",
             version="2024-04-03",
             camera=camera,
-            start_time=datetime.now(),
+            start_time=dt.datetime.now(dt.timezone.utc),
             width=1920,
             height=1080,
             fps=30,
@@ -353,9 +360,11 @@ if __name__ == "__main__":
             bbox_width=0.5,
             bbox_height=0.5,
             confidence=0.5,
-            type="test",
+            feature_type="test",
         )
-        task = Task(video=video, type="test", status=TaskStatus.PENDING, last_modified=datetime.now(dt.timezone.utc))
+        task = Task(
+            video=video, task_type="test", status=TaskStatus.COMPLETED, updated_at=dt.datetime.now(dt.timezone.utc)
+        )
         session.add_all([camera, video, tracking, tracking_frame_feature, task])
         session.commit()
     Base.metadata.drop_all(engine)

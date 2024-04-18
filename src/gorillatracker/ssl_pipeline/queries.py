@@ -2,8 +2,9 @@
 This module contains pre-defined database queries.
 """
 
+import datetime as dt
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Iterator, Optional, Sequence
 
 from sqlalchemy import Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
@@ -57,7 +58,7 @@ def min_count_filter(
     def filter(self, frame_features: Iterator[TrackingFrameFeature]) -> Iterator[TrackingFrameFeature]:
         tracking_id_grouped = group_by_tracking_id(list(frame_features))
         predicate = (
-            lambda features: len([x for x in features if x.type == self.feature_type]) >= self.min_feature_count
+            lambda features: len([x for x in features if x.feature_type == self.feature_type]) >= self.min_feature_count
             if self.feature_type is not None
             else len(features) >= self.min_feature_count
         )
@@ -74,7 +75,7 @@ def min_count_filter(
     )
 
     if feature_type is not None:
-        subquery = subquery.where(TrackingFrameFeature.type == feature_type)
+        subquery = subquery.where(TrackingFrameFeature.feature_type == feature_type)
 
     query = query.where(TrackingFrameFeature.tracking_id.in_(subquery))
 
@@ -90,10 +91,10 @@ def feature_type_filter(
     Equivalent to python:
     ```python
     def filter(self, frame_features: Iterator[TrackingFrameFeature]) -> Iterator[TrackingFrameFeature]:
-        return filter(lambda x: x.type in self.feature_types, frame_features)
+        return filter(lambda x: x.feature_type in self.feature_types, frame_features)
     ```
     """
-    return query.where(TrackingFrameFeature.type.in_(feature_types))
+    return query.where(TrackingFrameFeature.feature_type.in_(feature_types))
 
 
 def confidence_filter(
@@ -143,9 +144,9 @@ def load_processed_videos(session: Session, version: str, required_completed_tas
     if required_completed_tasks:
         stmt = (
             stmt.join(Task)
-            .where(Task.type.in_(required_completed_tasks) & Task.status == TaskStatus.COMPLETED)
+            .where(Task.task_type.in_(required_completed_tasks), Task.status == TaskStatus.COMPLETED)
             .group_by(Video.video_id)
-            .having(func.count(Task.type.distinct()) == len(required_completed_tasks))
+            .having(func.count(Task.task_type.distinct()) == len(required_completed_tasks))
         )
     return session.execute(stmt).scalars().all()
 
@@ -182,6 +183,60 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tra
 
     overlapping_trackings = session.execute(stmt).fetchall()
     return [(row[0], row[1]) for row in overlapping_trackings]
+
+
+def get_next_task(
+    session: Session, task_type: str, max_retries: int = 0, task_timeout: dt.timedelta = dt.timedelta(days=1)
+) -> Iterator[Task]:
+    """Yields and handles task in a transactional manner. Useable in a multiprocessing context.
+    Each session is committed after a successful task completion, and rolled back if an exception is raised by this function.
+    Do **not** commit any changes that should be rolled back on exception.
+
+    Args:
+        session (Session): The database session.
+        task_type (str): The type of the task.
+        max_retries (int): The maximum number of retries, for failed or timed out tasks. Defaults to 0.
+        task_timeout (dt.timedelta): The maximum time a task can be in processing state before being considered timed out. Defaults to one day.
+    """
+    while True:
+        timeout_threshold = dt.datetime.now(dt.timezone.utc) - task_timeout
+        stmt = (
+            select(Task)
+            .where(
+                Task.task_type == task_type,
+                Task.status == TaskStatus.QUEUED,
+                # (
+                #     (Task.status == TaskStatus.QUEUED)
+                #     | (
+                #         (Task.status == TaskStatus.PROCESSING)
+                #         & (Task.updated_at < timeout_threshold)
+                #         & (Task.retries < max_retries)
+                #     )
+                #     | ((Task.status == TaskStatus.FAILED) & (Task.retries < max_retries))
+                # ),
+            )
+            .with_for_update(skip_locked=True)
+        )
+
+        task = session.execute(stmt).scalars().first()
+        if task is None:
+            break
+
+        if task.status != TaskStatus.QUEUED:
+            task.retries += 1
+        task.status = TaskStatus.PROCESSING
+        session.commit()
+
+        try:
+            yield task
+        except Exception:
+            session.rollback()
+            task.status = TaskStatus.FAILED
+            session.commit()
+            raise
+        else:
+            task.status = TaskStatus.COMPLETED
+            session.commit()
 
 
 if __name__ == "__main__":

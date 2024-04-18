@@ -38,9 +38,9 @@ def render_on_frame(
         bbox = BoundingBox.from_tracking_frame_feature(frame_feature)
         cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
         label = (
-            f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.type})"
+            f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.feature_type})"
             if frame_feature.tracking_id is not None
-            else f"UNRESOLVED ({frame_feature.type})"
+            else f"UNRESOLVED ({frame_feature.feature_type})"
         )
         cv2.putText(
             frame,

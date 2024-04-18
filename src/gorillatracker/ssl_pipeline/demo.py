@@ -17,14 +17,16 @@ import os
 import random
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate_videos
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
-from gorillatracker.ssl_pipeline.queries import load_processed_videos
+from gorillatracker.ssl_pipeline.models import Task
+from gorillatracker.ssl_pipeline.queries import load_processed_videos, load_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
-from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict_and_store, multiprocess_track_and_store
+from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 
 log = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ def visualize_pipeline(
     n_videos: int = 30,
     sampled_fps: int = 10,
     max_worker_per_gpu: int = 8,
-    gpus: list[int] = [0],
+    gpu_ids: list[int] = [0],
 ) -> None:
     """
     Visualize the tracking results of the pipeline.
@@ -49,7 +51,7 @@ def visualize_pipeline(
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
         sampled_fps (int, optional): The FPS to sample the video at. Defaults to 10.
         max_worker_per_gpu (int, optional): The maximum number of workers per GPU. Defaults to 8.
-        gpus (list[int], optional): The GPUs to use for tracking. Defaults to [0].
+        gpu_ids (list[int], optional): The GPUs to use for tracking. Defaults to [0].
 
     Returns:
         None, the visualizations are saved to the destination and to the SSLDataset.
@@ -68,37 +70,44 @@ def visualize_pipeline(
 
     preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
 
-    multiprocess_track_and_store(
-        version,
+    with Session(dataset.engine) as session:
+        videos = load_videos(session, to_track, version)
+        for video in videos:
+            for task in ["track_body", "predict_face_90", "predict_face_45"]:
+                video.tasks.append(Task(task_type=task))
+        session.commit()
+
+
+    multiprocess_track(
+        "body",  # NOTE(memben): Tracking will always be done on bodies
         dataset.body_model_path,
         dataset.yolo_kwargs,
-        to_track,
         dataset.tracker_config,
         dataset.engine,
-        "body",  # NOTE(memben): Tracking will always be done on bodies
         max_worker_per_gpu=max_worker_per_gpu,
-        gpus=gpus,
+        gpu_ids=gpu_ids,
     )
 
-    for yolo_model, yolo_kwargs, _, type in dataset.feature_models():
-        multiprocess_predict_and_store(
-            version,
+    for yolo_model, yolo_kwargs, _, feature_type in dataset.feature_models():
+        multiprocess_predict(
+            feature_type,
             yolo_model,
             yolo_kwargs,
-            to_track,
             dataset.engine,
-            type,
             max_worker_per_gpu=max_worker_per_gpu,
-            gpus=gpus,
+            gpu_ids=gpu_ids,
         )
+        
+    print(session.execute(select(Task)).scalars().all())
 
-    for _, _, correlator, type in dataset.feature_models():
+    for _, _, correlator, feature_type in dataset.feature_models():
         multiprocess_correlate_videos(
             version,
             to_track,
             dataset.engine,
             correlator,
-            type,
+            f"predict_{feature_type}",
+            tracked_type="track_body",
         )
 
     multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
@@ -115,7 +124,7 @@ if __name__ == "__main__":
         dataset,
         "2024-04-09",
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
-        max_worker_per_gpu=12,
-        gpus=[0],
+        n_videos=1,
+        max_worker_per_gpu=1,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
+        gpu_ids=[0],
     )
