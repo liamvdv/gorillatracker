@@ -3,19 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 
 import cv2
-import easyocr
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.models import Camera, Video
-
-
-class MetadataExtractorSmall(Protocol):
-    def __call__(self, video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata: ...
 
 
 class MetadataExtractor(Protocol):
@@ -53,7 +48,6 @@ def preprocess_and_store(
     sampled_fps: int,
     session_cls: sessionmaker[Session],
     metadata_extractor: MetadataExtractor,
-    ocr_reader: easyocr.Reader,
 ) -> None:
     metadata = metadata_extractor(video_path)
     properties = video_properties_extractor(video_path)
@@ -84,6 +78,5 @@ def preprocess_videos(
 ) -> None:
     session_cls = sessionmaker(bind=engine)
     assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
-    ocr_reader = easyocr.Reader(["en"], gpu=True, verbose=False)
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
-        preprocess_and_store(video_path, version, sampled_fps, session_cls, metadata_extractor, ocr_reader)
+        preprocess_and_store(video_path, version, sampled_fps, session_cls, metadata_extractor)
