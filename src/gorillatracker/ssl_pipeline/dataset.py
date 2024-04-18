@@ -3,6 +3,7 @@ Contains adapter classes for different datasets.
 """
 
 import logging
+import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -10,7 +11,6 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 import easyocr
-import os
 import pandas as pd
 from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
@@ -185,7 +185,7 @@ class GorillaDataset(SSLDataset):
         for dirpath, dirnames, filenames in os.walk(video_dir):
             for file in filenames:
                 if not file.startswith(".") and (file.lower().endswith(".avi") or file.lower().endswith(".mp4")):
-                    videos.append(os.path.join(dirpath, file))
+                    videos.append(Path(os.path.join(dirpath, file)))
         return videos
 
     @staticmethod
@@ -203,6 +203,7 @@ class GorillaDataset(SSLDataset):
                         continue
                     video_group_list.append((file_path.name, group_id))
         return video_group_list
+
 
 class GorillaDatasetSmall(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
