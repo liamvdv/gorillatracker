@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 import easyocr
+import os
 import pandas as pd
 from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
@@ -93,7 +94,7 @@ class GorillaDataset(SSLDataset):
     }
 
     DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
-    VIDEO_PATH = "/workspace/gorillatracker/video_data"
+    VIDEO_DIR = "/workspaces/gorillatracker/video_data"
 
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
@@ -112,7 +113,7 @@ class GorillaDataset(SSLDataset):
 
     def setup_social_groups(self, version: str) -> None:
         feature_type = "social_group"
-        video_groups = GorillaDataset.get_video_groups(self.VIDEO_PATH)
+        video_groups = GorillaDataset.get_video_groups(self.VIDEO_DIR)
         with Session(self._engine) as session:
             for video_name, group_id in video_groups:
                 try:
@@ -142,7 +143,7 @@ class GorillaDataset(SSLDataset):
 
     @property
     def video_paths(self) -> list[Path]:
-        return GorillaDataset.get_video_paths(self.VIDEO_PATH)
+        return GorillaDataset.get_video_paths(self.VIDEO_DIR)
 
     @property
     def body_model_path(self) -> Path:
@@ -181,46 +182,27 @@ class GorillaDataset(SSLDataset):
     @staticmethod
     def get_video_paths(video_dir: str) -> list[Path]:
         videos = []
-        for d in Path(video_dir).iterdir():
-            if not d.is_dir():
-                continue
-            for cam in d.iterdir():
-                if not cam.is_dir():
-                    continue
-                for video in cam.iterdir():
-                    if not video.is_dir():
-                        continue
-                    for video_clip in video.iterdir():
-                        if (
-                            video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi"
-                        ) and not video_clip.name.startswith("."):
-                            videos.append(video_clip)
+        for dirpath, dirnames, filenames in os.walk(video_dir):
+            for file in filenames:
+                if not file.startswith(".") and (file.lower().endswith(".avi") or file.lower().endswith(".mp4")):
+                    videos.append(os.path.join(dirpath, file))
         return videos
 
     @staticmethod
     def get_video_groups(video_dir: str) -> list[Tuple[str, str]]:
         video_group_list = []
-        for d in Path(video_dir).iterdir():
-            if not d.is_dir():
-                continue
-            for cam in d.iterdir():
-                if not cam.is_dir():
-                    continue
-                for video in cam.iterdir():
-                    if not video.is_dir():
+        for dirpath, dirnames, filenames in os.walk(video_dir):
+            for file in filenames:
+                if not file.startswith(".") and (file.lower().endswith(".avi") or file.lower().endswith(".mp4")):
+                    file_path = Path(file)
+                    parent = file_path.parent
+                    if not re.match(r"^.*?_\d+\s[A-Z]{2}$", parent.name):
                         continue
-                    if not re.match(r"^.*?_\d+\s[A-Z]{2}$", video.name):
+                    group_id = parent.name.split(" ")[1]
+                    if group_id == "XX":  # XX is unknown group
                         continue
-                    group_id = video.name.split(" ")[1]
-                    if group_id == "XX":
-                        continue
-                    for video_clip in video.iterdir():
-                        if (
-                            video_clip.suffix.lower() == ".mp4" or video_clip.suffix.lower() == ".avi"
-                        ) and not video_clip.name.startswith("."):
-                            video_group_list.append((video_clip.name, group_id))
+                    video_group_list.append((file_path.name, group_id))
         return video_group_list
-
 
 class GorillaDatasetSmall(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
