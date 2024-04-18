@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, extract_meta_data_time
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video, VideoFeature
-from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, MetadataExtractorSmall, VideoMetadata
+from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
 
 log = logging.getLogger(__name__)
 
@@ -255,7 +255,7 @@ class GorillaDatasetSmall(SSLDataset):
         return Path("models/yolov8n_gorilla_body.pt")
 
     @property
-    def metadata_extractor(self) -> MetadataExtractorSmall:
+    def metadata_extractor(self) -> MetadataExtractor:
         return GorillaDatasetSmall.get_video_metadata
 
     @property
