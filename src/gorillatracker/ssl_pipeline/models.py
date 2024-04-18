@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import enum
+import select
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Generic, Optional, Type, TypeVar
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
+import sqlalchemy.types as types
+from sqlalchemy import CheckConstraint, Dialect, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
 
@@ -20,6 +22,36 @@ class VideoRelationshipType(enum.Enum):
 class TrackingRelationshipType(enum.Enum):
     NEGATIVE = "negative"  # Implies that the Trackings are not the same
     POSITIVE = "positive"  # Implies that the Trackings are the same (animal)
+
+
+# WARNING(memben): Changing the class may affect the database
+# The values of the enum are stored in the database.
+class TaskStatus(enum.Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+T = TypeVar("T", bound=enum.Enum)
+
+
+class ExtensibleEnum(types.TypeDecorator, Generic[T]):
+    """Stores values as strings, converts them to and from enums."""
+
+    impl = types.String
+    cache_ok = True
+
+    def __init__(self, enum_cls: Type[T]) -> None:
+        super().__init__()
+        self.enum_cls = enum_cls
+
+    def process_bind_param(self, value: T, dialect: Dialect) -> str:
+        assert isinstance(value.value, str), f"{value} not serializable to string"
+        return value.value
+
+    def process_result_value(self, value: str, dialect: Dialect) -> T:
+        return self.enum_cls(value)
 
 
 class Base(DeclarativeBase):
@@ -68,9 +100,7 @@ class Video(Base):
 
     camera: Mapped[Camera] = relationship(back_populates="videos")
     features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
-    processed_video_frame_features: Mapped[list[ProcessedVideoFrameFeature]] = relationship(
-        back_populates="video", cascade="all, delete-orphan"
-    )
+    tasks: Mapped[list[Task]] = relationship(back_populates="video", cascade="all, delete-orphan")
 
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
     tracking_frame_features: Mapped[list[TrackingFrameFeature]] = relationship(
@@ -118,18 +148,6 @@ class Video(Base):
 
     def __repr__(self) -> str:
         return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
-
-
-class ProcessedVideoFrameFeature(Base):
-    __tablename__ = "processed_video_frame_feature"
-
-    processed_video_features_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    type: Mapped[str] = mapped_column(String(255))
-
-    video: Mapped[Video] = relationship(back_populates="processed_video_frame_features")
-
-    __table_args__ = (UniqueConstraint("video_id", "type"),)
 
 
 class VideoFeature(Base):
@@ -246,7 +264,7 @@ class VideoRelationship(Base):
     video_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     left_video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
     right_video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    edge: Mapped[str] = mapped_column(String(255))  # VideoRelationshipType
+    edge: Mapped[VideoRelationshipType] = mapped_column(ExtensibleEnum(VideoRelationshipType))
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
@@ -260,17 +278,6 @@ class VideoRelationship(Base):
         UniqueConstraint("left_video_id", "right_video_id", "reason", "created_by"),
     )
 
-    @property
-    def relationship(self) -> VideoRelationshipType:
-        return VideoRelationshipType(self.edge)
-
-    @validates("edge")
-    def validate_edge(self, key: str, edge: str) -> str:
-        allowed_values = [e.name for e in VideoRelationshipType]
-        if edge not in allowed_values:
-            raise ValueError(f"{key} must be one of {allowed_values}, not '{edge}'")
-        return edge
-
     def __repr__(self) -> str:
         return f"video_relationship(id={self.video_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
@@ -281,7 +288,7 @@ class TrackingRelationship(Base):
     tracking_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     left_tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
     right_tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
-    edge: Mapped[str] = mapped_column(String(255))  # TrackingRelationshipType
+    edge: Mapped[TrackingRelationshipType] = mapped_column(ExtensibleEnum(TrackingRelationshipType))
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
@@ -293,30 +300,37 @@ class TrackingRelationship(Base):
         UniqueConstraint("left_tracking_id", "right_tracking_id", "reason", "created_by"),
     )
 
-    @property
-    def relationship(self) -> TrackingRelationshipType:
-        return TrackingRelationshipType(self.edge)
-
-    @validates("edge")
-    def validate_edge(self, key: str, edge: str) -> str:
-        allowed_values = [e.name for e in TrackingRelationshipType]
-        if edge not in allowed_values:
-            raise ValueError(f"{key} must be one of {allowed_values}, not '{edge}'")
-        return edge
-
     def __repr__(self) -> str:
         return f"tracking_relationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
 
+class Task(Base):
+    __tablename__ = "task"
+
+    task_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
+    type: Mapped[str] = mapped_column(String(255))
+    status: Mapped[TaskStatus] = mapped_column(ExtensibleEnum(TaskStatus))
+    last_modified: Mapped[datetime]
+
+    video: Mapped[Video] = relationship(back_populates="tasks")
+
+    __table_args__ = (UniqueConstraint("video_id", "type"),)
+
+    def __repr__(self) -> str:
+        return f"task(id={self.task_id}, video_id={self.video_id}, type={self.type}, status={self.status}, last_modified={self.last_modified})"
+
+
 if __name__ == "__main__":
+    import datetime as dt
+
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-    with session.begin():
+    with SessionLocal() as session:
         camera = Camera(name="Test", latitude=0, longitude=0)
         video = Video(
             path="/absolute/path/to/test.mp4",
@@ -341,7 +355,7 @@ if __name__ == "__main__":
             confidence=0.5,
             type="test",
         )
-        session.add_all([camera, video, tracking, tracking_frame_feature])
-
-    session.close()
+        task = Task(video=video, type="test", status=TaskStatus.PENDING, last_modified=datetime.now(dt.timezone.utc))
+        session.add_all([camera, video, tracking, tracking_frame_feature, task])
+        session.commit()
     Base.metadata.drop_all(engine)
