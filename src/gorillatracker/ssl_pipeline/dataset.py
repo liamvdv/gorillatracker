@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, extract_meta_data_time, read_timestamp
 from gorillatracker.ssl_pipeline.models import Base, Camera, Video, VideoFeature
-from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, OldMetadataExtractor, VideoMetadata
+from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, MetadataExtractorSmall, VideoMetadata
 
 log = logging.getLogger(__name__)
 
@@ -222,7 +222,7 @@ class GorillaDataset(SSLDataset):
         return video_group_list
 
 
-class GorillaDatasetOld(SSLDataset):
+class GorillaDatasetSmall(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
     FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
     TIME_STAMP_BOX: BoundingBox = BoundingBox(
@@ -272,8 +272,8 @@ class GorillaDatasetOld(SSLDataset):
         return Path("models/yolov8n_gorilla_body.pt")
 
     @property
-    def metadata_extractor(self) -> OldMetadataExtractor:
-        return GorillaDatasetOld.get_video_metadata
+    def metadata_extractor(self) -> MetadataExtractorSmall:
+        return GorillaDatasetSmall.get_video_metadata
 
     @property
     def tracker_config(self) -> Path:
@@ -297,6 +297,6 @@ class GorillaDatasetOld(SSLDataset):
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
         date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path, GorillaDatasetOld.TIME_STAMP_BOX, ocr_reader=ocr_reader)
+        daytime = read_timestamp(video_path, GorillaDatasetSmall.TIME_STAMP_BOX, ocr_reader=ocr_reader)
         date = datetime.combine(date, daytime)
         return VideoMetadata(camera_name, date)
