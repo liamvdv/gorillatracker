@@ -6,16 +6,16 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 import cv2
-import easyocr
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
-from gorillatracker.ssl_pipeline.models import Camera, Video
+from gorillatracker.ssl_pipeline.models import Video
+from gorillatracker.ssl_pipeline.queries import get_or_create_camera
 
 
 class MetadataExtractor(Protocol):
-    def __call__(self, video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata: ...
+    def __call__(self, video_path: Path) -> VideoMetadata: ...
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,7 @@ class VideoMetadata:
     """High level metadata about a video."""
 
     camera_name: str
-    start_time: datetime
+    start_time: Optional[datetime]
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,6 @@ def preprocess_and_store(
     sampled_fps: int,
     session_cls: sessionmaker[Session],
     metadata_extractor: MetadataExtractor,
-    ocr_reader: easyocr.Reader,
 ) -> None:
     metadata = metadata_extractor(video_path)
     properties = video_properties_extractor(video_path)
@@ -66,7 +65,7 @@ def preprocess_and_store(
     )
 
     with session_cls() as session:
-        camera = session.execute(select(Camera).where(Camera.name == metadata.camera_name)).scalar_one()
+        camera = get_or_create_camera(session, metadata.camera_name)
         camera.videos.append(video)
         session.commit()
 
@@ -80,6 +79,5 @@ def preprocess_videos(
 ) -> None:
     session_cls = sessionmaker(bind=engine)
     assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
-    ocr_reader = easyocr.Reader(["en"], gpu=True, verbose=False)
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
-        preprocess_and_store(video_path, version, sampled_fps, session_cls, metadata_extractor, ocr_reader)
+        preprocess_and_store(video_path, version, sampled_fps, session_cls, metadata_extractor)

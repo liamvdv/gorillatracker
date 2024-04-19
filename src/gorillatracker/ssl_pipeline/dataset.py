@@ -2,20 +2,24 @@
 Contains adapter classes for different datasets.
 """
 
+import json
 import logging
+import os
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-import easyocr
 import pandas as pd
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, select
+from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
-from gorillatracker.ssl_pipeline.helpers import BoundingBox, read_timestamp
-from gorillatracker.ssl_pipeline.models import Base, Camera
+from gorillatracker.ssl_pipeline.helpers import BoundingBox
+from gorillatracker.ssl_pipeline.models import Base, Video, VideoFeature
+from gorillatracker.ssl_pipeline.queries import get_or_create_camera
 from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
 
 log = logging.getLogger(__name__)
@@ -25,6 +29,7 @@ class SSLDataset(ABC):
     def __init__(self, db_uri: str) -> None:
         engine = create_engine(db_uri)  # , echo=True)
         self._engine = engine
+        Base.metadata.create_all(self._engine)
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         """Returns a list of feature models to use for adding features of interest (e.g. face detector)"""
@@ -67,8 +72,8 @@ class SSLDataset(ABC):
         pass
 
     @abstractmethod
-    def setup_database(self) -> None:
-        """Creates and populates the database. Population is dataset specific but should include cameras setup."""
+    def post_setup(self, version: str) -> None:
+        """Post setup operations."""
         pass
 
 
@@ -94,24 +99,6 @@ class GorillaDataset(SSLDataset):
 
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
-
-    def setup_database(self) -> None:
-        Base.metadata.create_all(self._engine)
-
-    def setup_cameras(self) -> None:
-        df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
-        df["Name"] = df["Name"].str.rstrip("x")
-        with Session(self._engine) as session:
-            for _, row in df.iterrows():
-                camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
-                session.add(camera)
-            session.commit()
-
-    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
-        return [
-            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
-            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
-        ]
 
     @property
     def video_paths(self) -> list[Path]:
@@ -142,11 +129,73 @@ class GorillaDataset(SSLDataset):
     def engine(self) -> Engine:
         return self._engine
 
+    def post_setup(self, version: str) -> None:
+        self.setup_social_groups(version)
+        self.setup_camera_locations()
+
+    def setup_camera_locations(self) -> None:
+        df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
+        df["Name"] = df["Name"].str.rstrip("x")
+        with Session(self._engine) as session:
+            for _, row in df.iterrows():
+                camera = get_or_create_camera(session, row["Name"])
+                camera.latitude = row["lat"]
+                camera.longitude = row["long"]
+            session.commit()
+
+    def setup_social_groups(self, version: str) -> None:
+        df = pd.read_csv("data/ground_truth/cxl/misc/VideosGO_SPAC.csv", sep=",")
+        feature_type = "Social Group"
+        with Session(self._engine) as session:
+            for _, row in df.iterrows():
+                if self.check_valid_social_group(row["Group"]):
+                    social_group = self.extract_social_group(row["Group"])
+                    video_name = os.path.splitext(row["File"])[0] + ".mp4"  # csv has .MP4 instead of .mp4
+                    try:
+                        video_id = session.execute(
+                            select(Video.video_id).where((Video.version == version) & (Video.path.endswith(video_name)))
+                        ).scalar_one()
+                    except NoResultFound:
+                        continue
+                    except MultipleResultsFound as e:
+                        log.error(f"Multiple videos found in DB for {video_name} with version: {version}")
+                        raise e
+                    video_feature = VideoFeature(video_id=video_id, type=feature_type, value=social_group)
+                    session.add(video_feature)
+                    try:
+                        session.commit()
+                    except IntegrityError:
+                        log.error(
+                            f"Failed to add social group {social_group} for video {video_name} due to entry with video_id:{video_id} type:{feature_type} already in DB"
+                        )
+                        session.rollback()
+
+    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
+        return [
+            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
+        ]
+
     @staticmethod
-    def get_video_metadata(video_path: Path, ocr_reader: Optional[easyocr.Reader] = None) -> VideoMetadata:
+    def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
         _, date_str, _ = video_path.stem.split("_")
         date = datetime.strptime(date_str, "%Y%m%d")
-        daytime = read_timestamp(video_path, GorillaDataset.TIME_STAMP_BOX, ocr_reader=ocr_reader)
-        date = datetime.combine(date, daytime)
+        timestamps_path = "data/derived_data/timestamps.json"
+        with open(timestamps_path, "r") as f:
+            timestamps = json.load(f)
+        date = datetime.strptime(date_str, "%Y%m%d")
+        timestamp = timestamps[video_path.stem]
+        daytime = datetime.strptime(timestamp, "%I:%M %p")
+        date = datetime.combine(date, daytime.time())
         return VideoMetadata(camera_name, date)
+
+    @staticmethod
+    def check_valid_social_group(group_name: str) -> bool:
+        pattern = r"Group_[A-Z]{2}$"
+        return bool(re.match(pattern, group_name))
+
+    @staticmethod
+    def extract_social_group(group_name: str) -> str:
+        social_group = group_name.split("_")[1]
+        return social_group
