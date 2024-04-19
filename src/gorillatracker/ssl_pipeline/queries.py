@@ -220,7 +220,7 @@ def travel_time(
     return great_circle_distance(left_latitude, left_longitude, right_latitude, right_longitude) / travel_speed
 
 
-def travel_distance_negatives(session: Session, version: str, travel_speed: float) -> Sequence[tuple[int, int]]:
+def travel_distance_negatives(session: Session, version: str, travel_speed: float) -> Sequence[tuple[Video, Video]]:
     # join video table with camera table and select video_id, camera_id, latitude, and longitude
     subquery = (
         select(Video.video_id, Video.camera_id, Camera.latitude, Camera.longitude, Video.start_time)
@@ -258,7 +258,7 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
     return negative_tuples
 
 
-def social_group_negatives(session: Session, version: str) -> Sequence[tuple[int, int]]:
+def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Video, Video]]:
     subquery = (
         select(Video.video_id, VideoFeature.value)
         .join(VideoFeature, Video.video_id == VideoFeature.video_id)
