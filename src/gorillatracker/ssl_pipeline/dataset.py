@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import BoundingBox
-from gorillatracker.ssl_pipeline.models import Base, Camera, Video, VideoFeature
+from gorillatracker.ssl_pipeline.models import Base, Video, VideoFeature
+from gorillatracker.ssl_pipeline.queries import get_or_create_camera
 from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
 
 log = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class SSLDataset(ABC):
     def __init__(self, db_uri: str) -> None:
         engine = create_engine(db_uri)  # , echo=True)
         self._engine = engine
+        Base.metadata.create_all(self._engine)
 
     def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
         """Returns a list of feature models to use for adding features of interest (e.g. face detector)"""
@@ -70,8 +72,8 @@ class SSLDataset(ABC):
         pass
 
     @abstractmethod
-    def setup_database(self) -> None:
-        """Creates and populates the database. Population is dataset specific but should include cameras setup."""
+    def post_setup(self, version: str) -> None:
+        """Post setup operations."""
         pass
 
 
@@ -98,16 +100,47 @@ class GorillaDataset(SSLDataset):
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
 
-    def setup_database(self) -> None:
-        Base.metadata.create_all(self._engine)
+    @property
+    def video_paths(self) -> list[Path]:
+        return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
 
-    def setup_cameras(self) -> None:
+    @property
+    def body_model_path(self) -> Path:
+        return Path("models/yolov8n_gorilla_body.pt")
+
+    @property
+    def metadata_extractor(self) -> MetadataExtractor:
+        return GorillaDataset.get_video_metadata
+
+    @property
+    def tracker_config(self) -> Path:
+        return Path("cfgs/tracker/botsort.yaml")
+
+    @property
+    def yolo_kwargs(self) -> dict[str, Any]:
+        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
+        return {
+            **self._yolo_base_kwargs,
+            "iou": 0.2,
+            "conf": 0.7,
+        }
+
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
+    def post_setup(self, version: str) -> None:
+        self.setup_social_groups(version)
+        self.setup_camera_locations()
+
+    def setup_camera_locations(self) -> None:
         df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
         df["Name"] = df["Name"].str.rstrip("x")
         with Session(self._engine) as session:
             for _, row in df.iterrows():
-                camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
-                session.add(camera)
+                camera = get_or_create_camera(session, row["Name"])
+                camera.latitude = row["lat"]
+                camera.longitude = row["long"]
             session.commit()
 
     def setup_social_groups(self, version: str) -> None:
@@ -142,35 +175,6 @@ class GorillaDataset(SSLDataset):
             (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
             (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
         ]
-
-    @property
-    def video_paths(self) -> list[Path]:
-        return list(Path("/workspaces/gorillatracker/video_data").glob("*.mp4"))
-
-    @property
-    def body_model_path(self) -> Path:
-        return Path("models/yolov8n_gorilla_body.pt")
-
-    @property
-    def metadata_extractor(self) -> MetadataExtractor:
-        return GorillaDataset.get_video_metadata
-
-    @property
-    def tracker_config(self) -> Path:
-        return Path("cfgs/tracker/botsort.yaml")
-
-    @property
-    def yolo_kwargs(self) -> dict[str, Any]:
-        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
-        return {
-            **self._yolo_base_kwargs,
-            "iou": 0.2,
-            "conf": 0.7,
-        }
-
-    @property
-    def engine(self) -> Engine:
-        return self._engine
 
     @staticmethod
     def get_video_metadata(video_path: Path) -> VideoMetadata:
