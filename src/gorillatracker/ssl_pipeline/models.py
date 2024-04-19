@@ -31,8 +31,8 @@ class Camera(Base):
 
     camera_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True)
-    latitude: Mapped[float]
-    longitude: Mapped[float]
+    latitude: Mapped[Optional[float]]
+    longitude: Mapped[Optional[float]]
 
     videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete-orphan")
 
@@ -59,7 +59,7 @@ class Video(Base):
     version: Mapped[str]
     path: Mapped[str]  # absolute path to the video file
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
-    start_time: Mapped[datetime]
+    start_time: Mapped[Optional[datetime]]
     width: Mapped[int]
     height: Mapped[int]
     fps: Mapped[int]  # of the original video
@@ -214,6 +214,7 @@ class TrackingFrameFeature(Base):
     bbox_height: Mapped[float]
     confidence: Mapped[float]
     type: Mapped[str] = mapped_column(String(255))
+    cache_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")

@@ -13,7 +13,6 @@ The pipeline consists of the following steps:
 """
 
 import logging
-import os
 import random
 from pathlib import Path
 
@@ -109,17 +108,12 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
     # NOTE(memben): for setup only once
-    if not os.path.exists("test.db"):
-        dataset.setup_database()
-        dataset.setup_cameras()
     visualize_pipeline(
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
-        max_worker_per_gpu=12,
+        n_videos=8,
+        max_worker_per_gpu=4,
         gpus=[0],
     )
-    if True:
-        # needs to be executed after the tracking results are stored in the database
-        dataset.setup_social_groups(version)
+    dataset.post_setup(version)
