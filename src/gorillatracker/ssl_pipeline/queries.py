@@ -4,11 +4,19 @@ This module contains pre-defined database queries.
 
 from pathlib import Path
 from typing import Optional, Sequence
+from datetime import datetime
 
 from sqlalchemy import Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
 
-from gorillatracker.ssl_pipeline.models import ProcessedVideoFrameFeature, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import (
+    Camera,
+    ProcessedVideoFrameFeature,
+    Tracking,
+    TrackingFrameFeature,
+    Video,
+    VideoFeature,
+)
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -184,6 +192,77 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tra
     return [(row[0], row[1]) for row in overlapping_trackings]
 
 
+def great_circle_distance(left_latitude: float, left_longitude: float, right_latitude: float, right_longitude: float):
+    return 6371 * func.acos(
+        func.cos(func.radians(left_latitude))
+        * func.cos(func.radians(right_latitude))
+        * func.cos(func.radians(right_longitude) - func.radians(left_longitude))
+        + func.sin(func.radians(left_latitude)) * func.sin(func.radians(right_latitude))
+    )
+
+
+def time_diff(left_datetime: datetime, right_datetime: datetime):
+    return func.abs(func.julianday(left_datetime) - func.julianday(right_datetime)) * 24
+
+
+def travel_time(left_latitude: float, left_longitude: float, right_latitude: float, right_longitude: float, travel_speed: float):
+    return great_circle_distance(left_latitude, left_longitude, right_latitude, right_longitude) / travel_speed
+
+
+def travel_distance_negatives(session: Session, version: str) -> Sequence[tuple[int, int]]:
+    # join video table with camera table and select video_id, camera_id, latitude, and longitude
+    subquery = (
+        select(Video.video_id, Video.camera_id, Camera.latitude, Camera.longitude, Video.start_time)
+        .join(Camera, Video.camera_id == Camera.camera_id)
+        .where(Video.version == version)
+    ).subquery()
+    subquery_self = subquery.alias("subquery_self")
+
+    travel_speed = 10  # km/h
+    stmt = (
+        select(
+            subquery.c.video_id.label("left_video_id"),
+            subquery_self.c.video_id.label("right_video_id"),
+        )
+        .join(subquery_self, subquery.c.video_id < subquery_self.c.video_id)
+        .where(
+            subquery.c.camera_id != subquery_self.c.camera_id,
+            travel_time(
+                subquery.c.latitude,
+                subquery.c.longitude,
+                subquery_self.c.latitude,
+                subquery_self.c.longitude,
+                travel_speed,
+            ) 
+            > time_diff(subquery.c.start_time, subquery_self.c.start_time),
+        )
+    )
+
+    result = session.execute(stmt).all()
+    print(result)
+    result = [(row.left_video_id, row.right_video_id) for row in result]
+    return result
+
+
+def social_group_negatives(session: Session, version: str) -> Sequence[tuple[int, int]]:
+    subquery = (
+        select(Video.video_id, VideoFeature.value)
+        .join(VideoFeature, Video.video_id == VideoFeature.video_id)
+        .where(Video.version == version, VideoFeature.type == "Social Group")  # Note: string can change
+    ).subquery()
+
+    subquery_self = subquery.alias("subquery_self")
+    stmt = (
+        select(subquery.c.video_id.label("left_video_id"), subquery_self.c.video_id.label("right_video_id"))
+        .join(subquery_self, subquery.c.video_id < subquery_self.c.video_id)
+        .where(subquery.c.value != subquery_self.c.value)
+    )
+
+    result = session.execute(stmt).all()
+    result = [(row.left_video_id, row.right_video_id) for row in result]
+    return result
+
+
 if __name__ == "__main__":
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -191,9 +270,13 @@ if __name__ == "__main__":
     engine = create_engine("sqlite:///test.db")
 
     session_cls = sessionmaker(bind=engine)
+    version = "2024-04-09"
 
     # find first video_id in the database and then find overlapping trackings for that video and print them
     with session_cls() as session:
-        overlapping_trackings = find_overlapping_trackings(session)
-        for left_tracking, right_tracking in overlapping_trackings:
-            print(left_tracking.tracking_id, right_tracking.tracking_id)
+        video_negatives = social_group_negatives(session, version)
+        print(video_negatives)
+        social_groups = session.execute(select(VideoFeature).where(VideoFeature.type == "Social Group")).all()
+        print(social_groups)
+        video_negatives = travel_distance_negatives(session, version)
+        print(video_negatives)
