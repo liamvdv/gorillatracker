@@ -170,7 +170,9 @@ class GorillaDataset(SSLDataset):
                     video_name = os.path.splitext(row["File"])[0] + ".mp4"  # csv has .MP4 instead of .mp4
                     try:
                         video_id = session.execute(
-                            select(Video.video_id).where((Video.version == version) & (Video.absolute_path.endswith(video_name)))
+                            select(Video.video_id).where(
+                                (Video.version == version) & (Video.absolute_path.endswith(video_name))
+                            )
                         ).scalar_one()
                     except NoResultFound:
                         continue
@@ -186,7 +188,6 @@ class GorillaDataset(SSLDataset):
                             f"Failed to add social group {social_group} for video {video_name} due to entry with video_id:{video_id} type:{feature_type} already in DB"
                         )
                         session.rollback()
-
 
     @staticmethod
     def get_video_metadata(video_path: Path) -> VideoMetadata:

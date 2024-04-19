@@ -228,7 +228,7 @@ class TrackingFeature(Base):
     value: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="features")
-    
+
     __table_args__ = (UniqueConstraint("tracking_id", "feature_type"),)
 
     def __repr__(self) -> str:
