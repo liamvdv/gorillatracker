@@ -15,6 +15,7 @@ The pipeline consists of the following steps:
 import logging
 import random
 from pathlib import Path
+import cv2
 
 from sqlalchemy.orm import Session
 
@@ -55,6 +56,7 @@ def visualize_pipeline(
     """
 
     video_paths = sorted(dataset.video_paths)
+    #video_paths = [video_path for video_path in video_paths if video_path.suffix in [".mp4", ".MP4"]]
 
     # NOTE(memben): For the production pipeline we should do this for every step
     # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.

@@ -180,10 +180,10 @@ class GorillaDataset(SSLDataset):
     @staticmethod
     def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
-        date = extract_meta_data_time(video_path)
-        if date is None:
-            log.error(f"Could not extract date from video {video_path}")
-            raise ValueError(f"Could not extract date from video {video_path}")
+        try:
+            date = extract_meta_data_time(video_path)
+        except ValueError:
+            date = None
         return VideoMetadata(camera_name, date)
 
     @staticmethod
