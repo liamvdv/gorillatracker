@@ -13,7 +13,6 @@ The pipeline consists of the following steps:
 """
 
 import logging
-import os
 import random
 from pathlib import Path
 
@@ -104,28 +103,24 @@ def visualize_pipeline(
     multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
 
 def gpu2_demo():
+    version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDatasetSmall("sqlite:///test.db")
     # NOTE(memben): for setup only once
-    if not os.path.exists("test.db"):
-        dataset.setup_database()
-        dataset.setup_cameras()
     visualize_pipeline(
         dataset,
-        "2024-04-09",
+        version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
-        max_worker_per_gpu=12,
+        n_videos=8,
+        max_worker_per_gpu=4,
         gpus=[0],
     )
+    dataset.post_setup(version)
 
 def kisz_demo():
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
     # NOTE(memben): for setup only once
-    if not os.path.exists("test.db"):
-        dataset.setup_database()
-        dataset.setup_cameras()
     visualize_pipeline(
         dataset,
         "2024-04-18",
@@ -135,7 +130,6 @@ def kisz_demo():
         gpus=[0],
     )
     dataset.setup_social_groups()
-
 
 if __name__ == "__main__":
     kisz_demo()
