@@ -118,18 +118,19 @@ def gpu2_demo():
     dataset.post_setup(version)
 
 def kisz_demo():
+    version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
     # NOTE(memben): for setup only once
     visualize_pipeline(
         dataset,
-        "2024-04-18",
+        version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
-        max_worker_per_gpu=12,
+        n_videos=8,
+        max_worker_per_gpu=4,
         gpus=[0],
     )
-    dataset.setup_social_groups()
+    dataset.post_setup(version)
 
 if __name__ == "__main__":
     kisz_demo()

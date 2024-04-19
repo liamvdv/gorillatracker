@@ -75,6 +75,8 @@ class SSLDataset(ABC):
     def post_setup(self, version: str) -> None:
         """Post setup operations."""
         pass
+    
+#-----------------------------------------------------------------------------------------------------------------------------------------
 
 
 class GorillaDataset(SSLDataset):
@@ -101,16 +103,48 @@ class GorillaDataset(SSLDataset):
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
 
-    def setup_database(self) -> None:
-        Base.metadata.create_all(self._engine)
 
-    def setup_cameras(self) -> None:
+    @property
+    def video_paths(self) -> list[Path]:
+        return GorillaDataset.get_video_paths(self.VIDEO_DIR)
+
+    @property
+    def body_model_path(self) -> Path:
+        return Path("models/yolov8n_gorilla_body.pt")
+
+    @property
+    def metadata_extractor(self) -> MetadataExtractor:
+        return GorillaDataset.get_video_metadata
+
+    @property
+    def tracker_config(self) -> Path:
+        return Path("cfgs/tracker/botsort.yaml")
+
+    @property
+    def yolo_kwargs(self) -> dict[str, Any]:
+        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
+        return {
+            **self._yolo_base_kwargs,
+            "iou": 0.2,
+            "conf": 0.7,
+        }
+
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+    
+    def post_setup(self, version: str) -> None:
+        self.setup_social_groups(version)
+        self.setup_camera_locations()
+
+    def setup_camera_locations(self) -> None:
         df = pd.read_csv("data/ground_truth/cxl/misc/Kamaras_coorHPF.csv", sep=";", decimal=",")
         df["Name"] = df["Name"].str.rstrip("x")
         with Session(self._engine) as session:
             for _, row in df.iterrows():
-                camera = Camera(name=row["Name"], latitude=row["lat"], longitude=row["long"])
-                session.add(camera)
+                camera = get_or_create_camera(session, row["Name"])
+                camera.latitude = row["lat"]
+                camera.longitude = row["long"]
             session.commit()
 
     def setup_social_groups(self, version: str) -> None:
@@ -142,36 +176,7 @@ class GorillaDataset(SSLDataset):
             (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
             (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
         ]
-
-    @property
-    def video_paths(self) -> list[Path]:
-        return GorillaDataset.get_video_paths(self.VIDEO_DIR)
-
-    @property
-    def body_model_path(self) -> Path:
-        return Path("models/yolov8n_gorilla_body.pt")
-
-    @property
-    def metadata_extractor(self) -> MetadataExtractor:
-        return GorillaDataset.get_video_metadata
-
-    @property
-    def tracker_config(self) -> Path:
-        return Path("cfgs/tracker/botsort.yaml")
-
-    @property
-    def yolo_kwargs(self) -> dict[str, Any]:
-        # NOTE(memben): YOLOv8s video streaming has an internal off by one https://github.com/ultralytics/ultralytics/issues/8976 error, we fix it internally
-        return {
-            **self._yolo_base_kwargs,
-            "iou": 0.2,
-            "conf": 0.7,
-        }
-
-    @property
-    def engine(self) -> Engine:
-        return self._engine
-
+        
     @staticmethod
     def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
@@ -206,6 +211,7 @@ class GorillaDataset(SSLDataset):
                     video_group_list.append((file_path.name, group_id))
         return video_group_list
 
+#-----------------------------------------------------------------------------------------------------------------------------------------
 
 class GorillaDatasetSmall(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
