@@ -1,12 +1,14 @@
+import random
 from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Callable, Iterator, List
+
 from sqlalchemy import Select
 from sqlalchemy.orm import Session
-import random
 
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+
 
 class Sampler:
     """Defines how to sample TrackingFrameFeature instances from the database."""
@@ -46,14 +48,12 @@ class RandomSampler(Sampler):
         for features in tracking_id_grouped.values():
             num_samples = min(len(features), self.n_samples)
             yield from random.sample(features, num_samples)
-            
-            
+
+
 class EquidistantSampler(Sampler):
     """Sample a subset of TrackingFrameFeature instances per tracking that are equidistant in time."""
 
-    def __init__(
-        self, query_builder: Callable[[int], Select[tuple[TrackingFrameFeature]]], n_samples: int
-    ) -> None:
+    def __init__(self, query_builder: Callable[[int], Select[tuple[TrackingFrameFeature]]], n_samples: int) -> None:
         super().__init__(query_builder)
         self.n_samples = n_samples
 
@@ -74,8 +74,8 @@ class EquidistantSampler(Sampler):
         sampled_indices = [i * interval for i in range(n_samples)]
         sampled_features = [sorted_features[i] for i in sampled_indices]
         return sampled_features
-    
-    
+
+
 if __name__ == "__main__":
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = EquidistantSampler(query, n_samples=10)
-    
+
     frame_features = sampler.sample(videos[1].video_id, session)
     # group by tracking_frame_feature_id and print frame_nrs
     grouped = sampler.group_by_tracking_id(list(frame_features))
