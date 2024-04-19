@@ -47,7 +47,7 @@ T = TypeVar("T", bound=enum.Enum)
 class ExtensibleEnum(types.TypeDecorator, Generic[T]):
     """Stores values as strings, converts them to and from enums."""
 
-    impl = types.String
+    impl = types.String(255)
     cache_ok = True
 
     def __init__(self, enum_cls: Type[T]) -> None:
@@ -327,8 +327,6 @@ class Task(Base):
 
     video: Mapped[Video] = relationship(back_populates="tasks")
     task_key_values: Mapped[list[TaskKeyValue]] = relationship(back_populates="task", cascade="all, delete-orphan")
-
-    __table_args__ = (UniqueConstraint("video_id", "task_type", "task_subtype"),)
 
     def get_key_value(self, key: str) -> str:
         for kv in self.task_key_values:

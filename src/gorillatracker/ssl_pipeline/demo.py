@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
-from gorillatracker.ssl_pipeline.models import Task, TaskType
+from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
 from gorillatracker.ssl_pipeline.queries import load_processed_videos, load_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
@@ -41,11 +41,23 @@ def create_tasks(session: Session, video_paths: list[Path], version: str) -> Non
                 (TaskType.TRACK, "body"),
                 (TaskType.PREDICT, "face_90"),
                 (TaskType.PREDICT, "face_45"),
-                (TaskType.CORRELATE, ""),
                 (TaskType.VISUALIZE, ""),
             ]:
-                # TODO (memben): add key value for correlation
                 video.tasks.append(Task(task_type=task_type, task_subtype=subtype))
+
+            for tracked, untracked, threshold in [
+                ("body", "face_90", 0.7),
+                ("body", "face_45", 0.7),
+            ]:
+                task = Task(task_type=TaskType.CORRELATE)
+                task.task_key_values.extend(
+                    [
+                        TaskKeyValue(key="tracked", value=tracked),
+                        TaskKeyValue(key="untracked", value=untracked),
+                        TaskKeyValue(key="threshold", value=str(threshold)),
+                    ]
+                )
+                video.tasks.append(task)
 
 
 def visualize_pipeline(
@@ -86,7 +98,7 @@ def visualize_pipeline(
 
     preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
 
-    create_tasks(session, to_track, version)    
+    create_tasks(session, to_track, version)
 
     multiprocess_track(
         "body",  # NOTE(memben): Tracking will always be done on bodies
