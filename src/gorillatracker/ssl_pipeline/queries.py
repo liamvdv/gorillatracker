@@ -9,7 +9,7 @@ from typing import Iterator, Optional, Sequence
 from sqlalchemy import Select, alias, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from gorillatracker.ssl_pipeline.models import Task, TaskStatus, TaskType, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import Camera, Task, TaskStatus, TaskType, Tracking, TrackingFrameFeature, Video
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -151,6 +151,15 @@ def load_processed_videos(session: Session, version: str, required_completed_tas
             .having(func.count(Task.task_type.distinct()) == len(required_completed_tasks))
         )
     return session.execute(stmt).scalars().all()
+
+
+def get_or_create_camera(session: Session, camera_name: str) -> Camera:
+    camera = session.execute(select(Camera).where(Camera.name == camera_name)).scalar_one_or_none()
+    if camera is None:
+        camera = Camera(name=camera_name)
+        session.add(camera)
+        session.commit()
+    return camera
 
 
 def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tracking]]:

@@ -3,14 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Optional, Protocol
 
 import cv2
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
-from gorillatracker.ssl_pipeline.models import Camera, Video
+from gorillatracker.ssl_pipeline.models import Video
+from gorillatracker.ssl_pipeline.queries import get_or_create_camera
 
 
 class MetadataExtractor(Protocol):
@@ -22,7 +23,7 @@ class VideoMetadata:
     """High level metadata about a video."""
 
     camera_name: str
-    start_time: datetime
+    start_time: Optional[datetime]
 
 
 @dataclass(frozen=True)
@@ -64,7 +65,7 @@ def preprocess_and_store(
     )
 
     with session_cls() as session:
-        camera = session.execute(select(Camera).where(Camera.name == metadata.camera_name)).scalar_one()
+        camera = get_or_create_camera(session, metadata.camera_name)
         camera.videos.append(video)
         session.commit()
 

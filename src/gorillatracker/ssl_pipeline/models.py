@@ -76,8 +76,8 @@ class Camera(Base):
 
     camera_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True)
-    latitude: Mapped[float]
-    longitude: Mapped[float]
+    latitude: Mapped[Optional[float]]
+    longitude: Mapped[Optional[float]]
 
     videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete-orphan")
 
@@ -104,7 +104,7 @@ class Video(Base):
     version: Mapped[str]
     absolute_path: Mapped[str]
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
-    start_time: Mapped[dt.datetime]
+    start_time: Mapped[Optional[dt.datetime]]
     width: Mapped[int]
     height: Mapped[int]
     fps: Mapped[int]  # of the original video
@@ -178,6 +178,8 @@ class VideoFeature(Base):
 
     video: Mapped[Video] = relationship(back_populates="features")
 
+    __table_args__ = (UniqueConstraint("video_id", "feature_type"),)
+
     def __repr__(self) -> str:
         return f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, feature_type={self.feature_type}, value={self.value})"
 
@@ -226,6 +228,8 @@ class TrackingFeature(Base):
     value: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="features")
+    
+    __table_args__ = (UniqueConstraint("tracking_id", "feature_type"),)
 
     def __repr__(self) -> str:
         return f"tracking_feature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, feature_type={self.feature_type}, value={self.value})"
@@ -246,6 +250,7 @@ class TrackingFrameFeature(Base):
     bbox_height: Mapped[float]
     confidence: Mapped[float]
     feature_type: Mapped[str] = mapped_column(String(255))
+    cache_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
