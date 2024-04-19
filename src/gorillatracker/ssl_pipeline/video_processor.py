@@ -103,8 +103,6 @@ def track_worker(
     tracker_config: Path,
     gpu: int,
 ) -> None:
-    import os
-
     yolo_model = YOLO(yolo_model_path)
     if "device" in yolo_kwargs:
         raise ValueError("device will be overwritten by the assigned GPU")
@@ -115,7 +113,6 @@ def track_worker(
 
     with Session(engine) as session:
         for task in get_next_task(session, TaskType.TRACK, task_subtype=feature_type):
-            print(f"Current Task {os.getpid()}: {task}")
             video = task.video
             track_and_update(session, video, yolo_model, yolo_kwargs, tracker_config, feature_type)
 

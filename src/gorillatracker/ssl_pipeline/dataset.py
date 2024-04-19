@@ -75,6 +75,10 @@ class SSLDataset(ABC):
         """Post setup operations."""
         pass
 
+    def drop_database(self) -> None:
+        if input("Are you sure you want to drop the database? (y/n): ") == "y":
+            Base.metadata.drop_all(self._engine)
+
 
 class GorillaDataset(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
