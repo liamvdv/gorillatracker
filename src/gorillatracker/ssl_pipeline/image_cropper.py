@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import logging
-import random
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from functools import partial
-from itertools import groupby
 from pathlib import Path
-from typing import Callable, Iterator
 
 import cv2
 from sqlalchemy import Engine, Select, select, update
@@ -18,48 +15,9 @@ from tqdm import tqdm
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import load_video
+from gorillatracker.ssl_pipeline.sampler import Sampler
 
 log = logging.getLogger(__name__)
-
-
-class Sampler:
-    """Defines how to sample TrackingFrameFeature instances from the database."""
-
-    def __init__(self, query_builder: Callable[[int], Select[tuple[TrackingFrameFeature]]]) -> None:
-        self.query_builder = query_builder
-
-    def sample(self, video_id: int, session: Session) -> Iterator[TrackingFrameFeature]:
-        """Sample a subset of TrackingFrameFeature instances from the database. Defined by query and sampling strategy."""
-
-        query = self.query_builder(video_id)
-        return iter(session.execute(query).scalars().all())
-
-    def group_by_tracking_id(self, frame_features: list[TrackingFrameFeature]) -> dict[int, list[TrackingFrameFeature]]:
-        frame_features.sort(key=lambda x: x.tracking.tracking_id)
-        return {
-            tracking_id: list(features)
-            for tracking_id, features in groupby(frame_features, key=lambda x: x.tracking.tracking_id)
-        }
-
-
-class RandomSampler(Sampler):
-    """Randomly sample a subset of TrackingFrameFeature instances per tracking."""
-
-    def __init__(
-        self, query_builder: Callable[[int], Select[tuple[TrackingFrameFeature]]], n_samples: int, seed: int = 42
-    ) -> None:
-        super().__init__(query_builder)
-        self.seed = seed
-        self.n_samples = n_samples
-
-    def sample(self, video_id: int, session: Session) -> Iterator[TrackingFrameFeature]:
-        query = self.query_builder(video_id)
-        tracking_frame_features = list(session.execute(query).scalars().all())
-        tracking_id_grouped = self.group_by_tracking_id(tracking_frame_features)
-        random.seed(self.seed)
-        for features in tracking_id_grouped.values():
-            num_samples = min(len(features), self.n_samples)
-            yield from random.sample(features, num_samples)
 
 
 @dataclass(frozen=True, order=True)
