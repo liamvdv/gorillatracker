@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
     with session_cls() as session:
         videos = session.execute(select(Video)).scalars().all()
-        video_paths = [Path(video.path) for video in videos]
+        video_paths = [video.path for video in videos]
 
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = RandomSampler(query_builder=query, n_samples=10)

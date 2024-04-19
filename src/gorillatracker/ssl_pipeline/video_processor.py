@@ -70,7 +70,7 @@ def predict_and_update(
     yolo_kwargs: dict[str, Any],
     feature_type: str,
 ) -> None:
-    with video_reader(Path(video.path), frame_step=video.frame_step) as video_feed:
+    with video_reader(video.path, frame_step=video.frame_step) as video_feed:
         for video_frame in video_feed:
             predictions: list[results.Results] = yolo_model(video_frame.frame, **yolo_kwargs)
             assert len(predictions) == 1
@@ -86,7 +86,7 @@ def track_and_update(
     feature_type: str,
 ) -> None:
     trackings: defaultdict[int, Tracking] = defaultdict(lambda: Tracking(video=video))
-    with video_reader(Path(video.path), frame_step=video.frame_step) as video_feed:
+    with video_reader(video.path, frame_step=video.frame_step) as video_feed:
         for video_frame in video_feed:
             predictions: list[results.Results] = yolo_model.track(
                 video_frame.frame, tracker=tracker_config, **yolo_kwargs, persist=True

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
-from typing import Generic, Optional, Type, TypeVar
+from pathlib import Path
+from typing import Any, Optional, Type, TypeVar
 
 import sqlalchemy.types as types
 from sqlalchemy import CheckConstraint, Dialect, ForeignKey, String, UniqueConstraint, event
@@ -44,7 +45,7 @@ class TaskType(enum.Enum):
 T = TypeVar("T", bound=enum.Enum)
 
 
-class ExtensibleEnum(types.TypeDecorator, Generic[T]):
+class ExtensibleEnum(types.TypeDecorator[T]):
     """Stores values as strings, converts them to and from enums."""
 
     impl = types.String(255)
@@ -54,11 +55,15 @@ class ExtensibleEnum(types.TypeDecorator, Generic[T]):
         super().__init__()
         self.enum_cls = enum_cls
 
-    def process_bind_param(self, value: T, dialect: Dialect) -> str:
+    def process_bind_param(self, value: Optional[T], dialect: Dialect) -> Optional[str]:
+        if value is None:
+            return None
         assert isinstance(value.value, str), f"{value} not serializable to string"
         return value.value
 
-    def process_result_value(self, value: str, dialect: Dialect) -> T:
+    def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[T]:
+        if value is None:
+            return None
         return self.enum_cls(value)
 
 
@@ -97,7 +102,7 @@ class Video(Base):
 
     video_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     version: Mapped[str]
-    path: Mapped[str]  # absolute path to the video file
+    absolute_path: Mapped[str]
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
     start_time: Mapped[dt.datetime]
     width: Mapped[int]
@@ -117,7 +122,7 @@ class Video(Base):
 
     __table_args__ = (
         CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),
-        UniqueConstraint("path", "version"),
+        UniqueConstraint("absolute_path", "version"),
     )
 
     @validates("version")
@@ -128,7 +133,7 @@ class Video(Base):
             raise ValueError(f"{key} must be in the format 'YYYY-MM-DD', is {value}")
         return value
 
-    @validates("path")
+    @validates("absolute_path")
     def validate_path(self, key: str, value: str) -> str:
         if not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
@@ -150,6 +155,10 @@ class Video(Base):
     @property
     def duration(self) -> dt.timedelta:
         return dt.timedelta(seconds=self.frames / self.fps)
+
+    @property
+    def path(self) -> Path:
+        return Path(self.absolute_path)
 
     def __hash__(self) -> int:
         return self.video_id
@@ -339,7 +348,7 @@ class Task(Base):
 
 
 @event.listens_for(Task, "before_update")
-def task_before_update(mapper: Mapper, connection: Connection, target: Task):
+def task_before_update(mapper: Mapper[Any], connection: Connection, target: Task) -> None:
     target.updated_at = dt.datetime.now(dt.timezone.utc)
 
 
@@ -370,7 +379,7 @@ if __name__ == "__main__":
     with SessionLocal() as session:
         camera = Camera(name="Test", latitude=0, longitude=0)
         video = Video(
-            path="/absolute/path/to/test.mp4",
+            absolute_path="/absolute/path/to/test.mp4",
             version="2024-04-03",
             camera=camera,
             start_time=dt.datetime.now(dt.timezone.utc),

@@ -17,7 +17,6 @@ import os
 import random
 from pathlib import Path
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
@@ -27,7 +26,7 @@ from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
 from gorillatracker.ssl_pipeline.queries import load_processed_videos, load_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
-from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
+from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize
 
 log = logging.getLogger(__name__)
 
@@ -95,6 +94,7 @@ def visualize_pipeline(
 
     random.seed(42)  # For reproducibility
     to_track = random.sample(video_paths, n_videos)
+    max_workers = len(gpu_ids) * max_worker_per_gpu
 
     preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
 
@@ -120,8 +120,8 @@ def visualize_pipeline(
             gpu_ids=gpu_ids,
         )
 
-    multiprocess_correlate(one_to_one_correlator, dataset.engine, len(gpu_ids) * max_worker_per_gpu)
-    multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
+    multiprocess_correlate(one_to_one_correlator, dataset.engine, max_workers)
+    multiprocess_visualize(dest_dir, dataset.engine, max_workers)
 
 
 if __name__ == "__main__":

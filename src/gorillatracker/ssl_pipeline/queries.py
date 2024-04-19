@@ -6,7 +6,7 @@ import datetime as dt
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
 
-from sqlalchemy import Select, alias, func, select
+from sqlalchemy import Select, alias, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from gorillatracker.ssl_pipeline.models import Task, TaskStatus, TaskType, Tracking, TrackingFrameFeature, Video
@@ -124,14 +124,16 @@ def load_tracked_features(session: Session, video_id: int, feature_types: list[s
 
 
 def load_video(session: Session, video_path: Path, version: str) -> Video:
-    return session.execute(select(Video).where(Video.path == str(video_path), Video.version == version)).scalar_one()
+    return session.execute(
+        select(Video).where(Video.absolute_path == str(video_path), Video.version == version)
+    ).scalar_one()
 
 
 def load_videos(session: Session, video_paths: list[Path], version: str) -> Sequence[Video]:
     return (
         session.execute(
             select(Video).where(
-                Video.path.in_([str(video_path) for video_path in video_paths]), Video.version == version
+                Video.absolute_path.in_([str(video_path) for video_path in video_paths]), Video.version == version
             )
         )
         .scalars()
@@ -204,21 +206,20 @@ def get_next_task(
     """
     while True:
         timeout_threshold = dt.datetime.now(dt.timezone.utc) - task_timeout
+        pending_condition = Task.status == TaskStatus.PENDING
+        processing_condition = (
+            (Task.status == TaskStatus.PROCESSING)
+            & (Task.updated_at < timeout_threshold)
+            & (Task.retries < max_retries)
+        )
+        failed_condition = (Task.status == TaskStatus.FAILED) & (Task.retries < max_retries)
+
         stmt = (
             select(Task)
             .where(
                 Task.task_type == task_type,
                 Task.task_subtype == task_subtype,
-                Task.status == TaskStatus.PENDING,
-                # (
-                #     (Task.status == TaskStatus.QUEUED)
-                #     | (
-                #         (Task.status == TaskStatus.PROCESSING)
-                #         & (Task.updated_at < timeout_threshold)
-                #         & (Task.retries < max_retries)
-                #     )
-                #     | ((Task.status == TaskStatus.FAILED) & (Task.retries < max_retries))
-                # ),
+                or_(pending_condition, processing_condition, failed_condition),
             )
             .with_for_update(skip_locked=True)
         )
