@@ -78,6 +78,7 @@ def create_crop_tasks(
     video_path: Path,
     version: str,
     session_cls: sessionmaker[Session],
+    sampler: Sampler,
     dest_base_path: Path,
 ) -> list[CropTask]:
     with session_cls() as session:
@@ -110,13 +111,29 @@ def crop_from_video(video_path: Path, crop_tasks: list[CropTask]) -> None:
 
 def update_cache_paths(crop_tasks: list[CropTask], session_cls: sessionmaker[Session]) -> None:
     with session_cls() as session:
-        for crop_task in crop_tasks:
-            session.execute(
-                update(TrackingFrameFeature)
-                .where(TrackingFrameFeature.tracking_frame_feature_id == crop_task.tracking_frame_feature_id)
-                .values(cache_path=str(crop_task.dest))
-            )
+        set_where_statements = [
+            {
+                "tracking_frame_feature_id": crop_task.tracking_frame_feature_id,
+                "cache_path": str(crop_task.dest),
+            }
+            for crop_task in crop_tasks
+        ]
+
+        session.execute(update(TrackingFrameFeature), set_where_statements)
         session.commit()
+
+
+def crop(
+    video_path: Path, version: str, session_cls: sessionmaker[Session], sampler: Sampler, dest_base_path: Path
+) -> None:
+    crop_tasks = create_crop_tasks(video_path, version, session_cls, sampler, dest_base_path)
+
+    if not crop_tasks:
+        log.warning(f"No frames to crop for video: {video_path}")
+        return
+
+    crop_from_video(video_path, crop_tasks)
+    update_cache_paths(crop_tasks, session_cls)
 
 
 _version = None
@@ -140,17 +157,10 @@ def _multiprocess_crop(
     assert _session_cls is not None, "Engine not initialized, call _init_cropper first"
     assert _version is not None, "Version not initialized, call _init_cropper instead"
     assert _sampler is not None, "Sampler not initialized, call _init_cropper instead"
-    crop_tasks = create_crop_tasks(video_path, _version, _session_cls, dest_base_path)
-
-    if not crop_tasks:
-        log.warning(f"No frames to crop for video: {video_path}")
-        return
-
-    crop_from_video(video_path, crop_tasks)
-    update_cache_paths(crop_tasks, _session_cls)
+    crop(video_path, _version, _session_cls, _sampler, dest_base_path)
 
 
-def multipricess_crop_from_video(
+def multiprocess_crop_from_video(
     video_paths: list[Path], version: str, engine: Engine, sampler: Sampler, dest_base_path: Path, max_workers: int
 ) -> None:
     with ProcessPoolExecutor(
@@ -194,4 +204,10 @@ if __name__ == "__main__":
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = Sampler(query_builder=query)
 
-    multipricess_crop_from_video(video_paths[:20], version, engine, sampler, Path("cropped_images"), max_workers=10)
+    multiprocess_crop_from_video(video_paths[:20], version, engine, sampler, Path("cropped_images"), max_workers=10)
+
+    # print cache_paths of first 50 TrackingFrameFeature instances
+    with session_cls() as session:
+        tracking_frame_features = session.execute(select(TrackingFrameFeature)).scalars().all()
+        for feature in tracking_frame_features[:50]:
+            print(feature.cache_path)
