@@ -21,15 +21,31 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
-from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate_videos
+from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
-from gorillatracker.ssl_pipeline.models import Task
+from gorillatracker.ssl_pipeline.models import Task, TaskType
 from gorillatracker.ssl_pipeline.queries import load_processed_videos, load_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
 
 log = logging.getLogger(__name__)
+
+
+# TODO(memben): This is a WIP
+def create_tasks(session: Session, video_paths: list[Path], version: str) -> None:
+    with session.begin():
+        videos = load_videos(session, video_paths, version)
+        for video in videos:
+            for task_type, subtype in [
+                (TaskType.TRACK, "body"),
+                (TaskType.PREDICT, "face_90"),
+                (TaskType.PREDICT, "face_45"),
+                (TaskType.CORRELATE, ""),
+                (TaskType.VISUALIZE, ""),
+            ]:
+                # TODO (memben): add key value for correlation
+                video.tasks.append(Task(task_type=task_type, task_subtype=subtype))
 
 
 def visualize_pipeline(
@@ -70,13 +86,7 @@ def visualize_pipeline(
 
     preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
 
-    with Session(dataset.engine) as session:
-        videos = load_videos(session, to_track, version)
-        for video in videos:
-            for task in ["track_body", "predict_face_90", "predict_face_45"]:
-                video.tasks.append(Task(task_type=task))
-        session.commit()
-
+    create_tasks(session, to_track, version)    
 
     multiprocess_track(
         "body",  # NOTE(memben): Tracking will always be done on bodies
@@ -88,7 +98,7 @@ def visualize_pipeline(
         gpu_ids=gpu_ids,
     )
 
-    for yolo_model, yolo_kwargs, _, feature_type in dataset.feature_models():
+    for yolo_model, yolo_kwargs, feature_type in dataset.feature_models():
         multiprocess_predict(
             feature_type,
             yolo_model,
@@ -97,19 +107,8 @@ def visualize_pipeline(
             max_worker_per_gpu=max_worker_per_gpu,
             gpu_ids=gpu_ids,
         )
-        
-    print(session.execute(select(Task)).scalars().all())
 
-    for _, _, correlator, feature_type in dataset.feature_models():
-        multiprocess_correlate_videos(
-            version,
-            to_track,
-            dataset.engine,
-            correlator,
-            f"predict_{feature_type}",
-            tracked_type="track_body",
-        )
-
+    multiprocess_correlate(one_to_one_correlator, dataset.engine, len(gpu_ids) * max_worker_per_gpu)
     multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
 
 

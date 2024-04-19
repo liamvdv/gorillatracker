@@ -9,7 +9,7 @@ from typing import Iterator, Optional, Sequence
 from sqlalchemy import Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
 
-from gorillatracker.ssl_pipeline.models import Task, TaskStatus, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import Task, TaskStatus, TaskType, Tracking, TrackingFrameFeature, Video
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -186,7 +186,11 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tra
 
 
 def get_next_task(
-    session: Session, task_type: str, max_retries: int = 0, task_timeout: dt.timedelta = dt.timedelta(days=1)
+    session: Session,
+    task_type: TaskType,
+    max_retries: int = 0,
+    task_timeout: dt.timedelta = dt.timedelta(days=1),
+    task_subtype: str = "",
 ) -> Iterator[Task]:
     """Yields and handles task in a transactional manner. Useable in a multiprocessing context.
     Each session is committed after a successful task completion, and rolled back if an exception is raised by this function.
@@ -204,7 +208,8 @@ def get_next_task(
             select(Task)
             .where(
                 Task.task_type == task_type,
-                Task.status == TaskStatus.QUEUED,
+                Task.task_subtype == task_subtype,
+                Task.status == TaskStatus.PENDING,
                 # (
                 #     (Task.status == TaskStatus.QUEUED)
                 #     | (
@@ -222,7 +227,7 @@ def get_next_task(
         if task is None:
             break
 
-        if task.status != TaskStatus.QUEUED:
+        if task.status != TaskStatus.PENDING:
             task.retries += 1
         task.status = TaskStatus.PROCESSING
         session.commit()

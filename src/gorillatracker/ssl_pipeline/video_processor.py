@@ -12,7 +12,7 @@ from ultralytics import YOLO
 from ultralytics.engine import results
 
 from gorillatracker.ssl_pipeline.helpers import video_reader
-from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import TaskType, Tracking, TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import get_next_task
 
 log = logging.getLogger(__name__)
@@ -63,29 +63,28 @@ def process_tracking(
     return detections
 
 
-def predict(
+def predict_and_update(
     session: Session,
     video: Video,
     yolo_model: YOLO,
     yolo_kwargs: dict[str, Any],
     feature_type: str,
-) -> Video:
+) -> None:
     with video_reader(Path(video.path), frame_step=video.frame_step) as video_feed:
         for video_frame in video_feed:
             predictions: list[results.Results] = yolo_model(video_frame.frame, **yolo_kwargs)
             assert len(predictions) == 1
             session.add_all(process_prediction(predictions[0], video, video_frame.frame_nr, feature_type))
-    return video
 
 
-def track(
+def track_and_update(
     session: Session,
     video: Video,
     yolo_model: YOLO,
     yolo_kwargs: dict[str, Any],
     tracker_config: Path,
     feature_type: str,
-) -> Video:
+) -> None:
     trackings: defaultdict[int, Tracking] = defaultdict(lambda: Tracking(video=video))
     with video_reader(Path(video.path), frame_step=video.frame_step) as video_feed:
         for video_frame in video_feed:
@@ -94,7 +93,6 @@ def track(
             )
             assert len(predictions) == 1
             session.add_all(process_tracking(predictions[0], video, video_frame.frame_nr, feature_type, trackings))
-    return video
 
 
 def track_worker(
@@ -107,7 +105,6 @@ def track_worker(
 ) -> None:
     import os
 
-    task_name = f"track_{feature_type}"
     yolo_model = YOLO(yolo_model_path)
     if "device" in yolo_kwargs:
         raise ValueError("device will be overwritten by the assigned GPU")
@@ -117,16 +114,15 @@ def track_worker(
     engine.dispose(close=False)
 
     with Session(engine) as session:
-        for task in get_next_task(session, task_name):
+        for task in get_next_task(session, TaskType.TRACK, task_subtype=feature_type):
             print(f"Current Task {os.getpid()}: {task}")
             video = task.video
-            track(session, video, yolo_model, yolo_kwargs, tracker_config, feature_type)
+            track_and_update(session, video, yolo_model, yolo_kwargs, tracker_config, feature_type)
 
 
 def predict_worker(
     feature_type: str, yolo_model_path: Path, yolo_kwargs: dict[str, Any], engine: Engine, gpu: int
 ) -> None:
-    task_name = f"predict_{feature_type}"
     yolo_model = YOLO(yolo_model_path)
     if "device" in yolo_kwargs:
         raise ValueError("device will be overwritten by the assigned GPU")
@@ -136,9 +132,9 @@ def predict_worker(
     engine.dispose(close=False)
 
     with Session(engine) as session:
-        for task in get_next_task(session, task_name):
+        for task in get_next_task(session, TaskType.PREDICT, task_subtype=feature_type):
             video = task.video
-            predict(session, video, yolo_model, yolo_kwargs, feature_type)
+            predict_and_update(session, video, yolo_model, yolo_kwargs, feature_type)
 
 
 def multiprocess_track(
@@ -150,16 +146,6 @@ def multiprocess_track(
     max_worker_per_gpu: int = 8,
     gpu_ids: list[int] = [0],
 ) -> None:
-
-    # track_worker(
-    #     feature_type,
-    #     yolo_model_path,
-    #     yolo_kwargs,
-    #     engine,
-    #     tracker_config,
-    #     gpu_ids[0],
-    # )
-
     gpus = gpu_ids * max_worker_per_gpu
 
     processes = []

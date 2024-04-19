@@ -13,7 +13,6 @@ import pandas as pd
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.feature_mapper import Correlator, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import BoundingBox
 from gorillatracker.ssl_pipeline.models import Base, Camera
 from gorillatracker.ssl_pipeline.video_preprocessor import MetadataExtractor, VideoMetadata
@@ -26,7 +25,7 @@ class SSLDataset(ABC):
         engine = create_engine(db_uri)  # , echo=True)
         self._engine = engine
 
-    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
+    def feature_models(self) -> list[tuple[Path, dict[str, Any], str]]:
         """Returns a list of feature models to use for adding features of interest (e.g. face detector)"""
         return []
 
@@ -107,10 +106,10 @@ class GorillaDataset(SSLDataset):
                 session.add(camera)
             session.commit()
 
-    def feature_models(self) -> list[tuple[Path, dict[str, Any], Correlator, str]]:
+    def feature_models(self) -> list[tuple[Path, dict[str, Any], str]]:
         return [
-            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
-            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
+            (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, self.FACE_45),
+            (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, self.FACE_90),
         ]
 
     @property

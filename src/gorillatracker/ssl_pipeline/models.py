@@ -28,10 +28,17 @@ class TrackingRelationshipType(enum.Enum):
 # WARNING(memben): Changing the class may affect the database
 # The values of the enum are stored in the database.
 class TaskStatus(enum.Enum):
-    QUEUED = "queued"
+    PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class TaskType(enum.Enum):
+    TRACK = "track"
+    PREDICT = "predict"
+    CORRELATE = "correlate"
+    VISUALIZE = "visualize"
 
 
 T = TypeVar("T", bound=enum.Enum)
@@ -312,14 +319,22 @@ class Task(Base):
 
     task_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    task_type: Mapped[str] = mapped_column(String(255))
-    status: Mapped[TaskStatus] = mapped_column(ExtensibleEnum(TaskStatus), default=TaskStatus.QUEUED)
+    task_type: Mapped[TaskType] = mapped_column(ExtensibleEnum(TaskType))
+    task_subtype: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[TaskStatus] = mapped_column(ExtensibleEnum(TaskStatus), default=TaskStatus.PENDING)
     retries: Mapped[int] = mapped_column(default=0)
     updated_at: Mapped[dt.datetime] = mapped_column(default=dt.datetime.now(dt.timezone.utc))
 
     video: Mapped[Video] = relationship(back_populates="tasks")
+    task_key_values: Mapped[list[TaskKeyValue]] = relationship(back_populates="task", cascade="all, delete-orphan")
 
-    __table_args__ = (UniqueConstraint("video_id", "task_type"),)
+    __table_args__ = (UniqueConstraint("video_id", "task_type", "task_subtype"),)
+
+    def get_key_value(self, key: str) -> str:
+        for kv in self.task_key_values:
+            if kv.key == key:
+                return kv.value
+        raise KeyError(f"Key {key} not found in task {self.task_id}")
 
     def __repr__(self) -> str:
         return f"task(id={self.task_id}, video_id={self.video_id}, task_type={self.task_type}, status={self.status}, last_modified={self.updated_at})"
@@ -328,6 +343,23 @@ class Task(Base):
 @event.listens_for(Task, "before_update")
 def task_before_update(mapper: Mapper, connection: Connection, target: Task):
     target.updated_at = dt.datetime.now(dt.timezone.utc)
+
+
+class TaskKeyValue(Base):
+    __tablename__ = "task_key_value"
+
+    task_key_value_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("task.task_id"))
+    key: Mapped[str] = mapped_column(String(255))
+    value: Mapped[str] = mapped_column(String(255))
+    task: Mapped[Task] = relationship(back_populates="task_key_values")
+
+    __table_args__ = (UniqueConstraint("task_id", "key"),)
+
+    def __repr__(self) -> str:
+        return (
+            f"task_key_value(id={self.task_key_value_id}, task_id={self.task_id}, key={self.key}, value={self.value})"
+        )
 
 
 if __name__ == "__main__":
@@ -363,8 +395,12 @@ if __name__ == "__main__":
             feature_type="test",
         )
         task = Task(
-            video=video, task_type="test", status=TaskStatus.COMPLETED, updated_at=dt.datetime.now(dt.timezone.utc)
+            video=video,
+            task_type=TaskType.PREDICT,
+            status=TaskStatus.COMPLETED,
+            updated_at=dt.datetime.now(dt.timezone.utc),
         )
+        task_key_value = TaskKeyValue(task=task, key="test", value="test")
         session.add_all([camera, video, tracking, tracking_frame_feature, task])
         session.commit()
     Base.metadata.drop_all(engine)
