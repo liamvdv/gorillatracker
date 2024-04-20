@@ -83,6 +83,8 @@ def create_crop_tasks(
 ) -> list[CropTask]:
     with session_cls() as session:
         video = load_video(session, video_path, version)
+        # NOTE(memben): When multiple videos have the same name, their TFF will be in the same folder, which is fine.
+        # If we want to avoid this, we can add the video_id to the path.
         dest_path = dest_base_path / version / video.camera.name / video_path.name
         frame_features = sampler.sample(video.video_id, session)
         crop_tasks = [
