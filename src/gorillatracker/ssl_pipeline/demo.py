@@ -15,11 +15,11 @@ The pipeline consists of the following steps:
 import logging
 import random
 from pathlib import Path
-import cv2
 
+import cv2
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDatasetSmall, GorillaDataset, SSLDataset
+from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate_videos
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.queries import load_processed_videos
@@ -35,7 +35,7 @@ def visualize_pipeline(
     version: str,
     dest_dir: Path,
     n_videos: int = 30,
-    sampled_fps: int = 10,
+    output_fps: int = 10,
     max_worker_per_gpu: int = 8,
     gpus: list[int] = [0],
 ) -> None:
@@ -47,7 +47,7 @@ def visualize_pipeline(
         version (str): The version of the pipeline.
         dest_dir (Path): The destination to save the visualizations.
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
-        sampled_fps (int, optional): The FPS to sample the video at. Defaults to 10.
+        output_fps (int, optional): The FPS to sample the video at. Defaults to 10.
         max_worker_per_gpu (int, optional): The maximum number of workers per GPU. Defaults to 8.
         gpus (list[int], optional): The GPUs to use for tracking. Defaults to [0].
 
@@ -56,7 +56,7 @@ def visualize_pipeline(
     """
 
     video_paths = sorted(dataset.video_paths)
-    #video_paths = [video_path for video_path in video_paths if video_path.suffix in [".mp4", ".MP4"]]
+    # video_paths = [video_path for video_path in video_paths if video_path.suffix in [".mp4", ".MP4"]]
 
     # NOTE(memben): For the production pipeline we should do this for every step
     # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
@@ -67,7 +67,7 @@ def visualize_pipeline(
     random.seed(42)  # For reproducibility
     to_track = random.sample(video_paths, n_videos)
 
-    preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
+    preprocess_videos(to_track, version, output_fps, dataset.engine, dataset.metadata_extractor)
 
     multiprocess_track_and_store(
         version,
@@ -104,6 +104,7 @@ def visualize_pipeline(
 
     multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
 
+
 def gpu2_demo():
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
@@ -118,6 +119,7 @@ def gpu2_demo():
         gpus=[0],
     )
     dataset.post_setup(version)
+
 
 def kisz_demo():
     version = "2024-04-09"
@@ -134,5 +136,6 @@ def kisz_demo():
     )
     dataset.post_setup(version)
 
+
 if __name__ == "__main__":
-    kisz_demo()
+    gpu2_demo()

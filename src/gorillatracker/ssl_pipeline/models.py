@@ -62,8 +62,8 @@ class Video(Base):
     start_time: Mapped[Optional[datetime]]
     width: Mapped[int]
     height: Mapped[int]
-    fps: Mapped[int]  # of the original video
-    sampled_fps: Mapped[int]  # of the tracked video
+    fps: Mapped[float]  # of the original video
+    output_fps: Mapped[int]  # of the tracked video
     frames: Mapped[int]
 
     camera: Mapped[Camera] = relationship(back_populates="videos")
@@ -78,7 +78,7 @@ class Video(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),
+        CheckConstraint("fps > output_fps", name="fps_gt_output_fps"),
         UniqueConstraint("path", "version"),
     )
 
@@ -98,16 +98,21 @@ class Video(Base):
             raise ValueError(f"{key} must end with '.mp4', '.avi', '.MP4' or '.AVI', is {value}")
         return value
 
-    @validates("width", "height", "fps", "sampled_fps", "frames")
+    @validates("width", "height", "fps", "output_fps", "frames")
     def validate_positive(self, key: str, value: int) -> int:
         if value <= 0:
             raise ValueError(f"{key} must be positive, is {value}")
         return value
 
     @property
+    def sampled_fps(self) -> float:
+        """The actual frames per second of the video after sampling."""
+        return self.fps / self.frame_step
+
+    @property
     def frame_step(self) -> int:
         """The number of frames to skip when sampling the video."""
-        return self.fps // self.sampled_fps
+        return int(self.fps / self.output_fps)
 
     @property
     def duration(self) -> timedelta:
@@ -117,7 +122,7 @@ class Video(Base):
         return self.video_id
 
     def __repr__(self) -> str:
-        return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
+        return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, output_fps={self.output_fps}, frames={self.frames})"
 
 
 class ProcessedVideoFrameFeature(Base):
@@ -328,7 +333,7 @@ if __name__ == "__main__":
             width=1920,
             height=1080,
             fps=30,
-            sampled_fps=5,
+            output_fps=5,
             frames=100,
         )
         tracking = Tracking(video=video)
