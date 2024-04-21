@@ -46,7 +46,7 @@ def video_properties_extractor(video_path: Path) -> VideoProperties:
 def preprocess_and_store(
     video_path: Path,
     version: str,
-    output_fps: int,
+    target_output_fps: int,
     session_cls: sessionmaker[Session],
     metadata_extractor: MetadataExtractor,
 ) -> None:
@@ -59,7 +59,7 @@ def preprocess_and_store(
         width=properties.width,
         height=properties.height,
         fps=properties.fps,
-        output_fps=output_fps,
+        target_output_fps=target_output_fps,
         frames=properties.frames,
     )
 
@@ -72,11 +72,12 @@ def preprocess_and_store(
 def preprocess_videos(
     video_paths: list[Path],
     version: str,
-    output_fps: int,
+    target_output_fps: int,
     engine: Engine,
     metadata_extractor: MetadataExtractor,
 ) -> None:
+    
     session_cls = sessionmaker(bind=engine)
     assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
-        preprocess_and_store(video_path, version, output_fps, session_cls, metadata_extractor)
+        preprocess_and_store(video_path, version, target_output_fps, session_cls, metadata_extractor)

@@ -72,7 +72,7 @@ def visualize_video(video_path: Path, version: str, session_cls: sessionmaker[Se
         tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
         # NOTE: video_tracking is the tracked version of source_video
         tracked_video = cv2.VideoWriter(
-            str(dest), fourcc, video_tracking.sampled_fps, (video_tracking.width, video_tracking.height)
+            str(dest), fourcc, video_tracking.output_fps, (video_tracking.width, video_tracking.height)
         )
         with video_reader(video_path, frame_step=video_tracking.frame_step) as source_video:
             for frame in source_video:

@@ -35,7 +35,7 @@ def visualize_pipeline(
     version: str,
     dest_dir: Path,
     n_videos: int = 30,
-    output_fps: int = 10,
+    target_output_fps: int = 10,
     max_worker_per_gpu: int = 8,
     gpus: list[int] = [0],
 ) -> None:
@@ -47,7 +47,7 @@ def visualize_pipeline(
         version (str): The version of the pipeline.
         dest_dir (Path): The destination to save the visualizations.
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
-        output_fps (int, optional): The FPS to sample the video at. Defaults to 10.
+        target_output_fps (int, optional): The FPS to sample the video at. Defaults to 10.
         max_worker_per_gpu (int, optional): The maximum number of workers per GPU. Defaults to 8.
         gpus (list[int], optional): The GPUs to use for tracking. Defaults to [0].
 
@@ -67,7 +67,7 @@ def visualize_pipeline(
     random.seed(42)  # For reproducibility
     to_track = random.sample(video_paths, n_videos)
 
-    preprocess_videos(to_track, version, output_fps, dataset.engine, dataset.metadata_extractor)
+    preprocess_videos(to_track, version, target_output_fps, dataset.engine, dataset.metadata_extractor)
 
     multiprocess_track_and_store(
         version,
