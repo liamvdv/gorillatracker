@@ -122,7 +122,7 @@ class Video(Base):
 
     __table_args__ = (
         CheckConstraint("fps > target_output_fps", name="fps_gt_target_output_fps"),
-        UniqueConstraint("path", "version"),
+        UniqueConstraint("absolute_path", "version"),
     )
 
     @validates("version")
