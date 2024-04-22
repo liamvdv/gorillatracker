@@ -103,7 +103,7 @@ def visualize_pipeline(
     multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
 
 
-def gpu2_demo():
+def gpu2_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDatasetSmall("sqlite:///test.db")
@@ -119,7 +119,7 @@ def gpu2_demo():
     dataset.post_setup(version)
 
 
-def kisz_demo():
+def kisz_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDataset("sqlite:///test.db")
