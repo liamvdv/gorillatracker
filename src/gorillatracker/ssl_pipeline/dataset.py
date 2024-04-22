@@ -77,9 +77,6 @@ class SSLDataset(ABC):
         pass
 
 
-# -----------------------------------------------------------------------------------------------------------------------------------------
-
-
 class GorillaDataset(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
     FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
@@ -211,8 +208,6 @@ class GorillaDataset(SSLDataset):
                     video_group_list.append((file_path.name, group_id))
         return video_group_list
 
-
-# -----------------------------------------------------------------------------------------------------------------------------------------
 
 
 class GorillaDatasetSmall(SSLDataset):
