@@ -16,7 +16,6 @@ import logging
 import random
 from pathlib import Path
 
-import cv2
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
@@ -56,7 +55,6 @@ def visualize_pipeline(
     """
 
     video_paths = sorted(dataset.video_paths)
-    # video_paths = [video_path for video_path in video_paths if video_path.suffix in [".mp4", ".MP4"]]
 
     # NOTE(memben): For the production pipeline we should do this for every step
     # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
@@ -130,12 +128,12 @@ def kisz_demo():
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=8,
-        max_worker_per_gpu=4,
+        n_videos=20,
+        max_worker_per_gpu=10,
         gpus=[0],
     )
     dataset.post_setup(version)
 
 
 if __name__ == "__main__":
-    gpu2_demo()
+    kisz_demo()
