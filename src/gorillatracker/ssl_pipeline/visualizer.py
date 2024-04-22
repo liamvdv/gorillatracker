@@ -64,7 +64,7 @@ def visualize_video(video: Video, dest: Path) -> None:
         feature.tracking_id for frame in tracked_frames.values() for feature in frame if feature.tracking_id is not None
     }
     tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
-    tracked_video = cv2.VideoWriter(str(dest), fourcc, video.sampled_fps, (video.width, video.height))
+    tracked_video = cv2.VideoWriter(str(dest), fourcc, video.output_fps, (video.width, video.height))
     with video_reader(video.path, frame_step=video.frame_step) as source_video:
         for frame in source_video:
             render_on_frame(frame.frame, tracked_frames[frame.frame_nr], tracking_id_to_label_map)

@@ -107,8 +107,8 @@ class Video(Base):
     start_time: Mapped[Optional[dt.datetime]]
     width: Mapped[int]
     height: Mapped[int]
-    fps: Mapped[int]  # of the original video
-    sampled_fps: Mapped[int]  # of the tracked video
+    fps: Mapped[float]  # of the original video
+    target_output_fps: Mapped[int]  # of the tracked video
     frames: Mapped[int]
 
     camera: Mapped[Camera] = relationship(back_populates="videos")
@@ -121,8 +121,8 @@ class Video(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),
-        UniqueConstraint("absolute_path", "version"),
+        CheckConstraint("fps > target_output_fps", name="fps_gt_target_output_fps"),
+        UniqueConstraint("path", "version"),
     )
 
     @validates("version")
@@ -137,20 +137,25 @@ class Video(Base):
     def validate_path(self, key: str, value: str) -> str:
         if not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
-        if not value.endswith(".mp4"):
-            raise ValueError(f"{key} must end with '.mp4', is {value}")
+        if not (value.lower().endswith(".mp4") or value.lower().endswith(".avi")):
+            raise ValueError(f"{key} must end with '.mp4', '.avi', '.MP4' or '.AVI', is {value}")
         return value
 
-    @validates("width", "height", "fps", "sampled_fps", "frames")
+    @validates("width", "height", "fps", "target_output_fps", "frames")
     def validate_positive(self, key: str, value: int) -> int:
         if value <= 0:
             raise ValueError(f"{key} must be positive, is {value}")
         return value
 
     @property
+    def output_fps(self) -> float:
+        """The actual frames per second of the video after sampling."""
+        return self.fps / self.frame_step
+
+    @property
     def frame_step(self) -> int:
         """The number of frames to skip when sampling the video."""
-        return self.fps // self.sampled_fps
+        return int(self.fps / self.target_output_fps)
 
     @property
     def duration(self) -> dt.timedelta:
@@ -391,7 +396,7 @@ if __name__ == "__main__":
             width=1920,
             height=1080,
             fps=30,
-            sampled_fps=5,
+            target_output_fps=5,
             frames=100,
         )
         tracking = Tracking(video=video)
