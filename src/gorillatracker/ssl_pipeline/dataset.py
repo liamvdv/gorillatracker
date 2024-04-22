@@ -194,18 +194,17 @@ class GorillaDataset(SSLDataset):
 
     @staticmethod
     def get_video_groups(video_dir: str) -> list[Tuple[str, str]]:
+        videos = GorillaDataset.get_video_paths(video_dir)
         video_group_list = []
-        for dirpath, dirnames, filenames in os.walk(video_dir):
-            for file in filenames:
-                if not file.startswith(".") and (file.lower().endswith(".avi") or file.lower().endswith(".mp4")):
-                    file_path = Path(file)
-                    parent = file_path.parent
-                    if not re.match(r"^.*?_\d+\s[A-Z]{2}$", parent.name):
-                        continue
-                    group_id = parent.name.split(" ")[1]
-                    if group_id == "XX":  # XX is unknown group
-                        continue
-                    video_group_list.append((file_path.name, group_id))
+        for video in videos:
+            file_path = Path(video)
+            parent = file_path.parent
+            if not re.match(r"^.*?_\d+\s[A-Z]{2}$", parent.name):
+                continue
+            group_id = parent.name.split(" ")[1]
+            if group_id == "XX":  # XX is unknown group
+                continue
+            video_group_list.append((file_path.name, group_id))
         return video_group_list
 
 
