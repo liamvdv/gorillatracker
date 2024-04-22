@@ -22,7 +22,7 @@ from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
-from gorillatracker.ssl_pipeline.queries import load_processed_videos, load_videos
+from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize
@@ -50,8 +50,8 @@ def create_tasks(session: Session, video_paths: list[Path], version: str) -> Non
                 task = Task(task_type=TaskType.CORRELATE)
                 task.task_key_values.extend(
                     [
-                        TaskKeyValue(key="tracked", value=tracked),
-                        TaskKeyValue(key="untracked", value=untracked),
+                        TaskKeyValue(key="tracked_feature_type", value=tracked),
+                        TaskKeyValue(key="untracked_feature_type", value=untracked),
                         TaskKeyValue(key="threshold", value=str(threshold)),
                     ]
                 )
@@ -88,16 +88,16 @@ def visualize_pipeline(
     # NOTE(memben): For the production pipeline we should do this for every step
     # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
     with Session(dataset.engine) as session:
-        preprocessed_videos = list(load_processed_videos(session, version, []))
+        preprocessed_videos = list(load_preprocessed_videos(session, version, []))
         video_paths = remove_processed_videos(video_paths, preprocessed_videos)
 
     random.seed(42)  # For reproducibility
-    to_track = random.sample(video_paths, n_videos)
+    videos_to_track = random.sample(video_paths, n_videos)
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
-    preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
+    preprocess_videos(videos_to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
 
-    create_tasks(session, to_track, version)
+    create_tasks(session, videos_to_track, version)
 
     multiprocess_track(
         "body",  # NOTE(memben): Tracking will always be done on bodies

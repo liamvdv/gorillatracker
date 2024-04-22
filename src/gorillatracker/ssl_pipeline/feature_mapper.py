@@ -83,8 +83,8 @@ def correlate_worker(
     session_cls = sessionmaker(bind=engine)
     with session_cls() as session:
         for task in get_next_task(session, TaskType.CORRELATE):
-            tracked = task.get_key_value("tracked")
-            untracked = task.get_key_value("untracked")
+            tracked = task.get_key_value("tracked_feature_type")
+            untracked = task.get_key_value("untracked_feature_type")
             threshold = float(task.get_key_value("threshold"))
             tracked_features = load_tracked_features(session, task.video_id, [tracked])
             untracked_features = load_features(session, task.video_id, [untracked])

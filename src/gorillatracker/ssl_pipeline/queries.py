@@ -141,15 +141,8 @@ def load_videos(session: Session, video_paths: list[Path], version: str) -> Sequ
     )
 
 
-def load_processed_videos(session: Session, version: str, required_completed_tasks: list[str]) -> Sequence[Video]:
+def load_preprocessed_videos(session: Session, version: str) -> Sequence[Video]:
     stmt = select(Video).where(Video.version == version)
-    if required_completed_tasks:
-        stmt = (
-            stmt.join(Task)
-            .where(Task.task_type.in_(required_completed_tasks), Task.status == TaskStatus.COMPLETED)
-            .group_by(Video.video_id)
-            .having(func.count(Task.task_type.distinct()) == len(required_completed_tasks))
-        )
     return session.execute(stmt).scalars().all()
 
 
