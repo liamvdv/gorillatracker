@@ -52,6 +52,7 @@ def preprocess_and_store(
 ) -> None:
     metadata = metadata_extractor(video_path)
     properties = video_properties_extractor(video_path)
+    assert properties.fps != 0, "fps should not be 0"
     video = Video(
         path=str(video_path),
         version=version,
@@ -75,9 +76,16 @@ def preprocess_videos(
     target_output_fps: int,
     engine: Engine,
     metadata_extractor: MetadataExtractor,
-) -> None:
-
+) -> list[Path]:
+    valid_video_paths = video_paths.copy()
     session_cls = sessionmaker(bind=engine)
-    assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
-        preprocess_and_store(video_path, version, target_output_fps, session_cls, metadata_extractor)
+        try:
+            assert video_path.exists(), f"Video {video_path} does not exist"
+            preprocess_and_store(video_path, version, target_output_fps, session_cls, metadata_extractor)
+        except AssertionError as e:
+            print(f"Error processing video {video_path}: {e}")
+            valid_video_paths.remove(video_path)
+    if(len(valid_video_paths) < len(video_paths)):
+        print(f"Only {len(valid_video_paths)} out of {len(video_paths)} videos were processed.")
+    return valid_video_paths

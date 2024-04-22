@@ -65,7 +65,7 @@ def visualize_pipeline(
     random.seed(42)  # For reproducibility
     to_track = random.sample(video_paths, n_videos)
 
-    preprocess_videos(to_track, version, target_output_fps, dataset.engine, dataset.metadata_extractor)
+    to_track = preprocess_videos(to_track, version, target_output_fps, dataset.engine, dataset.metadata_extractor)
 
     multiprocess_track_and_store(
         version,
