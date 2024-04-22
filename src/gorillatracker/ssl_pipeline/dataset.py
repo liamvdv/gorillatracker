@@ -75,8 +75,9 @@ class SSLDataset(ABC):
     def post_setup(self, version: str) -> None:
         """Post setup operations."""
         pass
-    
-#-----------------------------------------------------------------------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------------------------------------------------------------------
 
 
 class GorillaDataset(SSLDataset):
@@ -102,7 +103,6 @@ class GorillaDataset(SSLDataset):
 
     def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(db_uri)
-
 
     @property
     def video_paths(self) -> list[Path]:
@@ -132,7 +132,7 @@ class GorillaDataset(SSLDataset):
     @property
     def engine(self) -> Engine:
         return self._engine
-    
+
     def post_setup(self, version: str) -> None:
         self.setup_social_groups(version)
         self.setup_camera_locations()
@@ -176,7 +176,7 @@ class GorillaDataset(SSLDataset):
             (Path("models/yolov8n_gorilla_face_45.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_45),
             (Path("models/yolov8n_gorilla_face_90.pt"), self._yolo_base_kwargs, one_to_one_correlator, self.FACE_90),
         ]
-        
+
     @staticmethod
     def get_video_metadata(video_path: Path) -> VideoMetadata:
         camera_name = video_path.stem.split("_")[0]
@@ -211,7 +211,9 @@ class GorillaDataset(SSLDataset):
                     video_group_list.append((file_path.name, group_id))
         return video_group_list
 
-#-----------------------------------------------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------------------------------------------------------------
+
 
 class GorillaDatasetSmall(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
