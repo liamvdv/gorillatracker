@@ -203,6 +203,16 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
         )
+        
+    if args.pretrained_weights_file is not None:
+        #delete everything in model except model.model
+        for k in list(model.__dict__.keys()):
+            if k != "model" and not k.startswith("_"):
+                del model.__dict__[k]
+        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
+        torch.save(model.state_dict(), args.pretrained_weights_file)
+        logger.info("Model saved")
+        exit(0)
 
     ########### Start val & train loop ###########
     if args.val_before_training and not args.resume:
@@ -223,13 +233,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
-        #delete everything in model except model.model
-        # for k in list(model.__dict__.keys()):
-        #     if k != "model" and not k.startswith("_"):
-        #         del model.__dict__[k]
-        # # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
-        # torch.save(model.state_dict(), "inceptionv3.pth")
-        # logger.info("Model saved")
         
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")

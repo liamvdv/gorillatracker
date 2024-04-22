@@ -400,7 +400,6 @@ def knn_with_train(
     )
     assert precision is not None
 
-    print("knn done")
     return {
         "accuracy": accuracy.item(),
         "accuracy_top5": accuracy_top5.item(),
@@ -459,7 +458,6 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
     )
     assert precision is not None
 
-    print("knn done")
     return {
         "accuracy": accuracy.item(),
         "accuracy_top5": accuracy_top5.item(),
