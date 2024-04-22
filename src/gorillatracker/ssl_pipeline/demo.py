@@ -88,7 +88,7 @@ def visualize_pipeline(
     # NOTE(memben): For the production pipeline we should do this for every step
     # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
     with Session(dataset.engine) as session:
-        preprocessed_videos = list(load_preprocessed_videos(session, version, []))
+        preprocessed_videos = list(load_preprocessed_videos(session, version))
         video_paths = remove_processed_videos(video_paths, preprocessed_videos)
 
     random.seed(42)  # For reproducibility
