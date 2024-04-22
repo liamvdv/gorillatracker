@@ -99,8 +99,8 @@ class TrainingArgs:
     data_dir: Path = field(default=Path("./mnist"))
     data_resize_transform: Union[int, None] = field(default=None)
     video_data: bool = field(default=False)
-    
-    pretrained_weights_file: str = field(default=None)
+
+    pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.
 
     def __post_init__(self) -> None:

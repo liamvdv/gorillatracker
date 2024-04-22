@@ -26,8 +26,7 @@ from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
-from gorillatracker.losses.triplet_loss import get_loss
-from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper
+from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 
 
@@ -234,10 +233,9 @@ class BaseModule(L.LightningModule):
             isinstance(self.loss_module_train, L2SPRegularization_Wrapper)
             and isinstance(self.loss_module_train.loss, VariationalPrototypeLearning)
             and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch
-        ): # is wrapped in l2sp regularization
+        ):  # is wrapped in l2sp regularization
             self.loss_module_train.loss.set_using_memory_bank(True)
             logger.info("Using memory bank")
-        
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         images, labels = batch
@@ -296,26 +294,28 @@ class BaseModule(L.LightningModule):
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
-            loss_module_val = self.loss_module_val if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss
-            num_classes = self.loss_module_val.num_classes if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss.num_classes
-            
+            loss_module_val = self.loss_module_val if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss  # type: ignore
+            num_classes = self.loss_module_val.num_classes if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss.num_classes  # type: ignore
+
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
             for label in range(num_classes):
-                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()
-                class_embeddings = np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
-                class_weights[label] = torch.tensor(
-                    class_embeddings
-                ).mean(dim=0)
+                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)][
+                    "embedding"
+                ].tolist()
+                class_embeddings = (
+                    np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                )
+                class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
                 if torch.isnan(class_weights[label]).any():
                     class_weights[label] = 0.0
 
             # calculate loss for all embeddings
-            loss_module_val.set_weights(class_weights)
+            loss_module_val.set_weights(class_weights)  # type: ignore
 
             losses = []
             for _, row in self.embeddings_table.iterrows():
                 loss, _, _ = loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)
+                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)  # type: ignore
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
@@ -343,7 +343,7 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
-        
+
         # optimizer = torch.optim.RMSprop(
         #     self.model.parameters(),
         #     lr=self.initial_lr,
@@ -956,7 +956,6 @@ class ResNet50DinoV2Wrapper(BaseModule):
         )
 
 
-
 class InceptionV3Wrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -964,7 +963,7 @@ class InceptionV3Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("inception_v3", pretrained=not self.from_scratch)
-        
+
         # self.model.reset_classifier(self.embedding_size) # TODO
         self.model.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.fc.in_features),

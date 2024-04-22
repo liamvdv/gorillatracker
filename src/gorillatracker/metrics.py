@@ -16,9 +16,9 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
+from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
-from sklearn.preprocessing import LabelEncoder
 
 import gorillatracker.type_helper as gtypes
 
@@ -89,7 +89,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_embeddings, train_labels = (
             self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
         )
-        
+
         metrics = {
             "knn5": partial(knn, k=5),
             "knn": partial(knn, k=1),
@@ -365,7 +365,12 @@ def knn_with_train(
 
     distance_matrix.fill_diagonal_(float("inf"))
 
-    _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True, )
+    _, closest_indices = torch.topk(
+        distance_matrix,
+        k,
+        largest=False,
+        sorted=True,
+    )
     assert closest_indices.shape == (len(combined_embeddings), k)
 
     closest_labels = combined_labels[closest_indices]
@@ -379,7 +384,6 @@ def knn_with_train(
     # Select only the validation part of the classification matrix
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
-
 
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
@@ -417,8 +421,8 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
 
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels.tolist())
-    
+    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
+
     distance_matrix = pairwise_euclidean_distance(val_embeddings)
 
     # Ensure distances on the diagonal are set to a large value so they are ignored
@@ -426,7 +430,7 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
 
     # Find the indices of the closest embeddings for each embedding
     classification_matrix = torch.zeros((len(val_embeddings), k))
-    
+
     _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True)
     assert closest_indices.shape == (len(val_embeddings), k)
 
@@ -437,7 +441,6 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
     for i in range(num_classes):
         classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
     assert classification_matrix.shape == (len(val_embeddings), num_classes)
-    
 
     accuracy = tm.functional.accuracy(
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"

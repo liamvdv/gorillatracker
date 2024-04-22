@@ -1,5 +1,5 @@
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import torch
 import wandb
@@ -158,7 +158,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         every_n_epochs=int(args.save_interval),
     )
 
-    early_stopping = EarlyStopping( 
+    early_stopping = EarlyStopping(
         monitor="val/loss",
         mode="min",
         min_delta=args.min_delta,
@@ -203,9 +203,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
         )
-        
+
     if args.pretrained_weights_file is not None:
-        #delete everything in model except model.model
+        # delete everything in model except model.model
         for k in list(model.__dict__.keys()):
             if k != "model" and not k.startswith("_"):
                 del model.__dict__[k]
@@ -219,7 +219,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info(f"Rank {current_process_rank} | Validation before training...")
         trainer.validate(model, dm)
-        
+
         if args.only_val:
             exit(0)
 
@@ -233,7 +233,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
-        
+
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)

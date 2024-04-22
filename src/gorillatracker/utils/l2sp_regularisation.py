@@ -226,7 +226,7 @@ class L2_SP(nn.Module):
         #                 towards_pretrained += (param - pretrained_param).pow(2).sum()*0.5
         #             elif key in self.new_keys:
         #                 towards_0 += param.pow(2).sum()*0.5
-        
+
         return towards_pretrained * self.alpha + towards_0 * self.beta
 
 

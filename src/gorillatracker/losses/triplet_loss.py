@@ -14,6 +14,7 @@ eps = 1e-16  # an arbitrary small value to be used for numerical stability trick
 
 logger = logging.getLogger(__name__)
 
+
 def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
     """Convert labels to tensor
 
@@ -25,7 +26,7 @@ def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
     """
     if isinstance(labels, torch.Tensor):
         return labels
-    
+
     le = LabelEncoder()
     labels = le.fit_transform(labels)
 
@@ -357,7 +358,15 @@ class TripletLossOfflineNative(nn.Module):
 class L2SPRegularization_Wrapper(nn.Module):
     """Wrapper that adds L2SP regularization to any loss"""
 
-    def __init__(self, loss: nn.Module, model: nn.Module, path_to_pretrained_weights: str, alpha: float, beta: float, log_func: Callable = lambda x, y: None):
+    def __init__(
+        self,
+        loss: nn.Module,
+        model: nn.Module,
+        path_to_pretrained_weights: str,
+        alpha: float,
+        beta: float,
+        log_func: Callable[[str, float], None] = lambda x, y: None,
+    ):
         super().__init__()
         assert path_to_pretrained_weights is not None, "Path to pretrained weights must be provided"
         self.loss = loss
@@ -375,7 +384,11 @@ class L2SPRegularization_Wrapper(nn.Module):
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
 
 
-def get_loss(loss_mode: str, log_func = lambda x,y: None, **kw_args: Any,) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
+def get_loss(
+    loss_mode: str,
+    log_func: Callable[[str, float], None] = lambda x, y: None,
+    **kw_args: Any,
+) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
     l2sp = False
     if "l2sp" in loss_mode:
         loss_mode = loss_mode.replace("/l2sp", "")
