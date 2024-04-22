@@ -197,14 +197,13 @@ class GorillaDataset(SSLDataset):
         videos = GorillaDataset.get_video_paths(video_dir)
         video_group_list = []
         for video in videos:
-            file_path = Path(video)
-            parent = file_path.parent
+            parent = video.parent
             if not re.match(r"^.*?_\d+\s[A-Z]{2}$", parent.name):
                 continue
             group_id = parent.name.split(" ")[1]
             if group_id == "XX":  # XX is unknown group
                 continue
-            video_group_list.append((file_path.name, group_id))
+            video_group_list.append((video.name, group_id))
         return video_group_list
 
 
