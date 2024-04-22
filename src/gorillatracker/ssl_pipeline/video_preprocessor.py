@@ -86,6 +86,6 @@ def preprocess_videos(
         except AssertionError as e:
             print(f"Error processing video {video_path}: {e}")
             valid_video_paths.remove(video_path)
-    if(len(valid_video_paths) < len(video_paths)):
+    if len(valid_video_paths) < len(video_paths):
         print(f"Only {len(valid_video_paths)} out of {len(video_paths)} videos were processed.")
     return valid_video_paths
