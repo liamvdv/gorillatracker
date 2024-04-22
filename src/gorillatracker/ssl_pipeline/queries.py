@@ -2,13 +2,21 @@
 This module contains pre-defined database queries.
 """
 
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Sequence
 
-from sqlalchemy import Select, alias, func, select
+from sqlalchemy import ColumnElement, Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
 
-from gorillatracker.ssl_pipeline.models import Camera, ProcessedVideoFrameFeature, Tracking, TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import (
+    Camera,
+    ProcessedVideoFrameFeature,
+    Tracking,
+    TrackingFrameFeature,
+    Video,
+    VideoFeature,
+)
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -193,6 +201,96 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tra
     return [(row[0], row[1]) for row in overlapping_trackings]
 
 
+def great_circle_distance(
+    left_latitude: ColumnElement[float],
+    left_longitude: ColumnElement[float],
+    right_latitude: ColumnElement[float],
+    right_longitude: ColumnElement[float],
+) -> ColumnElement[float]:
+    return 6371 * func.acos(
+        func.cos(func.radians(left_latitude))
+        * func.cos(func.radians(right_latitude))
+        * func.cos(func.radians(right_longitude) - func.radians(left_longitude))
+        + func.sin(func.radians(left_latitude)) * func.sin(func.radians(right_latitude))
+    )
+
+
+def time_diff(left_datetime: ColumnElement[datetime], right_datetime: ColumnElement[datetime]) -> ColumnElement[float]:
+    return func.abs(func.julianday(left_datetime) - func.julianday(right_datetime)) * 24
+
+
+def travel_time(
+    left_latitude: ColumnElement[float],
+    left_longitude: ColumnElement[float],
+    right_latitude: ColumnElement[float],
+    right_longitude: ColumnElement[float],
+    travel_speed: float,
+) -> ColumnElement[float]:
+    return great_circle_distance(left_latitude, left_longitude, right_latitude, right_longitude) / travel_speed
+
+
+def travel_distance_negatives(session: Session, version: str, travel_speed: float) -> Sequence[tuple[Video, Video]]:
+    # join video table with camera table and select video_id, camera_id, latitude, and longitude
+    subquery = (
+        select(Video.video_id, Video.camera_id, Camera.latitude, Camera.longitude, Video.start_time)
+        .join(Camera, Video.camera_id == Camera.camera_id)
+        .where(Video.version == version)
+    ).subquery()
+
+    left_subquery = alias(subquery)
+    right_subquery = alias(subquery)
+
+    left_video = aliased(Video)
+    right_video = aliased(Video)
+
+    stmt = (
+        select(left_video, right_video)
+        .join(left_subquery, left_video.video_id == left_subquery.c.video_id)
+        .join(right_subquery, right_video.video_id == right_subquery.c.video_id)
+        .where(
+            left_subquery.c.camera_id != right_subquery.c.camera_id,
+            travel_time(
+                left_subquery.c.latitude,
+                left_subquery.c.longitude,
+                right_subquery.c.latitude,
+                right_subquery.c.longitude,
+                travel_speed,
+            )
+            > time_diff(left_subquery.c.start_time, right_subquery.c.start_time),
+            left_subquery.c.video_id < right_subquery.c.video_id,
+        )
+    )
+
+    result = session.execute(stmt).all()
+    negative_tuples = [(row[0], row[1]) for row in result]
+    return negative_tuples
+
+
+def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Video, Video]]:
+    subquery = (
+        select(Video.video_id, VideoFeature.value)
+        .join(VideoFeature, Video.video_id == VideoFeature.video_id)
+        .where(Video.version == version, VideoFeature.type == "Social Group")
+        # Note: string can change
+    ).subquery()
+
+    left_subquery = alias(subquery)
+    right_subquery = alias(subquery)
+
+    left_video = aliased(Video)
+    right_video = aliased(Video)
+
+    stmt = (
+        select(left_video, right_video)
+        .join(left_subquery, left_video.video_id == left_subquery.c.video_id)
+        .join(right_subquery, right_video.video_id == right_subquery.c.video_id)
+        .where(left_subquery.c.value != right_subquery.c.value, left_subquery.c.video_id < right_subquery.c.video_id)
+    )
+    result = session.execute(stmt).all()
+    negative_tuples = [(row[0], row[1]) for row in result]
+    return negative_tuples
+
+
 if __name__ == "__main__":
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -200,9 +298,12 @@ if __name__ == "__main__":
     engine = create_engine("sqlite:///test.db")
 
     session_cls = sessionmaker(bind=engine)
+    version = "2024-04-09"
 
-    # find first video_id in the database and then find overlapping trackings for that video and print them
     with session_cls() as session:
-        overlapping_trackings = find_overlapping_trackings(session)
-        for left_tracking, right_tracking in overlapping_trackings:
-            print(left_tracking.tracking_id, right_tracking.tracking_id)
+        video_negatives = social_group_negatives(session, version)
+        print(video_negatives[:10])
+        social_groups = session.execute(select(VideoFeature).where(VideoFeature.type == "Social Group")).all()
+        print(social_groups)
+        video_negatives = travel_distance_negatives(session, version, 10)
+        print(video_negatives[:10])
