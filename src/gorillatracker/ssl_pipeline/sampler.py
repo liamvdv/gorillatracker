@@ -67,8 +67,12 @@ class EquidistantSampler(Sampler):
 
     def sample_equidistant(self, features: List[TrackingFrameFeature], n_samples: int) -> List[TrackingFrameFeature]:
         sorted_features = sorted(features, key=lambda x: x.frame_nr)
-        interval = max(1, len(sorted_features) // n_samples)
-        return sorted_features[::interval]
+        num_features = len(features)
+        if num_features <= n_samples:
+            return features
+        interval = len(sorted_features) / n_samples
+        indices = [int(i * interval) for i in range(n_samples)]
+        return [sorted_features[i] for i in indices]
 
 
 if __name__ == "__main__":
