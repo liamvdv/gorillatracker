@@ -77,6 +77,7 @@ def preprocess_videos(
     engine: Engine,
     metadata_extractor: MetadataExtractor,
 ) -> list[Path]:
+    """preprocess_videos and return valid video paths."""
     valid_video_paths = video_paths.copy()
     session_cls = sessionmaker(bind=engine)
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
