@@ -27,9 +27,9 @@ from transformers import ResNetModel
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import get_loss
-from model_miew import GeM
 from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper
-from gorillatracker.model_miewid import load_miewid_model
+from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
+
 
 def warmup_lr(
     warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
@@ -1075,7 +1075,7 @@ class MiewIdNetWrapper(BaseModule):
         self.set_losses(self.model, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.backbone.blocks[-1][-1].conv_pwl
+        return self.model.blocks[-1][-1].conv_pwl
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model(x)
@@ -1094,9 +1094,10 @@ class MiewIdNetWrapper(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(440, scale=(0.75, 1.0)),
             ]
         )
+
 
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {

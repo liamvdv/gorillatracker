@@ -245,7 +245,8 @@ def splitter(
                     f"WARN: individual {individum.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
                 )
             train_bucket.extend(selection)
-        rest = ungroup(individums)
+        # need to shuffle again because we ungroup() will return images of individuals sequentially
+        rest = consistent_random_permutation(ungroup(individums), lambda x: x.value, seed + 1)
         val_bucket, rest = rest[:val_count], rest[val_count:]
         assert len(val_bucket) == val_count, "Dataset too small: Not enough images left to fill validation."
         test_bucket, rest = rest[:test_count], rest[test_count:]
