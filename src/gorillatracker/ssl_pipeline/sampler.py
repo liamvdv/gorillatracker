@@ -70,8 +70,8 @@ class EquidistantSampler(Sampler):
         num_features = len(features)
         if num_features <= n_samples:
             return features
-        interval = len(sorted_features) / n_samples
-        indices = [int(i * interval) for i in range(n_samples)]
+        interval = (num_features - 1) // (n_samples - 1) if n_samples > 1 else 0
+        indices = [i * interval for i in range(n_samples)]
         return [sorted_features[i] for i in indices]
 
 
