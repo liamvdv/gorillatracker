@@ -2,16 +2,16 @@
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
-force_deterministic: True      # Force deterministic behavior
-precision: 32                   # Training precision (e.g., "bf16-mixed")
+force_deterministic: True       # Force deterministic behavior
+precision: "32-true"            # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 16                      # Number of workers for data loading
+workers: 16                     # Number of workers for data loading
 
 
 # Model and Training Arguments
 project_name: "Embedding-EfficientNet-CXL-OpenSet" # WandB project name
-run_name: "efficientnet_l-arcface-prec16-improvedembed-p0.32-strongwd"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["pure-openset"]            # WandB tags for experiment tracking
+run_name: "261-add-the-ability-to-do-quantization-using-pytorch-2-export-quantization"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)

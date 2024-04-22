@@ -39,13 +39,93 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
 
 sweeps = [
     {
-        "project_name": "Embedding-ResNet152-CXL-Open",
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
         "entity": "gorillas",
-        "config_path": "./cfgs/resnet152_cxl.yml",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
         "parameters": {
-            "initial_lr": {"values": [1e-3, 1e-4, 1e-5, 1e-6]},
-            "l2_alpha": {"values": [1e-2, 1e-3, 1e-4, 1e-5]},
-            "l2_beta": {"values": [1e-2, 1e-3, 1e-4]},
+            "precision": {"value": "32-true"},
+            "wandb_tags": {"value": ["fp32-true"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "16-true"},
+            "wandb_tags": {"value": ["fp16-true"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "bf16-true"},
+            "wandb_tags": {"value": ["bf16-true"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "bf16-mixed"},
+            "wandb_tags": {"value": ["bf16-mixed"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "transformer-engine-float16"},
+            "wandb_tags": {"value": ["fp8", "weights-bf16"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "transformer-engine"},
+            "wandb_tags": {"value": ["fp8", "weights-fp16"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "int8-training"},
+            "wandb_tags": {"value": ["int8-activations", "weights-fp16", "fp16-computations"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "int8"},
+            "wandb_tags": {"value": ["int8", "fp16-computations"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "fp4"},
+            "wandb_tags": {"value": ["fp4", "fp16-computations"]},
+        },
+    },
+    {
+        "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "parameters": {
+            "precision": {"value": "nf4"},
+            "wandb_tags": {"value": ["nf4", "fp16-computations"]},
         },
     },
 ]

@@ -14,6 +14,7 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+from lightning.pytorch.plugins import BitsandbytesPrecision
 
 
 def main(args: TrainingArgs) -> None:  # noqa: C901
@@ -109,9 +110,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     else:
         model = model_cls(**model_args)  # type: ignore
 
-    # https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
-    torch.set_float32_matmul_precision("high")
-
     if args.compile:
         if not hasattr(torch, "compile"):
             raise RuntimeError(
@@ -171,6 +169,11 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         callbacks.append(CUDAMetricsCallback())
 
     # Initialize trainer
+    supported_quantizations = ["nf4", "nf4-dq", "fp4", "fp4-dq", "int8", "int8-training"]
+    if args.precision in supported_quantizations:
+        args.plugins = BitsandbytesPrecision(mode=args.precision)
+        args.precision = "bf16-true"
+
     trainer = Trainer(
         max_epochs=args.max_epochs,
         val_check_interval=args.val_check_interval,
@@ -187,6 +190,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         fast_dev_run=args.fast_dev_run,
         profiler=args.profiler,
         inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+        plugins=args.plugins,
         # reload_dataloaders_every_n_epochs=1,
     )
 
