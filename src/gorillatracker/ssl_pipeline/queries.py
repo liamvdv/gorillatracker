@@ -236,7 +236,6 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
         .join(Camera, Video.camera_id == Camera.camera_id)
         .where(Video.version == version)
     ).subquery()
-    subquery_self = subquery.alias("subquery_self")
 
     left_subquery = alias(subquery)
     right_subquery = alias(subquery)
@@ -249,15 +248,15 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
         .join(left_subquery, left_video.video_id == left_subquery.c.video_id)
         .join(right_subquery, right_video.video_id == right_subquery.c.video_id)
         .where(
-            subquery.c.camera_id != subquery_self.c.camera_id,
+            left_subquery.c.camera_id != right_subquery.c.camera_id,
             travel_time(
-                subquery.c.latitude,
-                subquery.c.longitude,
-                subquery_self.c.latitude,
-                subquery_self.c.longitude,
+                left_subquery.c.latitude,
+                left_subquery.c.longitude,
+                right_subquery.c.latitude,
+                right_subquery.c.longitude,
                 travel_speed,
             )
-            < time_diff(subquery.c.start_time, subquery_self.c.start_time),
+            > time_diff(left_subquery.c.start_time, right_subquery.c.start_time),
             left_subquery.c.video_id < right_subquery.c.video_id,
         )
     )
@@ -271,7 +270,8 @@ def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Vid
     subquery = (
         select(Video.video_id, VideoFeature.value)
         .join(VideoFeature, Video.video_id == VideoFeature.video_id)
-        .where(Video.version == version, VideoFeature.type == "Social Group")  # Note: string can change
+        .where(Video.version == version, VideoFeature.type == "Social Group")
+        # Note: string can change
     ).subquery()
 
     left_subquery = alias(subquery)
@@ -280,14 +280,12 @@ def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Vid
     left_video = aliased(Video)
     right_video = aliased(Video)
 
-    subquery_self = subquery.alias("subquery_self")
     stmt = (
         select(left_video, right_video)
         .join(left_subquery, left_video.video_id == left_subquery.c.video_id)
         .join(right_subquery, right_video.video_id == right_subquery.c.video_id)
-        .where(subquery.c.value != subquery_self.c.value, left_subquery.c.video_id < right_subquery.c.video_id)
+        .where(left_subquery.c.value != right_subquery.c.value, left_subquery.c.video_id < right_subquery.c.video_id)
     )
-
     result = session.execute(stmt).all()
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
@@ -302,7 +300,6 @@ if __name__ == "__main__":
     session_cls = sessionmaker(bind=engine)
     version = "2024-04-09"
 
-    # find first video_id in the database and then find overlapping trackings for that video and print them
     with session_cls() as session:
         video_negatives = social_group_negatives(session, version)
         print(video_negatives[:10])
