@@ -62,18 +62,13 @@ class EquidistantSampler(Sampler):
         tracking_frame_features = list(session.execute(query).scalars().all())
         tracking_id_grouped = self.group_by_tracking_id(tracking_frame_features)
         for features in tracking_id_grouped.values():
-            if len(features) <= self.n_samples:
-                yield from features
-            else:
-                sampled_features = self.sample_equidistant(features, self.n_samples)
-                yield from sampled_features
+            sampled_features = self.sample_equidistant(features, self.n_samples)
+            yield from sampled_features
 
     def sample_equidistant(self, features: List[TrackingFrameFeature], n_samples: int) -> List[TrackingFrameFeature]:
         sorted_features = sorted(features, key=lambda x: x.frame_nr)
-        interval = len(sorted_features) // n_samples
-        sampled_indices = [i * interval for i in range(n_samples)]
-        sampled_features = [sorted_features[i] for i in sampled_indices]
-        return sampled_features
+        interval = max(1, len(sorted_features) // n_samples)
+        return sorted_features[::interval]
 
 
 if __name__ == "__main__":
