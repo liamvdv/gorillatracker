@@ -151,8 +151,9 @@ if __name__ == "__main__":
         query = associated_filter(query)
         return query
 
-    shutil.rmtree("cropped_images")
-    Path("cropped_images").mkdir(parents=True, exist_ok=True)
+    abs_path = "/workspaces/gorillatracker/cropped_images"
+    shutil.rmtree(abs_path)
+    Path(abs_path).mkdir(parents=True, exist_ok=True)
 
     session_cls = sessionmaker(bind=engine)
     version = "2024-04-09"  # TODO(memben)
@@ -164,7 +165,7 @@ if __name__ == "__main__":
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = Sampler(query_builder=query)
 
-    multiprocess_crop_from_video(video_paths[:20], version, engine, sampler, Path("cropped_images"), max_workers=10)
+    multiprocess_crop_from_video(video_paths[:20], version, engine, sampler, Path(abs_path), max_workers=10)
 
     # print cache_paths of first 50 TrackingFrameFeature instances
     with session_cls() as session:
