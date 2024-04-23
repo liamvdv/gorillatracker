@@ -4,22 +4,12 @@ from collections import defaultdict
 from typing import Generic, Protocol, TypeVar
 
 
-class Hashable(Protocol):
-    def __hash__(self) -> int: ...
-
-
-CT = TypeVar("CT")
-
-
 class Comparable(Protocol):
-    def __lt__(self: CT, other: CT) -> bool: ...
+    def __lt__(self, other: Comparable) -> bool: ...
 
 
-class HashableComparable(Hashable, Comparable): ...
-
-
-T = TypeVar("T", bound=Hashable)
-K = TypeVar("K", bound=HashableComparable)
+T = TypeVar("T")
+K = TypeVar("K", bound=Comparable)
 
 
 class DirectedBipartiteGraph(Generic[T]):

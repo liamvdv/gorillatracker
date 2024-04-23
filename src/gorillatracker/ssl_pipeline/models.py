@@ -165,9 +165,6 @@ class Video(Base):
     def path(self) -> Path:
         return Path(self.absolute_path)
 
-    def __hash__(self) -> int:
-        return self.video_id
-
     def __repr__(self) -> str:
         return f"""video(id={self.video_id}, version={self.version}, path={self.path}, 
                 camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"""
@@ -216,9 +213,6 @@ class Tracking(Base):
         start_frame = min(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         end_frame = max(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         return dt.timedelta(seconds=(end_frame - start_frame) / fps)
-
-    def __hash__(self) -> int:
-        return self.tracking_id
 
     def __repr__(self) -> str:
         return f"tracking(id={self.tracking_id}, video_id={self.video_id})"
@@ -279,9 +273,6 @@ class TrackingFrameFeature(Base):
         if value is not None and not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
         return value
-
-    def __hash__(self) -> int:
-        return self.tracking_frame_feature_id
 
     def __lt__(self, other: TrackingFrameFeature) -> bool:
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id
