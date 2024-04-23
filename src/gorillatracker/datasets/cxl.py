@@ -3,12 +3,14 @@ from typing import List, Literal, Optional, Tuple, Union
 
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
-from sklearn.preprocessing import LabelEncoder
+import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
+
+from gorillatracker.utils.labelencoder import LabelEncoder
 
 Label = Union[int, str]
 
@@ -30,8 +32,7 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
     le = LabelEncoder()
-    le.fit(labels)
-    return le.transform(labels)
+    return le.transform_list(labels)
 
 
 class CXLDataset(Dataset[Tuple[Image.Image, Label]]):

@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, List, Literal, Union
 
 import torch
 import torch.nn.functional as F
-from sklearn.preprocessing import LabelEncoder
+# from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
@@ -10,24 +10,6 @@ import gorillatracker.utils.l2sp_regularisation as l2
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
-
-
-def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
-    """Convert labels to tensor
-
-    Args:
-        labels: labels in array-like, e.g., list or numpy array. shape: (batch_size,)
-
-    Returns:
-        Tensor of labels. shape: (batch_size,). That contains labels from 0 to num_classes - 1.
-    """
-    if isinstance(labels, torch.Tensor):
-        return labels
-
-    le = LabelEncoder()
-    labels = le.fit_transform(labels)
-
-    return torch.tensor(labels)
 
 
 def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
@@ -45,7 +27,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     # step 1 - get a mask for distinct indices
 
     # shape: (batch_size, batch_size)
-    labels = convert_labels_to_tensor(labels)
+    
     batch_size = labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool)
     indices_not_equal = torch.logical_not(indices_equal)
@@ -95,7 +77,7 @@ def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] 
         A negative distance is valid if:
         `labels[i] != labels[j] and i != j`
     """
-    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = labels.detach().clone()
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=tensor_labels.device)
     indices_not_equal = torch.logical_not(indices_equal)
@@ -128,7 +110,7 @@ def get_semi_hard_mask(
     """
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
-    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = labels.detach().clone()
     tensor_labels = tensor_labels.to(device)
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=device)
@@ -264,7 +246,6 @@ class TripletLossOnline(nn.Module):
         anchor_negative_dists: torch.Tensor,
         labels: gtypes.MergedLabels,
     ) -> torch.Tensor:
-        labels = convert_labels_to_tensor(labels)
 
         mask = get_triplet_mask(labels)
         if self.mode == "hard":  # take only the hardest negative as a negative per anchor
