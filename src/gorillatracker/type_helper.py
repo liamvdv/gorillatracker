@@ -2,6 +2,8 @@ from typing import Any, Callable, Tuple, Union
 
 import cv2.typing as cvt
 import torch
+from torch.utils.data import DataLoader
+
 
 # Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
@@ -24,8 +26,8 @@ BatchQuadletIds = Tuple[BatchId, BatchId, BatchId, BatchId]
 BatchQuadletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel, BatchLabel]
 BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
-BatchTripletDataLoader = torch.utils.data.DataLoader[Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]]
-BatchQuadletDataLoader = torch.utils.data.DataLoader[Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]]
+BatchTripletDataLoader = DataLoader[Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]]
+BatchQuadletDataLoader = DataLoader[Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]]
 # BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
 BatchSimpleDataLoader = Any
 

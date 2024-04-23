@@ -18,7 +18,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
+from gorillatracker.ssl_pipeline.ssl_dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
 from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_videos
@@ -124,14 +124,15 @@ def visualize_pipeline(
 def gpu2_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDatasetSmall("sqlite:///test.db")
+    dataset = GorillaDatasetSmall()
+    dataset.setup_database()
     # NOTE(memben): for setup only once
     visualize_pipeline(
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=1,
-        max_worker_per_gpu=1,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
+        n_videos=50,
+        max_worker_per_gpu=12,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
         gpu_ids=[0],
     )
     dataset.post_setup(version)
@@ -154,4 +155,4 @@ def kisz_demo() -> None:
 
 
 if __name__ == "__main__":
-    kisz_demo()
+    gpu2_demo()

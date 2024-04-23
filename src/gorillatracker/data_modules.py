@@ -92,7 +92,9 @@ class NletDataModule(L.LightningDataModule):
 
 
 class TripletDataModule(NletDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+    def get_dataloader(
+        self,
+    ) -> Callable[[Dataset[tuple[gtypes.Id, Any, gtypes.Label]], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
 
 
@@ -101,13 +103,23 @@ class VideoTripletDataModule(TripletDataModule):
         return VideoTripletDataLoader(
             self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
         )
+        
+class SSLTripletDataModule(TripletDataModule):
+    def train_dataloader(self) -> BatchNletDataLoader:
+        return SSLTripletDataLoader(
+            self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
+        )
 
 
 class QuadletDataModule(NletDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
+    def get_dataloader(
+        self,
+    ) -> Callable[[Dataset[tuple[gtypes.Id, Any, gtypes.Label]], int, bool], gtypes.BatchQuadletDataLoader]:
         return QuadletDataLoader
 
 
 class SimpleDataModule(NletDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
+    def get_dataloader(
+        self,
+    ) -> Callable[[Dataset[tuple[gtypes.Id, Any, gtypes.Label]], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader

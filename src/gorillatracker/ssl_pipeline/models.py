@@ -274,6 +274,12 @@ class TrackingFrameFeature(Base):
             raise ValueError(f"frame_nr must be a multiple of {self.video.frame_step}, is {frame_nr}")
         return frame_nr
 
+    @validates("cache_path")
+    def validate_cache_path(self, key: str, value: str) -> str:
+        if not value.startswith("/"):
+            raise ValueError(f"{key} must be an absolute path, is {value}")
+        return value
+
     def __hash__(self) -> int:
         return self.tracking_frame_feature_id
 
@@ -283,7 +289,7 @@ class TrackingFrameFeature(Base):
     def __repr__(self) -> str:
         return f"""tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, 
         frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, 
-        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type})"""
+        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cache_path={self.cache_path})"""
 
 
 class VideoRelationship(Base):
