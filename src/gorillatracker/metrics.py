@@ -268,7 +268,7 @@ def knn(
     train_labels_encoded = torch.tensor(train_labels_encoded)
 
     if use_train_embeddings:
-        print("Using train embeddings for knn")
+        # print("Using train embeddings for knn")
         return knn_with_train(
             val_embeddings,
             val_labels_encoded,
@@ -297,6 +297,11 @@ def knn_with_train(
     4. Select only the validation part of the classification matrix (len(val_embeddings) x num_classes)
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
+    # convert embeddings and labels to tensors
+    val_embeddings = torch.tensor(val_embeddings)
+    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
+    train_embeddings = train_embeddings.clone().detach()  # type: ignore
+    train_labels = torch.tensor(train_labels.tolist())  # type: ignore
 
     combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)  # type: ignore
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
@@ -310,7 +315,12 @@ def knn_with_train(
 
     distance_matrix.fill_diagonal_(float("inf"))
 
-    _, closest_indices = torch.topk(distance_matrix, k, largest=False)
+    _, closest_indices = torch.topk(
+        distance_matrix,
+        k,
+        largest=False,
+        sorted=True,
+    )
     assert closest_indices.shape == (len(combined_embeddings), k)
 
     closest_labels = combined_labels[closest_indices]
@@ -344,7 +354,6 @@ def knn_with_train(
     )
     assert precision is not None
 
-    print("knn done")
     return {
         "accuracy": accuracy.item(),
         "accuracy_top5": accuracy_top5.item(),
@@ -360,26 +369,28 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
         k = num_classes
 
+    # convert embeddings and labels to tensors
+    val_embeddings = torch.tensor(val_embeddings)
+    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
+
     distance_matrix = pairwise_euclidean_distance(val_embeddings)
 
     # Ensure distances on the diagonal are set to a large value so they are ignored
     distance_matrix.fill_diagonal_(float("inf"))
 
     # Find the indices of the closest embeddings for each embedding
-    classification_matrix = torch.zeros((len(distance_matrix), k))
-    for i in range(k):
-        closest_indices = torch.argmin(distance_matrix, dim=1)
-        closest_labels = val_labels[closest_indices]
-        # Set the distance to the closest embedding to a large value so it is ignored
-        distance_matrix[torch.arange(len(distance_matrix)), closest_indices] = float("inf")
-        classification_matrix[:, i] = closest_labels
-    # Calculate the most common label for each embedding
-    # transform classification_matrix of shape (n,k) to (n,num_classes) where num_classes is the number of unique labels
-    # the idea is that in the end the classification_matrix contains the probability for each class for each embedding
-    classification_matrix_cpy = classification_matrix.clone()
-    classification_matrix = torch.zeros((len(classification_matrix), num_classes))
+    classification_matrix = torch.zeros((len(val_embeddings), k))
+
+    _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True)
+    assert closest_indices.shape == (len(val_embeddings), k)
+
+    closest_labels = val_labels[closest_indices]
+    assert closest_labels.shape == closest_indices.shape
+
+    classification_matrix = torch.zeros((len(val_embeddings), num_classes))
     for i in range(num_classes):
-        classification_matrix[:, i] = torch.sum(classification_matrix_cpy == i, dim=1) / k
+        classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
+    assert classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
@@ -400,7 +411,6 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
     )
     assert precision is not None
 
-    print("knn done")
     return {
         "accuracy": accuracy.item(),
         "accuracy_top5": accuracy_top5.item(),
@@ -434,7 +444,7 @@ def pca(
     plot.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.0)
     # plot.figure.savefig("pca.png")
     plot = wandb.Image(plot.figure)
-    print("pca done")
+    # print("pca done")
     return plot
 
 
@@ -473,7 +483,7 @@ def tsne(
     plot.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.0)
     # plot.figure.savefig("tnse.png")
     plot = wandb.Image(plot.figure)
-    print("tsne done")
+    # print("tsne done")
     return plot
 
 

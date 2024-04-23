@@ -78,6 +78,8 @@ class TrainingArgs:
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
+        "softmax/arcface/l2sp",
+        "softmax/vpl/l2sp",
     ] = field(default="offline")
 
     batch_size: int = field(default=8)
@@ -85,6 +87,7 @@ class TrainingArgs:
     gradient_accumulation_steps: int = field(default=1)
     max_epochs: int = field(default=300)
     val_check_interval: float = field(default=1.0)
+    check_val_every_n_epoch: int = field(default=1)
     val_before_training: bool = field(default=False)
     only_val: bool = field(default=False)
     save_interval: float = field(default=10)
@@ -96,6 +99,8 @@ class TrainingArgs:
     data_dir: Path = field(default=Path("./mnist"))
     data_resize_transform: Union[int, None] = field(default=None)
     video_data: bool = field(default=False)
+
+    pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.
 
     def __post_init__(self) -> None:

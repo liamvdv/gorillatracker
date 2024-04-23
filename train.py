@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import torch
@@ -14,6 +15,10 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+
+warnings.filterwarnings("ignore", ".*does not have many workers.*")
+warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
+warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
 
 def main(args: TrainingArgs) -> None:  # noqa: C901
@@ -104,8 +109,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             # we will resume via trainer.fit(ckpt_path=...)
         else:  # load only weights
             model = model_cls(**model_args)  # type: ignore
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
-            model.load_state_dict(torch_load["state_dict"], strict=False)
+            # torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
+            # model.load_state_dict(torch_load["state_dict"], strict=False)
     else:
         model = model_cls(**model_args)  # type: ignore
 
@@ -172,8 +177,10 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     # Initialize trainer
     trainer = Trainer(
+        num_sanity_val_steps=0,
         max_epochs=args.max_epochs,
         val_check_interval=args.val_check_interval,
+        check_val_every_n_epoch=args.check_val_every_n_epoch,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),
@@ -197,12 +204,22 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Effective batch size: {args.batch_size} | "
         )
 
+    if args.pretrained_weights_file is not None:
+        # delete everything in model except model.model
+        for k in list(model.__dict__.keys()):
+            if k != "model" and not k.startswith("_"):
+                del model.__dict__[k]
+        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
+        torch.save(model.state_dict(), args.pretrained_weights_file)
+        logger.info("Model saved")
+        exit(0)
+
     ########### Start val & train loop ###########
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info(f"Rank {current_process_rank} | Validation before training...")
-        val_result = trainer.validate(model, dm)
-        print(val_result)
+        trainer.validate(model, dm)
+
         if args.only_val:
             exit(0)
 
@@ -216,6 +233,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
+
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
@@ -230,6 +248,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
             logger.success("Saving finished!")
+    else:
+        logger.info("Rank is not 0, skipping checkpoint saving...")
 
 
 if __name__ == "__main__":
