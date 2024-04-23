@@ -54,6 +54,11 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         model_cls.get_training_transforms(),  # type: ignore
     )
 
+    kfold_k = 1
+    if args.kfold:
+        kfold_k = int(str(args.data_dir).split("-")[-1])
+        dm.val_fold = 0
+        dm.k = kfold_k
     ################# Construct model ##############
 
     # Resume from checkpoint if specified
@@ -206,8 +211,18 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         if args.only_val:
             exit(0)
 
+    
     logger.info(f"Rank {current_process_rank} | Starting training...")
-    trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
+    for i in range(kfold_k):
+        logger.info(f"Rank {current_process_rank} | k-fold iteration {i}...")
+        if args.kfold:
+            dm.val_fold = i
+            model.num_classes = (
+                (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
+                if not args.video_data
+                else (-1, -1, -1)
+            )
+        trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
 
     if trainer.interrupted:
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")

@@ -3,7 +3,7 @@ from typing import Any, Callable, Literal, Optional, Type
 
 import lightning as L
 import torchvision.transforms as transforms
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, ConcatDataset
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader, VideoTripletDataLoader
@@ -111,3 +111,68 @@ class QuadletDataModule(NletDataModule):
 class SimpleDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader
+
+
+class KFoldDataModule(NletDataModule):
+    def __init__(
+        self,
+        data_dir: str,
+        batch_size: int = 32,
+        dataset_class: Optional[Type[Dataset[Any]]] = None,
+        transforms: Optional[gtypes.Transform] = None,
+        training_transforms: Optional[gtypes.Transform] = None,
+        val_fold: int = 0,
+        k: int = 5,
+    ) -> None:
+        super().__init__()
+        self.transforms = transforms
+        self.training_transforms = training_transforms
+        self.dataset_class = dataset_class
+        self.data_dir = data_dir
+        self.batch_size = batch_size
+        self.val_fold = val_fold
+        self.k = k
+    
+    def setup(self, stage: str) -> None:
+        assert self.dataset_class is not None, "dataset_class must be set before calling setup"
+        logger.info(
+            f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}"
+        )
+
+        if stage == "fit":
+            datasets = []
+            for i in range(self.k):
+                if i != self.val_fold:
+                    datasets.append(self.dataset_class(self.data_dir, partition=f"fold-{i}", transform=transforms.Compose([self.transforms, self.training_transforms])))  # type: ignore
+            self.train = ConcatDataset(datasets)
+            self.val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
+        elif stage == "test":
+            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+        elif stage == "validate":
+            self.val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
+        elif stage == "predict":
+            # TODO(liamvdv): delay until we know how things should look.
+            # self.predict = None
+            raise ValueError("stage predict not yet supported by data module.")
+        else:
+            raise ValueError(f"unknown stage '{stage}'")
+    
+    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
+        if mode == "train":
+            datasets = []
+            for i in range(self.k):
+                if i != self.val_fold:
+                    datasets.append(self.dataset_class(self.data_dir, partition=f"fold-{i}", transform=transforms.Compose([self.transforms, self.training_transforms])))  # type: ignore
+            train = ConcatDataset(datasets)
+            return train.get_num_classes()  # type: ignore
+        elif mode == "val":
+            val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
+            return val.get_num_classes()  # type: ignore
+        elif mode == "test":
+            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            return test.get_num_classes()  # type: ignore
+        else:
+            raise ValueError(f"unknown mode '{mode}'")
+    
+    def get_dataloader(self) -> Any:
+        return TripletDataLoader

@@ -79,6 +79,7 @@ class TrainingArgs:
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
     ] = field(default="offline")
+    kfold: bool = field(default=False)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

@@ -311,7 +311,7 @@ def VideoTripletDataLoader(
     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
     dataset will be shuffled once at the start and not after that.
     """
-    sampler = VideoTripletSampler(dataset, data_dir=data_dir)
+    sampler = TripletSampler(dataset, data_dir=data_dir)
     if not shuffle:
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(dataset)
@@ -330,3 +330,4 @@ if __name__ == "__main__":
     print("created DataLoader")
     # print first batch label
     next(iter(dataloader))
+    
