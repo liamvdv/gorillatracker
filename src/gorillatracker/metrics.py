@@ -20,7 +20,7 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.utils.labelencoder import LabelEncoder_Simple
+from gorillatracker.utils.labelencoder import LabelEncoder_Local
 
 # TODO: What is the wandb run type?
 Runner = Any
@@ -68,7 +68,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
         return train_embeddings.cpu(), train_labels.cpu()
-    
+
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
         current_step = trainer.global_step
@@ -218,7 +218,7 @@ def evaluate_embeddings(
     train_labels = torch.tensor(train_labels)
     val_labels = val_labels.type(torch.int64)
     train_labels = train_labels.type(torch.int64)
-    
+
     val_train_labels = torch.cat([val_labels, train_labels], dim=0)
 
     nval = len(val_labels)
@@ -251,23 +251,22 @@ def knn(
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
 ) -> Dict[str, Any]:
-    
+
     # sort by label
     val_labels, indices = torch.sort(val_labels)
     val_embeddings = val_embeddings[indices]
-    
+
     train_labels, indices = torch.sort(train_labels)
     train_embeddings = train_embeddings[indices]
-    
+
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
-    le = LabelEncoder_Simple()
+    le = LabelEncoder_Local()
     val_labels_encoded = le.transform_list(val_labels.tolist())
     val_labels_encoded = torch.tensor(val_labels_encoded)
-    
+
     train_labels_encoded = le.transform_list(train_labels.tolist())
     train_labels_encoded = torch.tensor(train_labels_encoded)
-    
-    
+
     if use_train_embeddings:
         print("Using train embeddings for knn")
         return knn_with_train(
@@ -326,7 +325,6 @@ def knn_with_train(
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
-
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
@@ -383,8 +381,6 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
     for i in range(num_classes):
         classification_matrix[:, i] = torch.sum(classification_matrix_cpy == i, dim=1) / k
 
-
-
     accuracy = tm.functional.accuracy(
         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
     )
@@ -420,7 +416,7 @@ def pca(
     num_classes = len(torch.unique(labels))
     embeddings = embeddings.numpy()
     labels = labels.numpy()
-    
+
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
     embeddings = pca.transform(embeddings)
@@ -448,7 +444,7 @@ def tsne(
     num_classes = len(torch.unique(labels))
     embeddings = embeddings.numpy()
     labels = labels.numpy()
-    
+
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]

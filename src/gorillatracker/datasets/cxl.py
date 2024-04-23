@@ -8,9 +8,8 @@ from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
-
-from gorillatracker.utils.labelencoder import LabelEncoder_Singleton
 from gorillatracker.type_helper import Id, Label
+from gorillatracker.utils.labelencoder import LabelEncoder_Global
 
 
 def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
@@ -29,7 +28,7 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
-    le = LabelEncoder_Singleton()
+    le = LabelEncoder_Global()
     return le.transform_list(labels)
 
 

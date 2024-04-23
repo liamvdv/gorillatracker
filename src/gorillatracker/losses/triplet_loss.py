@@ -26,7 +26,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     # step 1 - get a mask for distinct indices
 
     # shape: (batch_size, batch_size)
-    
+
     batch_size = labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool)
     indices_not_equal = torch.logical_not(indices_equal)

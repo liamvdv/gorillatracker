@@ -4,7 +4,7 @@ from typing import Any, Tuple
 import torch
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.utils.labelencoder import LabelEncoder_Simple
+from gorillatracker.utils.labelencoder import LabelEncoder_Local
 
 # import variational prototype learning from insightface
 
@@ -38,13 +38,13 @@ class ArcFaceLoss(torch.nn.Module):
 
         torch.nn.init.xavier_uniform_(self.prototypes)
         self.ce = torch.nn.CrossEntropyLoss()
-        self.le = LabelEncoder_Simple() # NOTE: new LabelEncoder_Simple instance (range 0:num_classes-1)
+        self.le = LabelEncoder_Local()  # NOTE: new LabelEncoder_Simple instance (range 0:num_classes-1)
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
 
         assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
-        
+
         labels = self.le.transform_list(labels.tolist())
         labels = torch.tensor(labels, device=embeddings.device)
 
@@ -128,7 +128,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         self.memory_bank = torch.zeros(delta_t * batch_size, embedding_size)
         self.memory_bank_labels = torch.zeros(delta_t * batch_size, dtype=torch.int32)
         self.using_memory_bank = False
-        self.le = LabelEncoder_Simple() # NOTE: new LabelEncoder_Simple instance (range 0:num_classes-1)
+        self.le = LabelEncoder_Local()  # NOTE: new LabelEncoder_Simple instance (range 0:num_classes-1)
 
     def set_using_memory_bank(self, using_memory_bank: bool) -> bool:
         """Sets whether or not to use the memory bank"""
@@ -211,10 +211,10 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the Variational Prototype Learning loss function"""
-        
+
         labels = self.le.transform_list(labels.tolist())
         labels = torch.tensor(labels, device=embeddings.device)
-        
+
         prototypes = self.calculate_prototype(embeddings, labels)
 
         cos_theta = (
