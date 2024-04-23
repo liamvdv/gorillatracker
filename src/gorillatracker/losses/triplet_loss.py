@@ -2,7 +2,6 @@ from typing import Any, Callable, Dict, List, Literal, Union
 
 import torch
 import torch.nn.functional as F
-# from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 import gorillatracker.type_helper as gtypes

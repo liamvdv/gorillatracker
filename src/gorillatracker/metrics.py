@@ -16,11 +16,11 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
-from sklearn.preprocessing import LabelEncoder as LabelEncoderSklearn
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.utils.labelencoder import LabelEncoder_Simple
 
 # TODO: What is the wandb run type?
 Runner = Any
@@ -260,10 +260,11 @@ def knn(
     train_embeddings = train_embeddings[indices]
     
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
-    val_labels_encoded = LabelEncoderSklearn().fit_transform(val_labels.tolist())
+    le = LabelEncoder_Simple()
+    val_labels_encoded = le.transform_list(val_labels.tolist())
     val_labels_encoded = torch.tensor(val_labels_encoded)
     
-    train_labels_encoded = LabelEncoderSklearn().fit_transform(train_labels.tolist())
+    train_labels_encoded = le.transform_list(train_labels.tolist())
     train_labels_encoded = torch.tensor(train_labels_encoded)
     
     

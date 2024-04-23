@@ -10,7 +10,7 @@ from torchvision import transforms
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
 
-from gorillatracker.utils.labelencoder import LabelEncoder
+from gorillatracker.utils.labelencoder import LabelEncoder_Singleton
 
 Label = Union[int, str]
 
@@ -31,7 +31,7 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
-    le = LabelEncoder()
+    le = LabelEncoder_Singleton()
     return le.transform_list(labels)
 
 
