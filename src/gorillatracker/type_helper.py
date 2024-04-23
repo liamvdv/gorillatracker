@@ -1,6 +1,7 @@
 from typing import Any, Callable, Tuple, Union
 
 import cv2.typing as cvt
+from PIL.Image import Image as PILImage
 import torch
 
 # Position top left, bottom right
@@ -11,6 +12,9 @@ Id = str
 Label = Union[str, int]
 TripletLabel = Tuple[Label, Label, Label]
 TripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+
+ImageLabel = Tuple[Id, PILImage, Label]
+Nlet = Tuple[ImageLabel, ...]
 
 BatchId = Tuple[Id, ...]
 BatchLabel = Tuple[Label, ...]
