@@ -1,8 +1,8 @@
 from typing import Any, Callable, Tuple, Union
 
 import cv2.typing as cvt
-from PIL.Image import Image as PILImage
 import torch
+from PIL.Image import Image as PILImage
 
 # Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
@@ -10,16 +10,21 @@ Image = cvt.MatLike
 
 Id = str
 Label = Union[str, int]
-TripletLabel = Tuple[Label, Label, Label]
-TripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
 ImageLabel = Tuple[Id, PILImage, Label]
-Nlet = Tuple[ImageLabel, ...]
+FlatNlet = Tuple[ImageLabel, ...]
+
+NletIds = Tuple[Id, ...]
+NletLabel = Tuple[Label, ...]
+NletValue = Tuple[torch.Tensor, ...]
+Nlet = Tuple[NletIds, NletValue, NletLabel]
+
 
 BatchId = Tuple[Id, ...]
 BatchLabel = Tuple[Label, ...]
 BatchTripletIds = Tuple[BatchId, BatchId, BatchId]
 BatchTripletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel]
+# stacked tensors
 BatchTripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
 LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -28,17 +33,22 @@ BatchQuadletIds = Tuple[BatchId, BatchId, BatchId, BatchId]
 BatchQuadletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel, BatchLabel]
 BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
-BatchTripletDataLoader = torch.utils.data.DataLoader[Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]]
-BatchQuadletDataLoader = torch.utils.data.DataLoader[Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]]
-# BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
-BatchSimpleDataLoader = Any
-
-BatchNletDataLoader = Union[BatchTripletDataLoader, BatchQuadletDataLoader]
-
 TripletBatch = Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]
 QuadletBatch = Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]
 
-NletBatch = Union[TripletBatch, QuadletBatch]
+NletBatchIds = Tuple[BatchId, ...]
+NletBatchLabels = Tuple[BatchLabel, ...]
+NletBatchValues = Tuple[torch.Tensor, ...]
+
+NletBatch = Tuple[NletBatchIds, NletBatchValues, NletBatchLabels]
+
+BatchTripletDataLoader = torch.utils.data.DataLoader[TripletBatch]
+BatchQuadletDataLoader = torch.utils.data.DataLoader[QuadletBatch]
+# BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
+BatchSimpleDataLoader = Any
+
+BatchNletDataLoader = torch.utils.data.DataLoader[NletBatch]
+
 
 MergedLabels = Union[BatchLabel, torch.Tensor]
 
