@@ -4,12 +4,13 @@ from typing import Dict, List, Optional
 import cv2
 from ultralytics import YOLO
 
+import gorillatracker.type_helper as gtypes
 import gorillatracker.utils.cutout_helpers as cutout_helpers
 import gorillatracker.utils.visualizer_helpers as visualizer_helpers
 
 
 def _group_images_by_label(images: List[str]) -> Dict[str, List[str]]:
-    images_grouped = {}
+    images_grouped: Dict[str, List[str]] = {}
     for image in images:
         image_group = image[:4]
         if image_group not in images_grouped:
@@ -18,9 +19,7 @@ def _group_images_by_label(images: List[str]) -> Dict[str, List[str]]:
     return images_grouped
 
 
-def _get_labeled_bbox(
-    src_dir: str, label_dir: str, labeled_images: List[str]
-) -> Dict[str, cutout_helpers.BOUNDING_BOX]:
+def _get_labeled_bbox(src_dir: str, label_dir: str, labeled_images: List[str]) -> Dict[str, gtypes.BoundingBox]:
     labeled_bbox = {}
     for label in labeled_images:
         src_image_path = os.path.join(src_dir, label)
@@ -31,7 +30,7 @@ def _get_labeled_bbox(
     return labeled_bbox
 
 
-def _create_reference_plot(full_images: str, src_dir: str, bbox: Dict[str, cutout_helpers.BOUNDING_BOX]) -> None:
+def _create_reference_plot(full_images: list[str], src_dir: str, bbox: Dict[str, gtypes.BoundingBox]) -> None:
     images = []
     for image_name in full_images:
         image_path = os.path.join(src_dir, image_name)
@@ -42,7 +41,7 @@ def _create_reference_plot(full_images: str, src_dir: str, bbox: Dict[str, cutou
     visualizer_helpers.create_image_grid(images).savefig("reference_plot.png")
 
 
-def _predict_bbox(image_path: str, model: YOLO) -> List[cutout_helpers.BOUNDING_BOX]:
+def _predict_bbox(image_path: str, model: YOLO) -> List[gtypes.BoundingBox]:
     result = model(image_path)[0]
     bbox = result.boxes.xyxy.cpu().numpy()
     bbox = bbox.reshape(-1, 2, 2)
@@ -50,7 +49,7 @@ def _predict_bbox(image_path: str, model: YOLO) -> List[cutout_helpers.BOUNDING_
     return bbox
 
 
-def _label_image(image_path, model: YOLO) -> Optional[cutout_helpers.BOUNDING_BOX]:
+def _label_image(image_path: str, model: YOLO) -> Optional[gtypes.BoundingBox]:
     image = cv2.imread(image_path)
     bbox = _predict_bbox(image_path, model)
 
@@ -117,6 +116,6 @@ def label_dataset(src_dir: str, target_dir: str, model: YOLO) -> None:
 if __name__ == "__main__":
     src_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/full_images"
     target_dir = "/workspaces/gorillatracker/data/ground_truth/cxl/face_images"
-    model_path = "/workspaces/gorillatracker/models/yolov8n_gorillaface_pkmbzis.pt"
+    model_path = "/workspaces/gorillatracker/models/yolov8n_gorilla_face_90.pt"
     model = YOLO(model_path)
     label_dataset(src_dir, target_dir, model)
