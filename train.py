@@ -174,6 +174,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     trainer = Trainer(
         max_epochs=args.max_epochs,
         val_check_interval=args.val_check_interval,
+        check_val_every_n_epoch=args.check_val_every_n_epoch,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),
@@ -189,6 +190,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
         # reload_dataloaders_every_n_epochs=1,
     )
+    
 
     if current_process_rank == 0:
         logger.info(
@@ -219,6 +221,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
+        logger.info(f"Checkpoint saved to {save_path}")
 
         if args.save_model_to_wandb:
             logger.info("Collecting PL checkpoint for wandb...")
