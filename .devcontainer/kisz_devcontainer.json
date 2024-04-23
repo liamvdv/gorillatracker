@@ -30,8 +30,8 @@
         // DO NOT COMMIT THIS ENABLED TO REMOTE.
         // "--gpus",
         // "device=0",
-        // "-u",
-        // "0"
+        "-u",
+        "0"
     ],
     // ------------------------------------------------------------
     // Setup your mounts and env vars like for a docker run command
@@ -46,7 +46,7 @@
     "mounts": [
         "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,ro", // NOTE(memben): this is to get access to github 
         "source=${localEnv:HOME}/YOURNAME/.netrc,target=/home/mamba/.netrc,type=bind", // this is to get WANDB_API_KEY from .netrc
-        "source=${localEnv:HOME}/YOURNAME/.gitconfig,target=/home/mamba/.gitconfig,type=bind", // this is to get git credentials
+        "source=${localEnv:HOME}/YOURNAME/.gitconfig,target=/root/.gitconfig,type=bind", // this is to get git credentials
         "source=${localEnv:HOME}/YOURNAME/.cache,target=/home/mamba/.cache,type=bind", // general cache directory
         // GorillaTracker specific mounts.
         // NOTE(liamvdv): You have NO GOOD REASON to mount this dir as non-read-only. Please consult team if you think you need it.

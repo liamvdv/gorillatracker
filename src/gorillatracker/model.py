@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Callable, Dict, Literal, Tuple, Type
+from typing import Any, Callable, Dict, List, Literal, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -168,7 +168,11 @@ class BaseModule(L.LightningModule):
         self.loss_mode = loss_mode
 
         ##### Create Table embeddings_table
-        self.embeddings_table_columns = ["label", "embedding"]
+        self.embeddings_table_columns = [
+            "label",
+            "embedding",
+            "id",
+        ]  # note that the dataloader usually returns the order (id, embedding, label)
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
 
     def set_losses(
@@ -230,7 +234,7 @@ class BaseModule(L.LightningModule):
             logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        images, labels = batch
+        ids, images, labels = batch
         
         # assert isinstance(labels, list) and isinstance(labels[0], torch.tensor), f"Labels should be a list of tensor batches with ints, got {type(labels)}"
         labels = torch.cat(labels, dim=0).to(self.device)
@@ -244,17 +248,20 @@ class BaseModule(L.LightningModule):
         self.log("train/negative_distance", neg_dist, on_step=True)
         return loss
 
-    def add_validation_embeddings(self, anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels) -> None:
+    def add_validation_embeddings(
+        self, anchor_ids: List[str], anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels
+    ) -> None:
         # save anchor embeddings of validation step for later analysis in W&B
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
         embeddings = embeddings.cpu()
 
-        assert len(self.embeddings_table_columns) == 2
+        assert len(self.embeddings_table_columns) == 3
         data = {
             self.embeddings_table_columns[0]: (
                 anchor_labels.tolist()  # type: ignore
             ),
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
+            self.embeddings_table_columns[2]: anchor_ids,
         }
 
         df = pd.DataFrame(data)
@@ -262,15 +269,15 @@ class BaseModule(L.LightningModule):
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
-        n_achors = len(images[0])
+        ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
+        n_anchors = len(images[0])
         vec = torch.cat(images, dim=0)
         flat_labels = (
             torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
         )
+        flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
-
-        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
+        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
         if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
