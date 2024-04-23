@@ -144,7 +144,6 @@ dmypy.json
 /ultralytics
 yolov8n.pt
 /.vscode
-.devcontainer
 /runs
 /checkpoints
 /gorillavision
@@ -160,3 +159,4 @@ mnist/
 *.db
 *visualized.mp4
 cropped_images/*
+.devcontainer/devcontainer.json
