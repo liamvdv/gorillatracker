@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 from PIL import Image
 from torch.utils.data import Dataset
@@ -7,8 +7,6 @@ from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
-
-Label = Union[int, str]
 
 
 def get_samples_video(dirpath: Path) -> List[Tuple[Path, str]]:
@@ -44,7 +42,7 @@ def get_samples_cxl(dirpath: Path) -> List[Tuple[Path, str]]:
     return samples
 
 
-class SPACVideosDataset(Dataset[Tuple[Image.Image, Label]]):
+class SPACVideosDataset(Dataset[Tuple[gtypes.Id, Image.Image, gtypes.Label]]):
     def __init__(
         self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
     ):
@@ -69,12 +67,12 @@ class SPACVideosDataset(Dataset[Tuple[Image.Image, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[Image.Image, str]:
+    def __getitem__(self, idx: int) -> Tuple[str, Image.Image, str]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
-        return img, label
+        return str(img_path), img, label
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:

@@ -59,7 +59,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_embedding_batches = []
         train_labels = []
         for batch in self.train_dataloader:
-            images, labels = batch
+            ids, images, labels = batch
             anchor_images = images[0].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
@@ -147,7 +147,7 @@ def get_n_samples_from_dataloader(
 ) -> List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]]:
     samples: List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]] = []
     for batch in dataloader:
-        images, labels = batch
+        ids, images, labels = batch
         row_batch = zip(zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))

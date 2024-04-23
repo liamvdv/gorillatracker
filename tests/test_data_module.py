@@ -10,11 +10,19 @@ def save_image(tensor: torch.Tensor, path: str) -> None:
 
 
 def test_offline_data_module() -> None:
-    dm = get_data_module("gorillatracker.datasets.mnist.MNISTDataset", "./mnist", 1, "offline", False, lambda x: x)
+    dm = get_data_module(
+        "gorillatracker.datasets.mnist.MNISTDataset",
+        "./mnist",
+        1,
+        "offline",
+        False,
+        lambda x: x,
+        training_transforms=lambda x: x,
+    )
     dm.setup("fit")
     dl = dm.train_dataloader()
     for i, batch in enumerate(dl):
-        images, labels = batch
+        ids, images, labels = batch
 
         a, p, n = images
         # save_image(a[0], f"tests/{i}_anchor.png")

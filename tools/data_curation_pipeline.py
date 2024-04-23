@@ -156,7 +156,7 @@ class CurationPipeline:
         )
         embeddings = []
         for batch in tqdm.tqdm(dataloader):
-            embeddings.append(self.embedding_model(batch[0].to(self.device)).cpu())
+            embeddings.append(self.embedding_model(batch[1].to(self.device)).cpu())
         paths, labels = zip(*dataset.samples)
         return torch.cat(embeddings, dim=0), paths, labels
 
