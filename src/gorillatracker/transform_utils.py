@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from PIL.Image import Image
 from torchvision.transforms.functional import pad
 
@@ -17,11 +18,10 @@ class TensorSquarePad(torch.nn.Module):
         pad_bottom = pad_h - pad_top
         pad_left = pad_w // 2
         pad_right = pad_w - pad_left
-        padded_tensor = pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), value=self.pad_value)
+        padded_tensor = F.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), value=self.pad_value)
         return padded_tensor
 
 
-# TODO(memben): Sunset this
 class SquarePad:
     def __call__(self, image: Image) -> Image:
         # calc padding
