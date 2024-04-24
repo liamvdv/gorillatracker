@@ -18,7 +18,7 @@ class SSLDataset(Dataset[Nlet]):
         contrastive_sampler: ContrastiveSampler,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
-        transform: gtypes.Transform,
+        transform: gtypes.TensorTransform,
     ):
         self.contrastive_sampler = contrastive_sampler
         self.nlet_builder = nlet_builder
@@ -35,7 +35,7 @@ class SSLDataset(Dataset[Nlet]):
     def stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
         ids = tuple(img.image_path for img in flat_nlet)
         labels = tuple(img.class_label for img in flat_nlet)
-        values = tuple(self.transform(img.image) for img in flat_nlet)
+        values = tuple(self.transform(img.image_tensor) for img in flat_nlet)
         return Nlet(ids, values, labels)
 
 

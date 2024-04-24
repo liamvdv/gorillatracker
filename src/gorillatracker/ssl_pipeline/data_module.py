@@ -5,12 +5,11 @@ import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-from gorillatracker.datasets.cxl import CXLDataset
 import gorillatracker.ssl_pipeline.contrastive_sampler as contrastive_sampler
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
+from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.ssl_pipeline.dataset import SSLDataset, build_triplet
-from gorillatracker.transform_utils import SquarePad
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,8 +19,8 @@ class SSLDataModule(L.LightningDataModule):
     def __init__(
         self,
         batch_size: int = 32,
-        transforms: gtypes.Transform = lambda x: x,
-        training_transforms: gtypes.Transform = lambda x: x,
+        transforms: gtypes.TensorTransform = lambda x: x,
+        training_transforms: gtypes.TensorTransform = lambda x: x,
     ) -> None:
         super().__init__()
         self.transforms = transforms
@@ -38,39 +37,38 @@ class SSLDataModule(L.LightningDataModule):
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
             )
+            self.setup_val()
         elif stage == "test":
             raise NotImplementedError("test not yet supported by data module.")
         elif stage == "validate":
-            raise NotImplementedError("validate not yet supported by data module.")
+            self.setup_val()
         elif stage == "predict":
             self.predict = None
             raise NotImplementedError("stage predict not yet supported by data module.")
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    def train_dataloader(self) -> gtypes.BatchNletDataLoader:
-        self.setup("fit")
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn) # type: ignore
+    def setup_val(self) -> None:
+        self.triplet_data_module = TripletDataModule(
+            "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
+            dataset_class=CXLDataset,
+            batch_size=self.batch_size,
+            transforms=transforms.Compose([CXLDataset.get_transforms(), self.transforms]),
+            training_transforms=self.training_transforms,
+        )
+        self.triplet_data_module.setup("fit")
+
+    def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
 
     # TODO(memben)
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
-        data_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-        dm = TripletDataModule(
-            data_dir,
-            dataset_class=CXLDataset,
-            batch_size=self.batch_size,
-            transforms=self.transforms,
-            training_transforms=self.training_transforms,
-        )
-        dm.setup("fit")
-        return dm.train_dataloader()
+        return self.triplet_data_module.val_dataloader()
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
-        self.setup("test")
         raise NotImplementedError("test_dataloader not implemented")
 
     def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
-        self.setup("predict")
         raise NotImplementedError("predict_dataloader not implemented")
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
@@ -79,20 +77,9 @@ class SSLDataModule(L.LightningDataModule):
         values = tuple(torch.stack(nlet.values) for nlet in batch)
         return ids, values, labels
 
-    @classmethod
-    def get_transforms(cls) -> gtypes.Transform:
-        return transforms.Compose(
-            [
-                SquarePad(),
-                transforms.Resize(224),
-                transforms.ToTensor(),
-                # Uniform input, you may choose higher/lower sizes.
-            ]
-        )
-
 
 if __name__ == "__main__":
-    dm = SSLDataModule(transforms=SSLDataModule.get_transforms())
+    dm = SSLDataModule(transforms=transforms.ToTensor())
     print("Data Module created")
     dm.setup("fit")
     print("Data Module setup")

@@ -3,9 +3,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+import torch
 from PIL import Image
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from torchvision import transforms
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
@@ -20,6 +22,10 @@ class ContrastiveImage:
     @property
     def image(self) -> Image.Image:
         return Image.open(self.image_path)
+
+    @property
+    def image_tensor(self) -> torch.Tensor:
+        return transforms.ToTensor()(self.image)
 
 
 class ContrastiveSampler(ABC):

@@ -28,6 +28,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
+from gorillatracker.transform_utils import TensorSquarePad
 
 
 def warmup_lr(
@@ -741,6 +742,7 @@ class SwinV2BaseWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                TensorSquarePad(),
                 transforms.Resize((192), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
