@@ -50,7 +50,7 @@ class SSLDataModule(L.LightningDataModule):
 
     def setup_val(self) -> None:
         self.triplet_data_module = TripletDataModule(
-            "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
+            "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
             dataset_class=CXLDataset,
             batch_size=self.batch_size,
             transforms=transforms.Compose([CXLDataset.get_transforms(), self.transforms]),

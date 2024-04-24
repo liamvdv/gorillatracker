@@ -742,7 +742,7 @@ class SwinV2BaseWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                TensorSquarePad(),
+                TensorSquarePad(),  # NOTE(memben): For SSL, does not change CXL behavior
                 transforms.Resize((192), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]

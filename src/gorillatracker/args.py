@@ -95,7 +95,10 @@ class TrainingArgs:
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
     data_resize_transform: Union[int, None] = field(default=None)
-    video_data: bool = field(default=False)
+
+    # SSL Config
+    ssl: bool = field(default=False)
+
     # Add any additional fields as needed.
 
     def __post_init__(self) -> None:
