@@ -5,6 +5,7 @@ import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
+from gorillatracker.datasets.cxl import CXLDataset
 import gorillatracker.ssl_pipeline.contrastive_sampler as contrastive_sampler
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
@@ -49,32 +50,28 @@ class SSLDataModule(L.LightningDataModule):
 
     def train_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("fit")
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn) # type: ignore
 
     # TODO(memben)
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
         data_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
         dm = TripletDataModule(
             data_dir,
+            dataset_class=CXLDataset,
             batch_size=self.batch_size,
             transforms=self.transforms,
             training_transforms=self.training_transforms,
         )
-        dm.setup("train")
+        dm.setup("fit")
         return dm.train_dataloader()
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("test")
         raise NotImplementedError("test_dataloader not implemented")
-        return DataLoader(self.test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn)
 
     def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("predict")
         raise NotImplementedError("predict_dataloader not implemented")
-
-    def teardown(self, stage: str) -> None:
-        # NOTE(liamvdv): used to clean-up when the run is finished
-        pass
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
         ids = tuple(nlet.ids for nlet in batch)

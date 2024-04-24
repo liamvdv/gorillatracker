@@ -3,6 +3,7 @@ from typing import Any, Callable, Tuple, Union
 
 import cv2.typing as cvt
 import torch
+from torch.utils.data import DataLoader
 
 # Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
@@ -45,12 +46,12 @@ NletBatchValues = Tuple[torch.Tensor, ...]
 
 NletBatch = Tuple[NletBatchIds, NletBatchValues, NletBatchLabels]
 
-BatchTripletDataLoader = torch.utils.data.DataLoader[TripletBatch]
-BatchQuadletDataLoader = torch.utils.data.DataLoader[QuadletBatch]
+BatchTripletDataLoader = DataLoader[TripletBatch]
+BatchQuadletDataLoader = DataLoader[QuadletBatch]
 # BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
 BatchSimpleDataLoader = Any
 
-BatchNletDataLoader = torch.utils.data.DataLoader[NletBatch]
+BatchNletDataLoader = DataLoader[NletBatch]
 
 
 MergedLabels = Union[BatchLabel, torch.Tensor]
