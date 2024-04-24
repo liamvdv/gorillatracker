@@ -9,7 +9,7 @@ import gorillatracker.ssl_pipeline.contrastive_sampler as contrastive_sampler
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
 from gorillatracker.datasets.cxl import CXLDataset
-from gorillatracker.ssl_pipeline.dataset import SSLDataset, build_triplet
+from gorillatracker.ssl_pipeline.ssl_dataset import SSLDataset, build_triplet
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

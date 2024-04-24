@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
 from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_videos
-from gorillatracker.ssl_pipeline.ssl_dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
+from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize

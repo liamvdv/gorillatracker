@@ -102,7 +102,6 @@ class TrainingArgs:
     # SSL Config
     ssl: bool = field(default=False)
 
-
     pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.
 
