@@ -1,8 +1,8 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Tuple, Union
 
 import cv2.typing as cvt
 import torch
-from PIL.Image import Image as PILImage
 
 # Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
@@ -11,13 +11,16 @@ Image = cvt.MatLike
 Id = str
 Label = Union[str, int]
 
-ImageLabel = Tuple[Id, PILImage, Label]
-FlatNlet = Tuple[ImageLabel, ...]
-
 NletIds = Tuple[Id, ...]
 NletLabel = Tuple[Label, ...]
 NletValue = Tuple[torch.Tensor, ...]
-Nlet = Tuple[NletIds, NletValue, NletLabel]
+
+
+@dataclass(frozen=True)
+class Nlet:
+    ids: NletIds
+    values: NletValue
+    labels: NletLabel
 
 
 BatchId = Tuple[Id, ...]

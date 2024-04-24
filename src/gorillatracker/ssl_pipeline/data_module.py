@@ -6,11 +6,11 @@ import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-import gorillatracker.ssl_pipeline.graph_builder as graph_builder
+import gorillatracker.ssl_pipeline.contrastive_sampler as contrastive_sampler
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.dataset import SSLDataset, build_quadlet, build_triplet
-from gorillatracker.transform_utils import SquarePad
+from gorillatracker.ssl_pipeline.dataset import SSLDataset, build_triplet
 from gorillatracker.train_utils import get_dataset_class
+from gorillatracker.transform_utils import SquarePad
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,25 +31,17 @@ class SSLDataModule(L.LightningDataModule):
     def setup(self, stage: str) -> None:
         print("Setting up data module ", stage)
         if stage == "fit":
-            train_graph = graph_builder.DEMO_get_clique_graph()
+            train_sampler = contrastive_sampler.WIP_clique_sampler()
             self.train = SSLDataset(
-                train_graph,
+                train_sampler,
                 build_triplet,
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
             )
-            self.val = self.train  # TODO(memben)
         elif stage == "test":
-            self.test = None
             raise NotImplementedError("test not yet supported by data module.")
         elif stage == "validate":
-            train_graph = graph_builder.DEMO_get_clique_graph()
-            self.val = SSLDataset(
-                train_graph,
-                build_triplet,
-                "train",
-                transform=transforms.Compose([self.transforms, self.training_transforms]),
-            )  # TODO(memben)
+            raise NotImplementedError("validate not yet supported by data module.")
         elif stage == "predict":
             self.predict = None
             raise NotImplementedError("stage predict not yet supported by data module.")
@@ -61,8 +53,7 @@ class SSLDataModule(L.LightningDataModule):
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
 
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
-        self.setup("validate")
-        return DataLoader(self.val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn)
+        
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("test")
@@ -77,21 +68,11 @@ class SSLDataModule(L.LightningDataModule):
         # NOTE(liamvdv): used to clean-up when the run is finished
         pass
 
-    def collate_fn(self, batch: list[gtypes.FlatNlet]) -> gtypes.NletBatch:
-        nlets = tuple(self.collate_flat_nlet(flat_nlet) for flat_nlet in batch)
-
-        ids_batch = tuple(nlet[0] for nlet in nlets)
-        values_batch = tuple(torch.stack(nlet[1]) for nlet in nlets)
-        labels_batch = tuple(nlet[2] for nlet in nlets)
-
-        return ids_batch, values_batch, labels_batch
-
-    def collate_flat_nlet(self, flat_nlet: gtypes.FlatNlet) -> gtypes.Nlet:
-        ids = tuple(image_label[0] for image_label in flat_nlet)
-        images = tuple(image_label[1] for image_label in flat_nlet)
-        labels = tuple(image_label[2] for image_label in flat_nlet)
-        image_tensors = tuple(torch.tensor(np.array(image)) for image in images)
-        return ids, image_tensors, labels
+    def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
+        ids = tuple(nlet.ids for nlet in batch)
+        labels = tuple(nlet.labels for nlet in batch)
+        values = tuple(torch.stack(nlet.values) for nlet in batch)
+        return ids, values, labels
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:
