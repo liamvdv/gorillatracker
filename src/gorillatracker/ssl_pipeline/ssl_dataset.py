@@ -36,7 +36,7 @@ class SSLDataset(Dataset[Nlet]):
         ids = tuple(img.image_path for img in flat_nlet)
         labels = tuple(img.class_label for img in flat_nlet)
         values = tuple(self.transform(img.image_tensor) for img in flat_nlet)
-        return Nlet(ids, values, labels)
+        return ids, values, labels
 
 
 def build_triplet(

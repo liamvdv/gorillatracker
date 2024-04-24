@@ -73,9 +73,9 @@ class SSLDataModule(L.LightningDataModule):
         raise NotImplementedError
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
-        ids = tuple(nlet.ids for nlet in batch)
-        labels = tuple(nlet.labels for nlet in batch)
-        values = tuple(torch.stack(nlet.values) for nlet in batch)
+        ids = tuple(nlet[0] for nlet in batch)
+        values = tuple(torch.stack(nlet[1]) for nlet in batch)
+        labels = tuple(nlet[2] for nlet in batch)
         return ids, values, labels
 
 

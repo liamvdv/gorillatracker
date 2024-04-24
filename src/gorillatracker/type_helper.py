@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, Callable, Tuple, Union
 
 import cv2.typing as cvt
@@ -15,13 +14,7 @@ Label = Union[str, int]
 NletIds = Tuple[Id, ...]
 NletLabel = Tuple[Label, ...]
 NletValue = Tuple[torch.Tensor, ...]
-
-
-@dataclass(frozen=True)
-class Nlet:
-    ids: NletIds
-    values: NletValue
-    labels: NletLabel
+Nlet = Tuple[NletIds, NletValue, NletLabel]
 
 
 BatchId = Tuple[Id, ...]

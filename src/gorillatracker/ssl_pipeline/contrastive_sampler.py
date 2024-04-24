@@ -65,6 +65,8 @@ class CliqueGraphSampler(ContrastiveSampler):
         return self.graph.get_random_adjacent_clique_member(sample)
 
 
+# NOTE(memben): from here only prove of concept code
+
 DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
 
 
