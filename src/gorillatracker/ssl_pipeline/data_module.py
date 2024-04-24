@@ -48,6 +48,7 @@ class SSLDataModule(L.LightningDataModule):
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
+    # TODO(memben)
     def setup_val(self) -> None:
         self.triplet_data_module = TripletDataModule(
             "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
@@ -66,10 +67,10 @@ class SSLDataModule(L.LightningDataModule):
         return self.triplet_data_module.val_dataloader()
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
-        raise NotImplementedError("test_dataloader not implemented")
+        raise NotImplementedError
 
     def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
-        raise NotImplementedError("predict_dataloader not implemented")
+        raise NotImplementedError
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
         ids = tuple(nlet.ids for nlet in batch)
