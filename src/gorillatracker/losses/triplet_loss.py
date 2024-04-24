@@ -14,7 +14,7 @@ eps = 1e-16  # an arbitrary small value to be used for numerical stability trick
 logger = logging.getLogger(__name__)
 
 
-def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
+def get_triplet_mask(labels: torch.Tensor) -> torch.Tensor:
     """Compute a mask for valid triplets
 
     Args:
@@ -65,7 +65,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     return mask
 
 
-def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
+def get_distance_mask(labels: torch.Tensor, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
     """Compute mask for the calculation of the hardest positive and negative distance
 
     Args:
@@ -95,7 +95,7 @@ def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] 
 
 
 def get_semi_hard_mask(
-    labels: gtypes.MergedLabels,
+    labels: torch.Tensor,
     distance_matrix: torch.Tensor,
     margin: float = 1.0,
 ) -> torch.Tensor:
@@ -193,7 +193,7 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -246,7 +246,7 @@ class TripletLossOnline(nn.Module):
         distance_matrix: torch.Tensor,
         anchor_positive_dists: torch.Tensor,
         anchor_negative_dists: torch.Tensor,
-        labels: gtypes.MergedLabels,
+        labels: torch.Tensor,
     ) -> torch.Tensor:
 
         mask = get_triplet_mask(labels)

@@ -245,29 +245,27 @@ def evaluate_embeddings(
 
 def knn(
     val_embeddings: torch.Tensor,
-    val_labels: gtypes.MergedLabels,
+    val_labels: torch.Tensor,
     k: int = 5,
     use_train_embeddings: bool = False,
-    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
-    train_labels: Optional[gtypes.MergedLabels] = None,
+    train_embeddings: Optional[torch.Tensor] = None,
+    train_labels: Optional[torch.Tensor] = None,
 ) -> Dict[str, Any]:
 
+    if use_train_embeddings and (train_embeddings is None or train_labels is None):
+        raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
     # sort by label
     val_labels, indices = torch.sort(val_labels)
     val_embeddings = val_embeddings[indices]
 
-    train_labels, indices = torch.sort(train_labels)
-    train_embeddings = train_embeddings[indices]
-
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
     le = LabelEncoder_Local()
-    val_labels_encoded = le.transform_list(val_labels.tolist())
-    val_labels_encoded = torch.tensor(val_labels_encoded)
-
-    train_labels_encoded = le.transform_list(train_labels.tolist())
-    train_labels_encoded = torch.tensor(train_labels_encoded)
+    val_labels_encoded = torch.tensor(le.transform_list(val_labels.tolist()))
 
     if use_train_embeddings:
+        train_labels, indices = torch.sort(train_labels)  # type: ignore
+        train_embeddings = train_embeddings[indices]  # type: ignore
+        train_labels_encoded = torch.tensor(le.transform_list(train_labels.tolist()))
         # print("Using train embeddings for knn")
         return knn_with_train(
             val_embeddings,
@@ -283,9 +281,9 @@ def knn(
 def knn_with_train(
     val_embeddings: torch.Tensor,
     val_labels: torch.Tensor,
+    train_embeddings: torch.Tensor,
+    train_labels: torch.Tensor,
     k: int = 5,
-    train_embeddings: Optional[torch.Tensor] = None,
-    train_labels: Optional[torch.Tensor] = None,
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -299,14 +297,14 @@ def knn_with_train(
     """
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
-    train_embeddings = train_embeddings.clone().detach()  # type: ignore
-    train_labels = torch.tensor(train_labels.tolist())  # type: ignore
+    val_labels = torch.tensor(val_labels.tolist())
+    train_embeddings = train_embeddings.clone().detach()
+    train_labels = torch.tensor(train_labels.tolist())
 
-    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)  # type: ignore
+    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
 
-    num_classes: int = int(torch.max(combined_labels).item() + 1)  # type: ignore
+    num_classes: int = int(torch.max(combined_labels).item() + 1)
     assert num_classes == len(np.unique(combined_labels))
     if num_classes < k:
         k = num_classes
@@ -371,7 +369,7 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
 
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
+    val_labels = torch.tensor(val_labels.tolist())
 
     distance_matrix = pairwise_euclidean_distance(val_embeddings)
 

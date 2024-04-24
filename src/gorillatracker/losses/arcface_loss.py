@@ -1,5 +1,5 @@
 import math
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import torch
 
@@ -49,8 +49,8 @@ class ArcFaceLoss(torch.nn.Module):
 
         assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
 
-        labels = self.le.transform_list(labels.tolist())
-        labels = torch.tensor(labels, device=embeddings.device)
+        labels_transformed: List[int] = self.le.transform_list(labels.tolist())
+        labels = torch.tensor(labels_transformed, device=embeddings.device)
 
         # get cos(theta) for each embedding and prototype
         prototypes = self.prototypes.to(embeddings.device)
@@ -218,8 +218,8 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the Variational Prototype Learning loss function"""
 
-        labels = self.le.transform_list(labels.tolist())
-        labels = torch.tensor(labels, device=embeddings.device)
+        labels_transformed: List[int] = self.le.transform_list(labels.tolist())
+        labels = torch.tensor(labels_transformed, device=embeddings.device)
 
         prototypes = self.calculate_prototype(embeddings, labels)
 

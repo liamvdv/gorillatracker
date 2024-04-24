@@ -242,10 +242,10 @@ class BaseModule(L.LightningModule):
             logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels = batch
+        ids, images, labels_tuple = batch
 
         # assert isinstance(labels, list) and isinstance(labels[0], torch.tensor), f"Labels should be a list of tensor batches with ints, got {type(labels)}"
-        labels = torch.cat(labels, dim=0).to(self.device)
+        labels: torch.Tensor = torch.cat(list(labels_tuple), dim=0).to(self.device)  # type: ignore
 
         vec = torch.cat(images, dim=0)
         embeddings = self.forward(vec)
