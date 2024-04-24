@@ -1,9 +1,14 @@
+# NOTE(memben): let's worry about how we parse configs from the yaml file later
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from PIL import Image
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
 @dataclass(frozen=True, order=True)
@@ -54,14 +59,6 @@ class CliqueGraphSampler(ContrastiveSampler):
         return self.graph.get_random_adjacent_clique_member(sample)
 
 
-# NOTE(memben): let's worry about how we parse configs from the yaml file later
-
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
-
-from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
-
 DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
 
 
@@ -84,7 +81,7 @@ def DEMO_get_clique_graph() -> IndexedCliqueGraph[ContrastiveImage]:
         )
 
         # TODO(memben): tracking_id != label
-        contrastive_images = [ContrastiveImage(f.tracking_frame_feature_id, f.cache_path, f.tracking_id) for f in tracked_features] # type: ignore
+        contrastive_images = [ContrastiveImage(f.tracking_frame_feature_id, f.cache_path, f.tracking_id) for f in tracked_features]  # type: ignore
 
         graph = IndexedCliqueGraph(contrastive_images)
 
@@ -99,11 +96,13 @@ def DEMO_get_clique_graph() -> IndexedCliqueGraph[ContrastiveImage]:
             for other_tracking_id in tracking_id_mapper:
                 if tracking_id != other_tracking_id:
                     graph.partition(
-                        contrastive_images[tracking_id_mapper[tracking_id]], contrastive_images[tracking_id_mapper[other_tracking_id]]
+                        contrastive_images[tracking_id_mapper[tracking_id]],
+                        contrastive_images[tracking_id_mapper[other_tracking_id]],
                     )
 
         return graph
-    
+
+
 def WIP_clique_sampler() -> CliqueGraphSampler:
     graph = DEMO_get_clique_graph()
     sampler = CliqueGraphSampler(graph)

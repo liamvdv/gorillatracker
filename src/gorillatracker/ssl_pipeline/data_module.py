@@ -1,15 +1,14 @@
 import logging
 
 import lightning as L
-import numpy as np
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
 import gorillatracker.ssl_pipeline.contrastive_sampler as contrastive_sampler
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data_modules import TripletDataModule
 from gorillatracker.ssl_pipeline.dataset import SSLDataset, build_triplet
-from gorillatracker.train_utils import get_dataset_class
 from gorillatracker.transform_utils import SquarePad
 
 # logging.basicConfig(level=logging.INFO)
@@ -52,8 +51,17 @@ class SSLDataModule(L.LightningDataModule):
         self.setup("fit")
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
 
+    # TODO(memben)
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
-        
+        data_dir = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+        dm = TripletDataModule(
+            data_dir,
+            batch_size=self.batch_size,
+            transforms=self.transforms,
+            training_transforms=self.training_transforms,
+        )
+        dm.setup("train")
+        return dm.train_dataloader()
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("test")

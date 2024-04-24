@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Literal
 
-from PIL import Image
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
@@ -20,7 +16,7 @@ class SSLDataset(Dataset[Nlet]):
     def __init__(
         self,
         contrastive_sampler: ContrastiveSampler,
-        nlet_builder: Callable[[int, ContrastiveSampler], tuple[ContrastiveImage, ...]],
+        nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.Transform,
     ):
@@ -36,8 +32,8 @@ class SSLDataset(Dataset[Nlet]):
         flat_nlet = self.nlet_builder(idx, self.contrastive_sampler)
         return self.stack_flat_nlet(flat_nlet)
 
-    def stack_flat_nlet(self, flat_nlet: tuple[ContrastiveImage, ...]) -> Nlet:
-        ids = tuple(img.id for img in flat_nlet)
+    def stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
+        ids = tuple(img.image_path for img in flat_nlet)
         labels = tuple(img.class_label for img in flat_nlet)
         values = tuple(self.transform(img.image) for img in flat_nlet)
         return Nlet(ids, values, labels)
