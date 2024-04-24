@@ -26,7 +26,7 @@ from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
-from gorillatracker.losses.triplet_loss import get_loss
+from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.transform_utils import TensorSquarePad
 
@@ -205,6 +205,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
+            log_func=self.log,
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -232,6 +233,13 @@ class BaseModule(L.LightningModule):
             and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
         ):
             self.loss_module_train.set_using_memory_bank(True)
+            logger.info("Using memory bank")
+        elif (
+            isinstance(self.loss_module_train, L2SPRegularization_Wrapper)
+            and isinstance(self.loss_module_train.loss, VariationalPrototypeLearning)
+            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch
+        ):  # is wrapped in l2sp regularization
+            self.loss_module_train.loss.set_using_memory_bank(True)
             logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
@@ -290,25 +298,32 @@ class BaseModule(L.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
-        if isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+        if "softmax" in self.loss_mode:
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
-            class_weights = torch.zeros(self.loss_module_val.num_classes, self.embedding_size).to(self.device)
-            for label in range(self.loss_module_val.num_classes):
-                class_weights[label] = torch.tensor(
-                    self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()
-                ).mean(dim=0)
+            loss_module_val = self.loss_module_val if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss  # type: ignore
+            num_classes = self.loss_module_val.num_classes if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss.num_classes  # type: ignore
+
+            class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+            for label in range(num_classes):
+                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)][
+                    "embedding"
+                ].tolist()
+                class_embeddings = (
+                    np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                )
+                class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
                 if torch.isnan(class_weights[label]).any():
                     class_weights[label] = 0.0
 
             # calculate loss for all embeddings
-            self.loss_module_val.set_weights(class_weights)
+            loss_module_val.set_weights(class_weights)  # type: ignore
 
             losses = []
             for _, row in self.embeddings_table.iterrows():
-                loss, _, _ = self.loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)
+                loss, _, _ = loss_module_val(
+                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)  # type: ignore
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
@@ -336,6 +351,12 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
+
+        # optimizer = torch.optim.RMSprop(
+        #     self.model.parameters(),
+        #     lr=self.initial_lr,
+        #     weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
+        # )
 
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
@@ -752,8 +773,10 @@ class SwinV2BaseWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 
@@ -942,6 +965,43 @@ class ResNet50DinoV2Wrapper(BaseModule):
         )
 
 
+class InceptionV3Wrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = timm.create_model("inception_v3", pretrained=not self.from_scratch)
+
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.fc.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.Mixed_7c.branch_pool
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+            ]
+        )
+
+
 class FaceNetWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -1065,6 +1125,7 @@ custom_model_cls = {
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
+    "InceptionV3": InceptionV3Wrapper,
 }
 
 

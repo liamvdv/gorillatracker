@@ -29,8 +29,7 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
     le = LabelEncoder()
-    le.fit(labels)
-    return le.transform(labels)
+    return le.fit_transform(labels)
 
 
 class CXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):
