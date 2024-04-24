@@ -90,7 +90,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
     df = pd.DataFrame(columns=["embedding", "label", "input", "label_string"])
     with torch.no_grad():
         print("Generating embeddings...")
-        for imgs, labels in tqdm(dataset):
+        for ids, imgs, labels in tqdm(dataset):
             if isinstance(imgs, torch.Tensor):
                 imgs = [imgs]
                 labels = [labels]
@@ -118,6 +118,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
                         df,
                         pd.DataFrame(
                             {
+                                "id": [ids[i]],
                                 "embedding": [embeddings[i]],
                                 "label": [labels[i]],
                                 "input": [input_img],

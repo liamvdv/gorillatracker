@@ -1,12 +1,27 @@
 import string
+from typing import List, Tuple
+
+import numpy as np
+from torch import Tensor
 
 from gorillatracker.data_loaders import TripletDataLoader, TripletSampler
+from gorillatracker.type_helper import Id
+
+
+def generate_fake_dataset(
+    n_individuals: int = 4, all_labels: List[str] = list(string.ascii_lowercase)
+) -> List[Tuple[Id, Tensor, str]]:
+    n = len(all_labels) * n_individuals
+    labels = all_labels * n_individuals
+    ids = list(map(str, range(n)))
+    samples = [Tensor(np.eye(192 * 2 * 3))] * n
+    dataset = sorted(zip(ids, samples, labels), key=lambda x: x[2])
+    return dataset
 
 
 def test_triplet_sampler() -> None:
     epochs = 100
-    n_individuals = 4
-    dataset = sorted(enumerate(string.ascii_lowercase * n_individuals), key=lambda t: t[1])
+    dataset = generate_fake_dataset()
     sampler = TripletSampler(dataset)
 
     all_different = []
@@ -26,8 +41,7 @@ def test_triplet_sampler() -> None:
 
 def test_data_loader() -> None:
     epochs = 100
-    n_individuals = 4
-    dataset = list(enumerate(string.ascii_lowercase * n_individuals))
+    dataset = generate_fake_dataset()
     dl = TripletDataLoader(dataset, batch_size=1)  # type: ignore
     epoch_batches = []
     for _ in range(epochs):

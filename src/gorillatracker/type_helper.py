@@ -7,28 +7,32 @@ import torch
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
 Image = cvt.MatLike
 
+Id = str
 Label = Union[str, int]
 TripletLabel = Tuple[Label, Label, Label]
 TripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
-BatchLabel = Tuple[Label]
+BatchId = Tuple[Id, ...]
+BatchLabel = Tuple[Label, ...]
+BatchTripletIds = Tuple[BatchId, BatchId, BatchId]
 BatchTripletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel]
 BatchTripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
 LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
+BatchQuadletIds = Tuple[BatchId, BatchId, BatchId, BatchId]
 BatchQuadletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel, BatchLabel]
 BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
-BatchTripletDataLoader = torch.utils.data.DataLoader[Tuple[BatchTripletValue, BatchTripletLabel]]
-BatchQuadletDataLoader = torch.utils.data.DataLoader[Tuple[BatchQuadletValue, BatchQuadletLabel]]
+BatchTripletDataLoader = torch.utils.data.DataLoader[Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]]
+BatchQuadletDataLoader = torch.utils.data.DataLoader[Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]]
 # BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
 BatchSimpleDataLoader = Any
 
 BatchNletDataLoader = Union[BatchTripletDataLoader, BatchQuadletDataLoader]
 
-TripletBatch = Tuple[BatchTripletValue, BatchTripletLabel]
-QuadletBatch = Tuple[BatchQuadletValue, BatchQuadletLabel]
+TripletBatch = Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]
+QuadletBatch = Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]
 
 NletBatch = Union[TripletBatch, QuadletBatch]
 
