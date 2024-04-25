@@ -30,7 +30,7 @@ class SSLDataModule(L.LightningDataModule):
     def setup(self, stage: str) -> None:
         print("Setting up data module ", stage)
         if stage == "fit":
-            train_sampler = contrastive_sampler.WIP_clique_sampler()
+            train_sampler = contrastive_sampler.get_random_sampler()
             self.train = SSLDataset(
                 train_sampler,
                 build_triplet,
