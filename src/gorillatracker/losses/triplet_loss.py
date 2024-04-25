@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable, Dict, List, Literal, Union
 
 import torch
@@ -10,6 +11,8 @@ import gorillatracker.utils.l2sp_regularisation as l2
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
+
+logger = logging.getLogger(__name__)
 
 
 def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
@@ -355,21 +358,37 @@ class TripletLossOfflineNative(nn.Module):
 class L2SPRegularization_Wrapper(nn.Module):
     """Wrapper that adds L2SP regularization to any loss"""
 
-    def __init__(self, loss: nn.Module, model: nn.Module, path_to_pretrained_weights: str, alpha: float, beta: float):
+    def __init__(
+        self,
+        loss: nn.Module,
+        model: nn.Module,
+        path_to_pretrained_weights: str,
+        alpha: float,
+        beta: float,
+        log_func: Callable[[str, float], None] = lambda x, y: None,
+    ):
         super().__init__()
         assert path_to_pretrained_weights is not None, "Path to pretrained weights must be provided"
         self.loss = loss
         self.model = model
         self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
+        self.log = log_func
 
     def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
         standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
         l2sp_loss = self.l2sp_loss(self.model)
-
+        if type(l2sp_loss) == torch.Tensor:
+            self.log("l2_sp", l2sp_loss.item())
+        else:
+            self.log("l2_sp", l2sp_loss)
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
 
 
-def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
+def get_loss(
+    loss_mode: str,
+    log_func: Callable[[str, float], None] = lambda x, y: None,
+    **kw_args: Any,
+) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
     l2sp = False
     if "l2sp" in loss_mode:
         loss_mode = loss_mode.replace("/l2sp", "")
@@ -382,7 +401,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
     elif loss_mode == "online/semi-hard":
         loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
     elif loss_mode == "online/soft":
-        return TripletLossOnline(mode="soft", margin=kw_args["margin"])
+        loss_module = TripletLossOnline(mode="soft", margin=kw_args["margin"])
     elif loss_mode == "offline":
         loss_module = TripletLossOffline(margin=kw_args["margin"])
     elif loss_mode == "offline/native":
@@ -416,6 +435,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
             alpha=kw_args["l2_alpha"],
             beta=kw_args["l2_beta"],
+            log_func=log_func,
         )
 
     return loss_module
