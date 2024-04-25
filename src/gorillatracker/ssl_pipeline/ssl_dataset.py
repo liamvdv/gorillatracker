@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Callable, Literal
 
-import torch
 from torch.utils.data import Dataset
+from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.contrastive_sampler import ContrastiveImage, ContrastiveSampler
@@ -11,8 +11,6 @@ from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Nlet
 
 FlatNlet = tuple[ContrastiveImage, ...]
-
-from torchvision import transforms
 
 
 # TODO(memben): add chache for val, test

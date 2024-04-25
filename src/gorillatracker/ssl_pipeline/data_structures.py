@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 from collections import defaultdict
 from typing import Generic, Protocol, TypeVar
 
@@ -98,21 +97,9 @@ class CliqueGraph(Generic[T]):
     def get_clique(self, v: T) -> set[T]:
         return self.union_find.get_members(v)
 
-    def get_random_clique_member(self, v: T, exclude: list[T] = []) -> T:
-        clique = self.get_clique(v)
-        return random.choice([m for m in clique if m not in exclude])
-
     def get_adjacent_cliques(self, v: T) -> dict[T, set[T]]:
         adjacent_clique_roots = self._get_adjacent_partitions(v)
         return {r: self.get_clique(r) for r in adjacent_clique_roots}
-
-    def get_random_adjacent_clique(self, v: T) -> T:
-        adjacent_clique_roots = self._get_adjacent_partitions(v)
-        return random.choice(list(adjacent_clique_roots))
-
-    def get_random_adjacent_clique_member(self, v: T) -> T:
-        random_adjacent_clique = self.get_random_adjacent_clique(v)
-        return self.get_random_clique_member(random_adjacent_clique)
 
     def merge(self, u: T, v: T) -> None:
         assert u != v, "Self loops are not allowed."

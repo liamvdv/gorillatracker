@@ -1,25 +1,5 @@
-import torch
-import torch.nn.functional as F
 from PIL.Image import Image
 from torchvision.transforms.functional import pad
-
-
-class TensorSquarePad(torch.nn.Module):
-    def __init__(self, pad_value: int = 0):
-        super().__init__()
-        self.pad_value = pad_value
-
-    def forward(self, tensor: torch.Tensor) -> torch.Tensor:
-        _, h, w = tensor.size()
-        max_dim = max(h, w)
-        pad_h = max_dim - h
-        pad_w = max_dim - w
-        pad_top = pad_h // 2
-        pad_bottom = pad_h - pad_top
-        pad_left = pad_w // 2
-        pad_right = pad_w - pad_left
-        padded_tensor = F.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), value=self.pad_value)
-        return padded_tensor
 
 
 class SquarePad:

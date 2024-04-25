@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
@@ -78,23 +77,6 @@ class RandomClassSampler(ContrastiveSampler):
         negative_classes = [label for label in self.class_labels if label != positive_class]
         negative_class = random.choice(negative_classes)
         return random.choice(self.classes[negative_class])
-
-
-class CliqueGraphSampler(ContrastiveSampler):
-    def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
-        self.graph = graph
-
-    def __getitem__(self, idx: int) -> ContrastiveImage:
-        return self.graph[idx]
-
-    def __len__(self) -> int:
-        return len(self.graph)
-
-    def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
-        return self.graph.get_random_clique_member(sample)
-
-    def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
-        return self.graph.get_random_adjacent_clique_member(sample)
 
 
 def get_random_sampler() -> RandomClassSampler:
