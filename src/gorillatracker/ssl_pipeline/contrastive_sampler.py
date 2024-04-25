@@ -4,14 +4,12 @@ import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from itertools import groupby
+from typing import Any
 
-import torch
 from PIL import Image
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
-from torchvision import transforms
 
-import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
@@ -24,10 +22,6 @@ class ContrastiveImage:
     @property
     def image(self) -> Image.Image:
         return Image.open(self.image_path)
-
-    @property
-    def image_tensor(self) -> torch.Tensor:
-        return transforms.ToTensor()(self.image)
 
 
 class ContrastiveSampler(ABC):
@@ -50,16 +44,17 @@ class ContrastiveSampler(ABC):
         pass
 
 
-class RandomClassSampler(ContrastiveSampler):
-    """ContrastiveSampler that samples from a set of classes. Negatives are drawn evenly from all other classes."""
+class ContrastiveClassSampler(ContrastiveSampler):
+    """ContrastiveSampler that samples from a set of classes. Negatives are drawn from a uniformly sampled negative class"""
 
-    def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]]) -> None:
-        assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples"
+    def __init__(self, classes: dict[Any, list[ContrastiveImage]]) -> None:
         self.classes = classes
         self.class_labels = list(classes.keys())
         self.flat_samples = [sample for samples in classes.values() for sample in samples]
-        assert len(self.flat_samples) == len(set(self.flat_samples)), "Samples must be unique"
         self.sample_to_class = {sample: label for label, samples in classes.items() for sample in samples}
+
+        assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples"
+        assert len(self.flat_samples) == len(set(self.flat_samples)), "Samples must be unique"
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
         return self.flat_samples[idx]
@@ -69,17 +64,21 @@ class RandomClassSampler(ContrastiveSampler):
 
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         positive_class = self.sample_to_class[sample]
-        positive_samples = [sample for sample in self.classes[positive_class] if sample != sample]
-        return random.choice(list(positive_samples))
+        positives = [s for s in self.classes[positive_class] if s != sample]
+        return random.choice(positives)
 
+    # NOTE(memben): First samples a negative class to ensure a more balanced distribution of negatives,
+    # independent of the number of samples per class
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
+        """Different class is sampled uniformly at random and a random sample from that class is returned"""
         positive_class = self.sample_to_class[sample]
-        negative_classes = [label for label in self.class_labels if label != positive_class]
+        negative_classes = [c for c in self.class_labels if c != positive_class]
         negative_class = random.choice(negative_classes)
-        return random.choice(self.classes[negative_class])
+        negatives = self.classes[negative_class]
+        return random.choice(negatives)
 
 
-def get_random_sampler() -> RandomClassSampler:
+def get_random_sampler() -> ContrastiveClassSampler:
     PUBLIC_DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
     engine = create_engine(PUBLIC_DB_URI)
     with Session(engine) as session:
@@ -100,9 +99,14 @@ def get_random_sampler() -> RandomClassSampler:
             ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path, f.tracking_id) for f in tracked_features  # type: ignore
         ]
         groups = groupby(contrastive_images, lambda x: x.class_label)
-        classes = {label: list(samples) for label, samples in groups}
-        return RandomClassSampler(classes)
+        classes: dict[Any, list[ContrastiveImage]] = {}
+        for group in groups:
+            class_label, sample_iter = group
+            samples = list(sample_iter)
+            if len(samples) > 1:
+                classes[class_label] = samples
+        return ContrastiveClassSampler(classes)
 
 
 if __name__ == "__main__":
-    get_random_sampler()
+    get_random_sampler().positive(get_random_sampler()[0])
