@@ -100,7 +100,7 @@ class TrainingArgs:
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config
-    ssl: bool = field(default=False)
+    is_ssl: bool = field(default=False)
 
     pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.
