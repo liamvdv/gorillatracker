@@ -60,7 +60,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_labels = []
         for batch in self.train_dataloader:
             images, labels = batch
-            anchor_images = images[0].to(trainer.model.device)
+            anchor_images = images[0].to(trainer.model.device, dtype=trainer.model.dtype)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             anchor_labels = labels[0]
@@ -120,7 +120,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        log_grad_cam_images_to_wandb(self.run, trainer)
+        if trainer.model.dtype == torch.float32:
+            log_grad_cam_images_to_wandb(self.run, trainer)
 
 
 # now add stuff to evaluate the embeddings / the model that created the embeddings

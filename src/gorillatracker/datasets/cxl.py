@@ -65,7 +65,7 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> Tuple[Image.Image, int]:
-        img_path, label = self.samples[idx]
+        img_path, label = self.samples[0][idx]
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)

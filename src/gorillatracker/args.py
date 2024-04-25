@@ -102,6 +102,7 @@ class TrainingArgs:
     save_interval: float = field(default=10)
     embedding_save_interval: int = field(default=1)
     knn_with_train: bool = field(default=True)
+    plugins: List[str] = list_field(default=None)
 
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")

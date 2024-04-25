@@ -94,10 +94,10 @@ fi
 
 docker run --rm -it --ipc=host --network=host \
     -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
-    -v "${HOME}/data:/workspaces/gorillatracker/data,type=bind,ro" \
-    -v "${HOME}/data/embeddings:/workspaces/gorillatracker/data/embeddings,type=bind" \
-    -v "${HOME}/data/splits/:/workspaces/gorillatracker/data/splits,type=bind" \
-    -v "${HOME}/models/:/workspaces/gorillatracker/models,type=bind" \
+    -v "${HOME}/data:/workspaces/gorillatracker/data" \
+    -v "${HOME}/data/embeddings:/workspaces/gorillatracker/data/embeddings" \
+    -v "${HOME}/data/splits/:/workspaces/gorillatracker/data/splits" \
+    -v "${HOME}/models/:/workspaces/gorillatracker/models" \
     -v "$(pwd)/../.netrc:/home/gorilla/.netrc" \
     -v "$(pwd)/../.cache:/home/gorilla/.cache" \
     --user 0:0 \
