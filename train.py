@@ -57,7 +57,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     # TODO(memben): Unify
     dm: Union[SSLDataModule, NletDataModule]
-    if args.is_ssl:
+    if args.use_ssl:
         dm = SSLDataModule(
             batch_size=args.batch_size,
             transforms=model_transforms,
@@ -102,7 +102,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         lambda_membank=args.lambda_membank,
         num_classes=(
             (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))  # type: ignore
-            if not args.is_ssl
+            if not args.use_ssl
             else (-1, -1, -1)
         ),
         dropout_p=args.dropout_p,
