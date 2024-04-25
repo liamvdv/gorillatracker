@@ -28,7 +28,6 @@ class SSLDataModule(L.LightningDataModule):
         self.batch_size = batch_size
 
     def setup(self, stage: str) -> None:
-        print("Setting up data module ", stage)
         if stage == "fit":
             train_sampler = contrastive_sampler.get_random_sampler()
             self.train = SSLDataset(
@@ -50,21 +49,21 @@ class SSLDataModule(L.LightningDataModule):
 
     # TODO(memben)
     def setup_val(self) -> None:
-        self.triplet_data_module = TripletDataModule(
+        self.val_data_module = TripletDataModule(
             "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
             dataset_class=CXLDataset,
             batch_size=self.batch_size,
             transforms=transforms.Compose([CXLDataset.get_transforms(), self.transforms]),
             training_transforms=self.training_transforms,
         )
-        self.triplet_data_module.setup("fit")
+        self.val_data_module.setup("fit")
 
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
 
     # TODO(memben)
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
-        return self.triplet_data_module.val_dataloader()
+        return self.val_data_module.val_dataloader()
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         raise NotImplementedError
