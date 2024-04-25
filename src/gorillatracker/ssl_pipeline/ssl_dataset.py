@@ -20,7 +20,7 @@ class SSLDataset(Dataset[Nlet]):
         contrastive_sampler: ContrastiveSampler,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
-        transform: gtypes.TensorTransform,
+        transform: gtypes.Transform,
     ):
         self.contrastive_sampler = contrastive_sampler
         self.nlet_builder = nlet_builder

@@ -51,4 +51,3 @@ MergedLabels = Union[BatchLabel, torch.Tensor]
 
 
 Transform = Callable[[Any], Any]
-TensorTransform = Callable[[torch.Tensor], torch.Tensor]

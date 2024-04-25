@@ -19,8 +19,8 @@ class SSLDataModule(L.LightningDataModule):
     def __init__(
         self,
         batch_size: int = 32,
-        transforms: gtypes.TensorTransform = lambda x: x,
-        training_transforms: gtypes.TensorTransform = lambda x: x,
+        transforms: gtypes.Transform = lambda x: x,
+        training_transforms: gtypes.Transform = lambda x: x,
     ) -> None:
         super().__init__()
         self.transforms = transforms

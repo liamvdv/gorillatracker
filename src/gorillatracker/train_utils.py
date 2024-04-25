@@ -41,7 +41,6 @@ def get_data_module(
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
         [
-            # TODO(memben): Sunset get_transforms
             dataset_class.get_transforms() if hasattr(dataset_class, "get_transforms") else ToTensor(),
             _assert_tensor,
             model_transforms,
