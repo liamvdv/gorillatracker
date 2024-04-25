@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.contrastive_sampler import ContrastiveImage, ContrastiveSampler
+from gorillatracker.ssl_pipeline.contrastive_sampler import ContrastiveImage, ContrastiveSampler, get_random_ssl_sampler
 from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Nlet
 
@@ -17,12 +17,11 @@ FlatNlet = tuple[ContrastiveImage, ...]
 class SSLDataset(Dataset[Nlet]):
     def __init__(
         self,
-        contrastive_sampler: ContrastiveSampler,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.Transform,
     ):
-        self.contrastive_sampler = contrastive_sampler
+        self.contrastive_sampler = get_random_ssl_sampler()
         self.nlet_builder = nlet_builder
         self.transform = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition

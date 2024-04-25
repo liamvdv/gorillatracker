@@ -78,7 +78,8 @@ class ContrastiveClassSampler(ContrastiveSampler):
         return random.choice(negatives)
 
 
-def get_random_sampler() -> ContrastiveClassSampler:
+# TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
+def get_random_ssl_sampler() -> ContrastiveClassSampler:
     PUBLIC_DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
     engine = create_engine(PUBLIC_DB_URI)
     with Session(engine) as session:
@@ -106,7 +107,3 @@ def get_random_sampler() -> ContrastiveClassSampler:
             if len(samples) > 1:
                 classes[class_label] = samples
         return ContrastiveClassSampler(classes)
-
-
-if __name__ == "__main__":
-    get_random_sampler().positive(get_random_sampler()[0])

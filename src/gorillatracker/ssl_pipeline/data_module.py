@@ -5,7 +5,6 @@ import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-import gorillatracker.ssl_pipeline.contrastive_sampler as contrastive_sampler
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
 from gorillatracker.datasets.cxl import CXLDataset
@@ -29,9 +28,7 @@ class SSLDataModule(L.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
-            train_sampler = contrastive_sampler.get_random_sampler()
             self.train = SSLDataset(
-                train_sampler,
                 build_triplet,
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
