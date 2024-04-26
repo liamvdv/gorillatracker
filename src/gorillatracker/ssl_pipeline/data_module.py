@@ -44,14 +44,15 @@ class SSLDataModule(L.LightningDataModule):
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    # TODO(memben)
+    # TODO(memben): we want to use SSL Data for validation
     def setup_val(self) -> None:
         print("Using Body-Image Validation Set")
+        dataset_class = CXLDataset
         self.val_data_module = TripletDataModule(
             "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
-            dataset_class=CXLDataset,
+            dataset_class=dataset_class,
             batch_size=self.batch_size,
-            transforms=transforms.Compose([CXLDataset.get_transforms(), self.transforms]),
+            transforms=transforms.Compose([dataset_class.get_transforms(), self.transforms]),
             training_transforms=self.training_transforms,
         )
         self.val_data_module.setup("fit")

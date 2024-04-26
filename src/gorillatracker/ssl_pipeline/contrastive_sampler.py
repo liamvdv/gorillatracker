@@ -50,17 +50,17 @@ class ContrastiveClassSampler(ContrastiveSampler):
     def __init__(self, classes: dict[Any, list[ContrastiveImage]]) -> None:
         self.classes = classes
         self.class_labels = list(classes.keys())
-        self.flat_samples = [sample for samples in classes.values() for sample in samples]
+        self.samples = [sample for samples in classes.values() for sample in samples]
         self.sample_to_class = {sample: label for label, samples in classes.items() for sample in samples}
 
         assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples"
-        assert len(self.flat_samples) == len(set(self.flat_samples)), "Samples must be unique"
+        assert len(self.samples) == len(set(self.samples)), "Samples must be unique"
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
-        return self.flat_samples[idx]
+        return self.samples[idx]
 
     def __len__(self) -> int:
-        return len(self.flat_samples)
+        return len(self.samples)
 
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         positive_class = self.sample_to_class[sample]

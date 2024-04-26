@@ -55,7 +55,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
 
-    # TODO(memben): Unify
+    # TODO(memben): Unify SSLDatamodule and NletDataModule
     dm: Union[SSLDataModule, NletDataModule]
     if args.use_ssl:
         dm = SSLDataModule(
