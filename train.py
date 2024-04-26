@@ -145,6 +145,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
+        kfold_k=0,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -214,14 +215,17 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     
     logger.info(f"Rank {current_process_rank} | Starting training...")
     for i in range(kfold_k):
-        logger.info(f"Rank {current_process_rank} | k-fold iteration {i}...")
+        logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
         if args.kfold:
             dm.val_fold = i
+            dm.k = kfold_k
+            model = model_cls(**model_args)  # type: ignore
             model.num_classes = (
                 (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
                 if not args.video_data
                 else (-1, -1, -1)
             )
+            embeddings_logger_callback.kfold_k = i
         trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
 
     if trainer.interrupted:

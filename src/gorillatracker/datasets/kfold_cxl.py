@@ -50,8 +50,6 @@ class KFoldCXLDataset(Dataset[Tuple[Image.Image, Label]]):
         """
         dirpath = data_dir / Path(partition)
         samples = get_samples(dirpath)
-
-        print(dirpath)
         
         # new
         labels_string = [label for _, label in samples]

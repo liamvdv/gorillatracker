@@ -12,6 +12,7 @@ from gorillatracker.data_modules import (
     SimpleDataModule,
     TripletDataModule,
     VideoTripletDataModule,
+    KFoldDataModule,
 )
 
 
@@ -48,6 +49,9 @@ def get_data_module(
         base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
         base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
+    if "kfold" in data_dir:
+        base = KFoldDataModule
+    
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
         [

@@ -124,12 +124,7 @@ class KFoldDataModule(NletDataModule):
         val_fold: int = 0,
         k: int = 5,
     ) -> None:
-        super().__init__()
-        self.transforms = transforms
-        self.training_transforms = training_transforms
-        self.dataset_class = dataset_class
-        self.data_dir = data_dir
-        self.batch_size = batch_size
+        super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms)
         self.val_fold = val_fold
         self.k = k
     
@@ -164,7 +159,10 @@ class KFoldDataModule(NletDataModule):
                 if i != self.val_fold:
                     datasets.append(self.dataset_class(self.data_dir, partition=f"fold-{i}", transform=transforms.Compose([self.transforms, self.training_transforms])))  # type: ignore
             train = ConcatDataset(datasets)
-            return train.get_num_classes()  # type: ignore
+            num_classes = 0
+            for dataset in train.datasets:
+                num_classes += dataset.get_num_classes()
+            return num_classes  # type: ignore
         elif mode == "val":
             val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
             return val.get_num_classes()  # type: ignore
