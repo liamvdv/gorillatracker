@@ -80,7 +80,8 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
 def get_random_ssl_sampler() -> ContrastiveClassSampler:
-    PUBLIC_DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
+    WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
+    PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
     engine = create_engine(PUBLIC_DB_URI)
     with Session(engine) as session:
         tracked_features = list(

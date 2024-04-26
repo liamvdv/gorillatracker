@@ -46,6 +46,7 @@ class SSLDataModule(L.LightningDataModule):
 
     # TODO(memben)
     def setup_val(self) -> None:
+        print("Using Body-Image Validation Set")
         self.val_data_module = TripletDataModule(
             "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
             dataset_class=CXLDataset,
@@ -58,7 +59,7 @@ class SSLDataModule(L.LightningDataModule):
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
 
-    # TODO(memben)
+    # TODO(memben): we want to use SSL Data for validation
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
         return self.val_data_module.val_dataloader()
 

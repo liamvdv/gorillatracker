@@ -11,10 +11,10 @@ Image = cvt.MatLike
 Id = str
 Label = Union[str, int]
 
-NletIds = Tuple[Id, ...]
+NletId = Tuple[Id, ...]
 NletLabel = Tuple[Label, ...]
 NletValue = Tuple[torch.Tensor, ...]
-Nlet = Tuple[NletIds, NletValue, NletLabel]
+Nlet = Tuple[NletId, NletValue, NletLabel]
 
 
 BatchId = Tuple[Id, ...]

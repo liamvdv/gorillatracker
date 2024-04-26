@@ -269,7 +269,7 @@ class TrackingFrameFeature(Base):
         return frame_nr
 
     @validates("cache_path")
-    def validate_cache_path(self, key: str, value: str) -> str:
+    def validate_absolute_path(self, key: str, value: str) -> str:
         if value is not None and not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
         return value

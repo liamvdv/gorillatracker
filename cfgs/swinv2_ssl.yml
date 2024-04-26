@@ -70,7 +70,7 @@ knn_with_train: False
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
-is_ssl: True
+use_ssl: True
 
 
 data_resize_transform: 192
