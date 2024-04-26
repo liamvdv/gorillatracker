@@ -58,7 +58,7 @@ def build_triplet(
     return anchor_positive, positive, negative
 
 
-def build_quadruplet(
+def build_quadlet(
     idx: int, contrastive_sampler: ContrastiveSampler
 ) -> tuple[ContrastiveImage, ContrastiveImage, ContrastiveImage, ContrastiveImage]:
     anchor_positive = contrastive_sampler[idx]
