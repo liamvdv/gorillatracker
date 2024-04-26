@@ -163,7 +163,7 @@ class GorillaDataset(SSLDataset):
                 except MultipleResultsFound as e:
                     log.error(f"Multiple videos found in DB for {video_name} with version: {version}")
                     raise e
-                video_feature = VideoFeature(video_id=video_id, type=feature_type, value=group_id)
+                video_feature = VideoFeature(video_id=video_id, feature_type=feature_type, value=group_id)
                 session.add(video_feature)
                 try:
                     session.commit()
