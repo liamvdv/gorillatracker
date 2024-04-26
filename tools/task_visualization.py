@@ -82,50 +82,6 @@ class task_visualizer():
         self.progress.update(self.visualizing_task, completed=finished_tasks_count, total=tasks_count)
 
         
-def main():
-    console = Console()
-    layout = Layout()
-
-    # Create top panel for text stats
-    layout.split(
-        Layout(name="header", size=3),
-        Layout(name="main")
-    )
-
-    # Prepare the progress display
-    progress = Progress(TextColumn("[progress.description]{task.description}"),
-                        BarColumn(bar_width=None),
-                        TextColumn("{task.completed}/{task.total}"),
-                        console=console,
-                        expand=True)
-
-    task1 = progress.add_task("[red]Tracking...", total=100)
-    task2 = progress.add_task("[green]Predicting...", total=200)
-    task3 = progress.add_task("[blue]Visiualizing...", total=300)
-
-    layout["main"].update(progress)
-
-    # Use Live to manage the layout and updates smoothly
-    with Live(layout, refresh_per_second=10, console=console):
-        while not progress.finished:
-            # Update tasks
-            progress.update(task1, completed= 20)
-            progress.update(task2, advance=2)
-            progress.update(task3, advance=3)
-
-            # Update the header with dynamic information
-            current_time = time.strftime("%X")
-            layout["header"].update(Text(f"Time: {current_time}", justify="center"))
-
-            # Dynamically adjust the total if needed
-            if progress.tasks[task1].completed > 50:
-                progress.update(task1, total=150)
-            if progress.tasks[task2].completed > 100:
-                progress.update(task2, total=250)
-
-            time.sleep(0.1)
-
 if __name__ == "__main__":
-    #main()
     visualizer = task_visualizer(Session(GorillaDataset("sqlite:///test.db").engine))
     visualizer.update_loop()
