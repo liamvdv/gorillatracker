@@ -249,7 +249,7 @@ class TrackingFrameFeature(Base):
     bbox_height: Mapped[float]
     confidence: Mapped[float]
     feature_type: Mapped[str] = mapped_column(String(255))
-    cache_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cached: Mapped[bool] = mapped_column(default=False)
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
@@ -268,19 +268,13 @@ class TrackingFrameFeature(Base):
             raise ValueError(f"frame_nr must be a multiple of {self.video.frame_step}, is {frame_nr}")
         return frame_nr
 
-    @validates("cache_path")
-    def validate_absolute_path(self, key: str, value: str) -> str:
-        if value is not None and not value.startswith("/"):
-            raise ValueError(f"{key} must be an absolute path, is {value}")
-        return value
-
     def __lt__(self, other: TrackingFrameFeature) -> bool:
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id
 
     def __repr__(self) -> str:
         return f"""tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, 
         frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, 
-        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cache_path={self.cache_path})"""
+        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cached={self.cached})"""
 
 
 class VideoRelationship(Base):

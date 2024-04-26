@@ -88,7 +88,7 @@ def get_random_ssl_sampler() -> ContrastiveClassSampler:
             session.execute(
                 select(TrackingFrameFeature)
                 .where(
-                    TrackingFrameFeature.cache_path.isnot(None),
+                    TrackingFrameFeature.cached,
                     TrackingFrameFeature.tracking_id.isnot(None),
                     TrackingFrameFeature.feature_type == "body",
                 )
