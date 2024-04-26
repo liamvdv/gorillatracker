@@ -111,3 +111,30 @@ class QuadletDataModule(NletDataModule):
 class SimpleDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader
+
+
+class TripletBristolValDataModule(NletDataModule):
+    def __init__(
+        self,
+        data_dir: str,
+        data_dir_bristol: str,
+        batch_size: int = 32,
+        dataset_class: Optional[Type[Dataset[Any]]] = None,
+        bristol_class: Optional[Type[Dataset[Any]]] = None,
+        transforms: Optional[gtypes.Transform] = None,
+        training_transforms: Optional[gtypes.Transform] = None,
+    ) -> None:
+        super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms)
+        self.bristol_class = bristol_class
+        self.data_dir_bristol = data_dir_bristol
+        
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+        return TripletDataLoader
+    
+    def val_dataloader(self) -> gtypes.BatchNletDataLoader:
+        self.setup("validate")
+        
+        val_bristol = self.bristol_class(self.data_dir_bristol, partition="val", transform=self.transforms)
+        
+        return [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False),
+                self.get_dataloader()(val_bristol, batch_size=self.batch_size, shuffle=False)]

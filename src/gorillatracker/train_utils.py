@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Tuple, Type, Union
+from typing import Any, Tuple, Type, Union, Optional
 
 import torch
 from torch.utils.data import Dataset
@@ -12,6 +12,7 @@ from gorillatracker.data_modules import (
     SimpleDataModule,
     TripletDataModule,
     VideoTripletDataModule,
+    TripletBristolValDataModule
 )
 
 
@@ -39,6 +40,8 @@ def get_data_module(
     video_data: bool,
     model_transforms: gtypes.Transform,
     training_transforms: gtypes.Transform = None,  # type: ignore
+    data_dir_bristol: Optional[str] = None,
+    bristol_class_id: Optional[str] = None,
 ) -> NletDataModule:
     base: Type[NletDataModule]
     if video_data:
@@ -47,7 +50,7 @@ def get_data_module(
         base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
         base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
         base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
-
+    
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
         [
@@ -56,4 +59,8 @@ def get_data_module(
             model_transforms,
         ]
     )
+    if data_dir_bristol is not None:
+        base = TripletBristolValDataModule
+        return base(data_dir, data_dir_bristol, batch_size, dataset_class, get_dataset_class(bristol_class_id), transforms=transforms, training_transforms=training_transforms)
+    
     return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)

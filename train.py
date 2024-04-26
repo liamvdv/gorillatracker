@@ -137,6 +137,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         args.video_data,
         model_transforms,
         model.get_training_transforms(),
+        "data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0",
+        "gorillatracker.datasets.bristol.BristolDataset",
     )
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 

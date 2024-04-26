@@ -51,7 +51,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Literal, Tuple, TypeVar, Union
 
 import torch
 
@@ -141,17 +141,6 @@ def ungroup(individuals: List[Entry]) -> List[Entry]:
     return [img for individual in individuals for img in individual.value]  # type: ignore
 
 
-def ungroup_with_must_include_mask(individuals: List[Entry], k: int) -> Tuple[List[Entry], List[bool]]:
-    """preservers order"""
-    images = []
-    must_include_mask = []
-    for individual in individuals:
-        for i, img in enumerate(individual.value):  # type: ignore
-            images.append(img)
-            must_include_mask.append(i < k)
-    return images, must_include_mask
-
-
 def consistent_random_permutation(arr: List[T], unique_key: Callable[[Any], Any], seed: int) -> List[T]:
     g = torch.Generator()
     g.manual_seed(seed)
@@ -170,14 +159,14 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
     test_count = test / 100 * samples
 
     # we'll enfore at least 1
-    train_count = max(train_count, 1)
-    val_count = max(val_count, 1)
-    test_count = max(test_count, 1)
+    # train_count = max(train_count, 1)
+    # val_count = max(val_count, 1)
+    # test_count = max(test_count, 1)
 
     val_count = int(val_count)
     test_count = int(test_count)
     train_count = samples - (val_count + test_count)
-    assert train_count >= 1
+    #assert train_count >= 1
     return train_count, val_count, test_count
 
 
@@ -201,17 +190,6 @@ def write_entries(entries: List[Entry], outdir: Path) -> None:
         copy(entry.value, newpath)
 
 
-def sample_and_remove(arr: List[T], samples: int, mask: Optional[List[bool]] = None) -> Tuple[List[T], List[T]]:
-    if mask is None:
-        mask = [True] * len(arr)
-    assert len(arr) == len(mask)
-    view = [arr[i] for i, b in enumerate(mask) if b]
-    assert len(view) > samples, "masked array has less entries than required samples"
-    sampled = random.sample(view, samples)
-    remaining = [e for e in arr if e not in sampled]
-    return sampled, remaining
-
-
 def splitter(
     images: List[Entry],
     mode: Literal["openset", "closedset"],
@@ -220,8 +198,6 @@ def splitter(
     test: int,
     seed: int,
     min_train_count: int = 3,
-    reid_factor_val: Optional[int] = None,
-    reid_factor_test: Optional[int] = None,
 ) -> Tuple[List[Entry], List[Entry], List[Entry]]:
     assert train + val + test == 100, "train, val, test must sum to 100."
     random.seed(seed)
@@ -248,34 +224,22 @@ def splitter(
         # need to shuffle again because we ungroup() will return images of individuals sequentially
         rest = consistent_random_permutation(ungroup(individums), lambda x: x.value, seed + 1)
         val_bucket, rest = rest[:val_count], rest[val_count:]
-        assert len(val_bucket) == val_count, "Dataset too small: Not enough images left to fill validation."
+        # assert len(val_bucket) == val_count, "Dataset too small: Not enough images left to fill validation."
         test_bucket, rest = rest[:test_count], rest[test_count:]
-        assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
+        # assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
         train_bucket.extend(rest)
     elif mode == "openset":
-        assert isinstance(reid_factor_val, int) and isinstance(
-            reid_factor_test, int
-        ), "must pass reid_factor_{val,test} if mode=openset"
         # At least one unseen individuum in test and eval.
         train_count, val_count, test_count = compute_split(len(individums), train, val, test)
         print(
             f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={train_count}, Val={val_count}, Test={test_count}"
         )
-        train_bucket, train_must_include_mask = ungroup_with_must_include_mask(
-            individums[:train_count], k=min_train_count
-        )
+        train_bucket = ungroup(individums[:train_count])
         val_bucket = ungroup(individums[train_count : train_count + val_count])
         test_bucket = ungroup(individums[train_count + val_count :])
         # NOTE(liamvdv): We'll now move back a fraction of images from train_bucket to val and test
         #                to ensure we also look at reidentification of known faces.
         n = len(train_bucket)
-        reid_count_val = int(reid_factor_val / 100 * n)
-        reid_count_test = int(reid_factor_test / 100 * n)
-        inv_mask = [not v for v in train_must_include_mask]
-        reid_samples, train_bucket = sample_and_remove(train_bucket, reid_count_val + reid_count_test, mask=inv_mask)
-        assert len(reid_samples) == reid_count_test + reid_count_val, "sanity check"
-        val_bucket += reid_samples[:reid_count_val]
-        test_bucket += reid_samples[reid_count_val:]
 
         for individual in group(train_bucket):
             assert isinstance(individual.value, list)
@@ -307,16 +271,8 @@ def generate_split(
     val: int = 15,
     test: int = 15,
     min_train_count: int = 3,
-    reid_factor_val: Optional[int] = None,
-    reid_factor_test: Optional[int] = None,
 ) -> Path:
-    reid_factors = "-"
-    if mode == "openset":
-        assert isinstance(reid_factor_val, int) and isinstance(
-            reid_factor_test, int
-        ), "must pass reid_factor_test if mode=openset"
-        reid_factors = f"-reid-val-{reid_factor_val}-test-{reid_factor_test}"
-    name = f"splits/{dataset.replace('/', '-')}-{mode}{reid_factors}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
+    name = f"splits/{dataset.replace('/', '-')}-{mode}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
     outdir = Path(f"data/{name}")
 
     # NOTE hacky workaround
@@ -336,8 +292,6 @@ def generate_split(
         test=test,
         seed=seed,
         min_train_count=min_train_count,
-        reid_factor_test=reid_factor_test,
-        reid_factor_val=reid_factor_val,
     )
     stats_and_confirm(name, images, train_bucket, val_bucket, test_bucket)
     write_entries(train_bucket, outdir / "train")
@@ -468,19 +422,20 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
     _merge_dataset_splits(target, ds1, ds2, ds1_labeler, ds2_labeler)
 
 
-# if __name__ == "__main__":
-# dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
-# copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+if __name__ == "__main__":
+    # dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+    # copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 
-# dir = generate_split(
-#     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-# )
-# dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+    # dir = generate_split(
+    #     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+    # )
+    
+    dir = generate_split(dataset="ground_truth/bristol/cropped_images_face", mode="closedset", seed=42, train=0, val=100, test=0)
 
-# merge_dataset_splits(
-#     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-#     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-# )
+    # merge_dataset_splits(
+    #     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+    #     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+    # )
 
 # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
 # dir = generate_split(
