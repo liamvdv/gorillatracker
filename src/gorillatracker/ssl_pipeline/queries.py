@@ -327,7 +327,7 @@ def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Vid
     subquery = (
         select(Video.video_id, VideoFeature.value)
         .join(VideoFeature, Video.video_id == VideoFeature.video_id)
-        .where(Video.version == version, VideoFeature.feature_type == "Social Group")
+        .where(Video.version == version, VideoFeature.feature_type == "social_group")
         # Note: string can change
     ).subquery()
 
@@ -360,7 +360,7 @@ if __name__ == "__main__":
     with session_cls() as session:
         video_negatives = social_group_negatives(session, version)
         print(video_negatives[:10])
-        social_groups = session.execute(select(VideoFeature).where(VideoFeature.feature_type == "Social Group")).all()
+        social_groups = session.execute(select(VideoFeature).where(VideoFeature.feature_type == "social_group")).all()
         print(social_groups)
         video_negatives = travel_distance_negatives(session, version, 10)
         print(video_negatives[:10])

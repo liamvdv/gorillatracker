@@ -16,7 +16,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.helpers import extract_meta_data_time
-from gorillatracker.ssl_pipeline.models import Base, Video, VideoFeature
+from gorillatracker.ssl_pipeline.models import Base, Task, TaskKeyValue, TaskType, Video, VideoFeature
 from gorillatracker.ssl_pipeline.queries import get_or_create_camera
 from gorillatracker.ssl_pipeline.video_preprocessor import VideoMetadata
 
@@ -74,8 +74,9 @@ class SSLDataset(ABC):
         """Post setup operations."""
         pass
 
+    @classmethod
     @abstractmethod
-    def video_insert_hook(self, video: Video) -> None:
+    def video_insert_hook(cls, video: Video) -> None:
         """Hook to run when inserting a video. Used to add Task's and VideoFeatures."""
         pass
 
@@ -129,8 +130,9 @@ class GorillaDataset(SSLDataset):
     def video_paths(self) -> list[Path]:
         return self.get_video_paths(self.VIDEO_DIR)
 
+    @classmethod
     @abstractmethod
-    def get_social_group(self, video: Video) -> Optional[str]:
+    def get_social_group(cls, video: Video) -> Optional[str]:
         pass
 
     def get_yolo_model_config(self, name: str) -> tuple[Path, dict[str, Any]]:
@@ -159,22 +161,42 @@ class GorillaDataset(SSLDataset):
     def post_setup(self) -> None:
         self.setup_camera_locations()
 
-    def video_insert_hook(self, video: Video) -> None:
-        social_group = self.get_social_group(video)
+    @classmethod
+    def video_insert_hook(cls, video: Video) -> None:
+        social_group = cls.get_social_group(video)
         if social_group:
             video.features.append(VideoFeature(feature_type="social_group", value=social_group))
 
+        tasks_to_add = [
+            Task(task_type=TaskType.TRACK, task_subtype=cls.BODY),
+            Task(task_type=TaskType.PREDICT, task_subtype=cls.FACE_90),
+            Task(task_type=TaskType.PREDICT, task_subtype=cls.FACE_45),
+            Task(
+                task_type=TaskType.CORRELATE,
+                task_subtype=cls.FACE_45,
+                task_key_values=[
+                    TaskKeyValue(key="tracked_feature_type", value=cls.BODY),
+                    TaskKeyValue(key="untracked_feature_type", value=cls.FACE_45),
+                    TaskKeyValue(key="threshold", value="0.7"),
+                ],
+            ),
+            Task(
+                task_type=TaskType.CORRELATE,
+                task_subtype=cls.FACE_90,
+                task_key_values=[
+                    TaskKeyValue(key="tracked_feature_type", value=cls.BODY),
+                    TaskKeyValue(key="untracked_feature_type", value=cls.FACE_90),
+                    TaskKeyValue(key="threshold", value="0.7"),
+                ],
+            ),
+        ]
+
+        video.tasks.extend(tasks_to_add)
+
 
 class GorillaDatasetKISZ(GorillaDataset):
-    def metadata_extractor(self, video_path: Path) -> VideoMetadata:
-        camera_name = video_path.stem.split("_")[0]
-        try:
-            date = extract_meta_data_time(video_path)
-        except ValueError:
-            date = None
-        return VideoMetadata(camera_name, date)
-
-    def get_social_group(self, video: Video) -> Optional[str]:
+    @classmethod
+    def get_social_group(cls, video: Video) -> Optional[str]:
         parent = video.path.parent
         if not re.match(r"^.*?_\d+\s[A-Z]{2}$", parent.name):
             return None
@@ -183,11 +205,32 @@ class GorillaDatasetKISZ(GorillaDataset):
             return None
         return group_id
 
+    def metadata_extractor(self, video_path: Path) -> VideoMetadata:
+        camera_name = video_path.stem.split("_")[0]
+        try:
+            date = extract_meta_data_time(video_path)
+        except ValueError:
+            date = None
+        return VideoMetadata(camera_name, date)
+
 
 class GorillaDatasetGPUServer2(GorillaDataset):
     DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
     TIMESTAMPS = "data/derived_data/timestamps.json"
     SOCIAL_GROUPS = "data/ground_truth/cxl/misc/VideosGO_SPAC.csv"
+
+    @classmethod
+    def get_social_group(cls, video: Video) -> Optional[str]:
+        df = pd.read_csv(cls.SOCIAL_GROUPS, sep=",")
+        filename = video.path.name.replace(".mp4", ".MP4")  # csv has .MP4 instead of .mp4
+        matching_rows = df[df["File"] == filename]
+        if not len(matching_rows) == 1:
+            log.info(f"Found {len(matching_rows)} social groups for video {filename}, skipping")
+            return None
+        social_group = matching_rows.iloc[0]["Group"]
+        if re.match(r"Group_[A-Z]{2}$", social_group):
+            return social_group.split("_")[1]
+        return None
 
     def metadata_extractor(self, video_path: Path) -> VideoMetadata:
         with open(self.TIMESTAMPS, "r") as f:
@@ -199,16 +242,3 @@ class GorillaDatasetGPUServer2(GorillaDataset):
         daytime = datetime.strptime(timestamp, "%I:%M %p")
         date = datetime.combine(date, daytime.time())
         return VideoMetadata(camera_name, date)
-
-    def get_social_group(self, video: Video) -> Optional[str]:
-        df = pd.read_csv(self.SOCIAL_GROUPS, sep=",")
-        filename = video.path.name.replace(".mp4", ".MP4")  # csv has .MP4 instead of .mp4
-        matching_rows = df[df["File"] == filename]
-        if not len(matching_rows) == 1:
-            log.info(f"Found {len(matching_rows)} social groups for video {filename}, skipping")
-            return None
-        social_group = matching_rows.iloc[0]["Group"]
-
-        if re.match(r"Group_[A-Z]{2}$", social_group):
-            return social_group.split("_")[1]
-        return None
