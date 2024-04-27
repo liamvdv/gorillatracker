@@ -31,16 +31,12 @@ def id_to_color(track_id: Optional[int]) -> tuple[int, int, int]:
 def render_on_frame(
     frame: cv2.typing.MatLike,
     frame_features: Sequence[TrackingFrameFeature],
-    tracking_id_to_label_map: dict[int, int],
 ) -> cv2.typing.MatLike:
     for frame_feature in frame_features:
         bbox = BoundingBox.from_tracking_frame_feature(frame_feature)
         cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
-        label = (
-            f"{tracking_id_to_label_map[frame_feature.tracking_id]} ({frame_feature.feature_type})"
-            if frame_feature.tracking_id is not None
-            else f"UNRESOLVED ({frame_feature.feature_type})"
-        )
+        label = frame_feature.tracking_id if frame_feature.tracking_id is not None else "UNRESOLVED"
+        label = f"{label} ({frame_feature.feature_type}, {frame_feature.confidence:.2f})"
         cv2.putText(
             frame,
             label,
@@ -60,14 +56,10 @@ def visualize_video(video: Video, dest: Path) -> None:
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
 
     tracked_frames = groupby_frame(video.tracking_frame_features)
-    unique_tracking_ids = {
-        feature.tracking_id for frame in tracked_frames.values() for feature in frame if feature.tracking_id is not None
-    }
-    tracking_id_to_label_map = {id: i + 1 for i, id in enumerate(unique_tracking_ids)}
     tracked_video = cv2.VideoWriter(str(dest), fourcc, video.output_fps, (video.width, video.height))
     with video_reader(video.path, frame_step=video.frame_step) as source_video:
         for frame in source_video:
-            render_on_frame(frame.frame, tracked_frames[frame.frame_nr], tracking_id_to_label_map)
+            render_on_frame(frame.frame, tracked_frames[frame.frame_nr])
             tracked_video.write(frame.frame)
         tracked_video.release()
 
@@ -80,7 +72,7 @@ def visualize_worker(
     engine.dispose(close=False)
 
     with Session(engine) as session:
-        for task in get_next_task(session, TaskType.TRACK):
+        for task in get_next_task(session, TaskType.VISUALIZE):
             video = task.video
             dest = dest_base / video.path.name
             visualize_video(video, dest)
