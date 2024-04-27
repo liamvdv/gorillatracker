@@ -19,6 +19,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
+from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
 from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_videos
@@ -118,6 +119,8 @@ def visualize_pipeline(
             gpu_ids=gpu_ids,
         )
 
+    multiprocess_correlate(one_to_one_correlator, dataset.engine, max_workers)
+
     multiprocess_visualize(dest_dir, dataset.engine, max_workers)
 
 
@@ -154,4 +157,4 @@ def kisz_demo() -> None:
 
 
 if __name__ == "__main__":
-    kisz_demo()
+    gpu2_demo()
