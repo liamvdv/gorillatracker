@@ -35,6 +35,8 @@ class TaskStatus(enum.Enum):
     FAILED = "failed"
 
 
+# WARNING(memben): Changing the class may affect the database
+# The values of the enum are stored in the database.
 class TaskType(enum.Enum):
     TRACK = "track"
     PREDICT = "predict"
