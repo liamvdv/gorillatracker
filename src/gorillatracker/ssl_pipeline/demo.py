@@ -137,7 +137,6 @@ def gpu2_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDatasetGPUServer2("sqlite:///test.db")
-    # NOTE(memben): for setup only once
     visualize_pipeline(
         dataset,
         version,
@@ -153,7 +152,6 @@ def kisz_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDatasetKISZ()
-    # NOTE(memben): for setup only once
     visualize_pipeline(
         dataset,
         version,

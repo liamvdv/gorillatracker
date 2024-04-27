@@ -113,8 +113,8 @@ class GorillaDataset(SSLDataset):
 
     _model_config = {
         SSLDataset.BODY: (Path("models/yolov8n_gorilla_body.pt"), _yolo_body_kwargs),
-        FACE_45: (Path("models/yolov8n_gorilla_body.pt"), _yolo_body_kwargs),
-        FACE_90: (Path("models/yolov8n_gorilla_body.pt"), _yolo_body_kwargs),
+        FACE_45: (Path("models/yolov8n_gorilla_face_45.pt"), _yolo_face_45_kwargs),
+        FACE_90: (Path("models/yolov8n_gorilla_face_90.pt"), _yolo_face_90_kwargs),
     }
 
     @property
