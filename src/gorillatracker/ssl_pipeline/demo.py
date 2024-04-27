@@ -18,7 +18,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetGPUServer2, GorillaDatasetKISZ, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
@@ -95,21 +95,30 @@ def visualize_pipeline(
     videos_to_track = random.sample(video_paths, n_videos)
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
-    preprocess_videos(videos_to_track, version, target_output_fps, dataset.engine, dataset.metadata_extractor)
+    preprocess_videos(
+        videos_to_track,
+        version,
+        target_output_fps,
+        dataset.engine,
+        dataset.metadata_extractor,
+        dataset.video_insert_hook,
+    )
 
     create_tasks(session, videos_to_track, version)
 
+    body_model_path, yolo_body_kwargs = dataset.get_yolo_model_config("body")
     multiprocess_track(
         "body",  # NOTE(memben): Tracking will always be done on bodies
-        dataset.body_model_path,
-        dataset.yolo_kwargs,
+        body_model_path,
+        yolo_body_kwargs,
         dataset.tracker_config,
         dataset.engine,
         max_worker_per_gpu=max_worker_per_gpu,
         gpu_ids=gpu_ids,
     )
 
-    for yolo_model, yolo_kwargs, feature_type in dataset.feature_models():
+    for feature_type in dataset.features:
+        yolo_model, yolo_kwargs = dataset.get_yolo_model_config(feature_type)
         multiprocess_predict(
             feature_type,
             yolo_model,
@@ -127,7 +136,7 @@ def visualize_pipeline(
 def gpu2_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDatasetSmall("sqlite:///test.db")
+    dataset = GorillaDatasetGPUServer2("sqlite:///test.db")
     # NOTE(memben): for setup only once
     visualize_pipeline(
         dataset,
@@ -137,13 +146,13 @@ def gpu2_demo() -> None:
         max_worker_per_gpu=1,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
         gpu_ids=[0],
     )
-    dataset.post_setup(version)
+    dataset.post_setup()
 
 
 def kisz_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDataset("sqlite:///test.db")
+    dataset = GorillaDatasetKISZ()
     # NOTE(memben): for setup only once
     visualize_pipeline(
         dataset,
@@ -153,7 +162,7 @@ def kisz_demo() -> None:
         max_worker_per_gpu=10,
         gpu_ids=[0],
     )
-    dataset.post_setup(version)
+    dataset.post_setup()
 
 
 if __name__ == "__main__":

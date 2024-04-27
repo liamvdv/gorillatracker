@@ -18,6 +18,10 @@ class MetadataExtractor(Protocol):
     def __call__(self, video_path: Path) -> VideoMetadata: ...
 
 
+class InsertHook(Protocol):
+    def __call__(self, video: Video) -> None: ...
+
+
 @dataclass(frozen=True)
 class VideoMetadata:
     """High level metadata about a video."""
@@ -49,6 +53,7 @@ def preprocess_and_store(
     target_output_fps: int,
     session_cls: sessionmaker[Session],
     metadata_extractor: MetadataExtractor,
+    video_insert_hook: InsertHook,
 ) -> None:
     metadata = metadata_extractor(video_path)
     properties = video_properties_extractor(video_path)
@@ -66,6 +71,7 @@ def preprocess_and_store(
     with session_cls() as session:
         camera = get_or_create_camera(session, metadata.camera_name)
         camera.videos.append(video)
+        video_insert_hook(video)
         session.commit()
 
 
@@ -75,9 +81,10 @@ def preprocess_videos(
     target_output_fps: int,
     engine: Engine,
     metadata_extractor: MetadataExtractor,
+    video_insert_hook: InsertHook,
 ) -> None:
 
     session_cls = sessionmaker(bind=engine)
     assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):
-        preprocess_and_store(video_path, version, target_output_fps, session_cls, metadata_extractor)
+        preprocess_and_store(video_path, version, target_output_fps, session_cls, metadata_extractor, video_insert_hook)
