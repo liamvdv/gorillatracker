@@ -36,8 +36,8 @@ class task_visualizer():
     
     def __init__(self, session:Session):
         self.layout.split(
-            Layout(name="header", size=3),
-            Layout(name="main")
+            Layout(name="header", size=3), # for generar information
+            Layout(name="main") # for progress bars
         )
         self.progress = Progress(TextColumn("[progress.description]{task.description}"),
                         TimeRemainingColumn(),
@@ -46,14 +46,14 @@ class task_visualizer():
                         console=self.console,
                         expand=True)
         self.session = session
-        self.initialize()
+        self._initialize()
         
-    def initialize(self):
-        self.update_header()
-        self.initialize_tasks()
+    def _initialize(self):
+        self._update_header()
+        self._initialize_tasks()
         self.layout["main"].update(self.progress)
         
-    def initialize_tasks(self):
+    def _initialize_tasks(self):
         get_tasks = select(Task.task_type, Task.task_subtype).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Video.version == self.version).distinct()
         tasks = self.session.execute(get_tasks).all()
         for task in tasks:
@@ -65,30 +65,30 @@ class task_visualizer():
     def update_loop(self):
         with Live(self.layout, refresh_per_second=10, console=self.console):
             while not self.progress.finished:
-                self.update_header()
-                self.update_tasks_from_db()
+                self._update_header()
+                self._update_tasks_from_db()
                 time.sleep(0.1)                
         
-    def update_header(self):
+    def _update_header(self):
         startime:datetime = self.session.execute(select(func.min(Task.updated_at)).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Video.version == self.version)).scalar()
         header_content = Text(f"startime: {startime.strftime('%Y-%m-%d %H:%M')} | version: {self.version}", justify="center")
         self.layout["header"].update(header_content)
     
-    def update_tasks_from_db(self):
+    def _update_tasks_from_db(self):
         for(task_type, task_subtype) in self.tasks.keys():
             if task_subtype == "":
                 continue
-            self.update_subtask_from_db(task_type, task_subtype)
-        self.update_tasks()
+            self._update_subtask_from_db(task_type, task_subtype)
+        self._update_tasks()
         
-    def update_subtask_from_db(self, task_type:TaskType, task_subtype:str):
+    def _update_subtask_from_db(self, task_type:TaskType, task_subtype:str):
         task_query = select(func.count()).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Task.task_type == task_type, Task.task_subtype == task_subtype, Video.version == self.version)
         finished_task_query = task_query.where(Task.status == TaskStatus.COMPLETED)
         task_count = self.session.execute(task_query).scalar()
         finished_task_count = self.session.execute(finished_task_query).scalar()
         self.progress.update(self.tasks[(task_type, task_subtype)], completed=finished_task_count, total=task_count)
         
-    def update_tasks(self):
+    def _update_tasks(self):
         tasks = {}
         for task_type, task_subtype in self.tasks.keys():
             if task_subtype == "":
