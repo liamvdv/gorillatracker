@@ -260,13 +260,13 @@ def knn(
     val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
 
     if use_train_embeddings:
-        train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))
+        train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))  # type: ignore
         # print("Using train embeddings for knn")
         return knn_with_train(
             val_embeddings,
             val_labels_encoded,
             k=k,
-            train_embeddings=train_embeddings,
+            train_embeddings=train_embeddings,  # type: ignore
             train_labels=train_labels_encoded,
         )
     else:
