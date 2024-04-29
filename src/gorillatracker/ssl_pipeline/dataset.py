@@ -70,7 +70,7 @@ class SSLDataset(ABC):
         pass
 
     @abstractmethod
-    def post_setup(sel) -> None:
+    def post_setup(self) -> None:
         """Post setup operations."""
         pass
 

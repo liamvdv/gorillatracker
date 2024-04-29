@@ -17,11 +17,12 @@ FlatNlet = tuple[ContrastiveImage, ...]
 class SSLDataset(Dataset[Nlet]):
     def __init__(
         self,
+        base_dir: str,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.Transform,
     ):
-        self.contrastive_sampler = get_random_ssl_sampler()
+        self.contrastive_sampler = get_random_ssl_sampler(base_dir)
         self.nlet_builder = nlet_builder
         self.transform = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition
