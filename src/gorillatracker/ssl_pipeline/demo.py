@@ -62,7 +62,8 @@ def visualize_pipeline(
         video_paths = remove_processed_videos(video_paths, preprocessed_videos)
 
     random.seed(42)  # For reproducibility
-    videos_to_track = random.sample(video_paths, n_videos)
+    # videos_to_track = random.sample(video_paths, n_videos)
+    videos_to_track = [Path("/workspaces/gorillatracker/video_data/R501_20220325_189.mp4")]
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
     def visualize_hook(video: Video) -> None:
