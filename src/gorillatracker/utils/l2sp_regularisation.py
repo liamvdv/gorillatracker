@@ -143,7 +143,10 @@ class L2_SP(nn.Module):
         # state = torch.load(path_to_pretrained_weights, map_location='cpu')
         state = torch.load(path_to_pretrained_weights)
 
-        pretrained_state = state["state_dict"]
+        if "state_dict" in state:
+            pretrained_state = state["state_dict"]
+        else:
+            pretrained_state = state
         # dealing with lightning here TODO:
         pretrained_state = strip_prefix(pretrained_state)
 

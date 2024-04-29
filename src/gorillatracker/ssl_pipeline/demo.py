@@ -13,19 +13,19 @@ The pipeline consists of the following steps:
 """
 
 import logging
-import os
 import random
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDataset, SSLDataset
-from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate_videos
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetGPUServer2, GorillaDatasetKISZ, SSLDataset
+from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
-from gorillatracker.ssl_pipeline.queries import load_processed_videos
+from gorillatracker.ssl_pipeline.models import Task, TaskType, Video
+from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
-from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict_and_store, multiprocess_track_and_store
-from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize_video
+from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
+from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize
 
 log = logging.getLogger(__name__)
 
@@ -35,9 +35,9 @@ def visualize_pipeline(
     version: str,
     dest_dir: Path,
     n_videos: int = 30,
-    sampled_fps: int = 10,
+    target_output_fps: int = 10,
     max_worker_per_gpu: int = 8,
-    gpus: list[int] = [0],
+    gpu_ids: list[int] = [0],
 ) -> None:
     """
     Visualize the tracking results of the pipeline.
@@ -47,9 +47,9 @@ def visualize_pipeline(
         version (str): The version of the pipeline.
         dest_dir (Path): The destination to save the visualizations.
         n_videos (int, optional): The number of videos to visualize. Defaults to 20.
-        sampled_fps (int, optional): The FPS to sample the video at. Defaults to 10.
+        target_output_fps (int, optional): The FPS to sample the video at. Defaults to 10.
         max_worker_per_gpu (int, optional): The maximum number of workers per GPU. Defaults to 8.
-        gpus (list[int], optional): The GPUs to use for tracking. Defaults to [0].
+        gpu_ids (list[int], optional): The GPUs to use for tracking. Defaults to [0].
 
     Returns:
         None, the visualizations are saved to the destination and to the SSLDataset.
@@ -57,65 +57,83 @@ def visualize_pipeline(
 
     video_paths = sorted(dataset.video_paths)
 
-    # NOTE(memben): For the production pipeline we should do this for every step
-    # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
     with Session(dataset.engine) as session:
-        preprocessed_videos = list(load_processed_videos(session, version, []))
+        preprocessed_videos = list(load_preprocessed_videos(session, version))
         video_paths = remove_processed_videos(video_paths, preprocessed_videos)
 
     random.seed(42)  # For reproducibility
-    to_track = random.sample(video_paths, n_videos)
+    videos_to_track = random.sample(video_paths, n_videos)
+    max_workers = len(gpu_ids) * max_worker_per_gpu
 
-    preprocess_videos(to_track, version, sampled_fps, dataset.engine, dataset.metadata_extractor)
+    def visualize_hook(video: Video) -> None:
+        dataset.video_insert_hook(video)
+        video.tasks.append(Task(task_type=TaskType.VISUALIZE))
 
-    multiprocess_track_and_store(
+    preprocess_videos(
+        videos_to_track,
         version,
-        dataset.body_model_path,
-        dataset.yolo_kwargs,
-        to_track,
-        dataset.tracker_config,
+        target_output_fps,
         dataset.engine,
-        "body",  # NOTE(memben): Tracking will always be done on bodies
-        max_worker_per_gpu=max_worker_per_gpu,
-        gpus=gpus,
+        dataset.metadata_extractor,
+        visualize_hook,
     )
 
-    for yolo_model, yolo_kwargs, _, type in dataset.feature_models():
-        multiprocess_predict_and_store(
-            version,
+    body_model_path, yolo_body_kwargs = dataset.get_yolo_model_config(dataset.BODY)
+    multiprocess_track(
+        dataset.BODY,  # NOTE(memben): Tracking will always be done on bodies
+        body_model_path,
+        yolo_body_kwargs,
+        dataset.tracker_config,
+        dataset.engine,
+        max_worker_per_gpu=max_worker_per_gpu,
+        gpu_ids=gpu_ids,
+    )
+
+    for feature_type in dataset.features:
+        yolo_model, yolo_kwargs = dataset.get_yolo_model_config(feature_type)
+        multiprocess_predict(
+            feature_type,
             yolo_model,
             yolo_kwargs,
-            to_track,
             dataset.engine,
-            type,
             max_worker_per_gpu=max_worker_per_gpu,
-            gpus=gpus,
+            gpu_ids=gpu_ids,
         )
 
-    for _, _, correlator, type in dataset.feature_models():
-        multiprocess_correlate_videos(
-            version,
-            to_track,
-            dataset.engine,
-            correlator,
-            type,
-        )
+        multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
 
-    multiprocess_visualize_video(to_track, version, dataset.engine, dest_dir)
+    multiprocess_visualize(dest_dir, dataset.engine, max_workers)
+
+
+def gpu2_demo() -> None:
+    version = "2024-04-09"
+    logging.basicConfig(level=logging.INFO)
+    dataset = GorillaDatasetGPUServer2("sqlite:///test.db")
+    visualize_pipeline(
+        dataset,
+        version,
+        Path("/workspaces/gorillatracker/video_output"),
+        n_videos=10,
+        max_worker_per_gpu=1,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
+        gpu_ids=[0],
+    )
+    dataset.post_setup()
+
+
+def kisz_demo() -> None:
+    version = "2024-04-09"
+    logging.basicConfig(level=logging.INFO)
+    dataset = GorillaDatasetKISZ()
+    visualize_pipeline(
+        dataset,
+        version,
+        Path("/workspaces/gorillatracker/video_output"),
+        n_videos=20,
+        max_worker_per_gpu=10,
+        gpu_ids=[0],
+    )
+    dataset.post_setup()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDataset("sqlite:///test.db")
-    # NOTE(memben): for setup only once
-    if not os.path.exists("test.db"):
-        dataset.setup_database()
-        dataset.setup_cameras()
-    visualize_pipeline(
-        dataset,
-        "2024-04-09",
-        Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
-        max_worker_per_gpu=12,
-        gpus=[0],
-    )
+    gpu2_demo()

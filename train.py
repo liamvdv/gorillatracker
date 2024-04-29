@@ -1,4 +1,6 @@
+import warnings
 from pathlib import Path
+from typing import Union
 
 import torch
 import wandb
@@ -10,10 +12,16 @@ from torchvision.transforms import Compose, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
+from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
+from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+
+warnings.filterwarnings("ignore", ".*does not have many workers.*")
+warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
+warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
 
 def main(args: TrainingArgs) -> None:  # noqa: C901
@@ -39,20 +47,32 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     wandb_logging_module = WandbLoggingModule(args)
     wandb_logger = wandb_logging_module.construct_logger()
 
-    #################### Construct dataloaders #################
+    ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
+
+    #################### Construct dataloaders #################
     model_transforms = model_cls.get_tensor_transforms()
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        args.video_data,
-        model_transforms,
-        model_cls.get_training_transforms(),  # type: ignore
-    )
+
+    # TODO(memben): Unify SSLDatamodule and NletDataModule
+    dm: Union[SSLDataModule, NletDataModule]
+    if args.use_ssl:
+        dm = SSLDataModule(
+            batch_size=args.batch_size,
+            transforms=model_transforms,
+            training_transforms=model_cls.get_training_transforms(),
+            data_dir=str(args.data_dir),
+        )
+    else:
+        dm = get_data_module(
+            args.dataset_class,
+            str(args.data_dir),
+            args.batch_size,
+            args.loss_mode,
+            model_transforms,
+            model_cls.get_training_transforms(),
+        )
 
     kfold_k = 1
     if args.kfold:
@@ -85,8 +105,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         mem_bank_start_epoch=args.mem_bank_start_epoch,
         lambda_membank=args.lambda_membank,
         num_classes=(
-            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
-            if not args.video_data
+            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))  # type: ignore
+            if not args.use_ssl
             else (-1, -1, -1)
         ),
         dropout_p=args.dropout_p,
@@ -107,8 +127,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             # we will resume via trainer.fit(ckpt_path=...)
         else:  # load only weights
             model = model_cls(**model_args)  # type: ignore
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
-            model.load_state_dict(torch_load["state_dict"], strict=False)
+            # torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
+            # model.load_state_dict(torch_load["state_dict"], strict=False)
     else:
         model = model_cls(**model_args)  # type: ignore
 
@@ -185,6 +205,16 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Effective batch size: {args.batch_size} | "
         )
 
+    if args.pretrained_weights_file is not None:
+        # delete everything in model except model.model
+        for k in list(model.__dict__.keys()):
+            if k != "model" and not k.startswith("_"):
+                del model.__dict__[k]
+        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
+        torch.save(model.state_dict(), args.pretrained_weights_file)
+        logger.info("Model saved")
+        exit(0)
+
     logger.info(f"Rank {current_process_rank} | Starting training...")
 
     for i in range(kfold_k):
@@ -231,6 +261,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
+
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
@@ -245,6 +276,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
             logger.success("Saving finished!")
+    else:
+        logger.info("Rank is not 0, skipping checkpoint saving...")
 
 
 if __name__ == "__main__":

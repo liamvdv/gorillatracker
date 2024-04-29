@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from itertools import groupby
 from pathlib import Path
-from typing import Generator, Optional, Sequence
+from typing import Generator, Iterator, Optional, Sequence
 
 import cv2
 import easyocr
@@ -45,7 +45,7 @@ def video_frame_iterator(cap: cv2.VideoCapture, frame_step: int) -> Generator[Vi
 
 
 @contextmanager
-def video_reader(video_path: Path, frame_step: int = 1) -> Generator[Generator[VideoFrame, None, None], None, None]:
+def video_reader(video_path: Path, frame_step: int = 1) -> Iterator[Generator[VideoFrame, None, None]]:
     """
     Context manager for reading frames from a video file.
 
