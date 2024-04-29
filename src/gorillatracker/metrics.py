@@ -233,12 +233,13 @@ def evaluate_embeddings(
         for metric_name, metric in metrics.items()
     }
 
+    kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{embedding_name}/fold-{kfold_k}/{metric_name}/{key}": value})
+                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/{key}": value})
         else:
-            wandb.log({f"{embedding_name}/fold-{kfold_k}/{metric_name}": result})
+            wandb.log({f"{embedding_name}{kfold_str}{metric_name}": result})
 
     return results
 

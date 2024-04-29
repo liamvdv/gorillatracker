@@ -8,9 +8,8 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.type_helper import Id, Label
 from gorillatracker.transform_utils import SquarePad
-
-Label = Union[int, str]
 
 
 def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
@@ -34,7 +33,7 @@ def cast_label_to_int(labels: List[str]) -> List[int]:
     return le.transform(labels)
 
 
-class KFoldCXLDataset(Dataset[Tuple[Image.Image, Label]]):
+class KFoldCXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):
     def __init__(
         self,
         data_dir: str,
@@ -79,17 +78,12 @@ class KFoldCXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[Image.Image, int]:
+    def __getitem__(self, idx: int) -> Tuple[Id, Image.Image, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
-
-        # save img
-        # img2 = transforms.ToPILImage()(img)
-        # img2.save(f"img_{self.partition}.png")
-
-        return img, label
+        return str(img_path), img, label
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:

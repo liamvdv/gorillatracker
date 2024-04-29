@@ -167,7 +167,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
-        kfold_k=0,
+        kfold_k=0 if args.kfold else None,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(

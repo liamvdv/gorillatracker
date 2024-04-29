@@ -60,7 +60,7 @@ gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 2                  # Training goal (large number)
 val_before_training: False       # Perform validation before training
 only_val: False                 # Perform only validation
-kfold: True                     # Perform kfold cross validation
+kfold: False                     # Perform kfold cross validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
@@ -68,6 +68,6 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5"
-dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 data_resize_transform: 192
