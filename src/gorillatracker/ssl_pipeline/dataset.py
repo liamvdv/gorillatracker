@@ -218,7 +218,7 @@ class GorillaDatasetGPUServer2(GorillaDataset):
     DB_URI = "postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres"
     TIMESTAMPS = "data/derived_data/timestamps.json"
     SOCIAL_GROUPS = "data/ground_truth/cxl/misc/VideosGO_SPAC.csv"
-    
+
     def __init__(self) -> None:
         super().__init__(self.DB_URI)
 
