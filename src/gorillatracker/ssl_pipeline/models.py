@@ -268,6 +268,9 @@ class TrackingFrameFeature(Base):
             raise ValueError(f"frame_nr must be a multiple of {self.video.frame_step}, is {frame_nr}")
         return frame_nr
 
+    def cache_path(self, base_path: Path) -> Path:
+        return Path(base_path, str(self.tracking_frame_feature_id % 2 ** 8), str(self.tracking_frame_feature_id % 2 ** 16), f"{self.tracking_frame_feature_id}.png")
+    
     def __lt__(self, other: TrackingFrameFeature) -> bool:
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id
 

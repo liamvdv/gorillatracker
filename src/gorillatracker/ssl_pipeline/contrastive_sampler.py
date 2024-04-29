@@ -79,7 +79,7 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
 
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
-def get_random_ssl_sampler() -> ContrastiveClassSampler:
+def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
     WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
     PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
     engine = create_engine(PUBLIC_DB_URI)
@@ -98,7 +98,7 @@ def get_random_ssl_sampler() -> ContrastiveClassSampler:
             .all()
         )
         contrastive_images = [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path, f.tracking_id) for f in tracked_features  # type: ignore
+            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id) for f in tracked_features  # type: ignore
         ]
         groups = groupby(contrastive_images, lambda x: x.class_label)
         classes: dict[Any, list[ContrastiveImage]] = {}
@@ -108,3 +108,11 @@ def get_random_ssl_sampler() -> ContrastiveClassSampler:
             if len(samples) > 1:
                 classes[class_label] = samples
         return ContrastiveClassSampler(classes)
+
+
+if __name__ == "__main__":
+    sampler = get_random_ssl_sampler("/workspaces/gorillatracker/cropped_images")
+    print(len(sampler))
+    sample = sampler[0]
+    print(sample)
+    print(sampler.positive)
