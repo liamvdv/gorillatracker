@@ -232,6 +232,7 @@ def get_next_task(
                 Task.task_subtype == task_subtype,
                 or_(pending_condition, processing_condition, failed_condition),
             )
+            .limit(1)
             .with_for_update(skip_locked=True)
         )
 
