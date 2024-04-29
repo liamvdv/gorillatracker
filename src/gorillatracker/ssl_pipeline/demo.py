@@ -146,7 +146,7 @@ def kisz_demo() -> None:
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
+        n_videos=40,
         max_worker_per_gpu=10,
         gpu_ids=[0],
     )

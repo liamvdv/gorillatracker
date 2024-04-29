@@ -1,5 +1,6 @@
 import time
-from gorillatracker.ssl_pipeline.models import Task, TaskType, Video, TaskStatus
+from datetime import datetime
+from gorillatracker.ssl_pipeline.models import Task, TaskType, Video, TaskStatus 
 from gorillatracker.ssl_pipeline.dataset import GorillaDataset
 
 from rich.console import Console
@@ -12,6 +13,9 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import select
 
+from typing import Tuple
+
+Progress_Task = Tuple[TaskType, str] # TaskType and TaskSubType
 
 class task_visualizer():
     #viszalizer
@@ -23,6 +27,8 @@ class task_visualizer():
     tracking_task:TaskID
     predicting_task:TaskID
     visualizing_task:TaskID
+    
+    tasks:dict[Progress_Task, TaskID] = {}
     
     #db
     session:Session
@@ -39,47 +45,64 @@ class task_visualizer():
                         TextColumn("{task.completed}/{task.total}"),
                         console=self.console,
                         expand=True)
-        self.tracking_task = self.progress.add_task("[green]tracking...")
-        self.predicting_task = self.progress.add_task("[green]predicting...")
-        self.visualizing_task = self.progress.add_task("[green]visiualizing...")
-        self.layout["main"].update(self.progress)
         self.session = session
-        self.initialize_progress()
+        self.initialize()
         
+    def initialize(self):
+        self.update_header()
+        self.initialize_tasks()
+        self.layout["main"].update(self.progress)
+        
+    def initialize_tasks(self):
+        get_tasks = select(Task.task_type, Task.task_subtype).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Video.version == self.version).distinct()
+        tasks = self.session.execute(get_tasks).all()
+        for task in tasks:
+            print(task)
+            if((task[0], "") not in self.tasks):
+                self.tasks[(task[0], "")] = self.progress.add_task(f"[red]{task[0].value}")
+            self.tasks[task] = self.progress.add_task(f"[green]{task[0].value} {task[1]}")
+            
     def update_loop(self):
         with Live(self.layout, refresh_per_second=10, console=self.console):
             while not self.progress.finished:
+                self.update_header()
                 self.update_tasks_from_db()
                 time.sleep(0.1)                
         
-    def initialize_progress(self):
-        self.update_tasks_from_db()
+    def update_header(self):
+        startime:datetime = self.session.execute(select(func.min(Task.updated_at)).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Video.version == self.version)).scalar()
+        header_content = Text(f"startime: {startime.strftime('%Y-%m-%d %H:%M')} | version: {self.version}", justify="center")
+        self.layout["header"].update(header_content)
     
     def update_tasks_from_db(self):
-        self.update_tracking_progress()
-        self.update_predicting_progress()
-        self.update_visualizing_progress()
-
-    def update_tracking_progress(self):
-        tracking_tasks_query = select(func.count()).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Task.task_type == TaskType.TRACK, Video.version == self.version)
-        finished_tracking_tasks_query = tracking_tasks_query.where(Task.status == TaskStatus.COMPLETED)
-        tasks_count = self.session.execute(tracking_tasks_query).scalar()
-        finished_tasks_count = self.session.execute(finished_tracking_tasks_query).scalar()
-        self.progress.update(self.tracking_task, completed=finished_tasks_count, total=tasks_count)
+        for(task_type, task_subtype) in self.tasks.keys():
+            if task_subtype == "":
+                continue
+            self.update_subtask_from_db(task_type, task_subtype)
+        self.update_tasks()
         
-    def update_predicting_progress(self):
-        predicting_tasks_query = select(func.count()).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Task.task_type == TaskType.PREDICT, Video.version == self.version)
-        finished_predicting_tasks_query = predicting_tasks_query.where(Task.status == TaskStatus.COMPLETED)
-        tasks_count = self.session.execute(predicting_tasks_query).scalar()
-        finished_tasks_count = self.session.execute(finished_predicting_tasks_query).scalar()
-        self.progress.update(self.predicting_task, completed=finished_tasks_count, total=tasks_count)
+    def update_subtask_from_db(self, task_type:TaskType, task_subtype:str):
+        task_query = select(func.count()).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Task.task_type == task_type, Task.task_subtype == task_subtype, Video.version == self.version)
+        finished_task_query = task_query.where(Task.status == TaskStatus.COMPLETED)
+        task_count = self.session.execute(task_query).scalar()
+        finished_task_count = self.session.execute(finished_task_query).scalar()
+        self.progress.update(self.tasks[(task_type, task_subtype)], completed=finished_task_count, total=task_count)
         
-    def update_visualizing_progress(self):
-        visualizing_tasks_query = select(func.count()).select_from(Task).join(Video, Task.video_id == Video.video_id).where(Task.task_type == TaskType.VISUALIZE, Video.version == self.version)
-        finished_visualizing_tasks_query = visualizing_tasks_query.where(Task.status == TaskStatus.COMPLETED)
-        tasks_count = self.session.execute(visualizing_tasks_query).scalar()
-        finished_tasks_count = self.session.execute(finished_visualizing_tasks_query).scalar()
-        self.progress.update(self.visualizing_task, completed=finished_tasks_count, total=tasks_count)
+    def update_tasks(self):
+        tasks = {}
+        for task_type, task_subtype in self.tasks.keys():
+            if task_subtype == "":
+                continue
+            if task_type in tasks:
+                completed = tasks[task_type][0] + self.progress.tasks[self.tasks[(task_type, task_subtype)]].completed
+                total = tasks[task_type][1] + self.progress.tasks[self.tasks[(task_type, task_subtype)]].total
+                tasks[task_type] = (completed, total)
+            else:
+                completed = self.progress.tasks[self.tasks[(task_type, task_subtype)]].completed
+                total = self.progress.tasks[self.tasks[(task_type, task_subtype)]].total
+                tasks[task_type] = (completed, total)
+        for task_type, (completed, total) in tasks.items():
+            self.progress.update(self.tasks[(task_type, "")], completed=completed, total=total)       
 
         
 if __name__ == "__main__":
