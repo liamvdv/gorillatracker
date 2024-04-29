@@ -1,21 +1,30 @@
 from typing import Any, Dict, List, Tuple, Union
 
 mapping: Dict[str, int] = {}
+
+
 class LabelEncoder:
+    @staticmethod
     def encode(label: str) -> int:
         if label not in mapping:
             mapping[label] = len(mapping)
         return mapping[label]
 
+    @staticmethod
     def encode_list(labels: List[str]) -> List[int]:
         return [LabelEncoder.encode(label) for label in labels]
-    
+
+    @staticmethod
     def decode(index: int) -> str:
-        for label, idx in mapping.items():
-            if idx == index:
-                return label
+        decode_mapping = {v: k for k, v in mapping.items()}
+        assert len(decode_mapping) == len(mapping), "1:1 mapping"
+        return decode_mapping[index]
+    
+    @staticmethod
     def decode_list(indices: List[int]) -> List[str]:
-        return [LabelEncoder.decode(index) for index in indices]
+        decode_mapping = {v: k for k, v in mapping.items()}
+        assert len(decode_mapping) == len(mapping), "1:1 mapping"
+        return [decode_mapping[index] for index in indices]
 
 
 class LinearSequenceEncoder:
@@ -29,13 +38,17 @@ class LinearSequenceEncoder:
 
     def encode_list(self, labels: Union[List[int], Tuple[int]]) -> List[int]:
         return [self.encode(label) for label in labels]
-    
+
     def decode(self, index: int) -> int:
-        for label, idx in self.mapping.items():
-            if idx == index:
-                return label
+        decode_mapping = {v: k for k, v in self.mapping.items()}
+        assert len(decode_mapping) == len(self.mapping), "1:1 mapping"
+        return decode_mapping[index]
+             
+
     def decode_list(self, indices: Union[List[int], Tuple[int]]) -> List[int]:
-        return [self.decode(index) for index in indices]
+        decode_mapping = {v: k for k, v in self.mapping.items()}
+        assert len(decode_mapping) == len(self.mapping), "1:1 mapping"
+        return [decode_mapping[index] for index in indices]
 
 
 if __name__ == "__main__":
@@ -47,4 +60,3 @@ if __name__ == "__main__":
     le2 = LabelEncoder
     print(mapping.keys())
     print(le2.decode_list([0, 1, 0]))
-    
