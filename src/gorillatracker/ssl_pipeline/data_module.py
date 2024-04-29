@@ -20,15 +20,18 @@ class SSLDataModule(L.LightningDataModule):
         batch_size: int = 32,
         transforms: gtypes.Transform = lambda x: x,
         training_transforms: gtypes.Transform = lambda x: x,
+        data_dir: str = "/workspaces/gorillatracker/cropped_images/2024-04-09",
     ) -> None:
         super().__init__()
         self.transforms = transforms
         self.training_transforms = training_transforms
         self.batch_size = batch_size
+        self.data_dir = data_dir
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
             self.train = SSLDataset(
+                self.data_dir,
                 build_triplet,
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),

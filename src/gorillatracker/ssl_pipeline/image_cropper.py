@@ -28,10 +28,6 @@ class CropTask:
     tracking_frame_feature_id: int
 
 
-def destination_path(base_path: Path, feature: TrackingFrameFeature) -> Path:
-    return Path(base_path, str(feature.tracking.tracking_id), f"{feature.frame_nr}.png")
-
-
 def create_crop_tasks(
     video_path: Path,
     version: str,
@@ -43,12 +39,12 @@ def create_crop_tasks(
         video = load_video(session, video_path, version)
         # NOTE(memben): When multiple videos have the same name, their TFF will be in the same folder, which is fine.
         # If we want to avoid this, we can add the video_id to the path.
-        dest_path = dest_base_path / version / video.camera.name / video_path.name
+        dest_path = dest_base_path / version
         frame_features = sampler.sample(video.video_id, session)
         crop_tasks = [
             CropTask(
                 feature.frame_nr,
-                destination_path(dest_path, feature),
+                feature.cache_path(dest_path),
                 BoundingBox.from_tracking_frame_feature(feature),
                 feature.tracking_frame_feature_id,
             )
@@ -69,12 +65,12 @@ def crop_from_video(video_path: Path, crop_tasks: list[CropTask]) -> None:
         assert not crop_queue, "Not all crop tasks were completed"
 
 
-def update_cache_paths(crop_tasks: list[CropTask], session_cls: sessionmaker[Session]) -> None:
+def update_cached_tff(crop_tasks: list[CropTask], session_cls: sessionmaker[Session]) -> None:
     with session_cls() as session:
         set_where_statements = [
             {
                 "tracking_frame_feature_id": crop_task.tracking_frame_feature_id,
-                "cache_path": str(crop_task.dest),
+                "cached": True,
             }
             for crop_task in crop_tasks
         ]
@@ -93,7 +89,7 @@ def crop(
         return
 
     crop_from_video(video_path, crop_tasks)
-    update_cache_paths(crop_tasks, session_cls)
+    update_cached_tff(crop_tasks, session_cls)
 
 
 _version = None
@@ -167,8 +163,7 @@ if __name__ == "__main__":
 
     multiprocess_crop_from_video(video_paths[:20], version, engine, sampler, Path(abs_path), max_workers=10)
 
-    # print cache_paths of first 50 TrackingFrameFeature instances
     with session_cls() as session:
         tracking_frame_features = session.execute(select(TrackingFrameFeature)).scalars().all()
         for feature in tracking_frame_features[:50]:
-            print(feature.cache_path)
+            print(feature.cached)

@@ -113,7 +113,7 @@ def gpu2_demo() -> None:
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=1,
+        n_videos=10,
         max_worker_per_gpu=1,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
         gpu_ids=[0],
     )
