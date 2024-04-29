@@ -28,10 +28,6 @@ class CropTask:
     tracking_frame_feature_id: int
 
 
-def destination_path(base_path: Path, tff_id: int) -> Path:
-    return Path(base_path, str(tff_id % 2**8), str(tff_id % 2**16), f"{tff_id}.png")
-
-
 def create_crop_tasks(
     video_path: Path,
     version: str,
@@ -48,7 +44,7 @@ def create_crop_tasks(
         crop_tasks = [
             CropTask(
                 feature.frame_nr,
-                destination_path(dest_path, feature.tracking_frame_feature_id),
+                feature.cache_path(dest_path),
                 BoundingBox.from_tracking_frame_feature(feature),
                 feature.tracking_frame_feature_id,
             )

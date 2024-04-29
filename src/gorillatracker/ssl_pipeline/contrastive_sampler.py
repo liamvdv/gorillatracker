@@ -111,7 +111,8 @@ def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
 
 
 if __name__ == "__main__":
-    sampler = get_random_ssl_sampler("/workspaces/gorillatracker/cropped_images")
+    version = "2024-04-09"
+    sampler = get_random_ssl_sampler(f"/workspaces/gorillatracker/cropped_images/{version}")
     print(len(sampler))
     sample = sampler[0]
     print(sample)

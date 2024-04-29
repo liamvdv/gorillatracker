@@ -62,6 +62,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             batch_size=args.batch_size,
             transforms=model_transforms,
             training_transforms=model_cls.get_training_transforms(),
+            data_dir=str(args.data_dir),
         )
     else:
         dm = get_data_module(
