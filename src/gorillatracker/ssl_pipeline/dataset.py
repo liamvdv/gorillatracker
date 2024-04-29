@@ -88,6 +88,7 @@ class SSLDataset(ABC):
 class GorillaDataset(SSLDataset):
     FACE_90 = "face_90"  # angle of the face -90 to 90 degrees from the camera
     FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
+    # FACE_45 = "face_45"  # angle of the face -45 to 45 degrees from the camera
     VIDEO_DIR = "/workspaces/gorillatracker/video_data"
     CAMERA_LOCATIONS_CSV = "data/ground_truth/cxl/misc/Kamaras_coorHPF.csv"
 
@@ -110,6 +111,7 @@ class GorillaDataset(SSLDataset):
     _yolo_face_90_kwargs = {
         **_yolo_base_kwargs,
         "iou": 0.1,
+        "conf": 0.5,
     }
 
     _model_config = {
@@ -120,7 +122,7 @@ class GorillaDataset(SSLDataset):
 
     @property
     def features(self) -> list[str]:
-        return [self.FACE_45, self.FACE_90]
+        return [self.FACE_90]
 
     @property
     def tracker_config(self) -> Path:
@@ -170,16 +172,6 @@ class GorillaDataset(SSLDataset):
         tasks_to_add = [
             Task(task_type=TaskType.TRACK, task_subtype=cls.BODY),
             Task(task_type=TaskType.PREDICT, task_subtype=cls.FACE_90),
-            Task(task_type=TaskType.PREDICT, task_subtype=cls.FACE_45),
-            Task(
-                task_type=TaskType.CORRELATE,
-                task_subtype=cls.FACE_45,
-                task_key_values=[
-                    TaskKeyValue(key="tracked_feature_type", value=cls.BODY),
-                    TaskKeyValue(key="untracked_feature_type", value=cls.FACE_45),
-                    TaskKeyValue(key="threshold", value="0.7"),
-                ],
-            ),
             Task(
                 task_type=TaskType.CORRELATE,
                 task_subtype=cls.FACE_90,

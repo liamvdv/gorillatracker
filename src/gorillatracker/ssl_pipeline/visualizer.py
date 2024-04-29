@@ -34,16 +34,33 @@ def render_on_frame(
 ) -> cv2.typing.MatLike:
     for frame_feature in frame_features:
         bbox = BoundingBox.from_tracking_frame_feature(frame_feature)
-        cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(frame_feature.tracking_id), 2)
-        label_id = frame_feature.tracking_id or "UNRESOLVED"
-        label = f"{label_id} ({frame_feature.feature_type}, {frame_feature.confidence:.2f})"
+        if frame_feature.tracking_id is None:
+            continue
+        label_name = "Unknown"
+        id = frame_feature.tracking_id
+        frame_nr = frame_feature.frame_nr
+        # map id, frame to name:
+        if id == 1 and frame_nr <= 198 * 2:
+            label_name = "Sango"
+        elif id == 1 and frame_nr > 198 * 2:
+            label_name = "Bibi"
+        elif id == 5 or id == 8 or (id == 7 and frame_nr < 708 * 2) or id == 9:
+            label_name = "Tila"
+        elif id == 7 and frame_nr >= 708 * 2:
+            label_name = "Bibi"
+        
+        
+        
+        
+        cv2.rectangle(frame, bbox.top_left, bbox.bottom_right, id_to_color(hash(label_name)), 2)
+        label = f"{label_name} ({frame_feature.feature_type}, {frame_feature.confidence:.2f})"
         cv2.putText(
             frame,
             label,
             (bbox.x_top_left, bbox.y_top_left - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.9,
-            id_to_color(frame_feature.tracking_id),
+            id_to_color(hash(label_name)),
             3,
         )
     return frame

@@ -59,49 +59,58 @@ def visualize_pipeline(
 
     with Session(dataset.engine) as session:
         preprocessed_videos = list(load_preprocessed_videos(session, version))
-        video_paths = remove_processed_videos(video_paths, preprocessed_videos)
+        first_vid = preprocessed_videos[0]
+        print(first_vid)
+        first_vid.tasks = []
+        session.commit()
+        first_vid.tasks.append(Task(task_type=TaskType.VISUALIZE))
+        session.commit()
+        
+        # video_paths = remove_processed_videos(video_paths, preprocessed_videos)
+        
 
     random.seed(42)  # For reproducibility
     # videos_to_track = random.sample(video_paths, n_videos)
-    videos_to_track = [Path("/workspaces/gorillatracker/video_data/R501_20220325_189.mp4")]
+    # videos_to_track = [Path("/workspaces/gorillatracker/video_data/R501_20220325_189.mp4")]
+    videos_to_track = [Path("/workspaces/gorillatracker/R501_20220325_189.mp4")]
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
-    def visualize_hook(video: Video) -> None:
-        dataset.video_insert_hook(video)
-        video.tasks.append(Task(task_type=TaskType.VISUALIZE))
+    # def visualize_hook(video: Video) -> None:
+    #     dataset.video_insert_hook(video)
+    #     video.tasks.append(Task(task_type=TaskType.VISUALIZE))
 
-    preprocess_videos(
-        videos_to_track,
-        version,
-        target_output_fps,
-        dataset.engine,
-        dataset.metadata_extractor,
-        visualize_hook,
-    )
+    # preprocess_videos(
+    #     videos_to_track,
+    #     version,
+    #     target_output_fps,
+    #     dataset.engine,
+    #     dataset.metadata_extractor,
+    #     visualize_hook,
+    # )
 
-    body_model_path, yolo_body_kwargs = dataset.get_yolo_model_config(dataset.BODY)
-    multiprocess_track(
-        dataset.BODY,  # NOTE(memben): Tracking will always be done on bodies
-        body_model_path,
-        yolo_body_kwargs,
-        dataset.tracker_config,
-        dataset.engine,
-        max_worker_per_gpu=max_worker_per_gpu,
-        gpu_ids=gpu_ids,
-    )
+    # body_model_path, yolo_body_kwargs = dataset.get_yolo_model_config(dataset.BODY)
+    # multiprocess_track(
+    #     dataset.BODY,  # NOTE(memben): Tracking will always be done on bodies
+    #     body_model_path,
+    #     yolo_body_kwargs,
+    #     dataset.tracker_config,
+    #     dataset.engine,
+    #     max_worker_per_gpu=max_worker_per_gpu,
+    #     gpu_ids=gpu_ids,
+    # )
 
-    for feature_type in dataset.features:
-        yolo_model, yolo_kwargs = dataset.get_yolo_model_config(feature_type)
-        multiprocess_predict(
-            feature_type,
-            yolo_model,
-            yolo_kwargs,
-            dataset.engine,
-            max_worker_per_gpu=max_worker_per_gpu,
-            gpu_ids=gpu_ids,
-        )
+    # for feature_type in dataset.features:
+    #     yolo_model, yolo_kwargs = dataset.get_yolo_model_config(feature_type)
+    #     multiprocess_predict(
+    #         feature_type,
+    #         yolo_model,
+    #         yolo_kwargs,
+    #         dataset.engine,
+    #         max_worker_per_gpu=max_worker_per_gpu,
+    #         gpu_ids=gpu_ids,
+    #     )
 
-        multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
+    #     multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
 
     multiprocess_visualize(dest_dir, dataset.engine, max_workers)
 
