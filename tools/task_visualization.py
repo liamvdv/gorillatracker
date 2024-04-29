@@ -61,8 +61,9 @@ class TaskVisualizer:
         for task_type, task_subtype in tasks:
             if task_type not in self.tasks:
                 self.tasks[task_type] = self.progress.add_task(f"[red][bold]{task_type.value}")
-            self.sub_tasks[(task_type, task_subtype)] = self.progress.add_task(f"[green]{task_type.value} {task_subtype}")
-                
+            self.sub_tasks[(task_type, task_subtype)] = self.progress.add_task(
+                f"[green]{task_type.value} {task_subtype}"
+            )
 
     def update_loop(self) -> None:
         with Live(self.layout, refresh_per_second=2, console=self.console):
@@ -72,12 +73,12 @@ class TaskVisualizer:
                 time.sleep(0.5)
 
     def _update_header(self) -> None:
-        starttime: datetime = self.session.execute(
+        starttime = self.session.execute(
             select(func.min(Task.updated_at))
             .select_from(Task)
             .join(Video, Task.video_id == Video.video_id)
             .where(Video.version == self.version)
-        ).scalar()
+        ).scalar_one()
         header_content = Text(
             f"starttime: {starttime.strftime('%Y-%m-%d %H:%M')} | version: {self.version}", justify="center"
         )
@@ -106,9 +107,12 @@ class TaskVisualizer:
         total = 0
         sub_tasks = [task_subtype for task_type_, task_subtype in self.sub_tasks.keys() if task_type_ == task_type]
         for sub_task in sub_tasks:
-            completed += self.progress.tasks[self.sub_tasks[(task_type, sub_task)]].completed
-            total += self.progress.tasks[self.sub_tasks[(task_type, sub_task)]].total
+            sub_task_progress = self.progress.tasks[self.sub_tasks[(task_type, sub_task)]]
+            completed += int(sub_task_progress.completed)
+            assert sub_task_progress.total is not None, "make mypy happy"
+            total += int(sub_task_progress.total)
         self.progress.update(self.tasks[task_type], completed=completed, total=total)
+
 
 if __name__ == "__main__":
     visualizer = TaskVisualizer(Session(GorillaDatasetKISZ("sqlite:///test.db").engine))
