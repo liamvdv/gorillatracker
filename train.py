@@ -152,7 +152,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         str(args.data_dir),
         args.batch_size,
         args.loss_mode,
-        args.video_data,
+        # args.video_data,
         model_transforms,
         model.get_training_transforms(),
     )
@@ -249,7 +249,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
         if args.kfold:
-            dm.val_fold = i # type: ignore
+            dm.val_fold = i  # type: ignore
             embeddings_logger_callback.kfold_k = i
         trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
         model = model_cls(**model_args)  # type: ignore
