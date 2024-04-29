@@ -11,8 +11,8 @@ from gorillatracker.data_modules import (
     QuadletDataModule,
     SimpleDataModule,
     TripletDataModule,
-    VideoTripletDataModule,
     TripletKFoldDataModule,
+    VideoTripletDataModule,
 )
 
 
@@ -51,7 +51,7 @@ def get_data_module(
 
     if "kfold" in data_dir:
         base = TripletKFoldDataModule
-    
+
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
         [

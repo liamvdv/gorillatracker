@@ -57,8 +57,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     kfold_k = 1
     if args.kfold:
         kfold_k = int(str(args.data_dir).split("-")[-1])
-        dm.val_fold = 0
-        dm.k = kfold_k
     ################# Construct model ##############
 
     # Resume from checkpoint if specified
@@ -138,10 +136,10 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         model_transforms,
         model.get_training_transforms(),
     )
-    
+
     if args.kfold:
-        dm.k = kfold_k
-    
+        dm.k = kfold_k  # type: ignore
+
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -186,9 +184,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
         )
-    
+
     logger.info(f"Rank {current_process_rank} | Starting training...")
-    
+
     for i in range(kfold_k):
         # Initialize trainer
         trainer = Trainer(
@@ -221,7 +219,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
 
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
         if args.kfold:
-            dm.val_fold = i
+            dm.val_fold = i # type: ignore
             embeddings_logger_callback.kfold_k = i
         trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
         model = model_cls(**model_args)  # type: ignore

@@ -269,34 +269,34 @@ def kfold_splitter(
     images = consistent_random_permutation(images, lambda x: x.value, seed)
     fold_buckets: List[List[Entry]] = [[] for _ in range(k)]
     test_bucket: List[Entry] = []
-    
+
     fold_bucket_iterator = 0
 
     individuums = group(images)
     if mode == "closedset":
         trainval_count, _, test_count = compute_split(len(images), trainval, 0, test, True)
         fold_bucket_size = trainval_count // k
-        
+
         # TODO: smarter way of splitting the images into k folds
         for i in range(k):
             fold_buckets[i] = images[fold_bucket_iterator : fold_bucket_iterator + fold_bucket_size]
             fold_bucket_iterator += fold_bucket_size
-        
+
         test_bucket = images[fold_bucket_iterator:]
-        
+
     elif mode == "openset":
         # At least one unseen individuum in test and eval.
         # NOTE number of actual images in each fold (and test) can vary due to different number of images per individual.
         trainval_count, _, test_count = compute_split(len(individuums), trainval, 0, test, True)
         fold_bucket_size = trainval_count // k
-        
+
         print(
             f"Unique Individuals (Image Count Bias): Total={len(individuums)}, Train={trainval_count}, Test={test_count}"
         )
         for i in range(k):
             fold_buckets[i] = ungroup(individuums[fold_bucket_iterator : fold_bucket_iterator + fold_bucket_size])
             fold_bucket_iterator += fold_bucket_size
-            
+
         test_bucket = ungroup(individuums[fold_bucket_iterator:])
 
     return fold_buckets, test_bucket
@@ -361,7 +361,7 @@ def generate_simple_split(
     files = read_files(f"data/{dataset}")
     files = consistent_random_permutation(files, lambda x: x.value, seed)
     outdir = Path(f"data/{name}")
-    train_count, val_count, test_count = compute_split(len(files), train, val, test)
+    train_count, val_count, test_count = compute_split(len(files), train, val, test, False)
     train_set = files[:train_count]
     val_set = files[train_count : train_count + val_count]
     test_set = files[train_count + val_count :]
@@ -509,7 +509,7 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 if __name__ == "__main__":
     generate_kfold_split(mode="openset")
-    
+
     # dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
     # copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 

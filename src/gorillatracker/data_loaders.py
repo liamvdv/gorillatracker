@@ -330,4 +330,3 @@ if __name__ == "__main__":
     print("created DataLoader")
     # print first batch label
     next(iter(dataloader))
-    

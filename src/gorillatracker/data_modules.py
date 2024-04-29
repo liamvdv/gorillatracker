@@ -3,7 +3,7 @@ from typing import Any, Callable, Literal, Optional, Type
 
 import lightning as L
 import torchvision.transforms as transforms
-from torch.utils.data import Dataset, ConcatDataset
+from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader, VideoTripletDataLoader
@@ -127,7 +127,7 @@ class NLetKFoldDataModule(NletDataModule):
         super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms)
         self.val_fold = val_fold
         self.k = k
-    
+
     def setup(self, stage: str) -> None:
         assert self.dataset_class is not None, "dataset_class must be set before calling setup"
         logger.info(
@@ -147,7 +147,7 @@ class NLetKFoldDataModule(NletDataModule):
             raise ValueError("stage predict not yet supported by data module.")
         else:
             raise ValueError(f"unknown stage '{stage}'")
-    
+
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
             train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
@@ -160,8 +160,8 @@ class NLetKFoldDataModule(NletDataModule):
             return test.get_num_classes()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
-        
-        
+
+
 class TripletKFoldDataModule(NLetKFoldDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader

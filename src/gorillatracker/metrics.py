@@ -36,7 +36,12 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     """
 
     def __init__(
-        self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule, kfold_k: Optional[int] = None
+        self,
+        every_n_val_epochs: int,
+        knn_with_train: bool,
+        wandb_run: Runner,
+        dm: L.LightningDataModule,
+        kfold_k: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.embedding_artifacts: List[str] = []

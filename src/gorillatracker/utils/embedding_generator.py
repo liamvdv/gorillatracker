@@ -1,6 +1,6 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 from urllib.parse import urlparse
 
 import cv2
@@ -158,7 +158,9 @@ def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
     return max(models, key=lambda a: a.created_at)
 
 
-def generate_embeddings_from_run(run_url: str, outpath: str, dataset_cls: Optional[str], data_dir: Optional[str]) -> pd.DataFrame:
+def generate_embeddings_from_run(
+    run_url: str, outpath: str, dataset_cls: Optional[str], data_dir: Optional[str]
+) -> pd.DataFrame:
     """
     generate a pandas df that generates embeddings for all images in the dataset partitions train and val.
     stores to DataFrame
@@ -212,16 +214,12 @@ def generate_embeddings_from_run(run_url: str, outpath: str, dataset_cls: Option
 
     if data_dir is None:
         data_dir = args["data_dir"]
-        
+
     if dataset_cls is None:
         dataset_cls = args["dataset_class"]
 
-    train_dataset = get_dataset(
-        partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls
-    )
-    val_dataset = get_dataset(
-        partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls
-    )
+    train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"

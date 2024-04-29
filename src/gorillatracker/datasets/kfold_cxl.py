@@ -36,7 +36,12 @@ def cast_label_to_int(labels: List[str]) -> List[int]:
 
 class KFoldCXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def __init__(
-        self, data_dir: str, partition: Literal["train", "val", "test"], val_i: int, k: int, transform: Optional[gtypes.Transform] = None
+        self,
+        data_dir: str,
+        partition: Literal["train", "val", "test"],
+        val_i: int,
+        k: int,
+        transform: Optional[gtypes.Transform] = None,
     ):
         """
         Assumes directory structure:
@@ -60,7 +65,7 @@ class KFoldCXLDataset(Dataset[Tuple[Image.Image, Label]]):
         else:
             dirpath = data_dir / Path(partition)
             samples.extend(get_samples(dirpath))
-        
+
         # new
         labels_string = [label for _, label in samples]
         labels_int = cast_label_to_int(labels_string)
@@ -100,12 +105,14 @@ class KFoldCXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def get_num_classes(self) -> int:
         labels = [label for _, label in self.samples]
         return len(set(labels))
-    
-    
+
+
 if __name__ == "__main__":
     cxl = KFoldCXLDataset(
         "./data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5",
-        "fold-0",
+        "train",
+        0,
+        5,
         KFoldCXLDataset.get_transforms(),
     )
     print(cxl.get_num_classes())
