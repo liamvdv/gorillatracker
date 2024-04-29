@@ -9,7 +9,7 @@ from torchvision import transforms
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Id, Label
-from gorillatracker.utils.labelencoder import LabelEncoder_Global
+from gorillatracker.utils.labelencoder import LabelEncoder
 
 
 def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
@@ -28,8 +28,7 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
-    le = LabelEncoder_Global()
-    return le.transform_list(labels)
+    return LabelEncoder.encode_list(labels)
 
 
 class CXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):

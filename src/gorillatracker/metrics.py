@@ -20,7 +20,7 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.utils.labelencoder import LabelEncoder_Local
+from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
 Runner = Any
@@ -259,13 +259,13 @@ def knn(
     val_embeddings = val_embeddings[indices]
 
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
-    le = LabelEncoder_Local()
-    val_labels_encoded = torch.tensor(le.transform_list(val_labels.tolist()))
+    le = LinearSequenceEncoder()
+    val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
 
     if use_train_embeddings:
         train_labels, indices = torch.sort(train_labels)  # type: ignore
         train_embeddings = train_embeddings[indices]  # type: ignore
-        train_labels_encoded = torch.tensor(le.transform_list(train_labels.tolist()))
+        train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))
         # print("Using train embeddings for knn")
         return knn_with_train(
             val_embeddings,
