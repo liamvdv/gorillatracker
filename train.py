@@ -224,6 +224,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             dm.val_fold = i
             embeddings_logger_callback.kfold_k = i
         trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
+        model = model_cls(**model_args)  # type: ignore
 
     if trainer.interrupted:
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")

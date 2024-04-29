@@ -26,14 +26,6 @@ import gorillatracker.type_helper as gtypes
 Runner = Any
 
 
-def log_as_wandb_table(embeddings_table: pd.DataFrame, run: Runner) -> None:
-    tmp = embeddings_table.apply(
-        lambda row: pd.concat([pd.Series([row["label"]]), pd.Series(row["embedding"])]), axis=1
-    )
-    tmp.columns = ["label"] + [f"embedding_{i}" for i in range(len(embeddings_table["embedding"].iloc[0]))]
-    run.log({"embeddings": wandb.Table(dataframe=tmp)})  # type: ignore
-
-
 class LogEmbeddingsToWandbCallback(L.Callback):
     """
     A pytorch lightning callback that saves embeddings to wandb and logs them.

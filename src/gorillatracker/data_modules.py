@@ -113,7 +113,7 @@ class SimpleDataModule(NletDataModule):
         return SimpleDataLoader
 
 
-class KFoldDataModule(NletDataModule):
+class NLetKFoldDataModule(NletDataModule):
     def __init__(
         self,
         data_dir: str,
@@ -135,16 +135,12 @@ class KFoldDataModule(NletDataModule):
         )
 
         if stage == "fit":
-            datasets = []
-            for i in range(self.k):
-                if i != self.val_fold:
-                    datasets.append(self.dataset_class(self.data_dir, partition=f"fold-{i}", transform=transforms.Compose([self.transforms, self.training_transforms])))  # type: ignore
-            self.train = ConcatDataset(datasets)
-            self.val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
+            self.train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
         elif stage == "test":
-            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            self.test = self.dataset_class(self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
         elif stage == "validate":
-            self.val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None
@@ -154,23 +150,18 @@ class KFoldDataModule(NletDataModule):
     
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
-            datasets = []
-            for i in range(self.k):
-                if i != self.val_fold:
-                    datasets.append(self.dataset_class(self.data_dir, partition=f"fold-{i}", transform=transforms.Compose([self.transforms, self.training_transforms])))  # type: ignore
-            train = ConcatDataset(datasets)
-            num_classes = 0
-            for dataset in train.datasets:
-                num_classes += dataset.get_num_classes()
-            return num_classes  # type: ignore
+            train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            return train.get_num_classes()  # type: ignore
         elif mode == "val":
-            val = self.dataset_class(self.data_dir, partition=f"fold-{self.val_fold}", transform=self.transforms)  # type: ignore
+            val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
             return val.get_num_classes()  # type: ignore
         elif mode == "test":
-            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            test = self.dataset_class(self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
             return test.get_num_classes()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
-    
-    def get_dataloader(self) -> Any:
+        
+        
+class TripletKFoldDataModule(NLetKFoldDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
