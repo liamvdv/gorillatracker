@@ -138,6 +138,10 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         model_transforms,
         model.get_training_transforms(),
     )
+    
+    if args.kfold:
+        dm.k = kfold_k
+    
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -176,55 +180,48 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     if args.accelerator == "cuda":
         callbacks.append(CUDAMetricsCallback())
 
-    # Initialize trainer
-    trainer = Trainer(
-        max_epochs=args.max_epochs,
-        val_check_interval=args.val_check_interval,
-        devices=args.num_devices,
-        accelerator=args.accelerator,
-        strategy=str(args.distributed_strategy),
-        logger=wandb_logger,
-        deterministic=args.force_deterministic,
-        callbacks=callbacks,
-        precision=args.precision,
-        gradient_clip_val=args.grad_clip,
-        log_every_n_steps=24,
-        # accumulate_grad_batches=args.gradient_accumulation_steps,
-        fast_dev_run=args.fast_dev_run,
-        profiler=args.profiler,
-        inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-        # reload_dataloaders_every_n_epochs=1,
-    )
-
     if current_process_rank == 0:
         logger.info(
             f"Total optimizer epochs: {args.max_epochs} | "
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
         )
-
-    ########### Start val & train loop ###########
-    if args.val_before_training and not args.resume:
-        # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
-        logger.info(f"Rank {current_process_rank} | Validation before training...")
-        val_result = trainer.validate(model, dm)
-        print(val_result)
-        if args.only_val:
-            exit(0)
-
     
     logger.info(f"Rank {current_process_rank} | Starting training...")
+    
     for i in range(kfold_k):
+        # Initialize trainer
+        trainer = Trainer(
+            max_epochs=args.max_epochs,
+            val_check_interval=args.val_check_interval,
+            devices=args.num_devices,
+            accelerator=args.accelerator,
+            strategy=str(args.distributed_strategy),
+            logger=wandb_logger,
+            deterministic=args.force_deterministic,
+            callbacks=callbacks,
+            precision=args.precision,
+            gradient_clip_val=args.grad_clip,
+            log_every_n_steps=24,
+            # accumulate_grad_batches=args.gradient_accumulation_steps,
+            fast_dev_run=args.fast_dev_run,
+            profiler=args.profiler,
+            inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+            # reload_dataloaders_every_n_epochs=1,
+        )
+
+        ########### Start val & train loop ###########
+        if args.val_before_training and not args.resume:
+            # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
+            logger.info(f"Rank {current_process_rank} | Validation before training...")
+            val_result = trainer.validate(model, dm)
+            print(val_result)
+            if args.only_val:
+                continue
+
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
         if args.kfold:
             dm.val_fold = i
-            dm.k = kfold_k
-            model = model_cls(**model_args)  # type: ignore
-            model.num_classes = (
-                (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
-                if not args.video_data
-                else (-1, -1, -1)
-            )
             embeddings_logger_callback.kfold_k = i
         trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
 
