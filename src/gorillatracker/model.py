@@ -417,6 +417,7 @@ class BaseModule(L.LightningModule):
         """
         return lambda x: x
 
+    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         """Add your data augmentations here. Function will be called after get_tensor_transforms in the training loop"""
         return lambda x: x

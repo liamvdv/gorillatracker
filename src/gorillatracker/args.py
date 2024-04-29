@@ -98,7 +98,9 @@ class TrainingArgs:
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
     data_resize_transform: Union[int, None] = field(default=None)
-    video_data: bool = field(default=False)
+
+    # SSL Config
+    use_ssl: bool = field(default=False)
 
     pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.

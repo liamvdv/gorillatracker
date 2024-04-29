@@ -37,7 +37,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 1.0                       # Alpha for the l2sp loss
 l2_beta: 1.0                       # Beta for the l2sp loss
-path_to_pretrained_weights: "swin_base.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "/workspaces/gorillatracker/models/swin_base_untrained.ckpt"    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
@@ -65,6 +65,7 @@ only_val: False                 # Perform only validation
 
 save_interval: 10                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 10      # Embedding save interval
+save_model_to_wandb: True       # Save the model to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking

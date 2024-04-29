@@ -1,5 +1,6 @@
 import warnings
 from pathlib import Path
+from typing import Union
 
 import torch
 import wandb
@@ -11,8 +12,10 @@ from torchvision.transforms import Compose, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
+from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
+from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
@@ -44,20 +47,32 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     wandb_logging_module = WandbLoggingModule(args)
     wandb_logger = wandb_logging_module.construct_logger()
 
-    #################### Construct dataloaders #################
+    ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
+
+    #################### Construct dataloaders #################
     model_transforms = model_cls.get_tensor_transforms()
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        args.video_data,
-        model_transforms,
-        model_cls.get_training_transforms(),  # type: ignore
-    )
+
+    # TODO(memben): Unify SSLDatamodule and NletDataModule
+    dm: Union[SSLDataModule, NletDataModule]
+    if args.use_ssl:
+        dm = SSLDataModule(
+            batch_size=args.batch_size,
+            transforms=model_transforms,
+            training_transforms=model_cls.get_training_transforms(),
+            data_dir=str(args.data_dir),
+        )
+    else:
+        dm = get_data_module(
+            args.dataset_class,
+            str(args.data_dir),
+            args.batch_size,
+            args.loss_mode,
+            model_transforms,
+            model_cls.get_training_transforms(),
+        )
 
     ################# Construct model ##############
 
@@ -87,8 +102,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         mem_bank_start_epoch=args.mem_bank_start_epoch,
         lambda_membank=args.lambda_membank,
         num_classes=(
-            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))
-            if not args.video_data
+            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))  # type: ignore
+            if not args.use_ssl
             else (-1, -1, -1)
         ),
         dropout_p=args.dropout_p,
@@ -125,19 +140,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             )
         model = torch.compile(model)
 
-    #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        args.video_data,
-        model_transforms,
-        model.get_training_transforms(),
-    )
+    #################### Construct trainer #################
+
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
