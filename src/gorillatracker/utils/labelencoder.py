@@ -19,7 +19,7 @@ class LabelEncoder:
         decode_mapping = {v: k for k, v in mapping.items()}
         assert len(decode_mapping) == len(mapping), "1:1 mapping"
         return decode_mapping[index]
-    
+
     @staticmethod
     def decode_list(indices: List[int]) -> List[str]:
         decode_mapping = {v: k for k, v in mapping.items()}
@@ -43,7 +43,6 @@ class LinearSequenceEncoder:
         decode_mapping = {v: k for k, v in self.mapping.items()}
         assert len(decode_mapping) == len(self.mapping), "1:1 mapping"
         return decode_mapping[index]
-             
 
     def decode_list(self, indices: Union[List[int], Tuple[int]]) -> List[int]:
         decode_mapping = {v: k for k, v in self.mapping.items()}
