@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Protocol
 
+import logging
 import cv2
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -13,6 +14,8 @@ from tqdm import tqdm
 from gorillatracker.ssl_pipeline.models import Video
 from gorillatracker.ssl_pipeline.queries import get_or_create_camera
 
+
+log = logging.getLogger(__name__)
 
 class MetadataExtractor(Protocol):
     def __call__(self, video_path: Path) -> VideoMetadata: ...
@@ -57,6 +60,11 @@ def preprocess_and_store(
 ) -> None:
     metadata = metadata_extractor(video_path)
     properties = video_properties_extractor(video_path)
+    
+    if properties.fps < 1:
+        log.warning(f"Video {video_path} has an invalid FPS of {properties.fps}, skipping")
+        return
+    
     video = Video(
         absolute_path=str(video_path),
         version=version,
