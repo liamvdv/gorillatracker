@@ -254,17 +254,12 @@ def knn(
 
     if use_train_embeddings and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
-    # sort by label
-    val_labels, indices = torch.sort(val_labels)
-    val_embeddings = val_embeddings[indices]
 
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
     le = LinearSequenceEncoder()
     val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
 
     if use_train_embeddings:
-        train_labels, indices = torch.sort(train_labels)  # type: ignore
-        train_embeddings = train_embeddings[indices]  # type: ignore
         train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))
         # print("Using train embeddings for knn")
         return knn_with_train(
