@@ -7,7 +7,6 @@ from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader
-from gorillatracker.type_helper import BatchNletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

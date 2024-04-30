@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
@@ -8,8 +8,8 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.type_helper import Id, Label
 from gorillatracker.transform_utils import SquarePad
+from gorillatracker.type_helper import Id, Label
 
 
 def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:

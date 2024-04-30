@@ -51,7 +51,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Literal, Tuple, TypeVar, Union
 
 import torch
 

@@ -21,7 +21,6 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.datasets.spac_videos import SPACVideosDataset
 
 G = TypeVar("G")
 T = TypeVar("T")
