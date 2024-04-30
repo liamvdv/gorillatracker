@@ -9,11 +9,11 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import (
     NletDataModule,
     QuadletDataModule,
+    QuadletKFoldDataModule,
     SimpleDataModule,
+    SimpleKFoldDataModule,
     TripletDataModule,
     TripletKFoldDataModule,
-    QuadletKFoldDataModule,
-    SimpleKFoldDataModule,
 )
 
 

@@ -168,10 +168,10 @@ class TripletKFoldDataModule(NLetKFoldDataModule):
 
 
 class QuadletKFoldDataModule(NLetKFoldDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
         return QuadletDataLoader
-    
-    
+
+
 class SimpleKFoldDataModule(NLetKFoldDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader
