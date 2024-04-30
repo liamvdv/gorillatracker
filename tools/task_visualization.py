@@ -27,6 +27,7 @@ class TaskVisualizer:
     # db
     session: Session
     version: str = "2024-04-09"
+    
 
     def __init__(self, session: Session) -> None:
         self.layout.split(
@@ -51,7 +52,6 @@ class TaskVisualizer:
     def _initialize_tasks(self) -> None:
         get_tasks = (
             select(Task.task_type, Task.task_subtype)
-            .select_from(Task)
             .join(Video, Task.video_id == Video.video_id)
             .where(Video.version == self.version)
             .distinct()
@@ -74,7 +74,6 @@ class TaskVisualizer:
     def _update_header(self) -> None:
         start_time = self.session.execute(
             select(func.min(Task.updated_at))
-            .select_from(Task)
             .join(Video, Task.video_id == Video.video_id)
             .where(Video.version == self.version)
         ).scalar_one()
@@ -97,8 +96,8 @@ class TaskVisualizer:
             .where(Task.task_type == task_type, Task.task_subtype == task_subtype, Video.version == self.version)
         )
         finished_task_query = task_query.where(Task.status == TaskStatus.COMPLETED)
-        task_count = self.session.execute(task_query).scalar()
-        finished_task_count = self.session.execute(finished_task_query).scalar()
+        task_count = self.session.execute(task_query).scalar_one()
+        finished_task_count = self.session.execute(finished_task_query).scalar_one()
         self.progress.update(self.sub_tasks[(task_type, task_subtype)], completed=finished_task_count, total=task_count)
 
     def _update_task(self, task_type: TaskType) -> None:
