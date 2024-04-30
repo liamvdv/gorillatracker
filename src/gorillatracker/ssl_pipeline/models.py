@@ -35,6 +35,8 @@ class TaskStatus(enum.Enum):
     FAILED = "failed"
 
 
+# WARNING(memben): Changing the class may affect the database
+# The values of the enum are stored in the database.
 class TaskType(enum.Enum):
     TRACK = "track"
     PREDICT = "predict"
@@ -165,9 +167,6 @@ class Video(Base):
     def path(self) -> Path:
         return Path(self.absolute_path)
 
-    def __hash__(self) -> int:
-        return self.video_id
-
     def __repr__(self) -> str:
         return f"""video(id={self.video_id}, version={self.version}, path={self.path}, 
                 camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"""
@@ -217,9 +216,6 @@ class Tracking(Base):
         end_frame = max(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         return dt.timedelta(seconds=(end_frame - start_frame) / fps)
 
-    def __hash__(self) -> int:
-        return self.tracking_id
-
     def __repr__(self) -> str:
         return f"tracking(id={self.tracking_id}, video_id={self.video_id})"
 
@@ -255,7 +251,7 @@ class TrackingFrameFeature(Base):
     bbox_height: Mapped[float]
     confidence: Mapped[float]
     feature_type: Mapped[str] = mapped_column(String(255))
-    cache_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cached: Mapped[bool] = mapped_column(default=False)
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
@@ -274,8 +270,13 @@ class TrackingFrameFeature(Base):
             raise ValueError(f"frame_nr must be a multiple of {self.video.frame_step}, is {frame_nr}")
         return frame_nr
 
-    def __hash__(self) -> int:
-        return self.tracking_frame_feature_id
+    def cache_path(self, base_path: Path) -> Path:
+        return Path(
+            base_path,
+            str(self.tracking_frame_feature_id % 2**8),
+            str(self.tracking_frame_feature_id % 2**16),
+            f"{self.tracking_frame_feature_id}.png",
+        )
 
     def __lt__(self, other: TrackingFrameFeature) -> bool:
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id
@@ -283,7 +284,7 @@ class TrackingFrameFeature(Base):
     def __repr__(self) -> str:
         return f"""tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, 
         frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, 
-        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type})"""
+        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cached={self.cached})"""
 
 
 class VideoRelationship(Base):
@@ -346,6 +347,8 @@ class Task(Base):
 
     video: Mapped[Video] = relationship(back_populates="tasks")
     task_key_values: Mapped[list[TaskKeyValue]] = relationship(back_populates="task", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("video_id", "task_type", "task_subtype"),)
 
     def get_key_value(self, key: str) -> str:
         for kv in self.task_key_values:

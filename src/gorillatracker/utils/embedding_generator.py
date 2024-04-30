@@ -164,7 +164,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
                         df,
                         pd.DataFrame(
                             {
-                                "id": [ids[i]],
+                                "id": [ids],
                                 "embedding": [embeddings[i]],
                                 "label": [labels[i]],
                                 "input": [input_img],
