@@ -1,7 +1,7 @@
 # NOTE(liamvdv): missing ground_truth for bristol dataset
 
 from pathlib import Path
-from typing import List, Tuple, Union, Literal
+from typing import List, Literal, Tuple, Union
 
 from PIL import Image
 from torch.utils.data import Dataset

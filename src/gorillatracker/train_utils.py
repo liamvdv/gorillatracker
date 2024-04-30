@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Tuple, Type, Union, Optional
+from typing import Any, Optional, Tuple, Type, Union
 
 import torch
 from torch.utils.data import Dataset
@@ -11,7 +11,9 @@ from gorillatracker.data_modules import (
     QuadletDataModule,
     SimpleDataModule,
     TripletDataModule,
-    TripletBristolValDataModule
+    TripletBristolValDataModule,
+    QuadletBristolValDataModule,
+    SimpleBristolValDataModule,
 )
 
 
@@ -42,12 +44,9 @@ def get_data_module(
     bristol_class_id: Optional[str] = None,
 ) -> NletDataModule:
     base: Type[NletDataModule]
-    if video_data:
-        base = VideoTripletDataModule
-    else:
-        base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
-        base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
-        base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
+    base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
+    base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
+    base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(
@@ -58,7 +57,17 @@ def get_data_module(
         ]
     )
     if data_dir_bristol is not None:
-        base = TripletBristolValDataModule
-        return base(data_dir, data_dir_bristol, batch_size, dataset_class, get_dataset_class(bristol_class_id), transforms=transforms, training_transforms=training_transforms)
-    
+        base = QuadletBristolValDataModule if loss_mode.startswith("online") else None  # type: ignore
+        base = TripletBristolValDataModule if loss_mode.startswith("offline") else base  # type: ignore
+        base = SimpleBristolValDataModule if loss_mode.startswith("softmax") else base  # type: ignore
+        return base(
+            data_dir,
+            data_dir_bristol,
+            batch_size,
+            dataset_class,
+            get_dataset_class(bristol_class_id),
+            transforms=transforms,
+            training_transforms=training_transforms,
+        )
+
     return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
