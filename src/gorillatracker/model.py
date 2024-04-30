@@ -28,8 +28,7 @@ from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototype
 from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 
-# from transformers import ResNetModel
-
+from transformers import ResNetModel
 
 
 def warmup_lr(
@@ -898,74 +897,74 @@ class ResNet152Wrapper(BaseModule):
         )
 
 
-# class ResNet50Wrapper(BaseModule):
-#     def __init__(  # type: ignore
-#         self,
-#         **kwargs,
-#     ) -> None:
-#         super().__init__(**kwargs)
-#         self.model = (
-#             resnet50() if kwargs.get("from_scratch", False) else resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
-#         )
-#         # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-#         self.model.fc = torch.nn.Sequential(
-#             torch.nn.BatchNorm1d(self.model.fc.in_features),
-#             torch.nn.Dropout(p=self.dropout_p),
-#             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
-#             torch.nn.BatchNorm1d(self.embedding_size),
-#         )
-#         self.set_losses(self.model, **kwargs)
+class ResNet50Wrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = (
+            resnet50() if kwargs.get("from_scratch", False) else resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+        )
+        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.fc.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+        self.set_losses(self.model, **kwargs)
 
-#     @classmethod
-#     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-#         return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-#     @classmethod
-#     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-#         return transforms.Compose(
-#             [
-#                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-#                 transforms_v2.RandomHorizontalFlip(p=0.5),
-#             ]
-#         )
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+            ]
+        )
 
 
-# class ResNet50DinoV2Wrapper(BaseModule):
-#     def __init__(  # type: ignore
-#         self,
-#         **kwargs,
-#     ) -> None:
-#         super().__init__(**kwargs)
-#         self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
-#         # self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size) # TODO
-#         self.last_linear = torch.nn.Sequential(
-#             torch.nn.BatchNorm1d(2048),
-#             torch.nn.Dropout(p=self.dropout_p),
-#             torch.nn.Linear(in_features=2048, out_features=self.embedding_size),
-#             torch.nn.BatchNorm1d(self.embedding_size),
-#         )
-#         self.set_losses(self.model, **kwargs)
+class ResNet50DinoV2Wrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
+        # self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size) # TODO
+        self.last_linear = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(2048),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=2048, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+        self.set_losses(self.model, **kwargs)
 
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         outputs = self.model(x)
-#         gap = torch.nn.AdaptiveAvgPool2d((1, 1))
-#         feature_vector = gap(outputs.last_hidden_state)
-#         feature_vector = torch.flatten(feature_vector, start_dim=2).squeeze(-1)
-#         feature_vector = self.last_linear(feature_vector)
-#         return feature_vector
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        outputs = self.model(x)
+        gap = torch.nn.AdaptiveAvgPool2d((1, 1))
+        feature_vector = gap(outputs.last_hidden_state)
+        feature_vector = torch.flatten(feature_vector, start_dim=2).squeeze(-1)
+        feature_vector = self.last_linear(feature_vector)
+        return feature_vector
 
-#     @classmethod
-#     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-#         return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-#     @classmethod
-#     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-#         return transforms.Compose(
-#             [
-#                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-#                 transforms_v2.RandomHorizontalFlip(p=0.5),
-#             ]
-#         )
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+            ]
+        )
 
 
 class InceptionV3Wrapper(BaseModule):
@@ -1118,8 +1117,8 @@ custom_model_cls = {
     "ViT_Large": VisionTransformerWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
-    # "ResNet50Wrapper": ResNet50Wrapper,
-    # "ResNet50DinoV2Wrapper": ResNet50DinoV2Wrapper,
+    "ResNet50Wrapper": ResNet50Wrapper,
+    "ResNet50DinoV2Wrapper": ResNet50DinoV2Wrapper,
     "ConvNeXtV2_Base": ConvNeXtV2BaseWrapper,
     "ConvNeXtV2_Huge": ConvNeXtV2HugeWrapper,
     "ConvNextWrapper": ConvNextWrapper,
