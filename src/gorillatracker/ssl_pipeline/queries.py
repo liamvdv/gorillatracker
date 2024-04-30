@@ -135,9 +135,7 @@ def bodies_with_face_filter(query: Select[tuple[TrackingFrameFeature]]) -> Selec
     )
 
     query = query.where(
-        or_(
-            TrackingFrameFeature.tracking_frame_feature_id.in_(subquery), TrackingFrameFeature.feature_type != "body"
-        )
+        or_(TrackingFrameFeature.tracking_frame_feature_id.in_(subquery), TrackingFrameFeature.feature_type != "body")
     )
     return query
 
