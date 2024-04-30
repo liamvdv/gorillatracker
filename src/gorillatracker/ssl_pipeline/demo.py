@@ -128,12 +128,12 @@ def kisz_demo() -> None:
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=40,
-        max_worker_per_gpu=10,
+        n_videos=20,
+        max_worker_per_gpu=1,
         gpu_ids=[0],
     )
     dataset.post_setup()
 
 
 if __name__ == "__main__":
-    gpu2_demo()
+    kisz_demo()
