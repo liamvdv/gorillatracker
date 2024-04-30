@@ -16,11 +16,11 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
-from sklearn.preprocessing import LabelEncoder
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
 Runner = Any
@@ -57,17 +57,17 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
-        train_labels = []
+        train_labels = torch.tensor([])
         for batch in self.train_dataloader:
             ids, images, labels = batch
             anchor_images = images[0].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             anchor_labels = labels[0]
-            train_labels.extend(anchor_labels)
+            train_labels = torch.cat([train_labels, anchor_labels], dim=0)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
-        return train_embeddings.cpu(), tuple(train_labels)
+        return train_embeddings.cpu(), train_labels.cpu()
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         embeddings_table = pl_module.embeddings_table
@@ -214,12 +214,17 @@ def evaluate_embeddings(
     )
 
     # Transform any type to numeric type labels
-    le = LabelEncoder()
-    _val_train_labels = np.concatenate([data["label"], train_labels]) if train_labels is not None else data["label"]
-    val_train_labels = le.fit_transform(_val_train_labels)
-    nval = len(data["label"])
+    val_labels = torch.tensor(data["label"])
+    train_labels = torch.tensor(train_labels)
+    val_labels = val_labels.type(torch.int64)
+    train_labels = train_labels.type(torch.int64)
+
+    val_train_labels = torch.cat([val_labels, train_labels], dim=0)
+
+    nval = len(val_labels)
     val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
     val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
+    val_embeddings = torch.tensor(val_embeddings)
 
     assert len(val_embeddings) > 0, "No validation embeddings given."
 
@@ -238,103 +243,42 @@ def evaluate_embeddings(
     return results
 
 
-def fc_layer(
-    embeddings: torch.Tensor,
-    labels: gtypes.MergedLabels,
-    batch_size: int = 64,
-    epochs: int = 300,
-    seed: int = 42,
-    **kwargs: Any,
-) -> Dict[str, float]:
-    num_classes = (
-        int(np.max(labels)) + 1
-    )  # NOTE(liamvdv): not len() because train_labels also gets intermediate ids assigned.
-    model = torch.nn.Sequential(
-        torch.nn.Linear(embeddings.shape[1], 100),
-        torch.nn.Sigmoid(),
-        torch.nn.Linear(100, num_classes),
-    )
-    for param in model.parameters():
-        param.requires_grad_(True)
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.001)
-    criterion = torch.nn.CrossEntropyLoss()
-    # acitvate gradients
-    with torch.set_grad_enabled(True):
-        for epoch in range(epochs):
-            loss_sum = 0.0
-            embeddings_copy, labels_copy = sklearn.utils.shuffle(
-                embeddings, labels, random_state=seed + epoch, n_samples=len(embeddings)
-            )
-
-            for i in range(0, len(embeddings_copy), batch_size):
-                batch_embeddings = torch.tensor(embeddings_copy[i : i + batch_size])
-                batch_labels = torch.tensor(labels_copy[i : i + batch_size], dtype=torch.long)
-
-                assert batch_embeddings.shape[0] == batch_labels.shape[0]
-                outputs = model(batch_embeddings)
-                assert outputs.shape[0] == batch_embeddings.shape[0]
-                loss = criterion(outputs, batch_labels)
-
-                optimizer.zero_grad()
-                loss.requires_grad_(True)
-                loss.backward()
-                # apply gradient clipping
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
-                loss_sum += loss.item()
-
-            # loss_mean = loss_sum / (len(embeddings_copy) / batch_size)
-            loss_sum = 0.0
-            # if epoch % 100 == 0:
-            #     print(f"Loss: {loss_mean} in Epoch {epoch}")
-
-    final_outputs = None
-    embeddings = torch.tensor(embeddings)
-    labels = torch.tensor(labels)
-    with torch.no_grad():
-        final_outputs = torch.nn.functional.softmax(model(embeddings), dim=1)
-
-    accuracy = tm.functional.accuracy(
-        final_outputs, labels, task="multiclass", num_classes=num_classes, average="weighted"
-    )
-    assert accuracy is not None
-    accuracy_top5 = tm.functional.accuracy(final_outputs, labels, task="multiclass", num_classes=num_classes, top_k=5)
-    assert accuracy_top5 is not None
-    auroc = tm.functional.auroc(final_outputs, labels, task="multiclass", num_classes=num_classes)
-    assert auroc is not None
-    f1 = tm.functional.f1_score(final_outputs, labels, task="multiclass", num_classes=num_classes, average="weighted")
-    assert f1 is not None
-    return {"accuracy": accuracy.item(), "accuracy_top5": accuracy_top5.item(), "auroc": auroc.item(), "f1": f1.item()}
-
-
 def knn(
     val_embeddings: torch.Tensor,
-    val_labels: gtypes.MergedLabels,
+    val_labels: torch.Tensor,
     k: int = 5,
     use_train_embeddings: bool = False,
-    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
-    train_labels: Optional[gtypes.MergedLabels] = None,
+    train_embeddings: Optional[torch.Tensor] = None,
+    train_labels: Optional[torch.Tensor] = None,
 ) -> Dict[str, Any]:
+
+    if use_train_embeddings and (train_embeddings is None or train_labels is None):
+        raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
+
+    # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
+    le = LinearSequenceEncoder()
+    val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
+
     if use_train_embeddings:
+        train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))  # type: ignore
         # print("Using train embeddings for knn")
         return knn_with_train(
             val_embeddings,
-            val_labels,
+            val_labels_encoded,
             k=k,
-            train_embeddings=train_embeddings,
-            train_labels=train_labels,
+            train_embeddings=train_embeddings,  # type: ignore
+            train_labels=train_labels_encoded,
         )
     else:
-        return knn_naive(val_embeddings, val_labels, k=k)
+        return knn_naive(val_embeddings, val_labels_encoded, k=k)
 
 
 def knn_with_train(
     val_embeddings: torch.Tensor,
-    val_labels: gtypes.MergedLabels,
+    val_labels: torch.Tensor,
+    train_embeddings: torch.Tensor,
+    train_labels: torch.Tensor,
     k: int = 5,
-    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
-    train_labels: Optional[gtypes.MergedLabels] = None,
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -348,15 +292,14 @@ def knn_with_train(
     """
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
-    train_embeddings = train_embeddings.clone().detach()  # type: ignore
-    train_labels = torch.tensor(train_labels.tolist())  # type: ignore
+    val_labels = torch.tensor(val_labels.tolist())
+    train_embeddings = train_embeddings.clone().detach()
+    train_labels = torch.tensor(train_labels.tolist())
 
-    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)  # type: ignore
+    combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
 
-    # num_classes = 117
-    num_classes: int = torch.max(combined_labels).item() + 1  # type: ignore
+    num_classes: int = int(torch.max(combined_labels).item() + 1)
     assert num_classes == len(np.unique(combined_labels))
     if num_classes < k:
         k = num_classes
@@ -413,15 +356,15 @@ def knn_with_train(
     }
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: int = 5) -> Dict[str, Any]:
-    num_classes = np.max(val_labels).item() + 1
+def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5) -> Dict[str, Any]:
+    num_classes = len(torch.unique(val_labels))
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
         k = num_classes
 
     # convert embeddings and labels to tensors
     val_embeddings = torch.tensor(val_embeddings)
-    val_labels = torch.tensor(val_labels.tolist())  # type: ignore
+    val_labels = torch.tensor(val_labels.tolist())
 
     distance_matrix = pairwise_euclidean_distance(val_embeddings)
 
@@ -473,7 +416,10 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: gtypes.MergedLabels, k: 
 def pca(
     embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
 ) -> wandb.Image:  # generate a 2D plot of the embeddings
-    num_classes = len(np.unique(labels))
+    num_classes = len(torch.unique(labels))
+    embeddings = embeddings.numpy()
+    labels = labels.numpy()
+
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
     embeddings = pca.transform(embeddings)
@@ -498,8 +444,10 @@ def pca(
 def tsne(
     embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
-    num_classes = len(np.unique(labels))
-    # downsample the embeddings and also the labels to 1000 samples
+    num_classes = len(torch.unique(labels))
+    embeddings = embeddings.numpy()
+    labels = labels.numpy()
+
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]
@@ -532,40 +480,6 @@ def tsne(
     return plot
 
 
-def flda_metric(embeddings: torch.Tensor, labels: gtypes.MergedLabels, **kwargs: Any) -> float:  # TODO: test
-    # num_classes = len(np.unique(labels))
-    # (m_1 - m_2)^2/(s_1^2 + s_2^2)
-    mean_var_map = {label: [0.0, 0.0] for label in np.unique(labels)}
-    ratio_sum = 0.0
-
-    for label in np.unique(labels):
-        class_embeddings = embeddings[labels == label]
-        mean = np.mean(class_embeddings, axis=0)
-        variance = np.var(class_embeddings, axis=0)
-        mean_var_map[label] = [mean, variance]
-
-    for label in np.unique(labels):
-        for label2 in np.unique(labels):
-            if label == label2:
-                continue
-            mean1, var1 = mean_var_map[label]
-            mean2, var2 = mean_var_map[label2]
-            # mean and variance are vectors so use euclidean distance
-            ratio = np.linalg.norm(mean1 - mean2) / (np.linalg.norm(var1) + np.linalg.norm(var2))
-            # ratio = np.(mean1 - mean2) / (var1 + var2)
-            ratio_sum += ratio  # type: ignore
-
-    return ratio_sum / 2  # because we calculate the ratio twice for each pair
-
-
-def kmeans(
-    embeddings: torch.Tensor, num_clusters: int = 2, **kwargs: Any
-) -> Tuple[Any, Any]:  # TODO: log some kind of normalized mutual information score
-    k_means = sklearn.cluster.KMeans(n_clusters=num_clusters)
-    outputs = k_means.fit_predict(embeddings)
-    return k_means.cluster_centers_, outputs
-
-
 if __name__ == "__main__":
     # Test the EmbeddingAnalyzer and Accuracy metric
     run = wandb.init(entity="gorillas", project="MNIST-EfficientNetV2", name="test_embeddings2")
@@ -577,9 +491,6 @@ if __name__ == "__main__":
             "pca": pca,
             "tsne": tsne,
             "knn": knn,
-            "flda": flda_metric,
-            "fc_layer": fc_layer,
-            # "kmeans": kmeans
         },
     )
     print(results)

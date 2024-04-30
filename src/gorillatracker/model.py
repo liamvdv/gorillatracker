@@ -242,13 +242,15 @@ class BaseModule(L.LightningModule):
             logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels = batch
+        ids, images, labels_tuple = batch
+
+        # assert isinstance(labels, list) and isinstance(labels[0], torch.tensor), f"Labels should be a list of tensor batches with ints, got {type(labels)}"
+        labels: torch.Tensor = torch.cat(list(labels_tuple), dim=0).to(self.device)  # type: ignore
+
         vec = torch.cat(images, dim=0)
         embeddings = self.forward(vec)
-        flat_labels = (
-            torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
-        )
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
+
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -263,11 +265,7 @@ class BaseModule(L.LightningModule):
 
         assert len(self.embeddings_table_columns) == 3
         data = {
-            self.embeddings_table_columns[0]: (
-                anchor_labels.tolist()  # type: ignore
-                if torch.is_tensor(anchor_labels)  # type: ignore
-                else anchor_labels
-            ),
+            self.embeddings_table_columns[0]: (anchor_labels.tolist()),  # type: ignore
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
             self.embeddings_table_columns[2]: anchor_ids,
         }
