@@ -5,6 +5,7 @@ import torch
 import wandb
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import parse
 from torchvision.transforms import Compose, Resize
@@ -15,7 +16,6 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
-from lightning.pytorch.plugins import BitsandbytesPrecision
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")

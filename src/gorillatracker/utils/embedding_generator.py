@@ -56,7 +56,11 @@ def get_run(url: str) -> wandbRun:
 
 
 def load_model_from_wandb(
-    wandb_fullname: str, model_cls: Type[BaseModule], model_config: Dict[str, Any], device: str = "cpu", eval_mode: bool = True
+    wandb_fullname: str,
+    model_cls: Type[BaseModule],
+    model_config: Dict[str, Any],
+    device: str = "cpu",
+    eval_mode: bool = True,
 ) -> BaseModule:
     api = get_wandb_api()
 
