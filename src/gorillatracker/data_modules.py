@@ -165,3 +165,13 @@ class NLetKFoldDataModule(NletDataModule):
 class TripletKFoldDataModule(NLetKFoldDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
+
+
+class QuadletKFoldDataModule(NLetKFoldDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+        return QuadletDataLoader
+    
+    
+class SimpleKFoldDataModule(NLetKFoldDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+        return SimpleDataLoader
