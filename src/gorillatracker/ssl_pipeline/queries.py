@@ -122,6 +122,26 @@ def confidence_filter(
     return query
 
 
+def bodies_with_face_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[TrackingFrameFeature]]:
+    """
+    Filters the query to include only TrackingFrameFeature instances with a body feature and a face feature in the same frame.
+    """
+    tff = aliased(TrackingFrameFeature)
+    subquery = select(TrackingFrameFeature.tracking_frame_feature_id).where(
+        TrackingFrameFeature.feature_type == "body",
+        tff.feature_type == "face_90",
+        TrackingFrameFeature.tracking_id == tff.tracking_id,
+        TrackingFrameFeature.frame_nr == tff.frame_nr,
+    )
+
+    query = query.where(
+        or_(
+            TrackingFrameFeature.tracking_frame_feature_id.in_(subquery), TrackingFrameFeature.feature_type != "body"
+        )
+    )
+    return query
+
+
 def load_features(session: Session, video_id: int, feature_types: list[str]) -> Sequence[TrackingFrameFeature]:
     stmt = feature_type_filter(video_filter(video_id), feature_types)
     return session.execute(stmt).scalars().all()
@@ -357,10 +377,14 @@ if __name__ == "__main__":
     session_cls = sessionmaker(bind=engine)
     version = "2024-04-09"
 
+    def sampling_strategy(video_id: int) -> Select[tuple[TrackingFrameFeature]]:
+        query = video_filter(video_id)
+        query = associated_filter(query)
+        query = bodies_with_face_filter(query)
+        return query
+
     with session_cls() as session:
-        video_negatives = social_group_negatives(session, version)
-        print(video_negatives[:10])
-        social_groups = session.execute(select(VideoFeature).where(VideoFeature.feature_type == "social_group")).all()
-        print(social_groups)
-        video_negatives = travel_distance_negatives(session, version, 10)
-        print(video_negatives[:10])
+        tffs = session.execute(sampling_strategy(2)).scalars().all()
+        tffs = sorted(tffs, key=lambda x: x.frame_nr)
+        for tff in tffs:
+            print(tff.frame_nr, tff.tracking_id, tff.feature_type)
