@@ -18,43 +18,16 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDataset, GorillaDatasetSmall, SSLDataset
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetGPUServer2, GorillaDatasetKISZ, SSLDataset
+from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
-from gorillatracker.ssl_pipeline.models import Task, TaskKeyValue, TaskType
-from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_videos
+from gorillatracker.ssl_pipeline.models import Task, TaskType, Video
+from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
 from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize
 
 log = logging.getLogger(__name__)
-
-
-# TODO(memben): This is a WIP
-def create_tasks(session: Session, video_paths: list[Path], version: str) -> None:
-    with session.begin():
-        videos = load_videos(session, video_paths, version)
-        for video in videos:
-            for task_type, subtype in [
-                (TaskType.TRACK, "body"),
-                (TaskType.PREDICT, "face_90"),
-                (TaskType.PREDICT, "face_45"),
-                (TaskType.VISUALIZE, ""),
-            ]:
-                video.tasks.append(Task(task_type=task_type, task_subtype=subtype))
-
-            for tracked, untracked, threshold in [
-                ("body", "face_90", 0.7),
-                ("body", "face_45", 0.7),
-            ]:
-                task = Task(task_type=TaskType.CORRELATE)
-                task.task_key_values.extend(
-                    [
-                        TaskKeyValue(key="tracked_feature_type", value=tracked),
-                        TaskKeyValue(key="untracked_feature_type", value=untracked),
-                        TaskKeyValue(key="threshold", value=str(threshold)),
-                    ]
-                )
-                video.tasks.append(task)
 
 
 def visualize_pipeline(
@@ -84,8 +57,6 @@ def visualize_pipeline(
 
     video_paths = sorted(dataset.video_paths)
 
-    # NOTE(memben): For the production pipeline we should do this for every step
-    # owever, in this context, we want the process to fail if not all videos are preprocessed for debugging.
     with Session(dataset.engine) as session:
         preprocessed_videos = list(load_preprocessed_videos(session, version))
         video_paths = remove_processed_videos(video_paths, preprocessed_videos)
@@ -94,21 +65,32 @@ def visualize_pipeline(
     videos_to_track = random.sample(video_paths, n_videos)
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
-    preprocess_videos(videos_to_track, version, target_output_fps, dataset.engine, dataset.metadata_extractor)
+    def visualize_hook(video: Video) -> None:
+        dataset.video_insert_hook(video)
+        video.tasks.append(Task(task_type=TaskType.VISUALIZE))
 
-    create_tasks(session, videos_to_track, version)
+    preprocess_videos(
+        videos_to_track,
+        version,
+        target_output_fps,
+        dataset.engine,
+        dataset.metadata_extractor,
+        visualize_hook,
+    )
 
+    body_model_path, yolo_body_kwargs = dataset.get_yolo_model_config(dataset.BODY)
     multiprocess_track(
-        "body",  # NOTE(memben): Tracking will always be done on bodies
-        dataset.body_model_path,
-        dataset.yolo_kwargs,
+        dataset.BODY,  # NOTE(memben): Tracking will always be done on bodies
+        body_model_path,
+        yolo_body_kwargs,
         dataset.tracker_config,
         dataset.engine,
         max_worker_per_gpu=max_worker_per_gpu,
         gpu_ids=gpu_ids,
     )
 
-    for yolo_model, yolo_kwargs, feature_type in dataset.feature_models():
+    for feature_type in dataset.features:
+        yolo_model, yolo_kwargs = dataset.get_yolo_model_config(feature_type)
         multiprocess_predict(
             feature_type,
             yolo_model,
@@ -118,40 +100,40 @@ def visualize_pipeline(
             gpu_ids=gpu_ids,
         )
 
+        multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
+
     multiprocess_visualize(dest_dir, dataset.engine, max_workers)
 
 
 def gpu2_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDatasetSmall("sqlite:///test.db")
-    # NOTE(memben): for setup only once
+    dataset = GorillaDatasetGPUServer2()
     visualize_pipeline(
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=1,
-        max_worker_per_gpu=1,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
+        n_videos=24,
+        max_worker_per_gpu=12,  # NOTE(memben): SQLITE does not support multiprocessing, so we need to set this to 1
         gpu_ids=[0],
     )
-    dataset.post_setup(version)
+    dataset.post_setup()
 
 
 def kisz_demo() -> None:
     version = "2024-04-09"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDataset("sqlite:///test.db")
-    # NOTE(memben): for setup only once
+    dataset = GorillaDatasetKISZ()
     visualize_pipeline(
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=20,
-        max_worker_per_gpu=10,
+        n_videos=24,
+        max_worker_per_gpu=12,
         gpu_ids=[0],
     )
-    dataset.post_setup(version)
+    dataset.post_setup()
 
 
 if __name__ == "__main__":
-    kisz_demo()
+    gpu2_demo()

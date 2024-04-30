@@ -75,6 +75,7 @@ def correlate_and_update(
 
 
 def correlate_worker(
+    feature_type: str,
     correlator: Correlator,
     engine: Engine,
 ) -> None:
@@ -82,7 +83,7 @@ def correlate_worker(
     engine.dispose(close=False)
     session_cls = sessionmaker(bind=engine)
     with session_cls() as session:
-        for task in get_next_task(session, TaskType.CORRELATE):
+        for task in get_next_task(session, TaskType.CORRELATE, task_subtype=feature_type):
             tracked = task.get_key_value("tracked_feature_type")
             untracked = task.get_key_value("untracked_feature_type")
             threshold = float(task.get_key_value("threshold"))
@@ -92,13 +93,14 @@ def correlate_worker(
 
 
 def multiprocess_correlate(
+    feature_type: str,
     correlator: Correlator,
     engine: Engine,
     process_count: int,
 ) -> None:
     processes: list[multiprocessing.Process] = []
     for _ in range(process_count):
-        process = multiprocessing.Process(target=correlate_worker, args=(correlator, engine))
+        process = multiprocessing.Process(target=correlate_worker, args=(feature_type, correlator, engine))
         processes.append(process)
         process.start()
 

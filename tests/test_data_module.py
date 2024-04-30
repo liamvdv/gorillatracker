@@ -15,7 +15,6 @@ def test_offline_data_module() -> None:
         "./mnist",
         1,
         "offline",
-        False,
         lambda x: x,
         training_transforms=lambda x: x,
     )

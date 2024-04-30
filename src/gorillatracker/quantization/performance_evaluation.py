@@ -26,6 +26,6 @@ def get_knn_accuracy(
     quantized_model = model.to(device)
     images = images.to(device)
     generated_image_embeddings = quantized_model(images)
-    validation_labels = labels.numpy()
+    validation_labels = labels
     knn_results = knn_naive(generated_image_embeddings, validation_labels, knn)
     return knn_results

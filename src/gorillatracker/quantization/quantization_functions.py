@@ -10,7 +10,7 @@ def calibrate(model: nn.Module, calibration_input: torch.Tensor):
         model(calibration_input)
 
 
-def dynamic_default_quantization(model, dtype=torch.qint8):
+def dynamic_default_quantization(model: nn.Module, dtype=torch.qint8) -> nn.Module:
     """This function only supports quantizing the following layer types:
     - nn.LSTM
     - nn.Linear
@@ -22,7 +22,7 @@ def dynamic_default_quantization(model, dtype=torch.qint8):
     )
 
 
-def ptsq_quantization(model, calibration_input) -> nn.Module:
+def ptsq_quantization(model: nn.Module, calibration_input: torch.Tensor) -> nn.Module:
     """https://pytorch.org/docs/stable/quantization.html#post-training-static-quantization"""
     model = model.model
     model.qconfig = torch.quantization.get_default_qconfig("x86")
@@ -44,7 +44,7 @@ def ptsq_quantization(model, calibration_input) -> nn.Module:
     return model_int8
 
 
-def ptsq_quantization_fx(model, calibration_input) -> nn.Module:
+def ptsq_quantization_fx(model: nn.Module, calibration_input: torch.Tensor) -> nn.Module:
     """https://pytorch.org/docs/stable/quantization.html#post-training-static-quantization"""
 
     model = model.model

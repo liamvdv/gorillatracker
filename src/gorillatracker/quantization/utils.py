@@ -41,11 +41,11 @@ def get_model_input(
     return torch.stack(images), torch.tensor(labels)
 
 
-def log_model_to_file(model, file_name):
+def log_model_to_file(model, file_name) -> None:
     with open("model.txt", "w") as f:
         f.write(str(model))
 
 
-def print_model_parameters(model):
+def print_model_parameters(model) -> None:
     for name, param in model.named_parameters():
         print(f"{name}: {param.nelement()} parameters")
