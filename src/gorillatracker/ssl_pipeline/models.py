@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional, Type, TypeVar
 
 import sqlalchemy.types as types
-from sqlalchemy import CheckConstraint, Dialect, ForeignKey, String, UniqueConstraint, event
+from sqlalchemy import CheckConstraint, Dialect, ForeignKey, Index, String, UniqueConstraint, event
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.orm.mapper import Mapper
@@ -256,7 +256,7 @@ class TrackingFrameFeature(Base):
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
 
-    __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "feature_type"),)
+    Index("idx_frame_feature", "tracking_id", "frame_nr", "feature_type", unique=True)
 
     @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
