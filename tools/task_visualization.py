@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 from typing import Tuple
 
 from rich.console import Console
@@ -73,14 +72,14 @@ class TaskVisualizer:
                 time.sleep(0.5)
 
     def _update_header(self) -> None:
-        starttime = self.session.execute(
+        start_time = self.session.execute(
             select(func.min(Task.updated_at))
             .select_from(Task)
             .join(Video, Task.video_id == Video.video_id)
             .where(Video.version == self.version)
         ).scalar_one()
         header_content = Text(
-            f"starttime: {starttime.strftime('%Y-%m-%d %H:%M')} | version: {self.version}", justify="center"
+            f"start time: {start_time.strftime('%Y-%m-%d %H:%M')} | version: {self.version}", justify="center"
         )
         self.layout["header"].update(header_content)
 
