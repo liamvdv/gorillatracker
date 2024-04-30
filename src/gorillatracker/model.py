@@ -23,12 +23,13 @@ from torchvision.models import (
     resnet152,
 )
 
-# from transformers import ResNetModel
-
 import gorillatracker.type_helper as gtypes
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
+
+# from transformers import ResNetModel
+
 
 
 def warmup_lr(
@@ -168,6 +169,8 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
 
+        self.quant = torch.quantization.QuantStub()
+
         ##### Create Table embeddings_table
         self.embeddings_table_columns = [
             "label",
@@ -225,6 +228,7 @@ class BaseModule(L.LightningModule):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
