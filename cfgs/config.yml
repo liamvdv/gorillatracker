@@ -77,4 +77,4 @@ save_model_to_wandb: False      # Save the model to wandb
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: ""
 data_resize_transform: Null
-video_data: False
+use_ssl: False

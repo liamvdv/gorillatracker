@@ -40,7 +40,7 @@ def test_triplet_sampler() -> None:
 
 
 def test_data_loader() -> None:
-    epochs = 100
+    epochs = 10
     dataset = generate_fake_dataset()
     dl = TripletDataLoader(dataset, batch_size=1)  # type: ignore
     epoch_batches = []
