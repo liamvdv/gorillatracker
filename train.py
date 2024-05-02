@@ -196,7 +196,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
         # reload_dataloaders_every_n_epochs=1,
     )
-    
 
     if current_process_rank == 0:
         logger.info(

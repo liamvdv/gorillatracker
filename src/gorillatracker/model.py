@@ -464,7 +464,8 @@ class EfficientNetV2Wrapper(BaseModule):
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
-        
+
+
 class EfficientNetRW_M(BaseModule):
     def __init__(  # type: ignore
         self,
