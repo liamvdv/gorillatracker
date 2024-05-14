@@ -5,6 +5,7 @@
 # Example for opening a console without GPUs: bash ./scripts/run-in-docker.sh bash
 # Example for opening a console with GPUs 0,1,5,7: bash ./scripts/run-in-docker.sh -g 0,1,5,7 bash
 # Example with GPUs a custom docker image and training script: bash ./scripts/run-in-docker.sh -g 0,1,2,3 -i my-cool/docker-image:latest python train.py ...
+# Example running sweeps: bash scripts/run-in-docker.sh -g 6 "python init_sweep.py"
 # ---------------------
 # The current directory is mounted to /workspace in the docker container.
 # We automatically detect W&B login credentials in the ~/.netrc file and pass them to the docker container. To store them, do wandb login once on the host machine.
@@ -67,7 +68,7 @@ echo "gpus: $gpus"
 
 # Look for WANDB_API_KEY
 if [ -z "$WANDB_API_KEY" ]; then
-    export WANDB_API_KEY=$(awk '/api.wandb.ai/{getline; getline; print $2}' ~/.netrc)
+    export WANDB_API_KEY=$(awk '/api.wandb.ai/{getline; getline; print $2}' $PWD/../.netrc)
     if [ -z "$WANDB_API_KEY" ]; then
         echo "WANDB_API_KEY not found"
     else
@@ -93,10 +94,12 @@ fi
 
 docker run --rm -it --ipc=host --network=host \
     -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
-    -v "/scratch2/gorillatracker/data:/workspaces/gorillatracker/data:ro" \
-    -v "/scratch2/gorillatracker/data/splits:/workspaces/gorillatracker/data/splits:ro" \
-    -v "/scratch2/gorillatracker/models:/workspaces/gorillatracker/models" \
-    -v "/scratch1/wildlife_conservation_data/spac_gorillas_converted:/workspaces/gorillatracker/video_data:ro" \
+    -v "${HOME}/data:/workspaces/gorillatracker/data" \
+    -v "${HOME}/data/embeddings:/workspaces/gorillatracker/data/embeddings" \
+    -v "${HOME}/data/splits/:/workspaces/gorillatracker/data/splits" \
+    -v "${HOME}/models/:/workspaces/gorillatracker/models" \
+    -v "$(pwd)/../.netrc:/home/gorilla/.netrc" \
+    -v "$(pwd)/../.cache:/home/gorilla/.cache" \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
     --gpus=\"device=${gpus}\" \
