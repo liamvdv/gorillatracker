@@ -167,7 +167,7 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
 
-        self.quant = torch.quantization.QuantStub()
+        self.quant = torch.quantization.QuantStub()  # type: ignore
 
         ##### Create Table embeddings_table
         self.embeddings_table_columns = [
