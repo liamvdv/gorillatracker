@@ -1,7 +1,7 @@
 import torch
 
-# import onnx
-# import torchvision
+import onnx
+import torchvision
 
 model_path = "quantized_model.pth"
 model = torch.load(model_path)
