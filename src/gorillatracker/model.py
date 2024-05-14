@@ -468,6 +468,43 @@ class EfficientNetV2Wrapper(BaseModule):
         )
 
 
+class EfficientNetRW_M(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        is_from_scratch = kwargs.get("from_scratch", False)
+        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
+
+        self.model.classifier = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.classifier.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.conv_head
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+            ]
+        )
+
+
 class ConvNeXtV2BaseWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -1125,6 +1162,7 @@ custom_model_cls = {
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
+    "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
 }
 

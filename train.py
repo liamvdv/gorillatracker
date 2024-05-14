@@ -245,6 +245,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         assert checkpoint_callback.dirpath is not None
         save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
         trainer.save_checkpoint(save_path)
+        logger.info(f"Checkpoint saved to {save_path}")
 
         if args.save_model_to_wandb:
             logger.info("Collecting PL checkpoint for wandb...")
