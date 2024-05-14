@@ -60,8 +60,8 @@ jobs:
       - name: Setup Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          environment-file: environment.yml
-          cache-environment-key: micromamba-env-${{ hashFiles('environment.yml') }}
+          environment-file: environment-ci.yml
+          cache-environment-key: micromamba-env-${{ hashFiles('environment-ci.yml') }}
           init-shell: >-
             bash
 

@@ -1,0 +1,83 @@
+# NOTE(memben): Cuda removed for smaller builds
+name: research
+channels:
+  - conda-forge
+  - nodefaults
+  - pyviz/label/dev
+dependencies:
+  - python=3.10 # or don't specify the version and use latest stable
+
+  # ML libraries
+  - pytorch::pytorch>=2.0 # or don't specify the version and use latest stable
+  # CUDA only on linux and windows
+  - wandb
+  - lightning
+  - transformers
+  - tokenizers
+  - datasets
+  - evaluate
+  - accelerate
+  - sentencepiece
+  - torchvision
+  - faiss-cpu
+  - timm  # maybe necessary to switch to faiss-cuda
+
+  # Good to have
+  - numpy
+  - scipy
+  - pandas
+  - seqeval
+  - scikit-learn
+  - matplotlib
+
+  # Misc
+  - pydantic
+  - jsonlines
+  - zstandard
+  - debugpy
+  - tqdm
+  - ipykernel
+  - bokeh
+  - colorcet
+  - shapely
+
+  # Dev dependencies
+  - black
+  - ruff
+  - isort
+  - mypy
+  - pytest
+  - typer
+  - ipywidgets
+
+  # pip dependencies
+  - pip
+  - pip:
+      - pipx
+       # NOTE(memben): 🚩 see end of dockerfile, needed to fix dependency hell, https://github.com/ultralytics/ultralytics/issues/1270
+      - opencv-python-headless
+      - psycopg2-binary
+      - sqlalchemy
+      - warmup-scheduler
+      - simple_parsing
+      - print-on-steroids[exceptions]
+      - ultralytics 
+      - lapx>=0.5.2 # for ultralytics tracking
+      - types-PyYAML
+      - git+https://github.com/facebookresearch/segment-anything.git
+      - easyocr
+      - umap-learn
+      - bokeh
+      - colorcet
+      - grad-cam
+      - facenet_pytorch
+      - typer
+      - opencv-contrib-python
+
+
+# Non-standard section listing target platforms for conda-lock:
+platforms:
+  - linux-64
+  - osx-arm64 # This is for M1/M2 MacBooks
+  # - linux-aarch64 # This is linux-arm64. We can build Docker images for M1/M2 Macs on top of this - won't support MPS though
+  - win-64
