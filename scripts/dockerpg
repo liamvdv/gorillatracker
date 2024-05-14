@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+
+import typer
+import docker
+import yaml
+import os
+from datetime import datetime, timezone
+import time
+import subprocess
+
+"""
+Implementation notes:
+- The script uses the Docker SDK for Python to interact with the Docker API.
+- The script uses the `pg_dump` and `pg_restore` commands to backup and restore the PostgreSQL database.
+- The script assumes that the PostgreSQL service is defined in a `docker-compose.yml` file.
+- The script assumes that the PostgreSQL service is named `postgres` in the `docker-compose.yml` file.
+- The script assumes that the PostgreSQL service uses the official `postgres` Docker image.
+
+PostgreSQL commands from https://www.timescale.com/learn/postgres-cheat-sheet/backup.
+"""
+
+app = typer.Typer(no_args_is_help=True, help="Helper script to reliably backup, restore and test-backups PostgreSQL databases running in Docker containers.")
+
+
+def load_docker_compose_file(file_path: str = "docker-compose.yml"):
+    if not os.path.exists(file_path):
+        typer.echo(f"Error: The docker-compose file '{file_path}' does not exist.")
+        raise typer.Exit(code=1)
+    with open(file_path, "r") as file:
+        return yaml.safe_load(file)
+
+
+def get_postgres_service_info(compose_data, service_name="postgres"):
+    # https://github.com/docker-library/docs/blob/master/postgres/README.md
+    services = compose_data.get("services", {})
+    postgres_service = services.get(service_name, {})
+    image = postgres_service.get("image", "postgres")
+    env_vars = postgres_service.get("environment", {})
+    return {
+        "image": image,
+        "username": env_vars.get("POSTGRES_USER", "postgres"),
+        # POSTGRES_PASSWORD is read by the postgres server, PGPASSWORD is used by client tools (pg_dump, pg_restore, pg_isready, ...)
+        "password": env_vars.get("POSTGRES_PASSWORD", "postgres"),
+        "database": env_vars.get("POSTGRES_DB", "postgres"),
+    }
+
+
+def find_postgres_container():
+    client = docker.from_env()
+    postgres_containers = []
+
+    for container in client.containers.list():
+        container_info = container.attrs
+        image_name = container_info["Config"]["Image"]
+        exposed_ports = container_info["Config"].get("ExposedPorts", {})
+
+        if "postgres" in image_name and "5432/tcp" in exposed_ports:
+            postgres_containers.append(container)
+
+    if len(postgres_containers) == 0:
+        typer.echo("No running PostgreSQL containers found with port 5432 exposed.")
+        raise typer.Exit(code=1)
+    if len(postgres_containers) > 1:
+        typer.echo("Multiple PostgreSQL containers found. Please specify one.")
+        raise typer.Exit(code=1)
+
+    return postgres_containers[0]
+
+
+def get_container_uptime(container):
+    start_time_str = container.attrs["State"]["StartedAt"]
+    start_time = datetime.strptime(start_time_str.split(".")[0], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    current_time = datetime.now(timezone.utc)
+    uptime = current_time - start_time
+    return uptime
+
+
+def get_container_context(database: str, username: str, password: str, compose_file: str):
+    # Load docker-compose file
+    compose_data = load_docker_compose_file(compose_file)
+
+    # Load docker-compose file
+    compose_data = load_docker_compose_file(compose_file)
+
+    # Get PostgreSQL service information from docker-compose file
+    pg_info = get_postgres_service_info(compose_data)
+
+    # Override with manually passed options if provided
+    database = database or pg_info["database"]
+    username = username or pg_info["username"]
+    password = password or pg_info["password"]
+
+    if not password:
+        typer.echo("Error: PostgreSQL password must be provided either in the docker-compose file or as an argument.")
+        raise typer.Exit(code=1)
+
+    # Find the running PostgreSQL container
+    container = find_postgres_container()
+    # echo container infos and ask to continue, include uptime
+    typer.echo(
+        f"Found one PostgreSQL container:\nName: {container.name}\nId: {container.id[:12]}\nUptime: {get_container_uptime(container)}"
+    )
+    return container, database, username, password
+
+
+@app.command()
+def backup(
+    database: str = typer.Option(None, help="Name of the database to backup"),
+    username: str = typer.Option(None, help="Username for the PostgreSQL database"),
+    password: str = typer.Option(None, help="Password for the PostgreSQL database"),
+    output_file: str = typer.Option("backup.dump", help="Output file for the database dump"),
+    compose_file: str = typer.Option("docker-compose.yml", help="Path to the docker-compose.yml file"),
+):
+    """
+    Create a backup of the PostgreSQL database.
+    """
+    if os.path.exists(output_file):
+        confirm = typer.confirm(f"The file '{output_file}' already exists. Do you want to overwrite it?")
+        if not confirm:
+            typer.echo("Backup cancelled.")
+            raise typer.Exit()
+
+    container, database, username, password = get_container_context(database, username, password, compose_file)
+
+    # Execute the pg_dump command inside the PostgreSQL container
+    dump_command = f"pg_dump -U {username} -d {database} -F c -b -v -f /tmp/{output_file}"
+    env = {"PGPASSWORD": password}
+
+    typer.echo(f"Running backup command in container {container.name}: {dump_command}")
+    result = container.exec_run(dump_command, environment=env)
+
+    if result.exit_code != 0:
+        typer.echo(f"Error: {result.output.decode()}")
+        raise typer.Exit(code=1)
+
+    # Copy the backup file from the container to the host
+    backup_path_in_container = f"/tmp/{output_file}"
+    backup_path_on_host = os.path.abspath(output_file)
+    with open(backup_path_on_host, "wb") as f:
+        bits, _ = container.get_archive(backup_path_in_container)
+        for chunk in bits:
+            f.write(chunk)
+
+    typer.echo(f"Backup completed successfully. File saved to: {backup_path_on_host}")
+
+
+def restore_on_container(container, database: str, username: str, password: str, input_file: str):
+    if not os.path.exists(input_file):
+        typer.echo(f"Error: The input file '{input_file}' does not exist.")
+        raise typer.Exit(code=1)
+    # Copy the backup file from the host to the container
+    restore_path_in_container = f"/tmp/{os.path.basename(input_file)}"
+    with open(input_file, "rb") as f:
+        container.put_archive("/tmp", f.read())
+
+    # Execute the pg_restore command inside the PostgreSQL container
+    restore_command = f"pg_restore -U {username} -d {database} -v {restore_path_in_container}"
+    env = {"PGPASSWORD": password}  # PGPASSWORD is needed for pg_restore, pg_isready, ...
+
+    # Wait until PostgreSQL is available
+    timeout = 60
+    for i in range(1, timeout + 1):
+        typer.echo(f"Waiting for PostgreSQL to be available... ({i}/{timeout})")
+        if is_postgres_available(container):
+            break
+        time.sleep(1)
+
+    typer.echo(f"Running restore command in container {container.id[:12]}: {restore_command}")
+    result = container.exec_run(restore_command, environment=env)
+
+    if result.exit_code != 0:
+        typer.echo(f"Error: {result.output.decode()}")
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Restore completed successfully from: {input_file}")
+
+
+@app.command()
+def restore(
+    database: str = typer.Option(None, help="Name of the database to backup"),
+    username: str = typer.Option(None, help="Username for the PostgreSQL database"),
+    password: str = typer.Option(None, help="Password for the PostgreSQL database"),
+    input_file: str = typer.Option("backup.dump", help="Output file for the database dump"),
+    compose_file: str = typer.Option("docker-compose.yml", help="Path to the docker-compose.yml file"),
+):
+    """
+    Create a restore of the PostgreSQL database.
+    """
+    container, database, username, password = get_container_context(database, username, password, compose_file)
+    typer.echo(
+        f"Restore overview:\nDatabase: {database}\nUsername: {username}\nIn Container: {container.name} {container.id[:12]}\nInput file: {input_file}"
+    )
+    confirm = typer.confirm(f"Do you want to continue?")
+    if not confirm:
+        typer.echo("Restore cancelled.")
+        raise typer.Exit()
+    second_confirm = typer.confirm(f"Are you really sure?")
+    if not second_confirm:
+        typer.echo("Restore cancelled.")
+        raise typer.Exit()
+    restore_on_container(container, database, username, password, input_file)
+
+
+def is_postgres_available(container):
+    try:
+        exit_code, output = container.exec_run("pg_isready -U postgres", stderr=False, stdout=True)
+        return exit_code == 0
+    except Exception:
+        return False
+
+
+@app.command()
+def test(
+    input_file: str = typer.Option("backup.dump", help="Input file for the database restore"),
+    compose_file: str = typer.Option("docker-compose.yml", help="Path to the docker-compose.yml file"),
+    shell: bool = typer.Option(False, help="Attach to the restored container with psql"),
+    keep_container: bool = typer.Option(False, help="Keep the restored container after the test"),
+):
+    """
+    Test restore the PostgreSQL database from a backup file by creating a new container.
+    """
+    # Check if the input file exists
+    if not os.path.exists(input_file):
+        typer.echo(f"Error: The input file '{input_file}' does not exist.")
+        raise typer.Exit()
+
+    # Load docker-compose file
+    compose_data = load_docker_compose_file(compose_file)
+
+    # Get PostgreSQL service information from docker-compose file
+    pg_info = get_postgres_service_info(compose_data)
+
+    # Get the PostgreSQL image from the docker-compose file
+    image = pg_info["image"]
+    username = pg_info["username"]
+    password = pg_info["password"]
+    database = pg_info["database"]
+
+    # Create a new container from the PostgreSQL image, respect keep_container, attach options
+    client = docker.from_env()
+    typer.echo(f"Testing on image {image}")
+    container = client.containers.run(
+        image,
+        environment={"POSTGRES_USER": username, "POSTGRES_PASSWORD": password, "POSTGRES_DB": database},
+        ports={"5432/tcp": None},
+        # detach to run in background
+        detach=True,
+        # remove the container once stopped
+        remove=True,
+    )
+    typer.echo(f"Container {container.id[:12]} created successfully, will be removed on stop.")
+    restore_on_container(container, database, username, password, input_file)
+    # attach the container if requested
+    if shell:
+        typer.echo(f"Attach to container {container.id[:12]}")
+        typer.echo(f"psql basic commands: Quit with \q | List tables with \dt+ | View table <mytable> with \d+ <mytable> | List schemas with \dn+")
+        subprocess.run(["docker", "exec", "-it", container.id, "psql", "-U", username], env={"PGPASSWORD": password,  "PGDATABASE": database})
+
+    if keep_container:
+        typer.echo(f"Attach to container with\n\tdocker attach {container.id}")
+        typer.echo(f"Stop the container with\n\tdocker stop {container.id}")
+    else:
+        container.stop()
+        typer.echo(f"Stopped container {container.id[:12]}")
+        typer.echo(f"Container removed.") # automatically removed, see remove=True
+
+@app.command()
+def example():
+    """
+    Show an example usage of the script.
+    """
+    typer.echo("""# An example usage flow for the dockerpg script
+               
+# Backup the PostgreSQL database, make sure docker-compose.yml is in the current directory
+dockerpg backup
+
+# Test the backup by restore the PostgreSQL database to a new container, get psql shell. Will remove the container after test.
+dockerpg test --shell
+# List tables with
+\\dt+
+# Run arbitrary SQL, e. g. 
+SELECT 1;
+# Quit shell with
+\\q
+
+# To run your own tests against the container, use the --keep-container flag.
+""")
+
+@app.command()
+def example_compose():
+    """
+    Show an example docker-compose.yml file.
+    """
+    typer.echo("""# An example docker-compose.yml file consumed by the dockerpg script
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: superinsecure
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+    postgres_data:
+""")
+               
+if __name__ == "__main__":
+    app()
