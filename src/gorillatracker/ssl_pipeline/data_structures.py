@@ -51,9 +51,10 @@ class DirectedBipartiteGraph(Generic[T]):
 
 class UnionFind(Generic[T]):
     def __init__(self, vertices: list[T]) -> None:
+        assert len(vertices) == len(set(vertices)), "Vertices must be unique."
         self.root = {i: i for i in vertices}
         self.rank = {i: 1 for i in vertices}
-        self.members = {i: {i} for i in vertices}
+        self.members = {i: [i] for i in vertices}
 
     def find(self, x: T) -> T:
         if x == self.root[x]:
@@ -70,10 +71,10 @@ class UnionFind(Generic[T]):
         if self.rank[root_x] == self.rank[root_y]:
             self.rank[root_y] += 1
         self.root[root_x] = root_y
-        self.members[root_y] |= self.members.pop(root_x)
+        self.members[root_y].extend(self.members.pop(root_x))
         return root_y
 
-    def get_members(self, x: T) -> set[T]:
+    def get_members(self, x: T) -> list[T]:
         return self.members[self.find(x)]
 
 
@@ -94,10 +95,10 @@ class CliqueGraph(Generic[T]):
     def is_connected(self, u: T, v: T) -> bool:
         return self._find_root(u) == self._find_root(v)
 
-    def get_clique(self, v: T) -> set[T]:
+    def get_clique(self, v: T) -> list[T]:
         return self.union_find.get_members(v)
 
-    def get_adjacent_cliques(self, v: T) -> dict[T, set[T]]:
+    def get_adjacent_cliques(self, v: T) -> dict[T, list[T]]:
         adjacent_clique_roots = self._get_adjacent_partitions(v)
         return {r: self.get_clique(r) for r in adjacent_clique_roots}
 
@@ -144,7 +145,7 @@ class IndexedCliqueGraph(CliqueGraph[K]):
     def get_clique_representative(self, v: K) -> K:
         return min(self.get_clique(v))
 
-    def get_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+    def get_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
         adjacent_clique_roots = self._get_adjacent_partitions(v)
         adjacent_cliques = {}
         for r in adjacent_clique_roots:
