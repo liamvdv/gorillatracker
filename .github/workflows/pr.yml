@@ -1,11 +1,8 @@
 name: Lint & Test
 
 on:
-  push:
-      branches:
-        - lightweight-action-runner
   pull_request:
-    branches: [lightweight-action-runner]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
