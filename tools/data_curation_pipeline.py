@@ -221,11 +221,11 @@ class CurationPipeline:
         index.add(combined_embeddings)
 
         D, I = index.search(source_embeddings, self.k_nearest_neighbors + 1)
-        
+
         deduplicated_indices = self._find_deduplicated_indices(source_embeddings, D, I)
-        
+
         return pd.concat([source_df.iloc[deduplicated_indices], embedding_df[embedding_df["partition"] != source]])
-    
+
     def _find_deduplicated_indices(self, source_embeddings: np.ndarray, D, I) -> set:
         G = nx.Graph()
         num_source_images = source_embeddings.shape[0]
@@ -238,11 +238,10 @@ class CurationPipeline:
         for component in nx.connected_components(G):
             if any(idx >= num_source_images for idx in component):
                 to_discard.update(component)
-                
+
         deduplicated_indices = [i for i in range(num_source_images) if i not in to_discard]
-                
+
         return deduplicated_indices
-        
 
 
 class SSLCurationPipeline(CurationPipeline):
