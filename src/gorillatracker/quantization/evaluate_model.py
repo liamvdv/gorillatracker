@@ -1,8 +1,12 @@
+from typing import Union
+
 import torch
+from torch.fx import GraphModule
 
 import gorillatracker.quantization.performance_evaluation as performance_evaluation
 import gorillatracker.quantization.quantization_functions as quantization_functions
 from gorillatracker.datasets.cxl import CXLDataset
+from gorillatracker.model import BaseModule
 from gorillatracker.quantization.utils import get_model_input
 from gorillatracker.utils.embedding_generator import get_model_for_run_url
 
@@ -13,21 +17,21 @@ dataset_path = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_ima
 model_wandb_url = "https://wandb.ai/gorillas/Embedding-EfficientNet-CXL-OpenSet/runs/9aom7205/workspace"
 
 
-def main():
+def main() -> None:
     # 1. Quantization
 
     calibration_input_embeddings, _ = get_model_input(
         CXLDataset, dataset_path=dataset_path, partion="train", amount_of_tensors=number_of_calibration_images
     )
 
-    model = get_model_for_run_url(model_wandb_url)
+    model: Union[GraphModule, BaseModule] = get_model_for_run_url(model_wandb_url)
     if load_quantized_model:
         quantized_model_state_dict = torch.load("quantized_model_weights.pth")
         quantized_model = model
         quantized_model.load_state_dict(quantized_model_state_dict)
         quantized_model.eval()
     else:
-        quantized_model = quantization_functions.ptsq_quantization_fx(model, calibration_input_embeddings)
+        quantized_model = quantization_functions.ptsq_quantization_fx(model, calibration_input_embeddings)  # type: ignore
 
     if save_quantized_model:
         torch.save(model.state_dict(), "quantized_model_weights.pth")

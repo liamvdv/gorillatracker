@@ -21,14 +21,17 @@ log = logging.getLogger(__name__)
 def process_detection(
     box: results.Boxes, video: Video, frame_nr: int, feature_type: str, tracking: Optional[Tracking] = None
 ) -> TrackingFrameFeature:
-    x, y, w, h = box.xywhn[0].tolist()
+    x_n, y_n, w_n, h_n = box.xywhn[0].tolist()
+    _, _, w, h = box.xywh[0].tolist()
     confidence = box.conf.item()
     return TrackingFrameFeature(
         tracking=tracking,
         video=video,
         frame_nr=frame_nr,
-        bbox_x_center=x,
-        bbox_y_center=y,
+        bbox_x_center_n=x_n,
+        bbox_y_center_n=y_n,
+        bbox_width_n=w_n,
+        bbox_height_n=h_n,
         bbox_width=w,
         bbox_height=h,
         confidence=confidence,

@@ -199,8 +199,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     # Initialize trainer
     supported_quantizations = ["nf4", "nf4-dq", "fp4", "fp4-dq", "int8", "int8-training"]
     if args.precision in supported_quantizations:
-        args.plugins = BitsandbytesPrecision(mode=args.precision)
-        args.precision = "bf16-true"
+        args.plugins = BitsandbytesPrecision(mode=args.precision)  # type: ignore
+        args.precision = "16-true"
 
     if current_process_rank == 0:
         logger.info(

@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -20,7 +21,7 @@ def get_knn_accuracy(
     labels: torch.Tensor,
     device: torch.device = torch.device("cpu"),
     knn: int = 5,
-) -> dict:
+) -> dict[str, Any]:
 
     model.eval()
     quantized_model = model.to(device)
