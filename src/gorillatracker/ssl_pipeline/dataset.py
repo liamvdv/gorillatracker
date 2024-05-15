@@ -195,6 +195,7 @@ class GorillaDataset(SSLDataset):
 
 
 class GorillaDatasetKISZ(GorillaDataset):
+    DB_URI = "postgresql+psycopg2://postgres:whatever@postgres:5432/postgres"
     @classmethod
     def get_social_group(cls, video: Video) -> Optional[str]:
         parent = video.path.parent
