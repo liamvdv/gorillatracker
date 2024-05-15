@@ -94,11 +94,11 @@ fi
 docker run --rm -it --ipc=host --network=host \
     -v "${PWD}/../gorillatracker:/workspaces/gorillatracker" \
     -w /workspaces/gorillatracker \
-    -v "${HOME}/data:/workspaces/gorillatracker/data" \
+    -v "${HOME}/data:/workspaces/gorillatracker/data:ro" \
     -v "${HOME}/models/:/workspaces/gorillatracker/models" \
-    -v "${PWD}/../.netrc:/home/gorilla/.netrc" \
-    -v "${PWD}/../.cache:/home/gorilla/.cache" \
-    -v "/mnt/vast-gorilla,target=/workspaces/gorillatracker/video_data,type=bind,ro" \
+    -v "${PWD}/../.netrc:/home/gorilla/.netrc:ro" \
+    -v "${PWD}/../.cache:/home/gorilla/.cache:ro" \
+    -v "/mnt/vast-gorilla:/workspaces/gorillatracker/video_data:ro" \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
     --gpus=\"device=${gpus}\" \
