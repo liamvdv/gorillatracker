@@ -34,6 +34,7 @@ ENFORCE_AFTER = "2024-04-07"
 def keep(run) -> bool:
     return run.created_at <= ENFORCE_AFTER or "keep" in run.tags or "proof" in run.tags or "baseline" in run.tags
 
+
 # Initialize the WandB API
 if "WANDB_API_KEY" in os.environ:
     wandb.login(key=os.environ["WANDB_API_KEY"])
@@ -89,8 +90,10 @@ def clear_untraceable_names(run: Run) -> Optional[str]:
     if not match:
         return "name_untraceable"
 
+
 # https://docs.wandb.ai/ref/python/run
 run_filters = [clear_failed, clear_untraceable_names]
+
 
 class WandbCleaner:
     def __init__(self, rules, entity=ENTITY):
