@@ -210,35 +210,35 @@ def splitter(
     val_bucket: List[Entry] = []
     test_bucket: List[Entry] = []
 
-    individuums = group(images)
+    individums = group(images)
     if mode == "closedset":
         train_count, val_count, test_count = compute_split(len(images), train, val, test, False)
-        for individuum in individuums:
-            assert isinstance(individuum.value, list)
-            n = len(individuum.value)
+        for individum in individums:
+            assert isinstance(individum.value, list)
+            n = len(individum.value)
             # only take min_train_count images from each individual and update the individual's value
-            selection, individuum.value = individuum.value[:min_train_count], individuum.value[min_train_count:]
+            selection, individum.value = individum.value[:min_train_count], individum.value[min_train_count:]
             if len(selection) != min_train_count:
                 print(
-                    f"WARN: individual {individuum.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
+                    f"WARN: individual {individum.label} has less than min_train_count={min_train_count} images. It has {n} images. You may consider discarding it."
                 )
             train_bucket.extend(selection)
         # need to shuffle again because we ungroup() will return images of individuals sequentially
-        rest = consistent_random_permutation(ungroup(individuums), lambda x: x.value, seed + 1)
+        rest = consistent_random_permutation(ungroup(individums), lambda x: x.value, seed + 1)
         val_bucket, rest = rest[:val_count], rest[val_count:]
         assert len(val_bucket) == val_count, "Dataset too small: Not enough images left to fill validation."
         test_bucket, rest = rest[:test_count], rest[test_count:]
         assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
         train_bucket.extend(rest)
     elif mode == "openset":
-        # At least one unseen individuum in test and eval.
-        train_count, val_count, test_count = compute_split(len(individuums), train, val, test, False)
+        # At least one unseen individum in test and eval.
+        train_count, val_count, test_count = compute_split(len(individums), train, val, test, False)
         print(
-            f"Unique Individuals (Image Count Bias): Total={len(individuums)}, Train={train_count}, Val={val_count}, Test={test_count}"
+            f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={train_count}, Val={val_count}, Test={test_count}"
         )
-        train_bucket = ungroup(individuums[:train_count])
-        val_bucket = ungroup(individuums[train_count : train_count + val_count])
-        test_bucket = ungroup(individuums[train_count + val_count :])
+        train_bucket = ungroup(individums[:train_count])
+        val_bucket = ungroup(individums[train_count : train_count + val_count])
+        test_bucket = ungroup(individums[train_count + val_count :])
 
         n = len(train_bucket)
 
@@ -272,7 +272,7 @@ def kfold_splitter(
 
     fold_bucket_iterator = 0
 
-    individuums = group(images)
+    individums = group(images)
     if mode == "closedset":
         trainval_count, _, test_count = compute_split(len(images), trainval, 0, test, True)
         fold_bucket_size = trainval_count // k
@@ -285,19 +285,19 @@ def kfold_splitter(
         test_bucket = images[fold_bucket_iterator:]
 
     elif mode == "openset":
-        # At least one unseen individuum in test and eval.
+        # At least one unseen individum in test and eval.
         # NOTE number of actual images in each fold (and test) can vary due to different number of images per individual.
-        trainval_count, _, test_count = compute_split(len(individuums), trainval, 0, test, True)
+        trainval_count, _, test_count = compute_split(len(individums), trainval, 0, test, True)
         fold_bucket_size = trainval_count // k
 
         print(
-            f"Unique Individuals (Image Count Bias): Total={len(individuums)}, Train={trainval_count}, Test={test_count}"
+            f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={trainval_count}, Test={test_count}"
         )
         for i in range(k):
-            fold_buckets[i] = ungroup(individuums[fold_bucket_iterator : fold_bucket_iterator + fold_bucket_size])
+            fold_buckets[i] = ungroup(individums[fold_bucket_iterator : fold_bucket_iterator + fold_bucket_size])
             fold_bucket_iterator += fold_bucket_size
 
-        test_bucket = ungroup(individuums[fold_bucket_iterator:])
+        test_bucket = ungroup(individums[fold_bucket_iterator:])
 
     return fold_buckets, test_bucket
 

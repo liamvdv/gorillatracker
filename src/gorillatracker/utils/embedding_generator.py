@@ -56,7 +56,11 @@ def get_run(url: str) -> wandbRun:
 
 
 def load_model_from_wandb(
-    wandb_fullname: str, model_cls: Type[BaseModule], model_config: Dict[str, Any], device: str = "cpu"
+    wandb_fullname: str,
+    model_cls: Type[BaseModule],
+    model_config: Dict[str, Any],
+    device: str = "cpu",
+    eval_mode: bool = True,
 ) -> BaseModule:
     api = get_wandb_api()
 
@@ -81,8 +85,50 @@ def load_model_from_wandb(
     model.load_state_dict(model_state_dict)
 
     model.to(device)
-    model.eval()
+    if eval_mode:
+        model.eval()
     return model
+
+
+def get_model_for_run_url(run_url: str, eval_mode: bool = True) -> BaseModule:
+    run = get_run(run_url)
+    print("Using model from run:", run.name)
+    print("Config:", run.config)
+    # args = TrainingArgs(**run.config) # NOTE(liamvdv): contains potenially unknown keys / missing keys (e. g. l2_beta)
+    args = {
+        k: run.config[k]
+        for k in (
+            # Others:
+            "model_name_or_path",
+            "dataset_class",
+            "data_dir",
+            # Model Params:
+            "embedding_size",
+            "from_scratch",
+            "loss_mode",
+            "weight_decay",
+            "lr_schedule",
+            "warmup_mode",
+            "warmup_epochs",
+            "max_epochs",
+            "initial_lr",
+            "start_lr",
+            "end_lr",
+            "beta1",
+            "beta2",
+            "stepwise_schedule",
+            "lr_interval",
+            "l2_alpha",
+            "l2_beta",
+            "path_to_pretrained_weights",
+            # NOTE(liamvdv): might need be extended by other keys if model keys change
+        )
+    }
+
+    print("Loading model from latest checkpoint")
+    model_path = get_latest_model_checkpoint(run).qualified_name
+    model_cls = get_model_cls(args["model_name_or_path"])
+    return load_model_from_wandb(model_path, model_cls=model_cls, model_config=args, eval_mode=eval_mode)
 
 
 def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", norm_input: bool = False) -> pd.DataFrame:
@@ -174,44 +220,8 @@ def generate_embeddings_from_run(
         assert out.parent.exists(), "outpath parent must exist"
         assert out.suffix == ".pkl", "outpath must be a pickle file"
 
-    run = get_run(run_url)
-    print("Using model from run:", run.name)
-    print("Config:", run.config)
-    # args = TrainingArgs(**run.config) # NOTE(liamvdv): contains potenially unknown keys / missing keys (e. g. l2_beta)
-    args = {
-        k: run.config[k]
-        for k in (
-            # Others:
-            "model_name_or_path",
-            "dataset_class",
-            "data_dir",
-            # Model Params:
-            "embedding_size",
-            "from_scratch",
-            "loss_mode",
-            "weight_decay",
-            "lr_schedule",
-            "warmup_mode",
-            "warmup_epochs",
-            "max_epochs",
-            "initial_lr",
-            "start_lr",
-            "end_lr",
-            "beta1",
-            "beta2",
-            "stepwise_schedule",
-            "lr_interval",
-            "l2_alpha",
-            "l2_beta",
-            "path_to_pretrained_weights",
-            # NOTE(liamvdv): might need be extended by other keys if model keys change
-        )
-    }
-
-    print("Loading model from latest checkpoint")
-    model_path = get_latest_model_checkpoint(run).qualified_name
-    model_cls = get_model_cls(args["model_name_or_path"])
-    model = load_model_from_wandb(model_path, model_cls=model_cls, model_config=args)
+    model = get_model_for_run_url(run_url)
+    args = model.config
 
     if data_dir is None:
         data_dir = args["data_dir"]
@@ -304,7 +314,7 @@ def get_embedding_from_frame(
 
     # convert to pil image
     img = cv2.cvtColor(frame_cropped, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(img)  # type: ignore
+    img = Image.fromarray(img)
     transformed_image: torch.Tensor = model_transforms(img)
 
     model.eval()
