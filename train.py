@@ -202,28 +202,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         args.plugins = BitsandbytesPrecision(mode=args.precision)
         args.precision = "bf16-true"
 
-    trainer = Trainer(
-        num_sanity_val_steps=0,
-        max_epochs=args.max_epochs,
-        val_check_interval=args.val_check_interval,
-        check_val_every_n_epoch=args.check_val_every_n_epoch,
-        devices=args.num_devices,
-        accelerator=args.accelerator,
-        strategy=str(args.distributed_strategy),
-        logger=wandb_logger,
-        deterministic=args.force_deterministic,
-        callbacks=callbacks,
-        precision=args.precision,
-        gradient_clip_val=args.grad_clip,
-        log_every_n_steps=24,
-        # accumulate_grad_batches=args.gradient_accumulation_steps,
-        fast_dev_run=args.fast_dev_run,
-        profiler=args.profiler,
-        inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-        plugins=args.plugins,
-        # reload_dataloaders_every_n_epochs=1,
-    )
-
     if current_process_rank == 0:
         logger.info(
             f"Total optimizer epochs: {args.max_epochs} | "
@@ -246,8 +224,10 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     for i in range(kfold_k):
         # Initialize trainer
         trainer = Trainer(
+            num_sanity_val_steps=0,
             max_epochs=args.max_epochs,
             val_check_interval=args.val_check_interval,
+            check_val_every_n_epoch=args.check_val_every_n_epoch,
             devices=args.num_devices,
             accelerator=args.accelerator,
             strategy=str(args.distributed_strategy),
@@ -261,6 +241,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             fast_dev_run=args.fast_dev_run,
             profiler=args.profiler,
             inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+            plugins=args.plugins,
             # reload_dataloaders_every_n_epochs=1,
         )
 
@@ -274,6 +255,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
                 continue
 
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
+        logger.info(f"Rank {current_process_rank} | max_epochs: {model.max_epochs}")
         if args.kfold:
             dm.val_fold = i  # type: ignore
             embeddings_logger_callback.kfold_k = i
