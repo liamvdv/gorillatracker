@@ -4,7 +4,7 @@ This is a demo file to show how to use the SSL pipeline to track any animal in a
 The pipeline consists of the following steps:
 1. Create a dataset adapter for the dataset of interest. (dataset.py)
 2. Extract the metadata from the videos. (video_preprocessor.py)
-3. Use a tracking model to track the animal in the video. (video_processor.py) 
+3. Use a tracking model to track the animal in the video. (video_processor.py)
     - This should in be a YOLOv8 model (single_cls) trained on the body of the animal of interest.
 4. Store the tracking results in a database. (models.py)
 5. (Optional) Add additional features to the tracking results and correlate them. (video_processor.py and feature_mapper.py)
@@ -128,12 +128,12 @@ def kisz_demo() -> None:
         dataset,
         version,
         Path("/workspaces/gorillatracker/video_output"),
-        n_videos=24,
-        max_worker_per_gpu=12,
+        n_videos=1,
+        max_worker_per_gpu=1,
         gpu_ids=[0],
     )
     dataset.post_setup()
 
 
 if __name__ == "__main__":
-    gpu2_demo()
+    kisz_demo()

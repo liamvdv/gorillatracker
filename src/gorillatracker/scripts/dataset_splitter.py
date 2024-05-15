@@ -237,8 +237,7 @@ def splitter(
         train_bucket = ungroup(individums[:train_count])
         val_bucket = ungroup(individums[train_count : train_count + val_count])
         test_bucket = ungroup(individums[train_count + val_count :])
-        # NOTE(liamvdv): We'll now move back a fraction of images from train_bucket to val and test
-        #                to ensure we also look at reidentification of known faces.
+
         n = len(train_bucket)
 
         for individual in group(train_bucket):

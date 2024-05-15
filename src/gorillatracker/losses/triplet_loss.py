@@ -331,7 +331,7 @@ class TripletLossOfflineNative(nn.Module):
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
-        NO_VALUE = torch.tensor([-1], dtype=torch.float32)
+        NO_VALUE = torch.tensor([-1])
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
 
 

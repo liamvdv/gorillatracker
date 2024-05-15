@@ -16,7 +16,19 @@ class TrainingArgs:
     num_devices: int = field(default=1)
     distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default=None)
     force_deterministic: bool = field(default=False)
-    precision: Literal["32-true", "16-mixed", "bf16-mixed"] = field(default="bf16-mixed")
+    precision: Literal[
+        "32-true",
+        "16-mixed",
+        "bf16-mixed",
+        "16-true",
+        "transformer-engine-float16",
+        "transformer-engine",
+        "int8-training",
+        "int8",
+        "fp4",
+        "nf4",
+        "",
+    ] = field(default="bf16-mixed")
     compile: bool = field(default=False)
     workers: int = field(default=4)
 
@@ -93,6 +105,7 @@ class TrainingArgs:
     save_interval: float = field(default=10)
     embedding_save_interval: int = field(default=1)
     knn_with_train: bool = field(default=True)
+    plugins: List[str] = list_field(default=None)
 
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")

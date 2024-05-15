@@ -58,15 +58,15 @@ def crop_images_save_metadata_cxl(
 
 
 def generate_split_save_metadata_cxl(
-    dataset: str, meta_data: Dict[str, Any], seed: int = 42, reid_factor_test: int = 0, reid_factor_val: int = 0
+    dataset: str,
+    meta_data: Dict[str, Any],
+    seed: int = 42,
 ) -> str:
     """Generates a split for the cropped cxl dataset and saves the metadata to metadata.json.
 
     Args:
         meta_data: Metadata of the cropped cxl faces to save to metadata.json.
         seed: Seed for the random number generator. Defaults to 42.
-        reid_factor_test: The reid factor for the test set. Defaults to 10.
-        reid_factor_val: The reid factor for the val set. Defaults to 10.
 
     Returns:
         The path to the generated split.
