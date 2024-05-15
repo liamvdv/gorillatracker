@@ -3,6 +3,7 @@ from typing import List, Literal, Optional, Tuple
 
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
+from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -31,7 +32,7 @@ def cast_label_to_int(labels: List[str]) -> List[int]:
     return LabelEncoder.encode_list(labels)
 
 
-class CXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):
+class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __init__(
         self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
     ):
@@ -61,7 +62,7 @@ class CXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[Id, Image.Image, Label]:
+    def __getitem__(self, idx: int) -> Tuple[Id, Tensor, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
