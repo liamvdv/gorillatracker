@@ -48,12 +48,12 @@ import random
 import re
 import shutil
 import sys
-import numpy as np
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Tuple, TypeVar, Union
 
+import numpy as np
 import torch
 
 logger = logging.getLogger(__name__)
@@ -176,6 +176,7 @@ def compute_split(samples: int, train: int, val: int, test: int, kfold: bool) ->
 # version on main.
 TEST = False
 
+
 def copy(src: Path, dst: Path) -> None:
     if TEST:
         print(f"{src} -> {dst}")
@@ -290,13 +291,13 @@ def kfold_splitter(
         trainval_count, _, test_count = compute_split(len(individums), trainval, 0, test, True)
         fold_bucket_size = trainval_count // k
 
-        sorted_individums = sorted(individums, key=lambda x: len(x.value), reverse=True)
-        
+        sorted_individums = sorted(individums, key=lambda x: len(x.value), reverse=True)  # type: ignore
+
         sizes = [0 for _ in range(k)]
         num_images_fold = [0 for _ in range(k)]
-        
+
         test_size = 0
-        
+
         print(
             f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={trainval_count}, Test={test_count}"
         )
@@ -304,15 +305,15 @@ def kfold_splitter(
             for i in range(k):
                 smallest_fold_indices = np.where(sizes == np.min(sizes))[0]
                 individual = sorted_individums[fold_bucket_iterator]
-                
+
                 min_ind = smallest_fold_indices[0]
                 for i in smallest_fold_indices:
                     if num_images_fold[i] < num_images_fold[min_ind]:
                         min_ind = i
-                
+
                 fold_buckets[min_ind].extend(ungroup([individual]))
                 sizes[min_ind] += 1
-                num_images_fold[min_ind] += len(individual.value)
+                num_images_fold[min_ind] += len(individual.value)  # type: ignore
                 fold_bucket_iterator += 1
             test_bucket.extend(ungroup([sorted_individums[fold_bucket_iterator]]))
             test_size += 1
@@ -324,7 +325,7 @@ def kfold_splitter(
     for i, fold_bucket in enumerate(fold_buckets):
         print(f"Fold {i}: {len(fold_bucket)} images, {sizes[i]} individuals")
     print(f"Test: {len(test_bucket)} images, {test_size} individuals")
-    
+
     return fold_buckets, test_bucket
 
 
