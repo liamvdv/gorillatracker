@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Literal, Optional, Type
+from typing import Any, Callable, List, Literal, Optional, Type
 
 import lightning as L
 import torchvision.transforms as transforms
@@ -60,9 +60,9 @@ class NletDataModule(L.LightningDataModule):
         self.setup("fit")
         return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
 
-    def val_dataloader(self) -> gtypes.BatchNletDataLoader:
+    def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
         self.setup("validate")
-        return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
+        return [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)]
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("test")
@@ -128,10 +128,10 @@ class NletBristolValDataModule(NletDataModule):
         self.bristol_class = bristol_class
         self.data_dir_bristol = data_dir_bristol
 
-    def val_dataloader(self) -> gtypes.BatchNletDataLoader:
+    def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
         self.setup("validate")
 
-        val_bristol = self.bristol_class(self.data_dir_bristol, partition="val", transform=self.transforms)
+        val_bristol = self.bristol_class(self.data_dir_bristol, "val", self.transforms)  # type: ignore
 
         return [
             self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False),
@@ -148,7 +148,7 @@ class QuadletBristolValDataModule(NletBristolValDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
         return QuadletDataLoader
 
-    
+
 class SimpleBristolValDataModule(NletBristolValDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader

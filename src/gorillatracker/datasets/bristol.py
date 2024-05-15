@@ -1,15 +1,16 @@
 # NOTE(liamvdv): missing ground_truth for bristol dataset
 
 from pathlib import Path
-from typing import List, Literal, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 from PIL import Image
 from torch.utils.data import Dataset
 
-Label = Union[int, str]
+import gorillatracker.type_helper as gtypes
+from gorillatracker.type_helper import Id, Label
 
 
-def get_samples(data_dir: Path) -> List[Tuple[Path, Label]]:
+def get_samples(data_dir: Path) -> List[Tuple[Path, str]]:
     """
     Assumed directory structure:
         data_dir/
@@ -28,23 +29,20 @@ def get_samples(data_dir: Path) -> List[Tuple[Path, Label]]:
     return samples
 
 
-class BristolDataset(Dataset):
-    def __init__(self, data_dir, partition: Literal["train", "val", "test"], transform=None):
+class BristolDataset(Dataset[Tuple[Id, Image.Image, Label]]):
+    def __init__(
+        self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
+    ):
         dirpath = data_dir / Path(partition)
         self.samples = get_samples(dirpath)
         self.transform = transform
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[Id, Image.Image, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
-        return img, label
-
-
-if __name__ == "__main__":
-    for img, label in BristolDataset():
-        print(img, label, img.filename)
+        return str(img_path), img, label

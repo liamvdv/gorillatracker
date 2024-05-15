@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 import lightning as L
 import torch
@@ -64,7 +65,7 @@ class SSLDataModule(L.LightningDataModule):
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
 
     # TODO(memben): we want to use SSL Data for validation
-    def val_dataloader(self) -> gtypes.BatchNletDataLoader:
+    def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
         return self.val_data_module.val_dataloader()
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
