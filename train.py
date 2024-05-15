@@ -234,14 +234,14 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             logger=wandb_logger,
             deterministic=args.force_deterministic,
             callbacks=callbacks,
-            precision=args.precision, # type: ignore
+            precision=args.precision,  # type: ignore
             gradient_clip_val=args.grad_clip,
             log_every_n_steps=24,
             # accumulate_grad_batches=args.gradient_accumulation_steps,
             fast_dev_run=args.fast_dev_run,
             profiler=args.profiler,
             inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-            plugins=args.plugins, # type: ignore
+            plugins=args.plugins,  # type: ignore
             # reload_dataloaders_every_n_epochs=1,
         )
 
