@@ -1,6 +1,7 @@
+from typing import Tuple
+
 import torch
 
-from typing import Tuple
 from gorillatracker.model import BaseModule
 
 
