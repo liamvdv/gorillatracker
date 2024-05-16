@@ -216,7 +216,7 @@ def evaluate_embeddings(
 
     # Transform any type to numeric type labels
     val_labels = torch.tensor(data["label"])
-    train_labels = torch.tensor(train_labels)
+    train_labels = train_labels.clone().detach() if train_labels is not None else torch.tensor([])
     val_labels = val_labels.type(torch.int64)
     train_labels = train_labels.type(torch.int64)
 
@@ -292,7 +292,7 @@ def knn_with_train(
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
     # convert embeddings and labels to tensors
-    val_embeddings = torch.tensor(val_embeddings)
+    val_embeddings = val_embeddings.clone().detach()
     val_labels = torch.tensor(val_labels.tolist())
     train_embeddings = train_embeddings.clone().detach()
     train_labels = torch.tensor(train_labels.tolist())
@@ -364,7 +364,7 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
         k = num_classes
 
     # convert embeddings and labels to tensors
-    val_embeddings = torch.tensor(val_embeddings)
+    val_embeddings = val_embeddings.clone().detach()
     val_labels = torch.tensor(val_labels.tolist())
 
     distance_matrix = pairwise_euclidean_distance(val_embeddings)

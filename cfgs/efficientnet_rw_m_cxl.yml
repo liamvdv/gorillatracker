@@ -34,18 +34,18 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
-path_to_pretrained_weights: ""    # Path to the pretrained weights for the l2sp loss
-margin: 0.5                     # Margin for the contrastive loss (triplet loss)
-loss_mode: "softmax/arcface"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+path_to_pretrained_weights: "efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
+margin: 0.5                   # Margin for the contrastive loss (triplet loss)
+loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+initial_lr: 1e-4                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 16                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
