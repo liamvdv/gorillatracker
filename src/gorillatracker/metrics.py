@@ -216,7 +216,7 @@ def evaluate_embeddings(
 
     # Transform any type to numeric type labels
     val_labels = torch.tensor(data["label"])
-    train_labels = train_labels.clone().detach() if train_labels is not None else torch.tensor([])
+    train_labels = train_labels.clone().detach() if train_labels is not None else torch.tensor([]) # type: ignore
     val_labels = val_labels.type(torch.int64)
     train_labels = train_labels.type(torch.int64)
 
