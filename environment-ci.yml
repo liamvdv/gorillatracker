@@ -1,10 +1,7 @@
+# NOTE(memben): Cuda removed for smaller builds
 name: research
 channels:
   - conda-forge
-  - nvidia # nvidia channel for cuda packages
-  # We want to have a reproducible setup, so we don't want default channels,
-  # which may be different for different users. All required channels should
-  # be listed explicitly here.
   - nodefaults
   - pyviz/label/dev
 dependencies:
@@ -13,8 +10,6 @@ dependencies:
   # ML libraries
   - pytorch::pytorch>=2.0 # or don't specify the version and use latest stable
   # CUDA only on linux and windows
-  - pytorch::pytorch-cuda=12.1 # [linux]
-  - pytorch::pytorch-cuda=12.1 # [win]
   - wandb
   - lightning
   - transformers
@@ -34,7 +29,6 @@ dependencies:
   - seqeval
   - scikit-learn
   - matplotlib
-  - seaborn
 
   # Misc
   - pydantic
@@ -79,6 +73,7 @@ dependencies:
       - facenet_pytorch
       - typer
       - opencv-contrib-python
+
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:

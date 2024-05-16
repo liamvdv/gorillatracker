@@ -6,7 +6,15 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose, ToTensor
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_modules import NletDataModule, QuadletDataModule, SimpleDataModule, TripletDataModule
+from gorillatracker.data_modules import (
+    NletDataModule,
+    QuadletDataModule,
+    QuadletKFoldDataModule,
+    SimpleDataModule,
+    SimpleKFoldDataModule,
+    TripletDataModule,
+    TripletKFoldDataModule,
+)
 
 
 def get_dataset_class(pypath: str) -> Type[Dataset[Tuple[torch.Tensor, Union[str, int]]]]:
@@ -37,6 +45,11 @@ def get_data_module(
     base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
     base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
     base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
+
+    if "kfold" in data_dir:
+        base = QuadletKFoldDataModule if loss_mode.startswith("online") else None  # type: ignore
+        base = TripletKFoldDataModule if loss_mode.startswith("offline") else base  # type: ignore
+        base = SimpleKFoldDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(

@@ -167,6 +167,8 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
 
+        self.quant = torch.quantization.QuantStub()  # type: ignore
+
         ##### Create Table embeddings_table
         self.embeddings_table_columns = [
             "label",
@@ -224,6 +226,7 @@ class BaseModule(L.LightningModule):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
@@ -448,6 +451,43 @@ class EfficientNetV2Wrapper(BaseModule):
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv
         return self.model.features[-1][0]  # TODO(liamvdv)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+            ]
+        )
+
+
+class EfficientNetRW_M(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        is_from_scratch = kwargs.get("from_scratch", False)
+        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
+
+        self.model.classifier = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.classifier.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.conv_head
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1122,6 +1162,7 @@ custom_model_cls = {
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
+    "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
 }
 
