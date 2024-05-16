@@ -66,6 +66,7 @@ max_epochs: 5                   # Training goal (large number)
 val_check_interval: 1.0         # Validation check interval as a fraction of total steps or as an fixed number of steps
 val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
+kfold: False                     # Perform kfold cross validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval

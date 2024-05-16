@@ -3,14 +3,13 @@ from typing import List, Literal, Optional, Tuple
 
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
-from torch import Tensor
+from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Id, Label
-from gorillatracker.utils.labelencoder import LabelEncoder
 
 
 def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
@@ -29,25 +28,42 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
-    return LabelEncoder.encode_list(labels)
+    le = LabelEncoder()
+    le.fit(labels)
+    return le.transform(labels)
 
 
-class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
+class KFoldCXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):
     def __init__(
-        self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
+        self,
+        data_dir: str,
+        partition: Literal["train", "val", "test"],
+        val_i: int,
+        k: int,
+        transform: Optional[gtypes.Transform] = None,
     ):
         """
         Assumes directory structure:
             data_dir/
-                train/
+                fold-0/
                     ...
-                val/
+                fold-(k-1)/
                     ...
                 test/
                     ...
         """
-        dirpath = data_dir / Path(partition)
-        samples = get_samples(dirpath)
+        samples = []
+        if partition == "val":
+            dirpath = data_dir / Path(f"fold-{val_i}")
+            samples.extend(get_samples(dirpath))
+        elif partition == "train":
+            for i in range(k):
+                if i != val_i:
+                    dirpath = data_dir / Path(f"fold-{i}")
+                    samples.extend(get_samples(dirpath))
+        else:
+            dirpath = data_dir / Path(partition)
+            samples.extend(get_samples(dirpath))
 
         # new
         labels_string = [label for _, label in samples]
@@ -62,7 +78,7 @@ class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[Id, Tensor, Label]:
+    def __getitem__(self, idx: int) -> Tuple[Id, Image.Image, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
@@ -86,11 +102,14 @@ class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
 
 
 if __name__ == "__main__":
-    cxl = CXLDataset(
-        "data/DO-NOT-USE-PING-BEN-IF-IN-DOUBT-joined_splits/cxl_face-openset=True_0",
+    cxl = KFoldCXLDataset(
+        "./data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5",
         "train",
-        CXLDataset.get_transforms(),
+        0,
+        5,
+        KFoldCXLDataset.get_transforms(),
     )
+    print(cxl.get_num_classes())
     image = cxl[0][0]
     transformations = transforms.Compose(
         [
