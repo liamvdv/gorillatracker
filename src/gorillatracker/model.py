@@ -321,7 +321,7 @@ class BaseModule(L.LightningModule):
 
             # calculate loss for all embeddings
             loss_module_val.set_weights(class_weights)  # type: ignore
-            loss_module_val.le = lse # type: ignore
+            loss_module_val.le = lse  # type: ignore
 
             losses = []
             for _, row in self.embeddings_table.iterrows():
