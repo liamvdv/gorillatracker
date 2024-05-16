@@ -75,6 +75,9 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             model_cls.get_training_transforms(),
         )
 
+    kfold_k = 1
+    if args.kfold:
+        kfold_k = int(str(args.data_dir).split("-")[-1])
     ################# Construct model ##############
 
     # Resume from checkpoint if specified
@@ -138,7 +141,22 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             )
         model = torch.compile(model)
 
-    #################### Construct trainer #################
+    #################### Construct dataloaders & trainer #################
+    model_transforms = model.get_tensor_transforms()
+    if args.data_resize_transform is not None:
+        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    dm = get_data_module(
+        args.dataset_class,
+        str(args.data_dir),
+        args.batch_size,
+        args.loss_mode,
+        # args.video_data,
+        model_transforms,
+        model.get_training_transforms(),
+    )
+
+    if args.kfold:
+        dm.k = kfold_k  # type: ignore
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -147,6 +165,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
+        kfold_k=0 if args.kfold else None,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -183,28 +202,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         args.plugins = BitsandbytesPrecision(mode=args.precision)  # type: ignore
         args.precision = "16-true"
 
-    trainer = Trainer(
-        num_sanity_val_steps=0,
-        max_epochs=args.max_epochs,
-        val_check_interval=args.val_check_interval,
-        check_val_every_n_epoch=args.check_val_every_n_epoch,
-        devices=args.num_devices,
-        accelerator=args.accelerator,
-        strategy=str(args.distributed_strategy),
-        logger=wandb_logger,
-        deterministic=args.force_deterministic,
-        callbacks=callbacks,
-        precision=args.precision,  # type: ignore
-        gradient_clip_val=args.grad_clip,
-        log_every_n_steps=24,
-        # accumulate_grad_batches=args.gradient_accumulation_steps,
-        fast_dev_run=args.fast_dev_run,
-        profiler=args.profiler,
-        inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-        plugins=args.plugins,  # type: ignore
-        # reload_dataloaders_every_n_epochs=1,
-    )
-
     if current_process_rank == 0:
         logger.info(
             f"Total optimizer epochs: {args.max_epochs} | "
@@ -222,17 +219,48 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         logger.info("Model saved")
         exit(0)
 
-    ########### Start val & train loop ###########
-    if args.val_before_training and not args.resume:
-        # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
-        logger.info(f"Rank {current_process_rank} | Validation before training...")
-        trainer.validate(model, dm)
-
-        if args.only_val:
-            exit(0)
-
     logger.info(f"Rank {current_process_rank} | Starting training...")
-    trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
+
+    for i in range(kfold_k):
+        # Initialize trainer
+        trainer = Trainer(
+            num_sanity_val_steps=0,
+            max_epochs=args.max_epochs,
+            val_check_interval=args.val_check_interval,
+            check_val_every_n_epoch=args.check_val_every_n_epoch,
+            devices=args.num_devices,
+            accelerator=args.accelerator,
+            strategy=str(args.distributed_strategy),
+            logger=wandb_logger,
+            deterministic=args.force_deterministic,
+            callbacks=callbacks,
+            precision=args.precision,  # type: ignore
+            gradient_clip_val=args.grad_clip,
+            log_every_n_steps=24,
+            # accumulate_grad_batches=args.gradient_accumulation_steps,
+            fast_dev_run=args.fast_dev_run,
+            profiler=args.profiler,
+            inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+            plugins=args.plugins,  # type: ignore
+            # reload_dataloaders_every_n_epochs=1,
+        )
+
+        ########### Start val & train loop ###########
+        if args.val_before_training and not args.resume:
+            # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
+            logger.info(f"Rank {current_process_rank} | Validation before training...")
+            val_result = trainer.validate(model, dm)
+            print(val_result)
+            if args.only_val:
+                continue
+
+        logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
+        logger.info(f"Rank {current_process_rank} | max_epochs: {model.max_epochs}")
+        if args.kfold:
+            dm.val_fold = i  # type: ignore
+            embeddings_logger_callback.kfold_k = i
+        trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
+        model = model_cls(**model_args)  # type: ignore
 
     if trainer.interrupted:
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")

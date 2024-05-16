@@ -26,14 +26,6 @@ from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 Runner = Any
 
 
-def log_as_wandb_table(embeddings_table: pd.DataFrame, run: Runner) -> None:
-    tmp = embeddings_table.apply(
-        lambda row: pd.concat([pd.Series([row["label"]]), pd.Series(row["embedding"])]), axis=1
-    )
-    tmp.columns = ["label"] + [f"embedding_{i}" for i in range(len(embeddings_table["embedding"].iloc[0]))]
-    run.log({"embeddings": wandb.Table(dataframe=tmp)})  # type: ignore
-
-
 class LogEmbeddingsToWandbCallback(L.Callback):
     """
     A pytorch lightning callback that saves embeddings to wandb and logs them.
@@ -44,13 +36,19 @@ class LogEmbeddingsToWandbCallback(L.Callback):
     """
 
     def __init__(
-        self, every_n_val_epochs: int, knn_with_train: bool, wandb_run: Runner, dm: L.LightningDataModule
+        self,
+        every_n_val_epochs: int,
+        knn_with_train: bool,
+        wandb_run: Runner,
+        dm: L.LightningDataModule,
+        kfold_k: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
+        self.kfold_k = kfold_k if kfold_k is not None else None
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
 
@@ -112,6 +110,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             metrics=metrics,
             train_embeddings=train_embeddings,  # type: ignore
             train_labels=train_labels,
+            kfold_k=self.kfold_k,
         )
         # clear the table where the embeddings are stored
         # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # rese t embeddings table
@@ -209,6 +208,7 @@ def evaluate_embeddings(
     metrics: Dict[str, Any],
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
+    kfold_k: Optional[int] = None,
 ) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
     assert (train_embeddings is not None and train_labels is not None) or (
         train_embeddings is None and train_labels is None
@@ -234,12 +234,13 @@ def evaluate_embeddings(
         for metric_name, metric in metrics.items()
     }
 
+    kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{embedding_name}/{metric_name}/{key}": value})
+                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/{key}": value})
         else:
-            wandb.log({f"{embedding_name}/{metric_name}": result})
+            wandb.log({f"{embedding_name}{kfold_str}{metric_name}": result})
 
     return results
 
