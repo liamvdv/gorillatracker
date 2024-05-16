@@ -277,7 +277,7 @@ class BaseModule(L.LightningModule):
         self.embeddings_table = pd.concat([df, self.embeddings_table], ignore_index=True)
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
-    def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
+    def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
         n_anchors = len(images[0])
         vec = torch.cat(images, dim=0)
@@ -289,9 +289,9 @@ class BaseModule(L.LightningModule):
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
         if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-            self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
-            self.log("val/positive_distance", pos_dist, on_step=True)
-            self.log("val/negative_distance", neg_dist, on_step=True)
+            self.log(f"val/dataloader{dataloader_idx}/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
+            self.log(f"val/dataloader{dataloader_idx}/positive_distance", pos_dist, on_step=True)
+            self.log(f"val/dataloader{dataloader_idx}/negative_distance", neg_dist, on_step=True)
             return loss
         else:
             return torch.tensor(0.0)
