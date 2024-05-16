@@ -1,4 +1,4 @@
-from typing import Type, Union
+from typing import Any, Type, Union
 
 import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
@@ -19,7 +19,7 @@ class ModelConstructor:
         self.dm = dm
         self.model_args = self.model_args_from_training_args()
 
-    def model_args_from_training_args(self) -> dict:
+    def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
         return dict(
             model_name_or_path=args.model_name_or_path,
@@ -69,14 +69,14 @@ class ModelConstructor:
             )
 
             if self.args.resume:  # load weights, optimizer states, scheduler state, ...\
-                model = self.model_cls.load_from_checkpoint(args.saved_checkpoint_path, save_hyperparameters=False)
+                model = self.model_cls.load_from_checkpoint(self.args.saved_checkpoint_path, save_hyperparameters=False)
                 # we will resume via trainer.fit(ckpt_path=...)
             else:  # load only weights
-                model = self.model_cls(**self.model_args)  # type: ignore
+                model = self.model_cls(**self.model_args)
                 # torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
                 # model.load_state_dict(torch_load["state_dict"], strict=False)
         else:
-            model = self.model_cls(**self.model_args)  # type: ignore
+            model = self.model_cls(**self.model_args)
 
         if self.args.compile:
             if not hasattr(torch, "compile"):
@@ -85,4 +85,4 @@ class ModelConstructor:
                     "Please install torch >= 2.0 or disable compile."
                 )
             model = torch.compile(model)
-        return model  # type: ignore
+        return model

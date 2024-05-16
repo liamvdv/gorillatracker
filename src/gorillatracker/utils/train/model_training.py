@@ -1,10 +1,11 @@
 from typing import Tuple, Union
 
+from fsspec import Callback
 from lightning import Trainer
 from lightning.pytorch.loggers.wandb import WandbLogger
-from print_on_steroids import graceful_exceptions, logger
+from print_on_steroids import logger
 
-from dlib import get_rank
+from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
@@ -16,7 +17,7 @@ def train_and_validate_model(
     args: TrainingArgs,
     dm: Union[SSLDataModule, NletDataModule],
     model: BaseModule,
-    callbacks: list,
+    callbacks: list[Callback],
     wandb_logger: WandbLogger,
 ) -> Tuple[BaseModule, Trainer]:
     trainer = Trainer(
@@ -63,7 +64,7 @@ def train_and_validate_using_kfold(
     args: TrainingArgs,
     dm: Union[SSLDataModule, NletDataModule],
     model: BaseModule,
-    callbacks: list,
+    callbacks: list[Callback],
     wandb_logger: WandbLogger,
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
 ) -> Tuple[BaseModule, Trainer]:

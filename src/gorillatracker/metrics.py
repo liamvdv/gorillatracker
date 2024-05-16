@@ -21,7 +21,6 @@ from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
-from train_yolo import train
 
 # TODO: What is the wandb run type?
 Runner = Any

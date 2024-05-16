@@ -4,7 +4,7 @@ from typing import Union
 
 import torch
 import wandb
-from lightning import Trainer, seed_everything
+from lightning import seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import graceful_exceptions, logger
@@ -18,8 +18,8 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.train_utils import get_data_module
-from gorillatracker.utils.wandb_logger import WandbLoggingModule
 from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
+from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
@@ -159,18 +159,17 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     if args.use_quantization_aware_training:
         logger.info("Preperation for quantization aware training...")
         from torch._export import capture_pre_autograd_graph
-        from gorillatracker.quantization.utils import get_model_input
-        from torch.ao.quantization.quantize_pt2e import (
-            prepare_qat_pt2e,
-        )
+        from torch.ao.quantization.quantize_pt2e import prepare_qat_pt2e
         from torch.ao.quantization.quantizer.xnnpack_quantizer import (
             XNNPACKQuantizer,
             get_symmetric_quantization_config,
         )
 
+        from gorillatracker.quantization.utils import get_model_input
+
         example_inputs, _ = get_model_input(dm.dataset_class, str(args.data_dir), amount_of_tensors=100)  # type: ignore
-        model.model = capture_pre_autograd_graph(model.model, example_inputs)  # type: ignore
-        quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())
+        model.model = capture_pre_autograd_graph(model.model, example_inputs)
+        quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
         model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
 
     ################# Start training #################
