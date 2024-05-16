@@ -80,8 +80,15 @@ def load_model_from_wandb(
     ):  # necessary because arcface loss also saves prototypes
         model.loss_module_train.prototypes = torch.nn.Parameter(model_state_dict["loss_module_train.prototypes"])
         model.loss_module_val.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.prototypes"])
-    # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
-    # easiest fix is to just use the old embedding structure in the model class
+        # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
+        # easiest fix is to just use the old embedding structure in the model class
+    elif (
+        "loss_module_train.loss.prototypes" in model_state_dict or "loss_module_val.loss.prototypes" in model_state_dict
+    ):
+        model.loss_module_train.loss.prototypes = torch.nn.Parameter(
+            model_state_dict["loss_module_train.loss.prototypes"]
+        )
+        model.loss_module_val.loss.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.loss.prototypes"])
     model.load_state_dict(model_state_dict)
 
     model.to(device)

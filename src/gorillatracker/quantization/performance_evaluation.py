@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 
-from gorillatracker.metrics import knn_naive
+from gorillatracker.metrics import knn
 
 
 def size_of_model_in_mb(model: nn.Module) -> float:
@@ -19,7 +19,7 @@ def get_knn_accuracy(
     images: torch.Tensor,
     labels: torch.Tensor,
     device: torch.device = torch.device("cpu"),
-    knn: int = 5,
+    knn_number: int = 5,
 ) -> dict:
 
     model.eval()
@@ -27,5 +27,5 @@ def get_knn_accuracy(
     images = images.to(device)
     generated_image_embeddings = quantized_model(images)
     validation_labels = labels
-    knn_results = knn_naive(generated_image_embeddings, validation_labels, knn)
+    knn_results = knn(generated_image_embeddings, validation_labels, knn_number)
     return knn_results

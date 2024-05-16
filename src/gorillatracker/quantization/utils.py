@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torchvision import transforms
 
 from gorillatracker.transform_utils import SquarePad
@@ -41,9 +42,14 @@ def get_model_input(
     return torch.stack(images), torch.tensor(labels)
 
 
-def log_model_to_file(model, file_name) -> None:
-    with open("model.txt", "w") as f:
-        f.write(str(model))
+def log_model_to_file(model: nn.Module, file_name: str = "model.txt") -> None:
+    with open(file_name, "w") as f:
+        for name, layer in model.named_modules():
+            if len(list(layer.parameters())) > 0:  # Ensure the layer has parameters
+                precisions = [param.dtype for param in layer.parameters()]
+                f.write(f"Layer: {name}\n{layer}\nPrecisions: {precisions}\n\n")
+            else:
+                f.write(f"Layer: {name}\n{layer}\nPrecisions: None (No parameters)\n\n")
 
 
 def print_model_parameters(model) -> None:
