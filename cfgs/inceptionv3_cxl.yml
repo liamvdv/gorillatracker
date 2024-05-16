@@ -53,6 +53,7 @@ gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
 check_val_every_n_epoch: 10     # Perform validation every n epochs
 only_val: False                 # Perform only validation
+kfold: False                     # Perform kfold cross validation
 
 save_interval: 10                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 10      # Embedding save interval

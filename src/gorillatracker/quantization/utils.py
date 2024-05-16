@@ -1,12 +1,18 @@
+from typing import Literal, Type
+
 import torch
 import torch.nn as nn
 from torchvision import transforms
 
+from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.transform_utils import SquarePad
 
 
 def get_model_input(
-    dataset_cls, dataset_path: str, partion: str = "train", amount_of_tensors: int = 100
+    dataset_cls: Type[CXLDataset],
+    dataset_path: str,
+    partion: Literal["train", "val", "test"] = "train",
+    amount_of_tensors: int = 100,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Get a tensor of images and a tensor of labels from a dataset.
     Args:
@@ -52,6 +58,6 @@ def log_model_to_file(model: nn.Module, file_name: str = "model.txt") -> None:
                 f.write(f"Layer: {name}\n{layer}\nPrecisions: None (No parameters)\n\n")
 
 
-def print_model_parameters(model) -> None:
+def print_model_parameters(model: torch.nn.Module) -> None:
     for name, param in model.named_parameters():
         print(f"{name}: {param.nelement()} parameters")

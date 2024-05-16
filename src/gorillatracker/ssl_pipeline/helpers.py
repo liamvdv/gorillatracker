@@ -126,13 +126,13 @@ class BoundingBox:
     @classmethod
     def from_tracking_frame_feature(cls, frame_feature: TrackingFrameFeature) -> BoundingBox:
         return cls(
-            frame_feature.bbox_x_center,
-            frame_feature.bbox_y_center,
-            frame_feature.bbox_width,
-            frame_feature.bbox_height,
+            frame_feature.bbox_x_center_n,
+            frame_feature.bbox_y_center_n,
+            frame_feature.bbox_width_n,
+            frame_feature.bbox_height_n,
             frame_feature.confidence,
-            frame_feature.video.width,
-            frame_feature.video.height,
+            int(frame_feature.bbox_width / frame_feature.bbox_width_n),
+            int(frame_feature.bbox_height / frame_feature.bbox_height_n),
         )
 
 

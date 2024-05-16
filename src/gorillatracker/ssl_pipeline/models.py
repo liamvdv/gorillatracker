@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional, Type, TypeVar
 
 import sqlalchemy.types as types
-from sqlalchemy import CheckConstraint, Dialect, ForeignKey, String, UniqueConstraint, event
+from sqlalchemy import CheckConstraint, Dialect, ForeignKey, Index, String, UniqueConstraint, event
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.orm.mapper import Mapper
@@ -245,10 +245,12 @@ class TrackingFrameFeature(Base):
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))  # NOTE(memben): Denormalized
     tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True)
     frame_nr: Mapped[int]
-    bbox_x_center: Mapped[float]
-    bbox_y_center: Mapped[float]
-    bbox_width: Mapped[float]
-    bbox_height: Mapped[float]
+    bbox_x_center_n: Mapped[float]
+    bbox_y_center_n: Mapped[float]
+    bbox_width_n: Mapped[float]
+    bbox_height_n: Mapped[float]
+    bbox_width: Mapped[int]
+    bbox_height: Mapped[int]
     confidence: Mapped[float]
     feature_type: Mapped[str] = mapped_column(String(255))
     cached: Mapped[bool] = mapped_column(default=False)
@@ -256,9 +258,9 @@ class TrackingFrameFeature(Base):
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
 
-    __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "feature_type"),)
+    Index("idx_frame_feature", "tracking_id", "frame_nr", "feature_type", unique=True)
 
-    @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
+    @validates("bbox_x_center_n", "bbox_y_center_n", "bbox_width_n", "bbox_height_n", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
         if not 0 <= value <= 1:
             raise ValueError(f"{key} must be between 0 and 1, is {value}")
@@ -283,8 +285,8 @@ class TrackingFrameFeature(Base):
 
     def __repr__(self) -> str:
         return f"""tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, 
-        frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, 
-        bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cached={self.cached})"""
+        frame_nr={self.frame_nr}, bbox_x_center_n={self.bbox_x_center_n}, bbox_y_center_n={self.bbox_y_center_n}, bbox_width_n={self.bbox_width_n}, bbox_height_n={self.bbox_height_n},
+        bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cached={self.cached})"""
 
 
 class VideoRelationship(Base):
@@ -407,10 +409,12 @@ if __name__ == "__main__":
             tracking=tracking,
             video=video,
             frame_nr=0,
-            bbox_x_center=0.5,
-            bbox_y_center=0.5,
-            bbox_width=0.5,
-            bbox_height=0.5,
+            bbox_x_center_n=0.5,
+            bbox_y_center_n=0.5,
+            bbox_width_n=0.5,
+            bbox_height_n=0.5,
+            bbox_width=960,
+            bbox_height=540,
             confidence=0.5,
             feature_type="test",
         )
