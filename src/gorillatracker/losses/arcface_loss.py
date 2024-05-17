@@ -1,10 +1,9 @@
 import math
-from typing import Any, List, Tuple
+from typing import Any, Tuple
 
 import torch
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # import variational prototype learning from insightface
 
@@ -22,6 +21,7 @@ class ArcFaceLoss(torch.nn.Module):
         s: float = 64.0,
         margin: float = 0.5,
         accelerator: str = "cpu",
+        use_mixup: bool = False,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -42,16 +42,11 @@ class ArcFaceLoss(torch.nn.Module):
         tmp_rng = torch.Generator(device=accelerator)
         torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
         self.ce = torch.nn.CrossEntropyLoss()
-        self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor, one_hot=False) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
 
         assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
-
-        # NOTE(rob2u): necessary for range 0:n-1
-        labels_transformed: List[int] = self.le.encode_list(labels.tolist())
-        labels = torch.tensor(labels_transformed, device=embeddings.device)
 
         # get cos(theta) for each embedding and prototype
         prototypes = self.prototypes.to(embeddings.device)
@@ -71,8 +66,11 @@ class ArcFaceLoss(torch.nn.Module):
 
         assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
 
-        mask = torch.zeros(cos_theta.size(), device=cos_theta.device)
-        mask.scatter_(1, labels.view(-1, 1).long(), 1)  # mask is one-hot encoded labels
+        if one_hot:
+            mask = (labels.view(-1, self.num_classes) > eps).long()
+        else:
+            mask = torch.zeros(cos_theta.size(), device=cos_theta.device)
+            mask.scatter_(1, labels.view(-1, 1).long(), 1)  # mask is one-hot encoded labels
 
         output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: sometimes there is an additional penalty term
         output *= self.s
@@ -135,7 +133,6 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         self.memory_bank = torch.zeros(delta_t * batch_size, embedding_size)
         self.memory_bank_labels = torch.zeros(delta_t * batch_size, dtype=torch.int32)
         self.using_memory_bank = False
-        self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
     def set_using_memory_bank(self, using_memory_bank: bool) -> bool:
         """Sets whether or not to use the memory bank"""
@@ -218,10 +215,6 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """Forward pass of the Variational Prototype Learning loss function"""
-
-        # NOTE(rob2u): necessary for range 0:n-1
-        labels_transformed: List[int] = self.le.encode_list(labels.tolist())
-        labels = torch.tensor(labels_transformed, device=embeddings.device)
 
         prototypes = self.calculate_prototype(embeddings, labels)
 

@@ -52,6 +52,7 @@ class TrainingArgs:
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
     use_quantization_aware_training: bool = field(default=False)
+    use_mixup: bool = field(default=False)
 
     # Optimizer Arguments
     weight_decay: float = field(default=0.1)

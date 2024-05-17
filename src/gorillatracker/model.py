@@ -31,6 +31,17 @@ from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
+def in_batch_mixup(data: torch.Tensor, targets: torch.Tensor, alpha: float):
+    indices = torch.randperm(data.size(0))
+    data2 = data[indices]
+    targets2 = targets[indices]
+
+    lam = torch.FloatTensor([np.random.beta(alpha, alpha)]).to(data.device) # f(x; a,b) = const * x^(a-1) * (1-x)^(b-1)
+    data = data * lam + data2 * (1 - lam)
+    targets = targets * lam + targets2 * (1 - lam)
+
+    return data, targets
+
 def warmup_lr(
     warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
     epoch: int,
@@ -130,6 +141,7 @@ class BaseModule(L.LightningModule):
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         margin: float = 0.5,
+        use_mixup: bool = False,
         s: float = 64.0,
         delta_t: int = 200,
         mem_bank_start_epoch: int = 2,
@@ -167,6 +179,10 @@ class BaseModule(L.LightningModule):
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
+        self.use_mixup = use_mixup
+        self.num_classes = num_classes
+        self.le_train = LinearSequenceEncoder()
+        self.le_val = LinearSequenceEncoder()
 
         self.quant = torch.quantization.QuantStub()  # type: ignore
 
@@ -249,12 +265,22 @@ class BaseModule(L.LightningModule):
         ids, images, labels_tuple = batch
 
         # assert isinstance(labels, list) and isinstance(labels[0], torch.tensor), f"Labels should be a list of tensor batches with ints, got {type(labels)}"
-        labels: torch.Tensor = torch.cat(list(labels_tuple), dim=0).to(self.device)  # type: ignore
-
         vec = torch.cat(images, dim=0)
-        embeddings = self.forward(vec)
+        labels_tuple = torch.cat(labels_tuple, dim=0).tolist() if torch.is_tensor(labels_tuple[0]) else labels_tuple  # type: ignore
+        labels_list = self.le_train.encode_list(labels_tuple)
+        labels = torch.Tensor(labels_list).to(self.device).to(torch.int64)  # type: ignore
+        
+        if self.use_mixup:
+            assert "softmax" in self.loss_mode, "Mixup is only supported with softmax-based loss (e.g. ArcFace)"
+            labels_one_hot = torch.nn.functional.one_hot(labels, num_classes=self.num_classes[0]).float()
+            vec, labels_one_hot = in_batch_mixup(vec, labels_one_hot, 0.2) 
+            embeddings = self.forward(vec)
+            loss, pos_dist, neg_dist = self.loss_module_train(embeddings, labels_one_hot, one_hot=True)  # type: ignore   
+        else:
+            embeddings = self.forward(vec)
+            loss, pos_dist, neg_dist = self.loss_module_train(embeddings, labels)  # type: ignore
+        
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -285,6 +311,8 @@ class BaseModule(L.LightningModule):
         flat_labels = (
             torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
         )
+        flat_labels = torch.tensor(self.le_val.encode_list(flat_labels.tolist())).to(self.device)  # type: ignore
+        
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
@@ -321,7 +349,6 @@ class BaseModule(L.LightningModule):
 
             # calculate loss for all embeddings
             loss_module_val.set_weights(class_weights)  # type: ignore
-            loss_module_val.le = lse  # type: ignore
 
             losses = []
             for _, row in self.embeddings_table.iterrows():
@@ -502,8 +529,8 @@ class EfficientNetRW_M(BaseModule):
             [
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                # transforms_v2.RandomRotation(60, fill=0),
+                # transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
