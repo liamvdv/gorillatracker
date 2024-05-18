@@ -1,6 +1,6 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 from urllib.parse import urlparse
 
 import cv2
@@ -80,8 +80,15 @@ def load_model_from_wandb(
     ):  # necessary because arcface loss also saves prototypes
         model.loss_module_train.prototypes = torch.nn.Parameter(model_state_dict["loss_module_train.prototypes"])
         model.loss_module_val.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.prototypes"])
-    # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
-    # easiest fix is to just use the old embedding structure in the model class
+        # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
+        # easiest fix is to just use the old embedding structure in the model class
+    elif (
+        "loss_module_train.loss.prototypes" in model_state_dict or "loss_module_val.loss.prototypes" in model_state_dict
+    ):
+        model.loss_module_train.loss.prototypes = torch.nn.Parameter(
+            model_state_dict["loss_module_train.loss.prototypes"]
+        )
+        model.loss_module_val.loss.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.loss.prototypes"])
     model.load_state_dict(model_state_dict)
 
     model.to(device)
@@ -205,7 +212,9 @@ def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
     return max(models, key=lambda a: a.created_at)
 
 
-def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
+def generate_embeddings_from_run(
+    run_url: str, outpath: str, dataset_cls: Optional[str], data_dir: Optional[str]
+) -> pd.DataFrame:
     """
     generate a pandas df that generates embeddings for all images in the dataset partitions train and val.
     stores to DataFrame
@@ -221,12 +230,14 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
     model = get_model_for_run_url(run_url)
     args = model.config
 
-    train_dataset = get_dataset(
-        partition="train", data_dir=args["data_dir"], model=model, dataset_class=args["dataset_class"]
-    )
-    val_dataset = get_dataset(
-        partition="val", data_dir=args["data_dir"], model=model, dataset_class=args["dataset_class"]
-    )
+    if data_dir is None:
+        data_dir = args["data_dir"]
+
+    if dataset_cls is None:
+        dataset_cls = args["dataset_class"]
+
+    train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"

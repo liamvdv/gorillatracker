@@ -12,7 +12,7 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-FaceNet-CXL-OpenSet" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "157-explore-task-specific-pretrained-models" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "258-implement-k-fold-cross-validation" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["online/soft"]            # WandB tags for experiment tracking
 model_name_or_path: "FaceNet"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -43,8 +43,7 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "online/soft"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
-
+loss_mode: "offline"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
@@ -57,9 +56,10 @@ end_lr: 1e-7                    # End learning rate (for the learning rate sched
 batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
-val_before_training: True       # Perform validation before training
+max_epochs: 3                  # Training goal (large number)
+val_before_training: False       # Perform validation before training
 only_val: False                 # Perform only validation
+kfold: True                    # Toggle k-fold cross validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
@@ -67,6 +67,6 @@ embedding_save_interval: 2      # Embedding save interval
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5"
+dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 data_resize_transform: 192
