@@ -3,6 +3,7 @@ This module contains pre-defined database queries.
 """
 
 import datetime as dt
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
 
@@ -205,9 +206,8 @@ def get_next_task(
     task_timeout: dt.timedelta = dt.timedelta(days=1),
     task_subtype: str = "",
 ) -> Iterator[Task]:
-    """Yields and handles task in a transactional manner. Useable in a multiprocessing context.
-    Each session is committed after a successful task completion, and rolled back if an exception is raised by this function.
-    Do **not** commit any changes that should be rolled back on exception.
+    """Yields the next task. Useable in a multiprocessing context.
+    Use transactional_task to properly handle the task in a transactional manner.
 
     Args:
         session (Session): The database session.
@@ -244,17 +244,24 @@ def get_next_task(
             task.retries += 1
         task.status = TaskStatus.PROCESSING
         session.commit()
+        yield task
 
-        try:
-            yield task
-        except Exception:
-            session.rollback()
-            task.status = TaskStatus.FAILED
-            session.commit()
-            raise
-        else:
-            task.status = TaskStatus.COMPLETED
-            session.commit()
+
+@contextmanager
+def transactional_task(session: Session, task: Task) -> Iterator[Task]:
+    """Each session is committed after a successful task completion,
+    and rolled back if an exception is raised by this function.
+    Do **not** commit any changes that should be rolled back on exception."""
+    try:
+        yield task
+    except Exception:
+        session.rollback()
+        task.status = TaskStatus.FAILED
+        session.commit()
+        raise
+    else:
+        task.status = TaskStatus.COMPLETED
+        session.commit()
 
 
 def great_circle_distance(
