@@ -16,7 +16,19 @@ class TrainingArgs:
     num_devices: int = field(default=1)
     distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default=None)
     force_deterministic: bool = field(default=False)
-    precision: Literal["32-true", "16-mixed", "bf16-mixed"] = field(default="bf16-mixed")
+    precision: Literal[
+        "32-true",
+        "16-mixed",
+        "bf16-mixed",
+        "16-true",
+        "transformer-engine-float16",
+        "transformer-engine",
+        "int8-training",
+        "int8",
+        "fp4",
+        "nf4",
+        "",
+    ] = field(default="bf16-mixed")
     compile: bool = field(default=False)
     workers: int = field(default=4)
 
@@ -39,6 +51,7 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
+    use_quantization_aware_training: bool = field(default=False)
 
     # Optimizer Arguments
     weight_decay: float = field(default=0.1)
@@ -78,24 +91,33 @@ class TrainingArgs:
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
+        "softmax/arcface/l2sp",
+        "softmax/vpl/l2sp",
     ] = field(default="offline")
+    kfold: bool = field(default=False)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)
     gradient_accumulation_steps: int = field(default=1)
     max_epochs: int = field(default=300)
     val_check_interval: float = field(default=1.0)
+    check_val_every_n_epoch: int = field(default=1)
     val_before_training: bool = field(default=False)
     only_val: bool = field(default=False)
     save_interval: float = field(default=10)
     embedding_save_interval: int = field(default=1)
     knn_with_train: bool = field(default=True)
+    plugins: List[str] = list_field(default=None)
 
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
     data_resize_transform: Union[int, None] = field(default=None)
-    video_data: bool = field(default=False)
+
+    # SSL Config
+    use_ssl: bool = field(default=False)
+
+    pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.
 
     def __post_init__(self) -> None:

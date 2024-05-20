@@ -1,10 +1,11 @@
 import os
+from typing import Dict, List, Optional
+
 import cv2
 from ultralytics import YOLO
-import gorillatracker.utils.visualizer_helpers as visualizer_helpers
-import gorillatracker.utils.cutout_helpers as cutout_helpers
 
-from typing import List, Dict, Optional
+import gorillatracker.utils.cutout_helpers as cutout_helpers
+import gorillatracker.utils.visualizer_helpers as visualizer_helpers
 
 
 def _group_images_by_label(images: List[str]) -> Dict[str, List[str]]:

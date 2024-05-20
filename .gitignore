@@ -9,6 +9,9 @@ artifacts/
 ignored/
 results/
 **/checkpoints/*.ckpt
+**/*.pth
+**/*.onnx
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -144,7 +147,7 @@ dmypy.json
 /ultralytics
 yolov8n.pt
 /.vscode
-.devcontainer
+.devcontainer/devcontainer.json
 /runs
 /checkpoints
 /gorillavision

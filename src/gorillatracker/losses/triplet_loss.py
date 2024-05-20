@@ -1,8 +1,8 @@
+import logging
 from typing import Any, Callable, Dict, List, Literal, Union
 
 import torch
 import torch.nn.functional as F
-from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
@@ -11,26 +11,10 @@ from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototype
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
-
-def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
-    """Convert labels to tensor
-
-    Args:
-        labels: labels in array-like, e.g., list or numpy array. shape: (batch_size,)
-
-    Returns:
-        Tensor of labels. shape: (batch_size,). That contains labels from 0 to num_classes - 1.
-    """
-    if isinstance(labels, torch.Tensor):
-        return labels
-
-    le = LabelEncoder()
-    labels = le.fit_transform(labels)
-
-    return torch.tensor(labels)
+logger = logging.getLogger(__name__)
 
 
-def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
+def get_triplet_mask(labels: torch.Tensor) -> torch.Tensor:
     """Compute a mask for valid triplets
 
     Args:
@@ -45,7 +29,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     # step 1 - get a mask for distinct indices
 
     # shape: (batch_size, batch_size)
-    labels = convert_labels_to_tensor(labels)
+
     batch_size = labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool)
     indices_not_equal = torch.logical_not(indices_equal)
@@ -81,7 +65,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     return mask
 
 
-def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
+def get_distance_mask(labels: torch.Tensor, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
     """Compute mask for the calculation of the hardest positive and negative distance
 
     Args:
@@ -95,7 +79,7 @@ def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] 
         A negative distance is valid if:
         `labels[i] != labels[j] and i != j`
     """
-    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = labels.detach().clone()
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=tensor_labels.device)
     indices_not_equal = torch.logical_not(indices_equal)
@@ -111,7 +95,7 @@ def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] 
 
 
 def get_semi_hard_mask(
-    labels: gtypes.MergedLabels,
+    labels: torch.Tensor,
     distance_matrix: torch.Tensor,
     margin: float = 1.0,
 ) -> torch.Tensor:
@@ -128,7 +112,7 @@ def get_semi_hard_mask(
     """
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
-    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = labels.detach().clone()
     tensor_labels = tensor_labels.to(device)
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=device)
@@ -209,7 +193,7 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -262,9 +246,8 @@ class TripletLossOnline(nn.Module):
         distance_matrix: torch.Tensor,
         anchor_positive_dists: torch.Tensor,
         anchor_negative_dists: torch.Tensor,
-        labels: gtypes.MergedLabels,
+        labels: torch.Tensor,
     ) -> torch.Tensor:
-        labels = convert_labels_to_tensor(labels)
 
         mask = get_triplet_mask(labels)
         if self.mode == "hard":  # take only the hardest negative as a negative per anchor
@@ -348,28 +331,44 @@ class TripletLossOfflineNative(nn.Module):
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
-        NO_VALUE = torch.tensor([-1], dtype=torch.float32)
+        NO_VALUE = torch.tensor([-1])
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
 
 
 class L2SPRegularization_Wrapper(nn.Module):
     """Wrapper that adds L2SP regularization to any loss"""
 
-    def __init__(self, loss: nn.Module, model: nn.Module, path_to_pretrained_weights: str, alpha: float, beta: float):
+    def __init__(
+        self,
+        loss: nn.Module,
+        model: nn.Module,
+        path_to_pretrained_weights: str,
+        alpha: float,
+        beta: float,
+        log_func: Callable[[str, float], None] = lambda x, y: None,
+    ):
         super().__init__()
         assert path_to_pretrained_weights is not None, "Path to pretrained weights must be provided"
         self.loss = loss
         self.model = model
         self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
+        self.log = log_func
 
     def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
         standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
         l2sp_loss = self.l2sp_loss(self.model)
-
+        if type(l2sp_loss) == torch.Tensor:
+            self.log("l2_sp", l2sp_loss.item())
+        else:
+            self.log("l2_sp", l2sp_loss)
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
 
 
-def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
+def get_loss(
+    loss_mode: str,
+    log_func: Callable[[str, float], None] = lambda x, y: None,
+    **kw_args: Any,
+) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
     l2sp = False
     if "l2sp" in loss_mode:
         loss_mode = loss_mode.replace("/l2sp", "")
@@ -382,7 +381,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
     elif loss_mode == "online/semi-hard":
         loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
     elif loss_mode == "online/soft":
-        return TripletLossOnline(mode="soft", margin=kw_args["margin"])
+        loss_module = TripletLossOnline(mode="soft", margin=kw_args["margin"])
     elif loss_mode == "offline":
         loss_module = TripletLossOffline(margin=kw_args["margin"])
     elif loss_mode == "offline/native":
@@ -416,6 +415,7 @@ def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.B
             path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
             alpha=kw_args["l2_alpha"],
             beta=kw_args["l2_beta"],
+            log_func=log_func,
         )
 
     return loss_module

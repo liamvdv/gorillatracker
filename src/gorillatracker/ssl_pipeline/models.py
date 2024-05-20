@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import datetime as dt
 import enum
-from datetime import datetime, timedelta
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional, Type, TypeVar
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
+import sqlalchemy.types as types
+from sqlalchemy import CheckConstraint, Dialect, ForeignKey, Index, String, UniqueConstraint, event
+from sqlalchemy.engine.base import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
+from sqlalchemy.orm.mapper import Mapper
 
 
 # WARNING(memben): Changing the class may affect the database
@@ -22,6 +26,49 @@ class TrackingRelationshipType(enum.Enum):
     POSITIVE = "positive"  # Implies that the Trackings are the same (animal)
 
 
+# WARNING(memben): Changing the class may affect the database
+# The values of the enum are stored in the database.
+class TaskStatus(enum.Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+# WARNING(memben): Changing the class may affect the database
+# The values of the enum are stored in the database.
+class TaskType(enum.Enum):
+    TRACK = "track"
+    PREDICT = "predict"
+    CORRELATE = "correlate"
+    VISUALIZE = "visualize"
+
+
+T = TypeVar("T", bound=enum.Enum)
+
+
+class ExtensibleEnum(types.TypeDecorator[T]):
+    """Stores values as strings, converts them to and from enums."""
+
+    impl = types.String(255)
+    cache_ok = True
+
+    def __init__(self, enum_cls: Type[T]) -> None:
+        super().__init__()
+        self.enum_cls = enum_cls
+
+    def process_bind_param(self, value: Optional[T], dialect: Dialect) -> Optional[str]:
+        if value is None:
+            return None
+        assert isinstance(value.value, str), f"{value} not serializable to string"
+        return value.value
+
+    def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[T]:
+        if value is None:
+            return None
+        return self.enum_cls(value)
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -31,8 +78,8 @@ class Camera(Base):
 
     camera_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True)
-    latitude: Mapped[float]
-    longitude: Mapped[float]
+    latitude: Mapped[Optional[float]]
+    longitude: Mapped[Optional[float]]
 
     videos: Mapped[list[Video]] = relationship(back_populates="camera", cascade="all, delete-orphan")
 
@@ -57,20 +104,18 @@ class Video(Base):
 
     video_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     version: Mapped[str]
-    path: Mapped[str]  # absolute path to the video file
+    absolute_path: Mapped[str]
     camera_id: Mapped[int] = mapped_column(ForeignKey("camera.camera_id"))
-    start_time: Mapped[datetime]
+    start_time: Mapped[Optional[dt.datetime]]
     width: Mapped[int]
     height: Mapped[int]
-    fps: Mapped[int]  # of the original video
-    sampled_fps: Mapped[int]  # of the tracked video
+    fps: Mapped[float]  # of the original video
+    target_output_fps: Mapped[int]  # of the tracked video
     frames: Mapped[int]
 
     camera: Mapped[Camera] = relationship(back_populates="videos")
     features: Mapped[list[VideoFeature]] = relationship(back_populates="video", cascade="all, delete-orphan")
-    processed_video_frame_features: Mapped[list[ProcessedVideoFrameFeature]] = relationship(
-        back_populates="video", cascade="all, delete-orphan"
-    )
+    tasks: Mapped[list[Task]] = relationship(back_populates="video", cascade="all, delete-orphan")
 
     trackings: Mapped[list[Tracking]] = relationship(back_populates="video", cascade="all, delete-orphan")
     tracking_frame_features: Mapped[list[TrackingFrameFeature]] = relationship(
@@ -78,58 +123,53 @@ class Video(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("fps % sampled_fps = 0", name="fps_mod_sampled_fps"),
-        UniqueConstraint("path", "version"),
+        CheckConstraint("fps > target_output_fps", name="fps_gt_target_output_fps"),
+        UniqueConstraint("absolute_path", "version"),
     )
 
     @validates("version")
     def validate_version(self, key: str, value: str) -> str:
         try:
-            datetime.strptime(value, "%Y-%m-%d")
+            dt.datetime.strptime(value, "%Y-%m-%d")
         except ValueError:
             raise ValueError(f"{key} must be in the format 'YYYY-MM-DD', is {value}")
         return value
 
-    @validates("path")
+    @validates("absolute_path")
     def validate_path(self, key: str, value: str) -> str:
         if not value.startswith("/"):
             raise ValueError(f"{key} must be an absolute path, is {value}")
-        if not value.endswith(".mp4"):
-            raise ValueError(f"{key} must end with '.mp4', is {value}")
+        if not (value.lower().endswith(".mp4") or value.lower().endswith(".avi")):
+            raise ValueError(f"{key} must end with '.mp4', '.avi', '.MP4' or '.AVI', is {value}")
         return value
 
-    @validates("width", "height", "fps", "sampled_fps", "frames")
+    @validates("width", "height", "fps", "target_output_fps", "frames")
     def validate_positive(self, key: str, value: int) -> int:
         if value <= 0:
             raise ValueError(f"{key} must be positive, is {value}")
         return value
 
     @property
-    def frame_step(self) -> int:
-        """The number of frames to skip when sampling the video."""
-        return self.fps // self.sampled_fps
+    def output_fps(self) -> float:
+        """The actual frames per second of the video after sampling."""
+        return self.fps / self.frame_step
 
     @property
-    def duration(self) -> timedelta:
-        return timedelta(seconds=self.frames / self.fps)
+    def frame_step(self) -> int:
+        """The number of frames to skip when sampling the video."""
+        return int(self.fps / self.target_output_fps)
 
-    def __hash__(self) -> int:
-        return self.video_id
+    @property
+    def duration(self) -> dt.timedelta:
+        return dt.timedelta(seconds=self.frames / self.fps)
+
+    @property
+    def path(self) -> Path:
+        return Path(self.absolute_path)
 
     def __repr__(self) -> str:
-        return f"video(id={self.video_id}, version={self.version}, path={self.path}, camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"
-
-
-class ProcessedVideoFrameFeature(Base):
-    __tablename__ = "processed_video_frame_feature"
-
-    processed_video_features_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    type: Mapped[str] = mapped_column(String(255))
-
-    video: Mapped[Video] = relationship(back_populates="processed_video_frame_features")
-
-    __table_args__ = (UniqueConstraint("video_id", "type"),)
+        return f"""video(id={self.video_id}, version={self.version}, path={self.path}, 
+                camera_id={self.camera_id}, start_time={self.start_time}, fps={self.fps}, frames={self.frames})"""
 
 
 class VideoFeature(Base):
@@ -137,15 +177,15 @@ class VideoFeature(Base):
 
     video_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    type: Mapped[str] = mapped_column(String(255))
+    feature_type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
     video: Mapped[Video] = relationship(back_populates="features")
 
+    __table_args__ = (UniqueConstraint("video_id", "feature_type"),)
+
     def __repr__(self) -> str:
-        return (
-            f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, type={self.type}, value={self.value})"
-        )
+        return f"video_feature(id={self.video_feature_id}, video_id={self.video_id}, feature_type={self.feature_type}, value={self.value})"
 
 
 class Tracking(Base):
@@ -170,14 +210,11 @@ class Tracking(Base):
     )
 
     @property
-    def tracking_duration(self) -> timedelta:
+    def tracking_duration(self) -> dt.timedelta:
         fps = self.video.fps
         start_frame = min(self.frame_features, key=lambda x: x.frame_nr).frame_nr
         end_frame = max(self.frame_features, key=lambda x: x.frame_nr).frame_nr
-        return timedelta(seconds=(end_frame - start_frame) / fps)
-
-    def __hash__(self) -> int:
-        return self.tracking_id
+        return dt.timedelta(seconds=(end_frame - start_frame) / fps)
 
     def __repr__(self) -> str:
         return f"tracking(id={self.tracking_id}, video_id={self.video_id})"
@@ -188,13 +225,15 @@ class TrackingFeature(Base):
 
     tracking_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
-    type: Mapped[str] = mapped_column(String(255))
+    feature_type: Mapped[str] = mapped_column(String(255))
     value: Mapped[str] = mapped_column(String(255))
 
     tracking: Mapped[Tracking] = relationship(back_populates="features")
 
+    __table_args__ = (UniqueConstraint("tracking_id", "feature_type"),)
+
     def __repr__(self) -> str:
-        return f"tracking_feature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, type={self.type}, value={self.value})"
+        return f"tracking_feature(id={self.tracking_feature_id}, tracking_id={self.tracking_id}, feature_type={self.feature_type}, value={self.value})"
 
 
 class TrackingFrameFeature(Base):
@@ -206,19 +245,22 @@ class TrackingFrameFeature(Base):
     video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))  # NOTE(memben): Denormalized
     tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True)
     frame_nr: Mapped[int]
-    bbox_x_center: Mapped[float]
-    bbox_y_center: Mapped[float]
-    bbox_width: Mapped[float]
-    bbox_height: Mapped[float]
+    bbox_x_center_n: Mapped[float]
+    bbox_y_center_n: Mapped[float]
+    bbox_width_n: Mapped[float]
+    bbox_height_n: Mapped[float]
+    bbox_width: Mapped[int]
+    bbox_height: Mapped[int]
     confidence: Mapped[float]
-    type: Mapped[str] = mapped_column(String(255))
+    feature_type: Mapped[str] = mapped_column(String(255))
+    cached: Mapped[bool] = mapped_column(default=False)
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
 
-    __table_args__ = (UniqueConstraint("tracking_id", "frame_nr", "type"),)
+    Index("idx_frame_feature", "tracking_id", "frame_nr", "feature_type", unique=True)
 
-    @validates("bbox_x_center", "bbox_y_center", "bbox_width", "bbox_height", "confidence")
+    @validates("bbox_x_center_n", "bbox_y_center_n", "bbox_width_n", "bbox_height_n", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
         if not 0 <= value <= 1:
             raise ValueError(f"{key} must be between 0 and 1, is {value}")
@@ -230,11 +272,21 @@ class TrackingFrameFeature(Base):
             raise ValueError(f"frame_nr must be a multiple of {self.video.frame_step}, is {frame_nr}")
         return frame_nr
 
-    def __hash__(self) -> int:
-        return self.tracking_frame_feature_id
+    def cache_path(self, base_path: Path) -> Path:
+        return Path(
+            base_path,
+            str(self.tracking_frame_feature_id % 2**8),
+            str(self.tracking_frame_feature_id % 2**16),
+            f"{self.tracking_frame_feature_id}.png",
+        )
+
+    def __lt__(self, other: TrackingFrameFeature) -> bool:
+        return self.tracking_frame_feature_id < other.tracking_frame_feature_id
 
     def __repr__(self) -> str:
-        return f"tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, frame_nr={self.frame_nr}, bbox_x_center={self.bbox_x_center}, bbox_y_center={self.bbox_y_center}, bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, type={self.type})"
+        return f"""tracking_frame_feature(id={self.tracking_frame_feature_id}, video_id={self.video_id} tracking_id={self.tracking_id}, 
+        frame_nr={self.frame_nr}, bbox_x_center_n={self.bbox_x_center_n}, bbox_y_center_n={self.bbox_y_center_n}, bbox_width_n={self.bbox_width_n}, bbox_height_n={self.bbox_height_n},
+        bbox_width={self.bbox_width}, bbox_height={self.bbox_height}, confidence={self.confidence}, feature_type={self.feature_type}, cached={self.cached})"""
 
 
 class VideoRelationship(Base):
@@ -243,7 +295,7 @@ class VideoRelationship(Base):
     video_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     left_video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
     right_video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
-    edge: Mapped[str] = mapped_column(String(255))  # VideoRelationshipType
+    edge: Mapped[VideoRelationshipType] = mapped_column(ExtensibleEnum(VideoRelationshipType))
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
@@ -257,17 +309,6 @@ class VideoRelationship(Base):
         UniqueConstraint("left_video_id", "right_video_id", "reason", "created_by"),
     )
 
-    @property
-    def relationship(self) -> VideoRelationshipType:
-        return VideoRelationshipType(self.edge)
-
-    @validates("edge")
-    def validate_edge(self, key: str, edge: str) -> str:
-        allowed_values = [e.name for e in VideoRelationshipType]
-        if edge not in allowed_values:
-            raise ValueError(f"{key} must be one of {allowed_values}, not '{edge}'")
-        return edge
-
     def __repr__(self) -> str:
         return f"video_relationship(id={self.video_relationship_id}, left_video_id={self.left_video_id}, right_video_id={self.right_video_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
 
@@ -278,7 +319,7 @@ class TrackingRelationship(Base):
     tracking_relationship_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     left_tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
     right_tracking_id: Mapped[int] = mapped_column(ForeignKey("tracking.tracking_id"))
-    edge: Mapped[str] = mapped_column(String(255))  # TrackingRelationshipType
+    edge: Mapped[TrackingRelationshipType] = mapped_column(ExtensibleEnum(TrackingRelationshipType))
     reason: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[str] = mapped_column(String(255))
 
@@ -290,19 +331,57 @@ class TrackingRelationship(Base):
         UniqueConstraint("left_tracking_id", "right_tracking_id", "reason", "created_by"),
     )
 
-    @property
-    def relationship(self) -> TrackingRelationshipType:
-        return TrackingRelationshipType(self.edge)
+    def __repr__(self) -> str:
+        return f"""tracking_relationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, 
+    edge={self.edge}, reason={self.reason}, created_by={self.created_by})"""
 
-    @validates("edge")
-    def validate_edge(self, key: str, edge: str) -> str:
-        allowed_values = [e.name for e in TrackingRelationshipType]
-        if edge not in allowed_values:
-            raise ValueError(f"{key} must be one of {allowed_values}, not '{edge}'")
-        return edge
+
+class Task(Base):
+    __tablename__ = "task"
+
+    task_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))
+    task_type: Mapped[TaskType] = mapped_column(ExtensibleEnum(TaskType))
+    task_subtype: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[TaskStatus] = mapped_column(ExtensibleEnum(TaskStatus), default=TaskStatus.PENDING)
+    retries: Mapped[int] = mapped_column(default=0)
+    updated_at: Mapped[dt.datetime] = mapped_column(default=dt.datetime.now(dt.timezone.utc))
+
+    video: Mapped[Video] = relationship(back_populates="tasks")
+    task_key_values: Mapped[list[TaskKeyValue]] = relationship(back_populates="task", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("video_id", "task_type", "task_subtype"),)
+
+    def get_key_value(self, key: str) -> str:
+        for kv in self.task_key_values:
+            if kv.key == key:
+                return kv.value
+        raise KeyError(f"Key {key} not found in task {self.task_id}")
 
     def __repr__(self) -> str:
-        return f"tracking_relationship(id={self.tracking_relationship_id}, left_tracking_id={self.left_tracking_id}, right_tracking_id={self.right_tracking_id}, edge={self.edge}, reason={self.reason}, created_by={self.created_by})"
+        return f"task(id={self.task_id}, video_id={self.video_id}, task_type={self.task_type}, status={self.status}, last_modified={self.updated_at})"
+
+
+@event.listens_for(Task, "before_update")
+def task_before_update(mapper: Mapper[Any], connection: Connection, target: Task) -> None:
+    target.updated_at = dt.datetime.now(dt.timezone.utc)
+
+
+class TaskKeyValue(Base):
+    __tablename__ = "task_key_value"
+
+    task_key_value_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("task.task_id"))
+    key: Mapped[str] = mapped_column(String(255))
+    value: Mapped[str] = mapped_column(String(255))
+    task: Mapped[Task] = relationship(back_populates="task_key_values")
+
+    __table_args__ = (UniqueConstraint("task_id", "key"),)
+
+    def __repr__(self) -> str:
+        return (
+            f"task_key_value(id={self.task_key_value_id}, task_id={self.task_id}, key={self.key}, value={self.value})"
+        )
 
 
 if __name__ == "__main__":
@@ -312,18 +391,17 @@ if __name__ == "__main__":
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-    with session.begin():
+    with SessionLocal() as session:
         camera = Camera(name="Test", latitude=0, longitude=0)
         video = Video(
-            path="/absolute/path/to/test.mp4",
+            absolute_path="/absolute/path/to/test.mp4",
             version="2024-04-03",
             camera=camera,
-            start_time=datetime.now(),
+            start_time=dt.datetime.now(dt.timezone.utc),
             width=1920,
             height=1080,
             fps=30,
-            sampled_fps=5,
+            target_output_fps=5,
             frames=100,
         )
         tracking = Tracking(video=video)
@@ -331,14 +409,22 @@ if __name__ == "__main__":
             tracking=tracking,
             video=video,
             frame_nr=0,
-            bbox_x_center=0.5,
-            bbox_y_center=0.5,
-            bbox_width=0.5,
-            bbox_height=0.5,
+            bbox_x_center_n=0.5,
+            bbox_y_center_n=0.5,
+            bbox_width_n=0.5,
+            bbox_height_n=0.5,
+            bbox_width=960,
+            bbox_height=540,
             confidence=0.5,
-            type="test",
+            feature_type="test",
         )
-        session.add_all([camera, video, tracking, tracking_frame_feature])
-
-    session.close()
+        task = Task(
+            video=video,
+            task_type=TaskType.PREDICT,
+            status=TaskStatus.COMPLETED,
+            updated_at=dt.datetime.now(dt.timezone.utc),
+        )
+        task_key_value = TaskKeyValue(task=task, key="test", value="test")
+        session.add_all([camera, video, tracking, tracking_frame_feature, task])
+        session.commit()
     Base.metadata.drop_all(engine)

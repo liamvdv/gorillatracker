@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, time
 from itertools import groupby
 from pathlib import Path
-from typing import Generator, Optional, Sequence
+from typing import Generator, Iterator, Optional, Sequence
 
 import cv2
 import easyocr
@@ -43,7 +45,7 @@ def video_frame_iterator(cap: cv2.VideoCapture, frame_step: int) -> Generator[Vi
 
 
 @contextmanager
-def video_reader(video_path: Path, frame_step: int = 1) -> Generator[Generator[VideoFrame, None, None], None, None]:
+def video_reader(video_path: Path, frame_step: int = 1) -> Iterator[Generator[VideoFrame, None, None]]:
     """
     Context manager for reading frames from a video file.
 
@@ -124,13 +126,13 @@ class BoundingBox:
     @classmethod
     def from_tracking_frame_feature(cls, frame_feature: TrackingFrameFeature) -> BoundingBox:
         return cls(
-            frame_feature.bbox_x_center,
-            frame_feature.bbox_y_center,
-            frame_feature.bbox_width,
-            frame_feature.bbox_height,
+            frame_feature.bbox_x_center_n,
+            frame_feature.bbox_y_center_n,
+            frame_feature.bbox_width_n,
+            frame_feature.bbox_height_n,
             frame_feature.confidence,
-            frame_feature.video.width,
-            frame_feature.video.height,
+            int(frame_feature.bbox_width / frame_feature.bbox_width_n),
+            int(frame_feature.bbox_height / frame_feature.bbox_height_n),
         )
 
 
@@ -194,3 +196,43 @@ def _extract_time(time_stamp: str) -> time:
         return datetime.strptime(time_stamp, "%I%M%p").time()
     except ValueError:
         raise ValueError("Could not extract time stamp from frame")
+
+
+def extract_meta_data_time(video_path: Path) -> Optional[datetime]:
+    """
+    Extracts the creation time of the video from the metadata.
+    """
+    time_stamp = _extract_iso_timestamp(video_path)
+    if time_stamp is None:
+        return None
+    return datetime.fromisoformat(time_stamp.replace("Z", "+00:00"))
+
+
+def _extract_iso_timestamp(video_path: Path) -> Optional[str]:
+    ffprobe_command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_entries",
+        "format_tags=creation_time",
+        video_path,
+    ]
+
+    try:
+        result = subprocess.run(ffprobe_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)  # type: ignore
+        metadata = json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        log.error(f"ffprobe execution failed: {e.stderr}")
+        raise
+    except json.JSONDecodeError:
+        log.error("Failed to decode JSON from ffprobe output.")
+        raise
+
+    try:
+        creation_time = metadata["format"]["tags"]["creation_time"]
+        return creation_time
+    except KeyError:
+        log.error(f"Creation time not found in video metadata for {video_path}")
+        return None
