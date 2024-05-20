@@ -6,6 +6,7 @@ import datetime as dt
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
+import logging
 
 from sqlalchemy import ColumnElement, Select, alias, func, or_, select
 from sqlalchemy.orm import Session, aliased
@@ -20,6 +21,8 @@ from gorillatracker.ssl_pipeline.models import (
     Video,
     VideoFeature,
 )
+
+log = logging.getLogger(__name__)
 
 """
 The helper function `group_by_tracking_id` is not used perse, but it is included here for completeness.
@@ -254,11 +257,12 @@ def transactional_task(session: Session, task: Task) -> Iterator[Task]:
     Do **not** commit any changes that should be rolled back on exception."""
     try:
         yield task
-    except Exception:
+    except Exception as e:
         session.rollback()
         task.status = TaskStatus.FAILED
         session.commit()
-        raise
+        log.exception(e)
+        # NOTE(memben): swallow
     else:
         task.status = TaskStatus.COMPLETED
         session.commit()
