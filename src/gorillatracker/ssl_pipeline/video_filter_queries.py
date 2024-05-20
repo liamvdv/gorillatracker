@@ -1,29 +1,58 @@
 import datetime as dt
-from pathlib import Path
-from typing import Iterator, Optional, Sequence
+from typing import Optional
 
-from sqlalchemy import ColumnElement, Select, alias, func, or_, select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import Select, func, select
 
-from gorillatracker.ssl_pipeline.models import (
-    Camera,
-    Task,
-    TaskStatus,
-    TaskType,
-    Tracking,
-    TrackingFrameFeature,
-    Video,
-    VideoFeature,
-)
+from gorillatracker.ssl_pipeline.models import Video
 
-# filter video count
+def video_count_filter(
+    query: Select[tuple[Video]], num_videos: int
+) -> Select[tuple[Video]]:
+    """Filter the query to return a specific number of videos."""
+    return query.limit(num_videos)
 
-# filter camera count
+def camera_with_videos_filter(query: Select[tuple[Video]], num_videos: int) -> Select[tuple[Video]]:
+    """Filter the query to return videos from cameras with at least a certain number of videos."""
+    video_count = func.count(Video.video_id)
+    video_count_subquery = (
+        select(
+            Video.camera_id,
+            video_count
+        )
+        .group_by(Video.camera_id)
+        .having(video_count >= num_videos)
+    ).subquery()
+    return query.join(video_count_subquery, Video.camera_id == video_count_subquery.c.camera_id)
+    
+def extract_year(dt_obj: Optional[dt.datetime]) -> int:
+    if dt_obj is None:
+        return -1
+    return dt_obj.year
 
-# filter camera with x videos
+def year_filter(
+    query: Select[tuple[Video]], year: int
+) -> Select[tuple[Video]]:
+    """Filter the query to return videos from a specific year."""
+    return query.where(extract_year(Video.start_time) == year)
 
-# filter for year
+def extract_hour(dt_obj: Optional[dt.datetime])-> int:
+    if dt_obj is None:
+        return -1
+    return dt_obj.hour
 
-# filter for time
+def daytime_filter(
+    query: Select[tuple[Video]], start_hour: int, end_hour: int
+) -> Select[tuple[Video]]:
+    """Filter the query to return videos from a specific time of the day."""
+    return query.where(start_hour <= extract_hour(Video.start_time) <= end_hour)
 
-# filter for months
+def extract_month(dt_obj: Optional[dt.datetime]) -> int:
+    if dt_obj is None:
+        return -1
+    return dt_obj.month
+
+def month_filter(
+    query: Select[tuple[Video]], start_month: int, end_month: int
+) -> Select[tuple[Video]]:
+    """Filter the query to return videos from specific months."""
+    return query.where(start_month <= extract_month(Video.start_time) <= end_month)
