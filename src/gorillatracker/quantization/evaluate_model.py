@@ -8,7 +8,7 @@ import gorillatracker.quantization.quantization_functions as quantization_functi
 from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.model import BaseModule
 from gorillatracker.quantization.utils import get_model_input, log_model_to_file
-from gorillatracker.utils.embedding_generator import get_model_for_run_url
+from gorillatracker.utils.embedding_generator import get_run, get_model_from_run
 
 save_quantized_model = False
 load_quantized_model = False
@@ -25,7 +25,8 @@ def main() -> None:
         CXLDataset, dataset_path=dataset_path, partion="train", amount_of_tensors=number_of_calibration_images
     )
 
-    model: Union[GraphModule, BaseModule] = get_model_for_run_url(model_wandb_url)
+    run = get_run(model_wandb_url)
+    model: Union[GraphModule, BaseModule] = get_model_from_run(run)
     if load_quantized_model:
         quantized_model_state_dict = torch.load("quantized_model_weights.pth")
         quantized_model = model

@@ -97,8 +97,7 @@ def load_model_from_wandb(
     return model
 
 
-def get_model_for_run_url(run_url: str, eval_mode: bool = True) -> BaseModule:
-    run = get_run(run_url)
+def get_model_from_run(run, eval_mode: bool = True) -> BaseModule:
     print("Using model from run:", run.name)
     print("Config:", run.config)
     # args = TrainingArgs(**run.config) # NOTE(liamvdv): contains potenially unknown keys / missing keys (e. g. l2_beta)
@@ -213,7 +212,7 @@ def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
 
 
 def generate_embeddings_from_run(
-    run_url: str, outpath: str, dataset_cls: Optional[str], data_dir: Optional[str]
+    run_url: str, outpath: str, dataset_cls: Optional[str] = None, data_dir: Optional[str] = None
 ) -> pd.DataFrame:
     """
     generate a pandas df that generates embeddings for all images in the dataset partitions train and val.
@@ -227,17 +226,19 @@ def generate_embeddings_from_run(
         assert out.parent.exists(), "outpath parent must exist"
         assert out.suffix == ".pkl", "outpath must be a pickle file"
 
-    model = get_model_for_run_url(run_url)
-    args = model.config
+    run = get_run(run_url)
+    model = get_model_from_run(run)
 
     if data_dir is None:
-        data_dir = args["data_dir"]
+        print("Using data_dir from run")
+        data_dir = run.config["data_dir"]
 
     if dataset_cls is None:
-        dataset_cls = args["dataset_class"]
+        print("Using dataset_class from run")
+        dataset_cls = run.config["dataset_class"]
 
     train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
-    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=run.config["data_dir"], model=model, dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"
