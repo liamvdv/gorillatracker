@@ -219,6 +219,9 @@ class GorillaDatasetGPUServer2(GorillaDataset):
     TIMESTAMPS = "data/derived_data/timestamps.json"
     SOCIAL_GROUPS = "data/ground_truth/cxl/misc/VideosGO_SPAC.csv"
 
+    def __init__(self) -> None:
+        super().__init__(self.DB_URI)
+
     @classmethod
     def get_social_group(cls, video: Video) -> Optional[str]:
         df = pd.read_csv(cls.SOCIAL_GROUPS, sep=",")

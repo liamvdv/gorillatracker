@@ -9,6 +9,9 @@ artifacts/
 ignored/
 results/
 **/checkpoints/*.ckpt
+**/*.pth
+**/*.onnx
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

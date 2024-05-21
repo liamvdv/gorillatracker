@@ -53,7 +53,7 @@
         "source=${localEnv:HOME}/data,target=/workspaces/gorillatracker/data,type=bind,ro",
         "source=${localEnv:HOME}/data/embeddings,target=/workspaces/gorillatracker/data/embeddings,type=bind",
         "source=${localEnv:HOME}/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
-        // "source=/scratch1/wildlife_conservation_data/spac_gorillas_converted,target=/workspaces/gorillatracker/video_data,type=bind,ro", // cannot mount into data
+        "source=/mnt/vast-gorilla/,target=/workspaces/gorillatracker/video_data,type=bind,ro",
         // NOTE(liamvdv): Allow write.
         "source=${localEnv:HOME}/models/,target=/workspaces/gorillatracker/models,type=bind"
     ],

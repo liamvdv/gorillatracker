@@ -25,9 +25,10 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
+from gorillatracker.losses.arcface_loss import VariationalPrototypeLearning
 from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
+from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
 def warmup_lr(
@@ -167,6 +168,8 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
 
+        self.quant = torch.quantization.QuantStub()  # type: ignore
+
         ##### Create Table embeddings_table
         self.embeddings_table_columns = [
             "label",
@@ -224,6 +227,7 @@ class BaseModule(L.LightningModule):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
@@ -284,7 +288,7 @@ class BaseModule(L.LightningModule):
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
-        if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+        if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
             self.log("val/positive_distance", pos_dist, on_step=True)
@@ -303,10 +307,11 @@ class BaseModule(L.LightningModule):
             num_classes = self.loss_module_val.num_classes if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss.num_classes  # type: ignore
 
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+            lse = LinearSequenceEncoder()
+            self.embeddings_table["label"] = self.embeddings_table["label"].apply(lse.encode)
+
             for label in range(num_classes):
-                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)][
-                    "embedding"
-                ].tolist()
+                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == label]["embedding"].tolist()
                 class_embeddings = (
                     np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
                 )
@@ -316,11 +321,12 @@ class BaseModule(L.LightningModule):
 
             # calculate loss for all embeddings
             loss_module_val.set_weights(class_weights)  # type: ignore
+            loss_module_val.le = lse  # type: ignore
 
             losses = []
             for _, row in self.embeddings_table.iterrows():
                 loss, _, _ = loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)  # type: ignore
+                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(lse.decode(row["label"])).unsqueeze(0)  # type: ignore
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
@@ -448,6 +454,43 @@ class EfficientNetV2Wrapper(BaseModule):
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv
         return self.model.features[-1][0]  # TODO(liamvdv)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+            ]
+        )
+
+
+class EfficientNetRW_M(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        is_from_scratch = kwargs.get("from_scratch", False)
+        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
+
+        self.model.classifier = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.classifier.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.conv_head
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1122,6 +1165,7 @@ custom_model_cls = {
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
+    "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
 }
 

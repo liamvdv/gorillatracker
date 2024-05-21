@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,8 @@ from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.models import Video
 from gorillatracker.ssl_pipeline.queries import get_or_create_camera
+
+log = logging.getLogger(__name__)
 
 
 class MetadataExtractor(Protocol):
@@ -57,6 +60,11 @@ def preprocess_and_store(
 ) -> None:
     metadata = metadata_extractor(video_path)
     properties = video_properties_extractor(video_path)
+
+    if properties.fps < 1:
+        log.warning(f"Video {video_path} has an invalid FPS of {properties.fps}, skipping")
+        return
+
     video = Video(
         absolute_path=str(video_path),
         version=version,
