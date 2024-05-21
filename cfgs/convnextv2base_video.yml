@@ -47,7 +47,7 @@ grad_clip: 1.0                   # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 1               # Training goal (large number)
 val_check_interval: 400         # Validation check interval as a fraction of total steps or as an fixed number of steps
-val_before_training: False      # Perform validation before training
+val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: False                     # Perform kfold cross validation
 
