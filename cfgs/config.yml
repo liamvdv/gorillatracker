@@ -32,6 +32,7 @@ early_stopping_patience: 3      # Early stopping patience (number of epochs)
 min_delta: 0.01                     # Early stopping delta
 embedding_size: 128
 dropout_p: 0.32
+use_quantization_aware_training: False
 
 weight_decay: 0.2               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter

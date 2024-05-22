@@ -7,14 +7,15 @@ import gorillatracker.quantization.performance_evaluation as performance_evaluat
 import gorillatracker.quantization.quantization_functions as quantization_functions
 from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.model import BaseModule
-from gorillatracker.quantization.utils import get_model_input
+from gorillatracker.quantization.utils import get_model_input, log_model_to_file
 from gorillatracker.utils.embedding_generator import get_model_for_run_url
 
 save_quantized_model = False
-load_quantized_model = True
+load_quantized_model = False
+save_model_architecture = False
 number_of_calibration_images = 100
 dataset_path = "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-model_wandb_url = "https://wandb.ai/gorillas/Embedding-EfficientNet-CXL-OpenSet/runs/9aom7205/workspace"
+model_wandb_url = "https://wandb.ai/gorillas/Embedding-EfficientNetRWM-CXL-OpenSet/runs/lnw2khtz/workspace"
 
 
 def main() -> None:
@@ -36,6 +37,10 @@ def main() -> None:
     if save_quantized_model:
         torch.save(model.state_dict(), "quantized_model_weights.pth")
 
+    if save_model_architecture:
+        log_model_to_file(quantized_model, "quantized_model.txt")
+        log_model_to_file(model, "fp32_model.txt")
+
     # 2. Performance evaluation
     validations_input_embeddings, validation_labels = get_model_input(
         CXLDataset, dataset_path=dataset_path, partion="val", amount_of_tensors=-1
@@ -46,11 +51,15 @@ def main() -> None:
         images=validations_input_embeddings,
         labels=validation_labels,
         device=torch.device("cpu"),
-        knn=1,
+        knn_number=5,
     )
 
     fp32_model_accuracy = performance_evaluation.get_knn_accuracy(
-        model=model, images=validations_input_embeddings, labels=validation_labels, device=torch.device("cpu"), knn=1
+        model=model,
+        images=validations_input_embeddings,
+        labels=validation_labels,
+        device=torch.device("cpu"),
+        knn_number=5,
     )
     quantized_model_size = performance_evaluation.size_of_model_in_mb(quantized_model)
     fp32_model_size = performance_evaluation.size_of_model_in_mb(model)

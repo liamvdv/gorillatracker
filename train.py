@@ -4,7 +4,7 @@ from typing import Union
 
 import torch
 import wandb
-from lightning import Trainer, seed_everything
+from lightning import seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import graceful_exceptions, logger
@@ -18,6 +18,7 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.train_utils import get_data_module
+from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
@@ -77,72 +78,10 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             args.additional_val_data_dirs,
         )
 
-    kfold_k = 1
-    if args.kfold:
-        kfold_k = int(str(args.data_dir).split("-")[-1])
     ################# Construct model ##############
 
-    # Resume from checkpoint if specified
-    model_args = dict(
-        model_name_or_path=args.model_name_or_path,
-        from_scratch=args.from_scratch,
-        weight_decay=args.weight_decay,
-        beta1=args.beta1,
-        beta2=args.beta2,
-        epsilon=args.epsilon,
-        lr_schedule=args.lr_schedule,
-        warmup_mode=args.warmup_mode,
-        warmup_epochs=args.warmup_epochs,
-        max_epochs=args.max_epochs,
-        initial_lr=args.initial_lr,
-        start_lr=args.start_lr,
-        end_lr=args.end_lr,
-        stepwise_schedule=args.stepwise_schedule,
-        lr_interval=args.val_check_interval,
-        margin=args.margin,
-        loss_mode=args.loss_mode,
-        embedding_size=args.embedding_size,
-        batch_size=args.batch_size,
-        s=args.s,
-        delta_t=args.delta_t,
-        mem_bank_start_epoch=args.mem_bank_start_epoch,
-        lambda_membank=args.lambda_membank,
-        num_classes=(
-            (dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test"))  # type: ignore
-            if not args.use_ssl
-            else (-1, -1, -1)
-        ),
-        num_val_dataloaders=1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1,
-        dropout_p=args.dropout_p,
-        accelerator=args.accelerator,
-        l2_alpha=args.l2_alpha,
-        l2_beta=args.l2_beta,
-        path_to_pretrained_weights=args.path_to_pretrained_weights,
-        use_wildme_model=args.use_wildme_model,
-    )
-
-    if args.saved_checkpoint_path is not None:
-        args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
-            args.saved_checkpoint_path, wandb_logger.experiment
-        )
-
-        if args.resume:  # load weights, optimizer states, scheduler state, ...\
-            model = model_cls.load_from_checkpoint(args.saved_checkpoint_path, save_hyperparameters=False)
-            # we will resume via trainer.fit(ckpt_path=...)
-        else:  # load only weights
-            model = model_cls(**model_args)  # type: ignore
-            # torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
-            # model.load_state_dict(torch_load["state_dict"], strict=False)
-    else:
-        model = model_cls(**model_args)  # type: ignore
-
-    if args.compile:
-        if not hasattr(torch, "compile"):
-            raise RuntimeError(
-                f"The current torch version ({torch.__version__}) does not have support for compile."
-                "Please install torch >= 2.0 or disable compile."
-            )
-        model = torch.compile(model)
+    model_constructor = ModelConstructor(args, model_cls, dm)
+    model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Construct dataloaders & trainer #################
     model_transforms = model.get_tensor_transforms()
@@ -160,9 +99,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         args.additional_val_data_dirs,
     )
 
-    if args.kfold:
-        dm.k = kfold_k  # type: ignore
-
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -170,7 +106,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
-        kfold_k=0 if args.kfold else None,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -224,54 +159,40 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         logger.info("Model saved")
         exit(0)
 
-    logger.info(f"Rank {current_process_rank} | Starting training...")
-
-    for i in range(kfold_k):
-        # Initialize trainer
-        trainer = Trainer(
-            num_sanity_val_steps=0,
-            max_epochs=args.max_epochs,
-            val_check_interval=args.val_check_interval,
-            check_val_every_n_epoch=args.check_val_every_n_epoch,
-            devices=args.num_devices,
-            accelerator=args.accelerator,
-            strategy=str(args.distributed_strategy),
-            logger=wandb_logger,
-            deterministic=args.force_deterministic,
-            callbacks=callbacks,
-            precision=args.precision,  # type: ignore
-            gradient_clip_val=args.grad_clip,
-            log_every_n_steps=24,
-            # accumulate_grad_batches=args.gradient_accumulation_steps,
-            fast_dev_run=args.fast_dev_run,
-            profiler=args.profiler,
-            inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-            plugins=args.plugins,  # type: ignore
-            # reload_dataloaders_every_n_epochs=1,
+    ### Preperation for quantization aware training ###
+    if args.use_quantization_aware_training:
+        logger.info("Preperation for quantization aware training...")
+        from torch._export import capture_pre_autograd_graph
+        from torch.ao.quantization.quantize_pt2e import prepare_qat_pt2e
+        from torch.ao.quantization.quantizer.xnnpack_quantizer import (
+            XNNPACKQuantizer,
+            get_symmetric_quantization_config,
         )
 
-        ########### Start val & train loop ###########
-        if args.val_before_training and not args.resume:
-            # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
-            logger.info(f"Rank {current_process_rank} | Validation before training...")
-            val_result = trainer.validate(model, dm)
-            print(val_result)
-            if args.only_val:
-                continue
+        from gorillatracker.quantization.utils import get_model_input
 
-        logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
-        logger.info(f"Rank {current_process_rank} | max_epochs: {model.max_epochs}")
-        if args.kfold:
-            dm.val_fold = i  # type: ignore
-            embeddings_logger_callback.kfold_k = i
-        trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
-        model = model_cls(**model_args)  # type: ignore
+        example_inputs, _ = get_model_input(dm.dataset_class, str(args.data_dir), amount_of_tensors=100)  # type: ignore
+        model.model = capture_pre_autograd_graph(model.model, example_inputs)
+        quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
+        model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
 
-    if trainer.interrupted:
-        logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")
+    ################# Start training #################
+    logger.info(f"Rank {current_process_rank} | Starting training...")
+    if args.kfold:
+        model, trainer = train_and_validate_using_kfold(
+            args=args,
+            dm=dm,
+            model=model,
+            callbacks=callbacks,
+            wandb_logger=wandb_logger,
+            embeddings_logger_callback=embeddings_logger_callback,
+        )
     else:
-        logger.success("Fit complete")
+        model, trainer = train_and_validate_model(
+            args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger
+        )
 
+    ########### Save checkpoint ###########
     if current_process_rank == 0:
         logger.info("Trying to save checkpoint....")
 
