@@ -12,8 +12,8 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-SwinV2Large-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "188-fix-transform-issues-256-arcface" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["openset"]            # WandB tags for experiment tracking
+run_name: "258-implement-k-fold-cross-validation" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["kfold"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2LargeWrapper"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -43,7 +43,7 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "softmax/arcface"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "online/soft"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
@@ -57,9 +57,10 @@ end_lr: 1e-6                    # End learning rate (for the learning rate sched
 batch_size: 42                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 50                  # Training goal (large number)
-val_before_training: True       # Perform validation before training
+max_epochs: 2                  # Training goal (large number)
+val_before_training: False       # Perform validation before training
 only_val: False                 # Perform only validation
+kfold: False                     # Perform kfold cross validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval

@@ -53,6 +53,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Tuple, TypeVar, Union
 
+import numpy as np
 import torch
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,7 @@ def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
 
 
 def group(images: List[Entry]) -> List[Entry]:
-    """preservers order:
+    """preserves order:
     group order determined by first seen element with group id.
     inner group order in order of occurance in array.
     """
@@ -134,7 +135,7 @@ def group(images: List[Entry]) -> List[Entry]:
 
 
 def ungroup(individuals: List[Entry]) -> List[Entry]:
-    """preservers order"""
+    """preserves order"""
     assert all(
         isinstance(individual.value, list) for individual in individuals
     ), "Sanity check that is is not called on Paths."
@@ -149,7 +150,7 @@ def consistent_random_permutation(arr: List[T], unique_key: Callable[[Any], Any]
     return [arr[i] for i in idxs]
 
 
-def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, int, int]:
+def compute_split(samples: int, train: int, val: int, test: int, kfold: bool) -> Tuple[int, int, int]:
     if train + val + test != 100:
         raise ValueError("sum of train, val and test must be 100")
 
@@ -158,10 +159,11 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
     val_count = val / 100 * samples
     test_count = test / 100 * samples
 
-    # we'll enfore at least 1
-    train_count = max(train_count, 1)
-    val_count = max(val_count, 1)
-    test_count = max(test_count, 1)
+    if not kfold:
+        # we'll enfore at least 1
+        train_count = max(train_count, 1)
+        val_count = max(val_count, 1)
+        test_count = max(test_count, 1)
 
     val_count = int(val_count)
     test_count = int(test_count)
@@ -172,7 +174,7 @@ def compute_split(samples: int, train: int, val: int, test: int) -> Tuple[int, i
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = True
+TEST = False
 
 
 def copy(src: Path, dst: Path) -> None:
@@ -211,10 +213,11 @@ def splitter(
 
     individums = group(images)
     if mode == "closedset":
-        train_count, val_count, test_count = compute_split(len(images), train, val, test)
+        train_count, val_count, test_count = compute_split(len(images), train, val, test, False)
         for individum in individums:
             assert isinstance(individum.value, list)
             n = len(individum.value)
+            # only take min_train_count images from each individual and update the individual's value
             selection, individum.value = individum.value[:min_train_count], individum.value[min_train_count:]
             if len(selection) != min_train_count:
                 print(
@@ -229,8 +232,8 @@ def splitter(
         assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
         train_bucket.extend(rest)
     elif mode == "openset":
-        # At least one unseen individuum in test and eval.
-        train_count, val_count, test_count = compute_split(len(individums), train, val, test)
+        # At least one unseen individum in test and eval.
+        train_count, val_count, test_count = compute_split(len(individums), train, val, test, False)
         print(
             f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={train_count}, Val={val_count}, Test={test_count}"
         )
@@ -249,6 +252,81 @@ def splitter(
                 )
 
     return train_bucket, val_bucket, test_bucket
+
+
+def kfold_splitter(
+    images: List[Entry],
+    mode: Literal["openset", "closedset"],
+    trainval: int,
+    test: int,
+    seed: int,
+    k: int = 5,
+) -> Tuple[List[List[Entry]], List[Entry]]:
+    assert trainval + test == 100, "trainval, test must sum to 100."
+    random.seed(seed)
+    # This shuffe is preserved throughout groups and ungroups.
+    # because python dicts are ordered by insertion.
+    # We can now simply pop from the start / end to get random images.
+    images = consistent_random_permutation(images, lambda x: x.value, seed)
+    fold_buckets: List[List[Entry]] = [[] for _ in range(k)]
+    test_bucket: List[Entry] = []
+
+    fold_bucket_iterator = 0
+
+    individums = group(images)
+    if mode == "closedset":
+        trainval_count, _, test_count = compute_split(len(images), trainval, 0, test, True)
+        fold_bucket_size = trainval_count // k
+
+        # TODO: smarter way of splitting the images into k folds
+        for i in range(k):
+            fold_buckets[i] = images[fold_bucket_iterator : fold_bucket_iterator + fold_bucket_size]
+            fold_bucket_iterator += fold_bucket_size
+
+        test_bucket = images[fold_bucket_iterator:]
+
+    elif mode == "openset":
+        # At least one unseen individum in test and eval.
+        # NOTE number of actual images in each fold (and test) can vary due to different number of images per individual.
+        trainval_count, _, test_count = compute_split(len(individums), trainval, 0, test, True)
+        fold_bucket_size = trainval_count // k
+
+        sorted_individums = sorted(individums, key=lambda x: len(x.value), reverse=True)  # type: ignore
+
+        sizes = [0 for _ in range(k)]
+        num_images_fold = [0 for _ in range(k)]
+
+        test_size = 0
+
+        print(
+            f"Unique Individuals (Image Count Bias): Total={len(individums)}, Train={trainval_count}, Test={test_count}"
+        )
+        for j in range(fold_bucket_size):
+            for i in range(k):
+                smallest_fold_indices = np.where(sizes == np.min(sizes))[0]
+                individual = sorted_individums[fold_bucket_iterator]
+
+                min_ind = smallest_fold_indices[0]
+                for i in smallest_fold_indices:
+                    if num_images_fold[i] < num_images_fold[min_ind]:
+                        min_ind = i
+
+                fold_buckets[min_ind].extend(ungroup([individual]))
+                sizes[min_ind] += 1
+                num_images_fold[min_ind] += len(individual.value)  # type: ignore
+                fold_bucket_iterator += 1
+            test_bucket.extend(ungroup([sorted_individums[fold_bucket_iterator]]))
+            test_size += 1
+            fold_bucket_iterator += 1
+
+        test_bucket.extend(ungroup(individums[fold_bucket_iterator:]))
+        test_size += len(individums[fold_bucket_iterator:])
+
+    for i, fold_bucket in enumerate(fold_buckets):
+        print(f"Fold {i}: {len(fold_bucket)} images, {sizes[i]} individuals")
+    print(f"Test: {len(test_bucket)} images, {test_size} individuals")
+
+    return fold_buckets, test_bucket
 
 
 def stats_and_confirm(name: str, full: List[Entry], train: List[Entry], val: List[Entry], test: List[Entry]) -> None:
@@ -310,7 +388,7 @@ def generate_simple_split(
     files = read_files(f"data/{dataset}")
     files = consistent_random_permutation(files, lambda x: x.value, seed)
     outdir = Path(f"data/{name}")
-    train_count, val_count, test_count = compute_split(len(files), train, val, test)
+    train_count, val_count, test_count = compute_split(len(files), train, val, test, False)
     train_set = files[:train_count]
     val_set = files[train_count : train_count + val_count]
     test_set = files[train_count + val_count :]
@@ -318,6 +396,41 @@ def generate_simple_split(
     write_entries(train_set, outdir / "train")
     write_entries(val_set, outdir / "val")
     write_entries(test_set, outdir / "test")
+
+
+def generate_kfold_split(
+    dataset: str = "ground_truth/cxl/face_images",
+    mode: Literal["openset", "closedset"] = "closedset",
+    seed: int = 42,
+    trainval: int = 80,
+    test: int = 20,
+    k: int = 5,
+) -> Path:
+    name = f"splits/{dataset.replace('/', '-')}-kfold-{mode}-seed-{seed}-trainval-{trainval}-test-{test}-k-{k}"
+    outdir = Path(f"data/{name}")
+
+    # NOTE hacky workaround
+    if "cxl" in dataset:
+        images = read_ground_truth_cxl(f"data/{dataset}")
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "bristol" in dataset:
+        images = read_ground_truth_bristol(f"data/{dataset}")
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    else:
+        raise ValueError(f"unknown dataset {dataset}")
+    fold_buckets, test_bucket = kfold_splitter(
+        images,
+        mode=mode,
+        trainval=trainval,
+        test=test,
+        seed=seed,
+        k=k,
+    )
+    # stats_and_confirm(name, images, fold_buckets, [], test_bucket)
+    for i, fold_bucket in enumerate(fold_buckets):
+        write_entries(fold_bucket, outdir / f"fold-{i}")
+    write_entries(test_bucket, outdir / "test")
+    return outdir
 
 
 def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/full_images") -> None:
@@ -421,19 +534,21 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
     _merge_dataset_splits(target, ds1, ds2, ds1_labeler, ds2_labeler)
 
 
-# if __name__ == "__main__":
-# dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
-# copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
+if __name__ == "__main__":
+    generate_kfold_split(mode="openset")
 
-# dir = generate_split(
-#     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-# )
-# dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+    # dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
+    # copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 
-# merge_dataset_splits(
-#     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-#     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-# )
+    # dir = generate_split(
+    #     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
+    # )
+    # dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+
+    # merge_dataset_splits(
+    #     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+    #     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
+    # )
 
 # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
 # dir = generate_split(

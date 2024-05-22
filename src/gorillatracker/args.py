@@ -51,6 +51,7 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
+    use_quantization_aware_training: bool = field(default=False)
 
     # Optimizer Arguments
     weight_decay: float = field(default=0.1)
@@ -93,6 +94,7 @@ class TrainingArgs:
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
     ] = field(default="offline")
+    kfold: bool = field(default=False)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

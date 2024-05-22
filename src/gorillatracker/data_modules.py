@@ -6,8 +6,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader, VideoTripletDataLoader
-from gorillatracker.type_helper import BatchNletDataLoader
+from gorillatracker.data_loaders import QuadletDataLoader, SimpleDataLoader, TripletDataLoader
 
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -96,11 +95,12 @@ class TripletDataModule(NletDataModule):
         return TripletDataLoader
 
 
-class VideoTripletDataModule(TripletDataModule):
-    def train_dataloader(self) -> BatchNletDataLoader:
-        return VideoTripletDataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
-        )
+# TODO(V1nce1): deprecated?
+# class VideoTripletDataModule(TripletDataModule):
+#     def train_dataloader(self) -> BatchNletDataLoader:
+#         return VideoTripletDataLoader(
+#             self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
+#         )
 
 
 class QuadletDataModule(NletDataModule):
@@ -109,5 +109,69 @@ class QuadletDataModule(NletDataModule):
 
 
 class SimpleDataModule(NletDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
+        return SimpleDataLoader
+
+
+class NLetKFoldDataModule(NletDataModule):
+    def __init__(
+        self,
+        data_dir: str,
+        batch_size: int = 32,
+        dataset_class: Optional[Type[Dataset[Any]]] = None,
+        transforms: Optional[gtypes.Transform] = None,
+        training_transforms: Optional[gtypes.Transform] = None,
+        val_fold: int = 0,
+        k: int = 5,
+    ) -> None:
+        super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms)
+        self.val_fold = val_fold
+        self.k = k
+
+    def setup(self, stage: str) -> None:
+        assert self.dataset_class is not None, "dataset_class must be set before calling setup"
+        logger.info(
+            f"setup {stage} for Dataset {self.dataset_class.__name__} via Dataload {self.get_dataloader().__name__}"
+        )
+
+        if stage == "fit":
+            self.train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+        elif stage == "test":
+            self.test = self.dataset_class(self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+        elif stage == "validate":
+            self.val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+        elif stage == "predict":
+            # TODO(liamvdv): delay until we know how things should look.
+            # self.predict = None
+            raise ValueError("stage predict not yet supported by data module.")
+        else:
+            raise ValueError(f"unknown stage '{stage}'")
+
+    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
+        if mode == "train":
+            train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            return train.get_num_classes()  # type: ignore
+        elif mode == "val":
+            val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            return val.get_num_classes()  # type: ignore
+        elif mode == "test":
+            test = self.dataset_class(self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            return test.get_num_classes()  # type: ignore
+        else:
+            raise ValueError(f"unknown mode '{mode}'")
+
+
+class TripletKFoldDataModule(NLetKFoldDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
+        return TripletDataLoader
+
+
+class QuadletKFoldDataModule(NLetKFoldDataModule):
+    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
+        return QuadletDataLoader
+
+
+class SimpleKFoldDataModule(NLetKFoldDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader

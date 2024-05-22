@@ -64,6 +64,7 @@ dependencies:
       - opencv-python-headless
       - psycopg2-binary
       - sqlalchemy
+      - alembic
       - warmup-scheduler
       - simple_parsing
       - print-on-steroids[exceptions]
@@ -79,6 +80,7 @@ dependencies:
       - facenet_pytorch
       - typer
       - opencv-contrib-python
+      - onnx
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:
