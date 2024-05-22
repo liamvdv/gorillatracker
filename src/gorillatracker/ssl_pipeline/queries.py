@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterator, Optional, Sequence
 import logging
 
-from sqlalchemy import ColumnElement, Select, alias, func, or_, select
+from sqlalchemy import ColumnElement, Select, alias, func, or_, select, update
 from sqlalchemy.orm import Session, aliased
 
 from gorillatracker.ssl_pipeline.models import (
@@ -168,40 +168,6 @@ def get_or_create_camera(session: Session, camera_name: str) -> Camera:
     return camera
 
 
-def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tracking]]:
-    subquery = (
-        select(
-            TrackingFrameFeature.tracking_id,
-            func.min(TrackingFrameFeature.frame_nr).label("min_frame_nr"),
-            func.max(TrackingFrameFeature.frame_nr).label("max_frame_nr"),
-            TrackingFrameFeature.video_id,
-        )
-        .where(TrackingFrameFeature.tracking_id.isnot(None))
-        .group_by(TrackingFrameFeature.tracking_id)
-    ).subquery()
-
-    left_subquery = alias(subquery)
-    right_subquery = alias(subquery)
-
-    left_tracking = aliased(Tracking)
-    right_tracking = aliased(Tracking)
-
-    stmt = (
-        select(left_tracking, right_tracking)
-        .join(left_subquery, left_tracking.tracking_id == left_subquery.c.tracking_id)
-        .join(right_subquery, right_tracking.tracking_id == right_subquery.c.tracking_id)
-        .where(
-            (left_subquery.c.min_frame_nr <= right_subquery.c.max_frame_nr)
-            & (right_subquery.c.min_frame_nr <= left_subquery.c.max_frame_nr)
-            & (left_subquery.c.video_id == right_subquery.c.video_id)
-            & (left_subquery.c.tracking_id < right_subquery.c.tracking_id)
-        )
-    )
-
-    overlapping_trackings = session.execute(stmt).fetchall()
-    return [(row[0], row[1]) for row in overlapping_trackings]
-
-
 def get_next_task(
     session: Session,
     task_type: TaskType,
@@ -266,6 +232,39 @@ def transactional_task(session: Session, task: Task) -> Iterator[Task]:
     else:
         task.status = TaskStatus.COMPLETED
         session.commit()
+
+def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tracking]]:
+    subquery = (
+        select(
+            TrackingFrameFeature.tracking_id,
+            func.min(TrackingFrameFeature.frame_nr).label("min_frame_nr"),
+            func.max(TrackingFrameFeature.frame_nr).label("max_frame_nr"),
+            TrackingFrameFeature.video_id,
+        )
+        .where(TrackingFrameFeature.tracking_id.isnot(None))
+        .group_by(TrackingFrameFeature.tracking_id)
+    ).subquery()
+
+    left_subquery = alias(subquery)
+    right_subquery = alias(subquery)
+
+    left_tracking = aliased(Tracking)
+    right_tracking = aliased(Tracking)
+
+    stmt = (
+        select(left_tracking, right_tracking)
+        .join(left_subquery, left_tracking.tracking_id == left_subquery.c.tracking_id)
+        .join(right_subquery, right_tracking.tracking_id == right_subquery.c.tracking_id)
+        .where(
+            (left_subquery.c.min_frame_nr <= right_subquery.c.max_frame_nr)
+            & (right_subquery.c.min_frame_nr <= left_subquery.c.max_frame_nr)
+            & (left_subquery.c.video_id == right_subquery.c.video_id)
+            & (left_subquery.c.tracking_id < right_subquery.c.tracking_id)
+        )
+    )
+
+    overlapping_trackings = session.execute(stmt).fetchall()
+    return [(row[0], row[1]) for row in overlapping_trackings]
 
 
 def great_circle_distance(
@@ -359,20 +358,24 @@ def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Vid
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
 
+def reset_dependend_task_status(session: Session, dependent: TaskType, provider: TaskType) -> None:
+    stmt = (
+        update(Task)
+        .where(Task.retries > 1)
+        .values(status=TaskStatus.PENDING)
+    )
+    
+    
+    ...
 
 if __name__ == "__main__":
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
-    engine = create_engine("sqlite:///test.db")
+    engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
 
     session_cls = sessionmaker(bind=engine)
-    version = "2024-04-09"
-
-    with session_cls() as session:
-        video_negatives = social_group_negatives(session, version)
-        print(video_negatives[:10])
-        social_groups = session.execute(select(VideoFeature).where(VideoFeature.feature_type == "social_group")).all()
-        print(social_groups)
-        video_negatives = travel_distance_negatives(session, version, 10)
-        print(video_negatives[:10])
+    
+    with session_cls():
+        ...
+        

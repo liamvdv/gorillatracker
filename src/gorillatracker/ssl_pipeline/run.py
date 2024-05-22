@@ -16,7 +16,6 @@ log = logging.getLogger(__name__)
 def run_pipeline(
     dataset: SSLDataset,
     version: str,
-    n_videos: int = 30,
     target_output_fps: int = 10,
     max_worker_per_gpu: int = 8,
     gpu_ids: list[int] = [0],
@@ -25,10 +24,8 @@ def run_pipeline(
 
     with Session(dataset.engine) as session:
         preprocessed_videos = list(load_preprocessed_videos(session, version))
-        video_paths = remove_processed_videos(video_paths, preprocessed_videos)
+        videos_to_track = remove_processed_videos(video_paths, preprocessed_videos)
 
-    random.seed(42)  # For reproducibility
-    videos_to_track = random.sample(video_paths, n_videos)
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
     preprocess_videos(
@@ -65,6 +62,19 @@ def run_pipeline(
         multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
 
 
+def redo_correlation(
+    dataset: SSLDataset,
+    max_workers: int,
+) -> None:
+    """Correlation has no dependencies set on the previous steps,
+    so it need be redone for failed previous steps."""
+    
+    
+
+    for feature_type in dataset.features:
+        multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
+
+
 if __name__ == "__main__":
     version = "2024-04-18"
     logging.basicConfig(level=logging.INFO)
@@ -72,8 +82,7 @@ if __name__ == "__main__":
     run_pipeline(
         dataset,
         version,
-        n_videos=0,
-        max_worker_per_gpu=1,
-        gpu_ids=[0],
+        max_worker_per_gpu=20,
+        gpu_ids=[0, 1, 2, 3],
     )
     dataset.post_setup()
