@@ -72,10 +72,10 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         current_step = trainer.global_step
 
         assert trainer.max_epochs is not None
-        for i, embeddings_table in enumerate(embeddings_table_list):
+        for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
             table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
             artifact = wandb.Artifact(
-                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, i),
+                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_idx),
                 type="embeddings",
                 metadata={"step": current_step},
                 description="Embeddings from step {}".format(current_step),
@@ -100,7 +100,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                     "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
                     "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
                 }
-                if self.knn_with_train
+                if self.knn_with_train and dataloader_idx == 0
                 else {}
             )
             # log to wandb
@@ -111,7 +111,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 train_embeddings=train_embeddings,  # type: ignore
                 train_labels=train_labels,
                 kfold_k=self.kfold_k,
-                dataloader_idx=i,
+                dataloader_idx=dataloader_idx,
             )
             # clear the table where the embeddings are stored
             # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
@@ -235,7 +235,7 @@ def evaluate_embeddings(
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
         for metric_name, metric in metrics.items()
     }
-
+    
     kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
     for metric_name, result in results.items():
         if isinstance(result, dict):

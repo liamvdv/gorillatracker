@@ -289,7 +289,7 @@ class BaseModule(L.LightningModule):
         )
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
-        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
+        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx)  # type: ignore
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log(f"val/loss/dataloader_{dataloader_idx}", loss, on_step=True, sync_dist=True, prog_bar=True, add_dataloader_idx=False)
