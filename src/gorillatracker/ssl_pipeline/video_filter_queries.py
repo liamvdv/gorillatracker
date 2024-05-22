@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select, extract, and_
+from sqlalchemy import Select, func, select, extract, and_, case, Integer
 
 from gorillatracker.ssl_pipeline.models import Video
 
@@ -9,9 +9,10 @@ def get_videos(session, version: str):
     # query = year_filter(query, 2019)
     # query = daytime_filter(query, 0, 24)
     # query = month_filter(query, 7, 7)
+    query = video_length_filter(query, 1, 1)
     query = camera_with_videos_filter(query, 5000)
     result = session.execute(query).scalars().all()
-    video_list = [video.start_time for video in result]
+    video_list = [video.duration for video in result]
     return video_list
 
 def video_count_filter(
@@ -50,6 +51,20 @@ def month_filter(
 ) -> Select[tuple[Video]]:
     """Filter the query to return videos from specific months."""
     return query.where(and_(start_month <= extract("month", Video.start_time), extract("month", Video.start_time) <= end_month))
+
+def video_length_filter(
+    query: Select[tuple[Video]], min_length: int, max_length: int
+) -> Select[tuple[Video]]:
+    """Filter the query to return videos within a specific length range."""
+    duration_seconds = func.cast(
+        case(
+            (Video.fps != 0, Video.frames / Video.fps),
+            else_=0
+        ), Integer
+    )
+    return query.where(
+        and_(min_length <= duration_seconds, duration_seconds <= max_length)
+    )
 
 if __name__ == "__main__":
     from sqlalchemy import create_engine
