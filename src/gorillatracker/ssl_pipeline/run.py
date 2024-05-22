@@ -1,12 +1,12 @@
 import logging
-import random
 
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ, SSLDataset
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
-from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos
+from gorillatracker.ssl_pipeline.models import TaskType
+from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, reset_dependent_tasks_status
 from gorillatracker.ssl_pipeline.video_preprocessor import preprocess_videos
 from gorillatracker.ssl_pipeline.video_processor import multiprocess_predict, multiprocess_track
 
@@ -62,14 +62,15 @@ def run_pipeline(
         multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
 
 
-def redo_correlation(
+def redo_failed_correlation(
     dataset: SSLDataset,
     max_workers: int,
 ) -> None:
     """Correlation has no dependencies set on the previous steps,
     so it need be redone for failed previous steps."""
-    
-    
+
+    with Session(dataset.engine) as session:
+        reset_dependent_tasks_status(session, dependent=TaskType.CORRELATE, provider=TaskType.TRACK)
 
     for feature_type in dataset.features:
         multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)

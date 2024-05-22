@@ -3,12 +3,12 @@ This module contains pre-defined database queries.
 """
 
 import datetime as dt
+import logging
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
-import logging
 
-from sqlalchemy import ColumnElement, Select, alias, func, or_, select, update
+from sqlalchemy import ColumnElement, Select, alias, and_, func, or_, select, update
 from sqlalchemy.orm import Session, aliased
 
 from gorillatracker.ssl_pipeline.models import (
@@ -233,6 +233,7 @@ def transactional_task(session: Session, task: Task) -> Iterator[Task]:
         task.status = TaskStatus.COMPLETED
         session.commit()
 
+
 def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tracking]]:
     subquery = (
         select(
@@ -358,15 +359,20 @@ def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Vid
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
 
-def reset_dependend_task_status(session: Session, dependent: TaskType, provider: TaskType) -> None:
+
+def reset_dependent_tasks_status(session: Session, dependent: TaskType, provider: TaskType) -> None:
+    """Resets all dependent task status where the provider had one or more retries"""
+    subquery = select(Task.video_id).where(Task.retries > 0, Task.task_type == provider)
+
     stmt = (
         update(Task)
-        .where(Task.retries > 1)
+        .where(and_(Task.task_type == dependent, Task.video_id.in_(subquery)))
         .values(status=TaskStatus.PENDING)
     )
-    
-    
-    ...
+
+    session.execute(stmt)
+    session.commit()
+
 
 if __name__ == "__main__":
     from sqlalchemy import create_engine
@@ -375,7 +381,6 @@ if __name__ == "__main__":
     engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
 
     session_cls = sessionmaker(bind=engine)
-    
-    with session_cls():
-        ...
-        
+
+    with session_cls() as session:
+        reset_dependent_tasks_status(session, TaskType.CORRELATE, TaskType.TRACK)
