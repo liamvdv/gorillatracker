@@ -171,7 +171,7 @@ def get_or_create_camera(session: Session, camera_name: str) -> Camera:
 def get_next_task(
     session: Session,
     task_type: TaskType,
-    max_retries: int = 0,
+    max_retries: int = 1,
     task_timeout: dt.timedelta = dt.timedelta(days=1),
     task_subtype: str = "",
 ) -> Iterator[Task]:
