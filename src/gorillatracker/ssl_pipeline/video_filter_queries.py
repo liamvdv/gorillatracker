@@ -4,14 +4,14 @@ from sqlalchemy.orm import Session
 from gorillatracker.ssl_pipeline.models import Video
 
 
-def get_videos(session: Session, version: str) -> list[Video]:
+def get_video_query(version: str) -> Select[tuple[Video]]:
     query = select(Video).where(Video.version == version)
-    query = video_length_filter(query, 0, 20)
-    query = video_count_filter(query, 10)
+    return query
+
+def get_videos_from_query(query: Select[tuple[Video]], session: Session) -> list[Video]:
     result = session.execute(query).scalars().all()
     video_list = [video for video in result]
     return video_list
-
 
 def video_count_filter(query: Select[tuple[Video]], num_videos: int) -> Select[tuple[Video]]:
     """Filter the query to return a specific number of videos."""
@@ -56,13 +56,15 @@ if __name__ == "__main__":
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
-    engine = create_engine("postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres")
+    engine = create_engine("db-uri-here")
 
     session_cls = sessionmaker(bind=engine)
     version = "2024-04-18"
 
     with session_cls() as session:
-        videos = get_videos(session, version)
+        query = get_video_query(version)
+        # add filters here
+        videos = get_videos_from_query(query, session)
         print(len(videos))
         for video in videos[:20]:
             print(video)
