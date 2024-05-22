@@ -73,6 +73,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             args.loss_mode,
             model_transforms,
             model_cls.get_training_transforms(),
+            args.additional_val_dataset_classes,
+            args.additional_val_data_dirs,
         )
 
     kfold_k = 1
@@ -110,6 +112,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             if not args.use_ssl
             else (-1, -1, -1)
         ),
+        num_val_dataloaders=1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1,
         dropout_p=args.dropout_p,
         accelerator=args.accelerator,
         l2_alpha=args.l2_alpha,
@@ -153,6 +156,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         # args.video_data,
         model_transforms,
         model.get_training_transforms(),
+        args.additional_val_dataset_classes,
+        args.additional_val_data_dirs,
     )
 
     if args.kfold:
@@ -173,14 +178,14 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor="val/loss",
+        monitor="val/loss" if args.additional_val_dataset_classes is None else "val/loss/dataloader_0",
         mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss",
+        monitor="val/loss" if args.additional_val_dataset_classes is None else "val/loss/dataloader_0",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,

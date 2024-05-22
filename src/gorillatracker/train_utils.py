@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Optional, Tuple, Type, Union
+from typing import Any, Optional, Tuple, Type, Union, List
 
 import torch
 from torch.utils.data import Dataset
@@ -9,21 +9,11 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import (
     NletDataModule,
     QuadletDataModule,
+    SimpleDataModule,
+    TripletDataModule,
     QuadletKFoldDataModule,
-    SimpleDataModule,
     SimpleKFoldDataModule,
-    TripletDataModule,
     TripletKFoldDataModule,
-)
-from gorillatracker.data_modules import (
-    NletBristolValDataModule,
-    NletDataModule,
-    QuadletBristolValDataModule,
-    QuadletDataModule,
-    SimpleBristolValDataModule,
-    SimpleDataModule,
-    TripletBristolValDataModule,
-    TripletDataModule,
 )
 
 
@@ -50,10 +40,10 @@ def get_data_module(
     loss_mode: str,
     model_transforms: gtypes.Transform,
     training_transforms: gtypes.Transform = None,  # type: ignore
-    data_dir_bristol: Optional[str] = None,
-    bristol_class_id: Optional[str] = None,
-) -> Union[NletDataModule, NletBristolValDataModule]:
-    base: Union[Type[NletDataModule], Type[NletBristolValDataModule]]
+    additional_dataset_class_ids: Optional[List[str]] = None,
+    additional_data_dirs: Optional[List[str]] = None,
+) -> NletDataModule:
+    base: Type[NletDataModule]
     base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
     base = TripletDataModule if loss_mode.startswith("offline") else base
     base = SimpleDataModule if loss_mode.startswith("softmax") else base
@@ -71,18 +61,22 @@ def get_data_module(
             model_transforms,
         ]
     )
-    if data_dir_bristol is not None:
-        base = QuadletBristolValDataModule if loss_mode.startswith("online") else None  # type: ignore
-        base = TripletBristolValDataModule if loss_mode.startswith("offline") else base
-        base = SimpleBristolValDataModule if loss_mode.startswith("softmax") else base
-        return base(
-            data_dir,
-            data_dir_bristol,  # type: ignore
-            batch_size,  # type: ignore
-            dataset_class,
-            get_dataset_class(bristol_class_id),  # type: ignore
-            transforms,
-            training_transforms,
-        )
-
-    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
+    if additional_dataset_class_ids is None:
+        return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
+    else:
+        assert(additional_data_dirs is not None), "additional_data_dirs must be set"
+        dataset_classes = [get_dataset_class(cls_id) for cls_id in additional_dataset_class_ids]
+        transforms_list = []
+        for cls in dataset_classes:
+            transforms_list.append(
+                Compose(
+                    [
+                        cls.get_transforms() if hasattr(cls, "get_transforms") else ToTensor(),
+                        _assert_tensor,
+                        model_transforms,
+                    ]
+                )
+            )
+        
+        return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms, additional_dataset_classes=dataset_classes, additional_data_dirs=additional_data_dirs, additional_transforms=transforms_list)
+    

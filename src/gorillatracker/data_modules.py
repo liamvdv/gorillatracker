@@ -24,6 +24,9 @@ class NletDataModule(L.LightningDataModule):
         dataset_class: Optional[Type[Dataset[Any]]] = None,
         transforms: Optional[gtypes.Transform] = None,
         training_transforms: Optional[gtypes.Transform] = None,
+        additional_dataset_classes: Optional[List[Type[Dataset[Any]]]] = None,
+        additional_data_dirs: Optional[List[str]] = None,
+        additional_transforms: Optional[List[gtypes.Transform]] = None,
     ) -> None:
         super().__init__()
         self.transforms = transforms
@@ -31,6 +34,9 @@ class NletDataModule(L.LightningDataModule):
         self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.additional_dataset_classes = additional_dataset_classes
+        self.additional_data_dirs = additional_data_dirs
+        self.additional_transforms = additional_transforms
 
     def get_dataloader(self) -> Any:
         raise Exception("logic error, ask liamvdv")
@@ -44,10 +50,20 @@ class NletDataModule(L.LightningDataModule):
         if stage == "fit":
             self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            if self.additional_dataset_classes is not None:
+                assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
+                self.val_list = [self.val]
+                for data_dir, dataset_class, transform in zip(self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms):
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))
         elif stage == "test":
             self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
         elif stage == "validate":
             self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            if self.additional_dataset_classes is not None:
+                assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
+                self.val_list = [self.val]
+                for data_dir, dataset_class, transform in zip(self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms):
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None
@@ -61,7 +77,11 @@ class NletDataModule(L.LightningDataModule):
 
     def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
         self.setup("validate")
-        return [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)]
+        dataloaders = [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)]
+        if self.additional_dataset_classes is not None:
+            assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
+            dataloaders.extend([self.get_dataloader()(val, batch_size=self.batch_size, shuffle=False) for val in self.val_list[1:]])
+        return dataloaders
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("test")
@@ -81,8 +101,12 @@ class NletDataModule(L.LightningDataModule):
             train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             return train.get_num_classes()  # type: ignore
         elif mode == "val":
-            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
-            return val.get_num_classes()  # type: ignore
+            val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]  # type: ignore
+            if self.additional_dataset_classes is not None:
+                assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
+                for data_dir, dataset_class, transform in zip(self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms):
+                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))
+            return sum(val.get_num_classes() for val in val_list)
         elif mode == "test":
             test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
             return test.get_num_classes()  # type: ignore
@@ -173,46 +197,5 @@ class QuadletKFoldDataModule(NLetKFoldDataModule):
 
 
 class SimpleKFoldDataModule(NLetKFoldDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
-        return SimpleDataLoader
-
-
-class NletBristolValDataModule(NletDataModule):
-    def __init__(
-        self,
-        data_dir: str,
-        data_dir_bristol: str,
-        batch_size: int = 32,
-        dataset_class: Optional[Type[Dataset[Any]]] = None,
-        bristol_class: Optional[Type[Dataset[Any]]] = None,
-        transforms: Optional[gtypes.Transform] = None,
-        training_transforms: Optional[gtypes.Transform] = None,
-    ) -> None:
-        super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms)
-        self.bristol_class = bristol_class
-        self.data_dir_bristol = data_dir_bristol
-
-    def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
-        self.setup("validate")
-
-        val_bristol = self.bristol_class(self.data_dir_bristol, "val", self.transforms)  # type: ignore
-
-        return [
-            self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False),
-            self.get_dataloader()(val_bristol, batch_size=self.batch_size, shuffle=False),
-        ]
-
-
-class TripletBristolValDataModule(NletBristolValDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
-        return TripletDataLoader
-
-
-class QuadletBristolValDataModule(NletBristolValDataModule):
-    def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchQuadletDataLoader]:
-        return QuadletDataLoader
-
-
-class SimpleBristolValDataModule(NletBristolValDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchSimpleDataLoader]:
         return SimpleDataLoader
