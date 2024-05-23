@@ -147,7 +147,7 @@ def kisz_demo() -> None:
 
 def kisz_visualize_video(video_id: int) -> None:
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDatasetKISZ(GorillaDatasetKISZ.DB_URI)
+    dataset = GorillaDatasetKISZ()
     visualize_video(video_id, dataset, Path("/workspaces/gorillatracker/video_output"))
 
 

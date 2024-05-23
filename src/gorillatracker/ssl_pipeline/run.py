@@ -79,7 +79,7 @@ def redo_failed_correlation(
 if __name__ == "__main__":
     version = "2024-04-18"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDatasetKISZ(GorillaDatasetKISZ.DB_URI)
+    dataset = GorillaDatasetKISZ()
     run_pipeline(
         dataset,
         version,

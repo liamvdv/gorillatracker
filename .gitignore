@@ -163,4 +163,5 @@ mnist/
 *.db
 *mp4
 *MP4
+*AVI
 cropped_images/*
