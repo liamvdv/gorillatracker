@@ -65,6 +65,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             transforms=model_transforms,
             training_transforms=model_cls.get_training_transforms(),
             data_dir=str(args.data_dir),
+            additional_dataset_class_ids=args.additional_val_dataset_classes,
+            additional_data_dirs=args.additional_val_data_dirs,
         )
     else:
         dm = get_data_module(
@@ -106,6 +108,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
+        use_ssl=args.use_ssl,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(

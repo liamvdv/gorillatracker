@@ -41,6 +41,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         knn_with_train: bool,
         wandb_run: Runner,
         dm: L.LightningDataModule,
+        use_ssl: bool = False,
         kfold_k: Optional[int] = None,
     ) -> None:
         super().__init__()
@@ -48,6 +49,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
+        self.use_ssl = use_ssl
         self.kfold_k = kfold_k if kfold_k is not None else None
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
@@ -84,6 +86,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
 
+            if self.use_ssl and dataloader_idx == 0:
+                continue
+            
             train_embeddings, train_labels = (
                 self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
             )
@@ -235,7 +240,7 @@ def evaluate_embeddings(
         metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
         for metric_name, metric in metrics.items()
     }
-    
+
     kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
     for metric_name, result in results.items():
         if isinstance(result, dict):

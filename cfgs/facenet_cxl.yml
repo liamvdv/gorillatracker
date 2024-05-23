@@ -70,3 +70,6 @@ embedding_save_interval: 2      # Embedding save interval
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5"
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 data_resize_transform: 192
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

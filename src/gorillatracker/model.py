@@ -178,7 +178,9 @@ class BaseModule(L.LightningModule):
             "id",
         ]  # note that the dataloader usually returns the order (id, embedding, label)
         self.num_val_dataloaders = num_val_dataloaders
-        self.embeddings_table_list = [pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)]
+        self.embeddings_table_list = [
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
+        ]
 
     def set_losses(
         self,
@@ -263,7 +265,11 @@ class BaseModule(L.LightningModule):
         return loss
 
     def add_validation_embeddings(
-        self, anchor_ids: List[str], anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels, dataloader_idx: int
+        self,
+        anchor_ids: List[str],
+        anchor_embeddings: torch.Tensor,
+        anchor_labels: gtypes.MergedLabels,
+        dataloader_idx: int,
     ) -> None:
         # save anchor embeddings of validation step for later analysis in W&B
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
@@ -277,7 +283,9 @@ class BaseModule(L.LightningModule):
         }
 
         df = pd.DataFrame(data)
-        self.embeddings_table_list[dataloader_idx] = pd.concat([df, self.embeddings_table_list[dataloader_idx]], ignore_index=True)
+        self.embeddings_table_list[dataloader_idx] = pd.concat(
+            [df, self.embeddings_table_list[dataloader_idx]], ignore_index=True
+        )
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
@@ -292,9 +300,20 @@ class BaseModule(L.LightningModule):
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx)  # type: ignore
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-            self.log(f"val/loss/dataloader_{dataloader_idx}", loss, on_step=True, sync_dist=True, prog_bar=True, add_dataloader_idx=False)
-            self.log(f"val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False)
-            self.log(f"val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False)
+            self.log(
+                f"val/loss/dataloader_{dataloader_idx}",
+                loss,
+                on_step=True,
+                sync_dist=True,
+                prog_bar=True,
+                add_dataloader_idx=False,
+            )
+            self.log(
+                f"val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False
+            )
+            self.log(
+                f"val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False
+            )
             return loss
         else:
             return torch.tensor(0.0)
@@ -337,8 +356,9 @@ class BaseModule(L.LightningModule):
             self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
 
         # clear the table where the embeddings are stored
-        self.embeddings_table_list = [pd.DataFrame(columns=self.embeddings_table_columns) 
-                                     for _ in range(self.num_val_dataloaders)] # reset embeddings table
+        self.embeddings_table_list = [
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
+        ]  # reset embeddings table
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         if self.global_rank == 0:

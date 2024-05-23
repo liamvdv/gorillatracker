@@ -53,7 +53,9 @@ class NletDataModule(L.LightningDataModule):
             if self.additional_dataset_classes is not None:
                 assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 self.val_list = [self.val]
-                for data_dir, dataset_class, transform in zip(self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms):
+                for data_dir, dataset_class, transform in zip(
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
+                ):
                     self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))
         elif stage == "test":
             self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
@@ -62,7 +64,9 @@ class NletDataModule(L.LightningDataModule):
             if self.additional_dataset_classes is not None:
                 assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 self.val_list = [self.val]
-                for data_dir, dataset_class, transform in zip(self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms):
+                for data_dir, dataset_class, transform in zip(
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
+                ):
                     self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
@@ -80,7 +84,9 @@ class NletDataModule(L.LightningDataModule):
         dataloaders = [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)]
         if self.additional_dataset_classes is not None:
             assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
-            dataloaders.extend([self.get_dataloader()(val, batch_size=self.batch_size, shuffle=False) for val in self.val_list[1:]])
+            dataloaders.extend(
+                [self.get_dataloader()(val, batch_size=self.batch_size, shuffle=False) for val in self.val_list[1:]]
+            )
         return dataloaders
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
@@ -104,7 +110,9 @@ class NletDataModule(L.LightningDataModule):
             val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]  # type: ignore
             if self.additional_dataset_classes is not None:
                 assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
-                for data_dir, dataset_class, transform in zip(self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms):
+                for data_dir, dataset_class, transform in zip(
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
+                ):
                     val_list.append(dataset_class(data_dir, partition="val", transform=transform))
             return sum(val.get_num_classes() for val in val_list)
         elif mode == "test":

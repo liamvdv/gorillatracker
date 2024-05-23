@@ -73,3 +73,6 @@ knn_with_train: False
 use_ssl: True
 
 data_resize_transform: 192
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null
