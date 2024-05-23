@@ -3,13 +3,10 @@ from sqlalchemy import create_engine
 from dataclasses import dataclass
 from sqlalchemy.orm import sessionmaker
 from gorillatracker.ssl_pipeline.models import Video
-from sqlalchemy.orm import Session
 from sqlalchemy import Select
 import json
-import argparse
-from typing import List, Literal, Union
-from simple_parsing import field, list_field
-from simple_parsing import parse
+from typing import Literal
+from simple_parsing import field
 
 
 @dataclass(kw_only=True) 
@@ -17,7 +14,9 @@ class SplitArgs:
     db_uri: str
     version: str
     name: str = field(default = "SSL-Video-Split")
-    split_by_percentage: bool = field(default=True)
+    split_by: Literal["percentage",
+                      "cameras",
+                      "custom"] = field(default="split")
     
     train_split: int = field(default=80)
     val_split: int = field(default=10)
@@ -27,45 +26,82 @@ class SplitArgs:
     val_years: list[int] = field(default=list(range(2010,2030)))
     test_years: list[int] = field(default=list(range(2010,2030)))
     
-    train_months: list[int] = field(default=list(range(0,13)))
-    val_months: list[int] = field(default=list(range(0,13)))
-    test_months: list[int] = field(default=list(range(0,13)))
+    train_months: list[int] = field(default=list(range(1,13)))
+    val_months: list[int] = field(default=list(range(1,13)))
+    test_months: list[int] = field(default=list(range(1,13)))
     
     hours: list[int] = field(default=list(range(0,24)))
     video_length: tuple[int,int] = field(default=(0,1000000)) # min, max video length in seconds
-
-def build_query(args: argparse.Namespace) -> Select[tuple[Video]]:
-    query = vq.get_video_query(args.version)
-    # put args check here
-    return query
+    min_videos_per_camera: int = field(default=0)
     
+    max_train_videos: int = field(default=1000000)
+    max_val_videos: int = field(default=1000000)
+    max_test_videos: int = field(default=1000000)
 
-def build_filter_query(args: argparse.Namespace) -> Select[tuple[Video]]:
+def build_train_query(args: SplitArgs) -> Select[tuple[Video]]:
     query = vq.get_video_query(args.version)
-    # put args check here
+    query = vq.filter_by_years(query, args.train_years)
+    query = vq.filter_by_months(query, args.train_months)
+    query = vq.filter_by_hours(query, args.hours)
+    query = vq.filter_by_video_length(query, args.video_length)
+    query = vq.filter_by_min_videos_per_camera(query, args.min_videos_per_camera)
+    query = query.limit(args.max_train_videos)
     return query
 
-def split_by_filter(query: Select[tuple[Video]], filter_query: Select[tuple[Video]], session: Session) -> tuple[list[Video], list[Video], list[Video]]:
-    """creates a split of videos based on a filter query. The filter query is used to filter the videos for train.
-    The remaing videos are val. test is empty"""
-    all_videos = vq.get_videos_from_query(query, session)
-    filtered_videos = vq.get_videos_from_query(filter_query, session)
-    train = [video.video_id for video in all_videos if video in filtered_videos]
-    val = [video.video_id for video in all_videos if video not in filtered_videos]
-    test = []
-    return train, val, test
+def build_val_query(args: SplitArgs) -> Select[tuple[Video]]:
+    query = vq.get_video_query(args.version)
+    query = vq.filter_by_years(query, args.val_years)
+    query = vq.filter_by_months(query, args.val_months)
+    query = vq.filter_by_hours(query, args.hours)
+    query = vq.filter_by_video_length(query, args.video_length)
+    query = vq.filter_by_min_videos_per_camera(query, args.min_videos_per_camera)
+    query = query.limit(args.max_val_videos)
+    return query
 
-def split_by_percentage(train:int, val:int, test:int, query: Select[tuple[Video]], session: Session) -> tuple[list[Video], list[Video], list[Video]]:
-    """Split the videos into train, validation, and test sets by percentage."""
-    assert train + val + test == 100, "The sum of the split percentages must be 100"
-    result = session.execute(query).scalars().all()
-    videos = [video.video_id for video in result]
-    num_videos = len(videos)
-    train_end = int(num_videos * train / 100)
-    val_end = train_end + int(num_videos * val / 100)
+def build_test_query(args: SplitArgs) -> Select[tuple[Video]]:
+    query = vq.get_video_query(args.version)
+    query = vq.filter_by_years(query, args.test_years)
+    query = vq.filter_by_months(query, args.test_months)
+    query = vq.filter_by_hours(query, args.hours)
+    query = vq.filter_by_video_length(query, args.video_length)
+    query = vq.filter_by_min_videos_per_camera(query, args.min_videos_per_camera)
+    query = query.limit(args.max_test_videos)
+    return query
+
+def split_by_percentage(args: SplitArgs) -> tuple[list[Video], list[Video], list[Video]]:
+    assert args.train_split + args.val_split + args.test_split == 100, "The sum of the split percentages must be 100"
+    query = build_train_query(args)
+    engine = create_engine(args.db_uri)
+    session = sessionmaker(bind=engine)
+    videos = vq.get_videos_from_query(query, session())
+    train_end = int(len(videos) * args.train_split / 100)
+    val_end = train_end + int(len(videos) * args.val_split / 100)
     train = videos[:train_end]
     val = videos[train_end:val_end]
     test = videos[val_end:]
+    return train, val, test
+
+def split_by_cameras(args: SplitArgs) -> tuple[list[Video], list[Video], list[Video]]:
+    assert args.train_split + args.val_split + args.test_split == 100, "The sum of the split percentages must be 100"
+    engine = create_engine(args.db_uri)
+    session = sessionmaker(bind=engine)
+    cameras = vq.get_camera_ids(session())
+    train_cameras = cameras[:int(len(cameras) * args.train_split / 100)]
+    val_cameras = cameras[len(train_cameras):len(train_cameras) + int(len(cameras) * args.val_split / 100)]
+    test_cameras = cameras[len(train_cameras) + len(val_cameras):]
+    train_videos = vq.get_videos_from_query(vq.camera_id_filter(build_train_query(args), train_cameras), session())
+    val_videos = vq.get_videos_from_query(vq.camera_id_filter(build_val_query(args), val_cameras), session())
+    test_videos = vq.get_videos_from_query(vq.camera_id_filter(build_test_query(args), test_cameras), session())
+    return train_videos, val_videos, test_videos
+
+def split_custom(args: SplitArgs) -> tuple[list[Video], list[Video], list[Video]]:
+    engine = create_engine(args.db_uri)
+    session = sessionmaker(bind=engine)
+    train = vq.get_videos_from_query(build_train_query(args), session())
+    val = vq.get_videos_from_query(build_val_query(args), session())
+    test = vq.get_videos_from_query(build_test_query(args), session())
+    val = [video for video in val if video not in train]
+    test = [video for video in test if video not in train and video not in val]
     return train, val, test
 
 def write_split_to_json(train: list[Video], val: list[Video], test: list[Video], args:SplitArgs) -> None:
@@ -74,16 +110,14 @@ def write_split_to_json(train: list[Video], val: list[Video], test: list[Video],
         json.dump({"train": train, "val": val, "test": test}, f)
               
 if __name__ == "__main__":
-    config_path = "./cfgs/config.yml"
-    args = parse(SplitArgs, config_path=config_path)
-    assert args.db_uri is not None, "Please provide a db uri"
-    assert args.version is not None, "Please provide a version"
-    args.name = f"{args.name}_{args.version}"
-    
-    engine = create_engine(args.db_uri)
-    session = sessionmaker(bind=engine)
-    
-    query = vq.get_video_query(args.version)
-    filter_query = getattr(vq, args.filter)(query, args.split)
-    train, val, test = split_by_filter(query, filter_query, session)
+    args = SplitArgs(db_uri="db-uri-here", version="2024-04-18")
+    args.name = f"{args.name}_{args.version}_{args.split_by}_split"
+    if(args.split_by == "percentage"):
+        train, val, test = split_by_percentage(args)
+    elif(args.split_by == "cameras"):
+        train, val, test = split_by_cameras(args)
+    elif(args.split_by == "custom"):
+        train, val, test = split_custom(args)
+    else:
+        raise ValueError("Invalid split_by argument")
     write_split_to_json(train, val, test, args)
