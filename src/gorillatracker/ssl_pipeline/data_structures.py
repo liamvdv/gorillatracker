@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from itertools import chain
 from typing import Generic, Protocol, TypeVar
 
 CT = TypeVar("CT")
@@ -177,7 +178,6 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
     A connection in a parent layer does not guarantee that the children are connected,
     but a disconnection in a parent layer ensures disconnection in the child layers."""
 
-
     def set_parent(self, parent: MultiLayerCliqueGraph[P], parent_edges: dict[K, P]) -> None:
         """
         Args:
@@ -202,28 +202,25 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
             return False
         return self.parent.is_partitioned(parent_u, parent_v)
 
-    def get_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+    def get_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
         return super().get_adjacent_cliques(v) | self._get_parent_adjacent_cliques(v)
 
-    def _get_parent_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+    def _get_parent_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
         # 1. We go one layer up and collect all adjacent cliques in the parent layer => parent_adjacent_cliques
-        #   a. This might be done recursively
+        #       This might be done recursively
         # 2. We get all nodes in the parent layer that are adjacent to the parent clique => adjacent_clique_parents
         # 3. We get all children of the adjacent parent cliques elements => adjacent_clique_representatives
         # 4. We return the cliques of the adjacent cliques
         if self.parent is None:
-            return {}  
+            return {}
         root_v = self._find_root(v)
         parent_v = self.parent_edges.get(root_v)
         if parent_v is None:
             return {}
         # Adjacent cliques of the parent layer
         parent_adjacent_cliques = self.parent.get_adjacent_cliques(parent_v)
-        # All parents of the adjacent cliques
-        adjacent_clique_parents = set.union(*parent_adjacent_cliques.values())
-        # All representatives of the adjacent cliques
-        adjacent_clique_representatives = set.union(*[self.inverse_parent_edges[p] for p in adjacent_clique_parents])
+        # All parents of the adjacent cliques (of the intermediate layer (self))
+        adjacent_clique_parents = chain.from_iterable(parent_adjacent_cliques.values())
+        # All representatives of the adjacent cliques (of the intermediate layer (self))
+        adjacent_clique_representatives = chain.from_iterable([self.inverse_parent_edges[p] for p in adjacent_clique_parents])
         return {r: self.get_clique(r) for r in adjacent_clique_representatives}
-    
-
-
