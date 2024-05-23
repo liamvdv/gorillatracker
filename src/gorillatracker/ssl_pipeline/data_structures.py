@@ -167,16 +167,8 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
     A connection in a parent layer does not guarantee that the children are connected,
     but a disconnection in a parent layer ensures disconnection in the child layers."""
 
-    def set_child(self, child: MultiLayerCliqueGraph[C], child_edges: defaultdict[K, C]) -> None:
-        """
-        Args:
-            child: Child CliqueGraph
-            child_edges: Mapping from a parent representative to its child representative
-        """
-        self.child = child
-        self.child_edges = child_edges
 
-    def set_parent(self, parent: MultiLayerCliqueGraph[P], parent_edges: defaultdict[K, P]) -> None:
+    def set_parent(self, parent: MultiLayerCliqueGraph[P], parent_edges: dict[K, P]) -> None:
         """
         Args:
             parent: Parent CliqueGraph
@@ -184,24 +176,44 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         """
         self.parent = parent
         self.parent_edges = parent_edges
+        self.inverse_parent_edges: defaultdict[P, set[K]] = defaultdict(set)
+        for child_r, parent_r in parent_edges.items():
+            self.inverse_parent_edges[parent_r].add(child_r)
 
     def is_partioned(self, u: K, v: K) -> bool:
-        return self.is_partitioned(u, v) or self._is_parent_partitioned(u, v)
+        return super().is_partitioned(u, v) or self._is_parent_partitioned(u, v)
 
     def _is_parent_partitioned(self, u: K, v: K) -> bool:
         if self.parent is None:
             return False
         root_u, root_v = self._find_root(u), self._find_root(v)
-        parent_u, parent_v = self.parent_edges[root_u], self.parent_edges[root_v]
+        parent_u, parent_v = self.parent_edges.get(root_u), self.parent_edges.get(root_v)
+        if parent_u is None or parent_v is None:
+            return False
         return self.parent.is_partitioned(parent_u, parent_v)
 
     def get_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
         return super().get_adjacent_cliques(v) | self._get_parent_adjacent_cliques(v)
 
     def _get_parent_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+        # 1. We go one layer up and collect all adjacent cliques in the parent layer => parent_adjacent_cliques
+        #   a. This might be done recursively
+        # 2. We get all nodes in the parent layer that are adjacent to the parent clique => adjacent_clique_parents
+        # 3. We get all children of the adjacent parent cliques elements => adjacent_clique_representatives
+        # 4. We return the cliques of the adjacent cliques
         if self.parent is None:
-            return {}
+            return {}  
         root_v = self._find_root(v)
-        parent_v = self.parent_edges[root_v]
+        parent_v = self.parent_edges.get(root_v)
+        if parent_v is None:
+            return {}
+        # Adjacent cliques of the parent layer
         parent_adjacent_cliques = self.parent.get_adjacent_cliques(parent_v)
-        adjacent_clique_parents = {}
+        # All parents of the adjacent cliques
+        adjacent_clique_parents = set.union(*parent_adjacent_cliques.values())
+        # All representatives of the adjacent cliques
+        adjacent_clique_representatives = set.union(*[self.inverse_parent_edges[p] for p in adjacent_clique_parents])
+        return {r: self.get_clique(r) for r in adjacent_clique_representatives}
+    
+
+
