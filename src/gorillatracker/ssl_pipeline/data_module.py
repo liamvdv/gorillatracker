@@ -5,13 +5,14 @@ import lightning as L
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from torchvision.transforms import Compose, ToTensor
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
 from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.ssl_pipeline.ssl_dataset import SSLDataset, build_triplet
-from torchvision.transforms import Compose, ToTensor
-from gorillatracker.train_utils import get_dataset_class, _assert_tensor
+from gorillatracker.train_utils import _assert_tensor, get_dataset_class
+
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -56,20 +57,23 @@ class SSLDataModule(L.LightningDataModule):
     # TODO(memben): we want to use SSL Data for validation
     def setup_val(self) -> None:
         print("Using Body-Image Validation Set")
-        
-        dataset_classes = [get_dataset_class(cls_id) for cls_id in self.additional_dataset_class_ids]
-        transforms_list = []
-        for cls in dataset_classes:
-            transforms_list.append(
-                Compose(
-                    [
-                        cls.get_transforms() if hasattr(cls, "get_transforms") else ToTensor(),
-                        _assert_tensor,
-                        self.transforms
-                    ]
+        dataset_classes = None
+        transforms_list = None
+        if self.additional_dataset_class_ids is not None:
+            assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
+            dataset_classes = [get_dataset_class(cls_id) for cls_id in self.additional_dataset_class_ids]
+            transforms_list = []
+            for cls in dataset_classes:
+                transforms_list.append(
+                    Compose(
+                        [
+                            cls.get_transforms() if hasattr(cls, "get_transforms") else ToTensor(),
+                            _assert_tensor,
+                            self.transforms,
+                        ]
+                    )
                 )
-            )
-        
+
         dataset_class = CXLDataset
         self.val_data_module = TripletDataModule(
             "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",

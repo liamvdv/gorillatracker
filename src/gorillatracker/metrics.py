@@ -88,7 +88,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
             if self.use_ssl and dataloader_idx == 0:
                 continue
-            
+
             train_embeddings, train_labels = (
                 self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
             )

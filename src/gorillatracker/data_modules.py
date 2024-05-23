@@ -54,9 +54,9 @@ class NletDataModule(L.LightningDataModule):
                 assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
-                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
         elif stage == "test":
             self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
         elif stage == "validate":
@@ -65,9 +65,9 @@ class NletDataModule(L.LightningDataModule):
                 assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
-                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None
@@ -111,10 +111,10 @@ class NletDataModule(L.LightningDataModule):
             if self.additional_dataset_classes is not None:
                 assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 for data_dir, dataset_class, transform in zip(
-                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))
-            return sum(val.get_num_classes() for val in val_list)
+                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
+            return sum(val.get_num_classes() for val in val_list)  # type: ignore
         elif mode == "test":
             test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
             return test.get_num_classes()  # type: ignore
