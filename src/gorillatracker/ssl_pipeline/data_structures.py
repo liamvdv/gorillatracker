@@ -12,6 +12,8 @@ class Comparable(Protocol):
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Comparable)
+C = TypeVar("C", bound=Comparable)
+P = TypeVar("P", bound=Comparable)
 
 
 class DirectedBipartiteGraph(Generic[T]):
@@ -157,3 +159,49 @@ class IndexedCliqueGraph(CliqueGraph[K]):
 
     def __len__(self) -> int:
         return len(self.vertices)
+
+
+class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
+    """Indexed Clique Graph supporting multiple layers of cut edges.
+    This allows for hierarchical or multi-layered connections between cliques.
+    A connection in a parent layer does not guarantee that the children are connected,
+    but a disconnection in a parent layer ensures disconnection in the child layers."""
+
+    def set_child(self, child: MultiLayerCliqueGraph[C], child_edges: defaultdict[K, C]) -> None:
+        """
+        Args:
+            child: Child CliqueGraph
+            child_edges: Mapping from a parent representative to its child representative
+        """
+        self.child = child
+        self.child_edges = child_edges
+
+    def set_parent(self, parent: MultiLayerCliqueGraph[P], parent_edges: defaultdict[K, P]) -> None:
+        """
+        Args:
+            parent: Parent CliqueGraph
+            parent_edges: Mapping from a child representative to is parent representative
+        """
+        self.parent = parent
+        self.parent_edges = parent_edges
+
+    def is_partioned(self, u: K, v: K) -> bool:
+        return self.is_partitioned(u, v) or self._is_parent_partitioned(u, v)
+
+    def _is_parent_partitioned(self, u: K, v: K) -> bool:
+        if self.parent is None:
+            return False
+        root_u, root_v = self._find_root(u), self._find_root(v)
+        parent_u, parent_v = self.parent_edges[root_u], self.parent_edges[root_v]
+        return self.parent.is_partitioned(parent_u, parent_v)
+
+    def get_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+        return super().get_adjacent_cliques(v) | self._get_parent_adjacent_cliques(v)
+
+    def _get_parent_adjacent_cliques(self, v: K) -> dict[K, set[K]]:
+        if self.parent is None:
+            return {}
+        root_v = self._find_root(v)
+        parent_v = self.parent_edges[root_v]
+        parent_adjacent_cliques = self.parent.get_adjacent_cliques(parent_v)
+        adjacent_clique_parents = {}
