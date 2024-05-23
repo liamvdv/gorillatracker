@@ -195,7 +195,11 @@ class GorillaDataset(SSLDataset):
 
 
 class GorillaDatasetKISZ(GorillaDataset):
-    DB_URI = "postgresql+psycopg2://postgres:whatever@postgres:5432/postgres"
+    DB_URI = os.environ.get("POSTGRESQL_URI")
+
+    def __init__(self) -> None:
+        assert self.DB_URI, "POSTGRESQL_URI environment variable not set."
+        super().__init__(self.DB_URI)
 
     @classmethod
     def get_social_group(cls, video: Video) -> Optional[str]:
