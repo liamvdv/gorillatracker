@@ -1,6 +1,7 @@
 # NOTE(memben): let's worry about how we parse configs from the yaml file later
 
 import random
+from functools import partial
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from itertools import groupby
@@ -8,11 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, Select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.sampler import RandomSampler, EquidistantSampler
+from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter, min_count_filter, feature_type_filter, confidence_filter
 
 
 @dataclass(frozen=True, order=True)
@@ -97,25 +100,43 @@ class ContrastiveClassSampler(ContrastiveSampler):
             return self.graph.get_random_clique_member(random_adjacent_clique)
 
 
+def sampling_strategy(
+    video_id, min_n_images_per_tracking: int, feature_types: list[str], min_confidence: float
+) -> Select[tuple[TrackingFrameFeature]]:
+    query = video_filter(video_id)
+    query = associated_filter(query)
+    query = min_count_filter(query, min_n_images_per_tracking)
+    query = feature_type_filter(query, feature_types)
+    query = confidence_filter(query, min_confidence)
+    return query
+
+
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
-def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
+def get_random_ssl_sampler(
+    base_path: str,
+    tff_selection: str,
+    n_videos: int,
+    n_samples: int,
+    min_n_images_per_tracking: int,
+    feature_types: list[str],
+    min_confidence: float,
+) -> ContrastiveClassSampler:
     WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
     PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
     engine = create_engine(PUBLIC_DB_URI)
+    query_builder = partial(
+        sampling_strategy,
+        min_n_images_per_tracking=min_n_images_per_tracking,
+        feature_types=feature_types,
+        min_confidence=min_confidence,
+    )
+    sampler = EquidistantSampler(query_builder, n_samples=n_samples) if tff_selection == "equidistant" else RandomSampler(query_builder, n_samples=n_samples)
     with Session(engine) as session:
-        tracked_features = list(
-            session.execute(
-                select(TrackingFrameFeature)
-                .where(
-                    TrackingFrameFeature.cached,
-                    TrackingFrameFeature.tracking_id.isnot(None),
-                    TrackingFrameFeature.feature_type == "body",
-                )
-                .order_by(TrackingFrameFeature.tracking_id)
-            )
-            .scalars()
-            .all()
-        )
+        video_ids = session.execute(select(Video.video_id)).scalars().all()
+        tracked_features = []
+        for video_id in video_ids[:n_videos]:
+            for tracked_feature in sampler.sample(video_id, session):
+                tracked_features.append(tracked_feature)
         contrastive_images = [
             ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
             for f in tracked_features

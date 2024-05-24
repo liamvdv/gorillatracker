@@ -21,12 +21,22 @@ class SSLDataModule(L.LightningDataModule):
         transforms: gtypes.Transform = lambda x: x,
         training_transforms: gtypes.Transform = lambda x: x,
         data_dir: str = "/workspaces/gorillatracker/cropped_images/2024-04-09",
+        tff_selection: str = "random",
+        n_videos: int = 200,
+        n_samples: int = 15,
+        min_n_images_per_tracking: int = 15,
+        feature_types: list[str] = ["body"],
     ) -> None:
         super().__init__()
         self.transforms = transforms
         self.training_transforms = training_transforms
         self.batch_size = batch_size
         self.data_dir = data_dir
+        self.tff_selection = tff_selection
+        self.n_videos = n_videos
+        self.n_samples = n_samples
+        self.min_n_images_per_tracking = min_n_images_per_tracking
+        self.feature_types = feature_types
 
     def setup(self, stage: str) -> None:
         if stage == "fit":

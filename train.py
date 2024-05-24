@@ -65,6 +65,12 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             transforms=model_transforms,
             training_transforms=model_cls.get_training_transforms(),
             data_dir=str(args.data_dir),
+            tff_selection=args.tff_selection,
+            n_videos=args.n_videos,
+            n_samples=args.n_samples,
+            min_n_images_per_tracking=args.min_n_images_per_tracking,
+            feature_types=args.feature_types,
+            min_confidence=args.min_confidence,
         )
     else:
         dm = get_data_module(
