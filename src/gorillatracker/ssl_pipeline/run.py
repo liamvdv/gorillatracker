@@ -71,6 +71,7 @@ def redo_failed_correlation(
 
     with Session(dataset.engine) as session:
         reset_dependent_tasks_status(session, dependent=TaskType.CORRELATE, provider=TaskType.TRACK)
+        reset_dependent_tasks_status(session, dependent=TaskType.CORRELATE, provider=TaskType.PREDICT)
 
     for feature_type in dataset.features:
         multiprocess_correlate(feature_type, one_to_one_correlator, dataset.engine, max_workers)
@@ -80,10 +81,5 @@ if __name__ == "__main__":
     version = "2024-04-18"
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDatasetKISZ()
-    run_pipeline(
-        dataset,
-        version,
-        max_worker_per_gpu=20,
-        gpu_ids=[0, 1, 2, 3],
-    )
-    dataset.post_setup()
+    redo_failed_correlation(dataset, max_workers=90)
+    # dataset.post_setup()

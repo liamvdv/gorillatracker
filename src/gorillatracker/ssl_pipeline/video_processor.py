@@ -5,6 +5,7 @@ import multiprocessing
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional
+import datetime as dt
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from ultralytics.engine import results
 from gorillatracker.ssl_pipeline.helpers import video_reader
 from gorillatracker.ssl_pipeline.models import TaskType, Tracking, TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import get_next_task, transactional_task
+
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +117,9 @@ def track_worker(
     engine.dispose(close=False)
 
     with Session(engine) as session:
-        for task in get_next_task(session, TaskType.TRACK, task_subtype=feature_type):
+        for task in get_next_task(
+            session, TaskType.TRACK, task_subtype=feature_type, max_retries=3, task_timeout=dt.timedelta(hours=1)
+        ):
             with transactional_task(session, task):
                 video = task.video
                 track_and_update(session, video, yolo_model, yolo_kwargs, tracker_config, feature_type)
@@ -133,7 +137,9 @@ def predict_worker(
     engine.dispose(close=False)
 
     with Session(engine) as session:
-        for task in get_next_task(session, TaskType.PREDICT, task_subtype=feature_type):
+        for task in get_next_task(
+            session, TaskType.PREDICT, task_subtype=feature_type, max_retries=1, task_timeout=dt.timedelta(hours=1)
+        ):
             with transactional_task(session, task):
                 video = task.video
                 predict_and_update(session, video, yolo_model, yolo_kwargs, feature_type)
