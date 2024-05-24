@@ -132,8 +132,6 @@ def multiprocess_crop_from_video(
 
 
 if __name__ == "__main__":
-    import shutil
-
     from sqlalchemy import create_engine
 
     from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter
@@ -146,7 +144,7 @@ if __name__ == "__main__":
         query = associated_filter(query)
         return query
 
-    abs_path = "/workspaces/gorillatracker/video_data/cropped_images"
+    abs_path = "/workspaces/gorillatracker/video_data/cropped-images"
 
     session_cls = sessionmaker(bind=engine)
     version = "2024-04-18"  # TODO(memben)
