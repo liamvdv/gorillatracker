@@ -250,11 +250,11 @@ class BaseModule(L.LightningModule):
         ids, images, labels = batch
 
         # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):
+        if torch.is_tensor(labels[0]):  # type: ignore
             flat_labels = torch.cat(labels, dim=0)  # type: ignore
         else:
             # NOTE(memben): this is the expected shape
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)  # type: ignore
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
 
         vec = torch.cat(images, dim=0)
         embeddings = self.forward(vec)
@@ -290,15 +290,15 @@ class BaseModule(L.LightningModule):
         vec = torch.cat(images, dim=0)
 
         # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):
+        if torch.is_tensor(labels[0]):  # type: ignore
             flat_labels = torch.cat(labels, dim=0)  # type: ignore
         else:
             # NOTE(memben): this is the expected shape
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)  # type: ignore
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
 
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
-        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
+        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
@@ -317,13 +317,13 @@ class BaseModule(L.LightningModule):
             loss_module_val = (
                 self.loss_module_val
                 if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss
-            )  # type: ignore
+                else self.loss_module_val.loss  # type: ignore
+            )
             num_classes = (
-                self.loss_module_val.num_classes
+                self.loss_module_val.num_classes  # type: ignore
                 if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss.num_classes
-            )  # type: ignore
+                else self.loss_module_val.loss.num_classes  # type: ignore
+            )
 
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
             lse = LinearSequenceEncoder()
