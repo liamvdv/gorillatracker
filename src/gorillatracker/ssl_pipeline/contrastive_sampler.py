@@ -129,8 +129,7 @@ def get_random_ssl_sampler(
     feature_types: list[str],
     min_confidence: float,
 ) -> ContrastiveClassSampler:
-    PUBLIC_DB_URI = "postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres"
-    engine = create_engine(PUBLIC_DB_URI)
+    engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
     query_builder = partial(
         sampling_strategy,
         min_n_images_per_tracking=min_n_images_per_tracking,
