@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
@@ -99,14 +100,13 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
 def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
-    WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
-    PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
-    engine = create_engine(PUBLIC_DB_URI)
+    engine = create_engine(GorillaDatasetKISZ.DB_URI)
     with Session(engine) as session:
         tracked_features = list(
             session.execute(
                 select(TrackingFrameFeature)
                 .where(
+                    TrackingFrameFeature.tracking_frame_feature_id < 100000,
                     TrackingFrameFeature.cached,
                     TrackingFrameFeature.tracking_id.isnot(None),
                     TrackingFrameFeature.feature_type == "body",
