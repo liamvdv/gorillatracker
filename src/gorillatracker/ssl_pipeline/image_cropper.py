@@ -87,7 +87,7 @@ def crop(
         log.warning(f"No frames to crop for video: {video_path}")
         return
 
-    try: 
+    try:
         crop_from_video(video_path, crop_tasks)
         update_cached_tff(crop_tasks, session_cls)
     except cv2.error as e:
