@@ -19,7 +19,7 @@ class SplitArgs:
     name: str = field(default="SSL-Video-Split")
     split_by: Literal["percentage", "camera", "custom"] = field(default="percentage")
     save_path: str = field(default=".")
-    save_pickles: bool = field(default=False)
+    save_pickle: bool = field(default=False)
     save_json: bool = field(default=False)
 
     train_split: int = field(default=80)
@@ -55,8 +55,8 @@ class SplitArgs:
         else:
             self.name = f"{self.name}_{self.version}_{self.split_by}_split"
         self.create_split()
-        if self.save_pickles:
-            self.save_to_pickles()
+        if self.save_pickle:
+            self.save_to_pickle()
         if self.save_json:
             self.save_to_json()
 
@@ -183,7 +183,7 @@ class SplitArgs:
                 indent=4,
             )
 
-    def save_to_pickles(self) -> None:
+    def save_to_pickle(self) -> None:
         """Save the class instance to a pickle file."""
         file_path = os.path.join(self.save_path, f"{self.name}.pkl")
         with open(file_path, "wb") as file:
@@ -196,7 +196,7 @@ if __name__ == "__main__":
         version="2024-04-18",
         save_path="/workspaces/gorillatracker/data/splits/SSL/",
         split_by="percentage",
-        save_pickles=True,
+        save_pickle=True,
         save_json=False,
         train_split=80,
         val_split=10,
