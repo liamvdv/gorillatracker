@@ -34,6 +34,12 @@ class SSLDataModule(L.LightningDataModule):
         self.data_dir = data_dir
         self.additional_dataset_class_ids = additional_dataset_class_ids
         self.additional_data_dirs = additional_data_dirs
+        
+        assert (additional_dataset_class_ids is None and additional_data_dirs is None) or len(
+            additional_dataset_class_ids  # type: ignore
+        ) == len(
+            additional_data_dirs  # type: ignore
+        ), "additional_dataset_classes and additional_data_dirs must have the same length"
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
@@ -60,7 +66,6 @@ class SSLDataModule(L.LightningDataModule):
         dataset_classes = None
         transforms_list = None
         if self.additional_dataset_class_ids is not None:
-            assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
             dataset_classes = [get_dataset_class(cls_id) for cls_id in self.additional_dataset_class_ids]
             transforms_list = []
             for cls in dataset_classes:

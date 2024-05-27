@@ -105,7 +105,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                     "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
                     "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
                 }
-                if self.knn_with_train and dataloader_idx == 0
+                if self.knn_with_train
                 else {}
             )
             # log to wandb

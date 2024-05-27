@@ -101,14 +101,14 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor="val/loss" if args.additional_val_dataset_classes is None else "val/loss/dataloader_0",
+        monitor="val/loss/dataloader_0",
         mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss" if args.additional_val_dataset_classes is None else "val/loss/dataloader_0",
+        monitor="val/loss/dataloader_0",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
