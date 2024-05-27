@@ -60,6 +60,15 @@ class SplitArgs:
         if self.save_json:
             self.save_to_json()
 
+    def train_video_ids(self) -> list[int]:
+        return self._train_video_ids
+
+    def val_video_ids(self) -> list[int]:
+        return self._val_video_ids
+
+    def test_video_ids(self) -> list[int]:
+        return self._test_video_ids
+
     def create_split(self) -> None:
         if self.split_by == "percentage":
             self.split_by_percentage()
