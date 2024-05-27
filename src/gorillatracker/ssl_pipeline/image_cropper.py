@@ -87,8 +87,12 @@ def crop(
         log.warning(f"No frames to crop for video: {video_path}")
         return
 
-    crop_from_video(video_path, crop_tasks)
-    update_cached_tff(crop_tasks, session_cls)
+    try: 
+        crop_from_video(video_path, crop_tasks)
+        update_cached_tff(crop_tasks, session_cls)
+    except cv2.error as e:
+        log.error(f"Error cropping video: {video_path}")
+        log.error(e)
 
 
 _version = None
@@ -155,4 +159,4 @@ if __name__ == "__main__":
 
     sampler = Sampler(query_builder=sampling_strategy)
 
-    multiprocess_crop_from_video(video_paths[:100], version, engine, sampler, Path(abs_path), max_workers=50)
+    multiprocess_crop_from_video(video_paths, version, engine, sampler, Path(abs_path), max_workers=80)
