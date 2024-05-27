@@ -1,9 +1,12 @@
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import wandb
 from fsspec import Callback
 from lightning import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
 
@@ -13,7 +16,7 @@ from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
-from lightning.pytorch.callbacks import ModelCheckpoint
+
 
 def train_and_validate_model(
     args: TrainingArgs,
@@ -93,15 +96,34 @@ def train_and_validate_using_kfold(
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
 
-    
-    run_path = wandb_logger.experiment.path
-    read_access_run = wandb.Api().run(run_path)
-    
-    metrics = read_access_run.summary()
-    
-    logger.info(f"Rank {current_process_rank} | Finished k-fold training. Metrics: {metrics}")
+    if args.kfold:
+        kfold_averaging(wandb_logger)
 
     return model, trainer
+
+
+def kfold_averaging(wandb_logger: WandbLogger) -> None:
+    run_path = wandb_logger.experiment.path
+    read_access_run = wandb.Api().run(run_path)  # type: ignore
+
+    summary = read_access_run.summary
+
+    metrics = [(key, value) for key, value in summary.items() if "val/embeddings/fold" in key]
+
+    aggregated_metrics = defaultdict(list)
+
+    # Step 1: Extract metrics by fold and group them
+    for key, value in metrics:
+        if isinstance(value, (int, float)):
+            base_key = "/".join(key.split("/")[:2] + ["averaged"] + key.split("/")[3:])  # Remove fold part
+            aggregated_metrics[base_key].append(value)
+
+    # Step 2: Compute averages
+    average_metrics = {}
+    for key, values in aggregated_metrics.items():
+        average_metrics[key] = np.mean(values)
+
+    wandb.log(average_metrics)
 
 
 def save_model(
@@ -124,7 +146,7 @@ def save_model(
         artifact.add_file(save_path, name="model.ckpt")
 
         logger.info("Pushing to wandb...")
-        aliases = ["train_end", "latest"]
+        aliases = ["train_end", "latest", name_suffix]
         wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
         logger.success("Saving finished!")

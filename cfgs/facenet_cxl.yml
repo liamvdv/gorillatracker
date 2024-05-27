@@ -56,10 +56,12 @@ end_lr: 1e-7                    # End learning rate (for the learning rate sched
 batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 3                  # Training goal (large number)
+max_epochs: 1                  # Training goal (large number)
 val_before_training: False       # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: True                    # Toggle k-fold cross validation
+
+save_model_to_wandb: True        # Save the model to wandb
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval

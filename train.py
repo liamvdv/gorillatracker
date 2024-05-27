@@ -123,7 +123,7 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
 
     callbacks = [
-        checkpoint_callback,    # keep this at the top
+        checkpoint_callback,  # keep this at the top
         wandb_disk_cleanup_callback,
         lr_monitor,
         early_stopping,
