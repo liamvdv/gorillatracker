@@ -11,6 +11,7 @@ from sqlalchemy import Engine, Select, update
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
+from gorillatracker.ssl_pipeline.dataset import GorillaDatsetKISZ
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_video
@@ -140,8 +141,7 @@ if __name__ == "__main__":
 
     from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter
 
-    PUBLIC_DB_URI = "postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres"
-    engine = create_engine(PUBLIC_DB_URI)
+    engine = create_engine(GorillaDatsetKISZ.DB_URI)
 
     def sampling_strategy(video_id: int) -> Select[tuple[TrackingFrameFeature]]:
         query = video_filter(video_id)
