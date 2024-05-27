@@ -93,7 +93,11 @@ def train_and_validate_using_kfold(
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
 
-    metrics = wandb_logger.experiment.summary()
+    
+    run_path = wandb_logger.experiment.path
+    read_access_run = wandb.Api().run(run_path)
+    
+    metrics = read_access_run.summary()
     
     logger.info(f"Rank {current_process_rank} | Finished k-fold training. Metrics: {metrics}")
 
