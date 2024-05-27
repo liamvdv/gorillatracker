@@ -1,5 +1,7 @@
-from typing import Tuple, Union
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
+import wandb
 from fsspec import Callback
 from lightning import Trainer
 from lightning.pytorch.loggers.wandb import WandbLogger
@@ -11,7 +13,7 @@ from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
-
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 def train_and_validate_model(
     args: TrainingArgs,
@@ -19,6 +21,7 @@ def train_and_validate_model(
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
+    model_name_suffix: Optional[str] = "",
 ) -> Tuple[BaseModule, Trainer]:
     trainer = Trainer(
         num_sanity_val_steps=0,
@@ -57,6 +60,15 @@ def train_and_validate_model(
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")
     else:
         logger.success("Fit complete")
+
+    ########### Save checkpoint ###########
+    current_process_rank = get_rank()
+
+    if current_process_rank == 0:
+        save_model(args, callbacks[0], wandb_logger, trainer, model_name_suffix)
+    else:
+        logger.info("Rank is not 0, skipping checkpoint saving...")
+
     return model, trainer
 
 
@@ -75,12 +87,40 @@ def train_and_validate_using_kfold(
 
     for i in range(kfold_k):
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
-        logger.info(f"Rank {current_process_rank} | max_epochs: {model.max_epochs}")
 
-        # TODO(Emirhan): this model is currently NOT being saved, we should save it after each fold
-        model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
+        model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger, f"_fold_{i}")
 
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
 
+    metrics = wandb_logger.experiment.summary()
+    
+    logger.info(f"Rank {current_process_rank} | Finished k-fold training. Metrics: {metrics}")
+
     return model, trainer
+
+
+def save_model(
+    args: TrainingArgs,
+    checkpoint_callback: ModelCheckpoint,
+    wandb_logger: WandbLogger,
+    trainer: Trainer,
+    name_suffix: Optional[str] = "",
+) -> None:
+    logger.info("Trying to save checkpoint....")
+
+    assert checkpoint_callback.dirpath is not None
+    save_path = str(Path(checkpoint_callback.dirpath) / f"last_model_ckpt{name_suffix}.ckpt")
+    trainer.save_checkpoint(save_path)
+    logger.info(f"Checkpoint saved to {save_path}")
+
+    if args.save_model_to_wandb:
+        logger.info("Collecting PL checkpoint for wandb...")
+        artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}{name_suffix}", type="model")
+        artifact.add_file(save_path, name="model.ckpt")
+
+        logger.info("Pushing to wandb...")
+        aliases = ["train_end", "latest"]
+        wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
+
+        logger.success("Saving finished!")
