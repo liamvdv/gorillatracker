@@ -23,6 +23,7 @@ from gorillatracker.ssl_pipeline.queries import (
     video_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 
 
 @dataclass(frozen=True, order=True)
@@ -129,7 +130,7 @@ def get_random_ssl_sampler(
     feature_types: list[str],
     min_confidence: float,
 ) -> ContrastiveClassSampler:
-    engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
+    engine = create_engine(GorillaDatasetKISZ.DB_URI)
     query_builder = partial(
         sampling_strategy,
         min_n_images_per_tracking=min_n_images_per_tracking,
