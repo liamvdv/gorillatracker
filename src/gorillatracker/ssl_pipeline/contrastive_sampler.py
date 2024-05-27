@@ -152,8 +152,8 @@ def get_random_ssl_sampler(
 
 
 if __name__ == "__main__":
-    version = "2024-04-09"
-    sampler = get_random_ssl_sampler(f"/workspaces/gorillatracker/cropped_images/{version}")
+    version = "2024-04-18"
+    sampler = get_random_ssl_sampler(f"/workspaces/gorillatracker/data/cropped-images/{version}", "equidistant", 200, 15, 15, ["body"], 0.5)
     print(len(sampler))
     sample = sampler[0]
     print(sample)
