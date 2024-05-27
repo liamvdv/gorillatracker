@@ -26,6 +26,7 @@ class SSLDataModule(L.LightningDataModule):
         n_samples: int = 15,
         min_n_images_per_tracking: int = 15,
         feature_types: list[str] = ["body"],
+        min_confidence: float = 0.5,
     ) -> None:
         super().__init__()
         self.transforms = transforms
@@ -37,6 +38,7 @@ class SSLDataModule(L.LightningDataModule):
         self.n_samples = n_samples
         self.min_n_images_per_tracking = min_n_images_per_tracking
         self.feature_types = feature_types
+        self.min_confidence = min_confidence
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
@@ -45,6 +47,12 @@ class SSLDataModule(L.LightningDataModule):
                 build_triplet,
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
+                tff_selection=self.tff_selection,
+                n_videos=self.n_videos,
+                n_samples=self.n_samples,
+                min_n_images_per_tracking=self.min_n_images_per_tracking,
+                feature_types=self.feature_types,
+                min_confidence=self.min_confidence,
             )
             self.setup_val()
         elif stage == "test":

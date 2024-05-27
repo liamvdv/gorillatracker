@@ -21,8 +21,16 @@ class SSLDataset(Dataset[Nlet]):
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.Transform,
+        tff_selection: str,
+        n_videos: int,
+        n_samples: int,
+        min_n_images_per_tracking: int,
+        feature_types: list[str],
+        min_confidence: float,
     ):
-        self.contrastive_sampler = get_random_ssl_sampler(base_dir)
+        self.contrastive_sampler = get_random_ssl_sampler(
+            base_dir, tff_selection, n_videos, n_samples, min_n_images_per_tracking, feature_types, min_confidence
+        )
         self.nlet_builder = nlet_builder
         self.transform = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition

@@ -1,21 +1,28 @@
 # NOTE(memben): let's worry about how we parse configs from the yaml file later
 
 import random
-from functools import partial
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Any
 
 from PIL import Image
-from sqlalchemy import create_engine, select, Select
+from sqlalchemy import Select, create_engine, select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.sampler import RandomSampler, EquidistantSampler
-from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter, min_count_filter, feature_type_filter, confidence_filter
+from gorillatracker.ssl_pipeline.queries import (
+    associated_filter,
+    cached_filter,
+    confidence_filter,
+    feature_type_filter,
+    min_count_filter,
+    video_filter,
+)
+from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler
 
 
 @dataclass(frozen=True, order=True)
@@ -101,9 +108,10 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
 
 def sampling_strategy(
-    video_id, min_n_images_per_tracking: int, feature_types: list[str], min_confidence: float
+    video_id: int, min_n_images_per_tracking: int, feature_types: list[str], min_confidence: float
 ) -> Select[tuple[TrackingFrameFeature]]:
     query = video_filter(video_id)
+    query = cached_filter(query)
     query = associated_filter(query)
     query = min_count_filter(query, min_n_images_per_tracking)
     query = feature_type_filter(query, feature_types)
@@ -121,8 +129,7 @@ def get_random_ssl_sampler(
     feature_types: list[str],
     min_confidence: float,
 ) -> ContrastiveClassSampler:
-    WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
-    PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
+    PUBLIC_DB_URI = "postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres"
     engine = create_engine(PUBLIC_DB_URI)
     query_builder = partial(
         sampling_strategy,
@@ -130,7 +137,11 @@ def get_random_ssl_sampler(
         feature_types=feature_types,
         min_confidence=min_confidence,
     )
-    sampler = EquidistantSampler(query_builder, n_samples=n_samples) if tff_selection == "equidistant" else RandomSampler(query_builder, n_samples=n_samples)
+    sampler = (
+        EquidistantSampler(query_builder, n_samples=n_samples)
+        if tff_selection == "equidistant"
+        else RandomSampler(query_builder, n_samples=n_samples)
+    )
     with Session(engine) as session:
         video_ids = session.execute(select(Video.video_id)).scalars().all()
         tracked_features = []
@@ -153,7 +164,9 @@ def get_random_ssl_sampler(
 
 if __name__ == "__main__":
     version = "2024-04-18"
-    sampler = get_random_ssl_sampler(f"/workspaces/gorillatracker/data/cropped-images/{version}", "equidistant", 200, 15, 15, ["body"], 0.5)
+    sampler = get_random_ssl_sampler(
+        f"/workspaces/gorillatracker/data/cropped-images/{version}", "equidistant", 200, 15, 15, ["body"], 0.5
+    )
     print(len(sampler))
     sample = sampler[0]
     print(sample)

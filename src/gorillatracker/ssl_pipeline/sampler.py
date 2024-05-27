@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
     query = partial(sampling_strategy, min_n_images_per_tracking=10)
     sampler = EquidistantSampler(query, n_samples=10)
-    
+
     frame_features = sampler.sample(videos[1].video_id, session)
     # group by tracking_frame_feature_id and print frame_nrs
     grouped = sampler.group_by_tracking_id(list(frame_features))

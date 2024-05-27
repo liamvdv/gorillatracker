@@ -117,11 +117,11 @@ class TrainingArgs:
     # SSL Config
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="random")
-    n_videos: int = field(default=200),
-    n_samples: int = field(default=15),
-    min_n_images_per_tracking: int = field(default=15),
-    feature_types: list[str] = field(default=["body"]),
-    min_confidence: float = field(default=0.5),
+    n_videos: int = field(default=200)
+    n_samples: int = field(default=15)
+    min_n_images_per_tracking: int = field(default=15)
+    feature_types: list[str] = field(default=["body"])
+    min_confidence: float = field(default=0.5)
 
     pretrained_weights_file: Union[str, None] = field(default=None)
     # Add any additional fields as needed.
