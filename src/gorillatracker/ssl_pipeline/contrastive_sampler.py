@@ -11,6 +11,7 @@ from typing import Any
 from PIL import Image
 from sqlalchemy import Select, create_engine, select
 from sqlalchemy.orm import Session
+from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
@@ -115,7 +116,7 @@ def sampling_strategy(
     query = cached_filter(query)
     query = associated_filter(query)
     query = feature_type_filter(query, feature_types)
-    # query = min_count_filter(query, min_n_images_per_tracking)
+    query = min_count_filter(query, min_n_images_per_tracking)
     query = confidence_filter(query, min_confidence)
     return query
 
@@ -145,7 +146,7 @@ def get_random_ssl_sampler(
     with Session(engine) as session:
         video_ids = session.execute(select(Video.video_id)).scalars().all()
         tracked_features = []
-        for video_id in video_ids[:n_videos]:
+        for video_id in tqdm(video_ids[:n_videos], unit="video", desc="Selecting TFFs"):
             for tracked_feature in sampler.sample(video_id, session):
                 tracked_features.append(tracked_feature)
         contrastive_images = [
@@ -165,7 +166,7 @@ def get_random_ssl_sampler(
 if __name__ == "__main__":
     version = "2024-04-18"
     sampler = get_random_ssl_sampler(
-        f"/workspaces/gorillatracker/video_data/cropped-images/{version}", "equidistant", 10, 15, 15, ["body"], 0.5
+        f"/workspaces/gorillatracker/video_data/cropped-images/{version}", "equidistant", 20, 15, 15, ["body"], 0.5
     )
     print(len(sampler))
     sample = sampler[0]
