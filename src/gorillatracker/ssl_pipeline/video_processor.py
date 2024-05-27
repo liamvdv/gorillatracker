@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import multiprocessing
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional
-import datetime as dt
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
@@ -15,7 +15,6 @@ from ultralytics.engine import results
 from gorillatracker.ssl_pipeline.helpers import video_reader
 from gorillatracker.ssl_pipeline.models import TaskType, Tracking, TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import get_next_task, transactional_task
-
 
 log = logging.getLogger(__name__)
 
