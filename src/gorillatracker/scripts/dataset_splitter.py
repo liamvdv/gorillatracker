@@ -168,7 +168,6 @@ def compute_split(samples: int, train: int, val: int, test: int, kfold: bool) ->
     val_count = int(val_count)
     test_count = int(test_count)
     train_count = samples - (val_count + test_count)
-    # assert train_count >= 1
     return train_count, val_count, test_count
 
 
@@ -227,9 +226,7 @@ def splitter(
         # need to shuffle again because we ungroup() will return images of individuals sequentially
         rest = consistent_random_permutation(ungroup(individums), lambda x: x.value, seed + 1)
         val_bucket, rest = rest[:val_count], rest[val_count:]
-        # assert len(val_bucket) == val_count, "Dataset too small: Not enough images left to fill validation."
         test_bucket, rest = rest[:test_count], rest[test_count:]
-        # assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
         train_bucket.extend(rest)
     elif mode == "openset":
         # At least one unseen individum in test and eval.

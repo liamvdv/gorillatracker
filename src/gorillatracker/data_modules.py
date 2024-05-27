@@ -38,6 +38,12 @@ class NletDataModule(L.LightningDataModule):
         self.additional_data_dirs = additional_data_dirs
         self.additional_transforms = additional_transforms
 
+        assert (additional_dataset_classes is None and additional_data_dirs is None) or len(
+            additional_dataset_classes  # type: ignore
+        ) == len(
+            additional_data_dirs  # type: ignore
+        ), "additional_dataset_classes and additional_data_dirs must have the same length"
+
     def get_dataloader(self) -> Any:
         raise Exception("logic error, ask liamvdv")
 
@@ -51,7 +57,6 @@ class NletDataModule(L.LightningDataModule):
             self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
             if self.additional_dataset_classes is not None:
-                assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
@@ -62,7 +67,6 @@ class NletDataModule(L.LightningDataModule):
         elif stage == "validate":
             self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
             if self.additional_dataset_classes is not None:
-                assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
@@ -83,7 +87,6 @@ class NletDataModule(L.LightningDataModule):
         self.setup("validate")
         dataloaders = [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)]
         if self.additional_dataset_classes is not None:
-            assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
             dataloaders.extend(
                 [self.get_dataloader()(val, batch_size=self.batch_size, shuffle=False) for val in self.val_list[1:]]
             )
@@ -109,7 +112,6 @@ class NletDataModule(L.LightningDataModule):
         elif mode == "val":
             val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]  # type: ignore
             if self.additional_dataset_classes is not None:
-                assert self.additional_data_dirs is not None, "additional_data_dirs must be set"
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
