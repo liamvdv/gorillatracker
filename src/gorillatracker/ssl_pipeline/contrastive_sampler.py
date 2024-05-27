@@ -109,7 +109,7 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
 
 def sampling_strategy(
-    video_id: int, min_n_images_per_tracking: int, feature_types: list[str], min_confidence: float
+    video_id: int, feature_types: list[str], min_confidence: float
 ) -> Select[tuple[TrackingFrameFeature]]:
     query = video_filter(video_id)
     query = cached_filter(query)
@@ -132,7 +132,6 @@ def get_random_ssl_sampler(
     engine = create_engine(GorillaDatasetKISZ.DB_URI)
     query_builder = partial(
         sampling_strategy,
-        min_n_images_per_tracking=min_n_images_per_tracking,
         feature_types=feature_types,
         min_confidence=min_confidence,
     )
