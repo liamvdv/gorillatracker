@@ -161,5 +161,7 @@ mnist/
 *.pt
 *.ckpt
 *.db
-*visualized.mp4
+*mp4
+*MP4
+*AVI
 cropped_images/*

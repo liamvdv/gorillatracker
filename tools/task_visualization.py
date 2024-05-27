@@ -26,12 +26,12 @@ class TaskVisualizer:
 
     # db
     session: Session
-    version: str = "2024-04-09"
-    
+    version: str = "2024-04-18"
 
     def __init__(self, session: Session) -> None:
         self.layout.split(
-            Layout(name="header", size=3), Layout(name="main")  # for generar information  # for progress bars
+            Layout(name="header", size=3),
+            Layout(name="main"),  # for generar information  # for progress bars
         )
         self.progress = Progress(
             TextColumn("[progress.description]{task.description}"),
@@ -113,5 +113,5 @@ class TaskVisualizer:
 
 
 if __name__ == "__main__":
-    visualizer = TaskVisualizer(Session(GorillaDatasetKISZ("sqlite:///test.db").engine))
+    visualizer = TaskVisualizer(Session(GorillaDatasetKISZ(GorillaDatasetKISZ.DB_URI).engine))
     visualizer.update_loop()

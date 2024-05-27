@@ -242,7 +242,7 @@ class TrackingFrameFeature(Base):
     __tablename__ = "tracking_frame_feature"
 
     tracking_frame_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))  # NOTE(memben): Denormalized
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"), index=True)  # NOTE(memben): Denormalized
     tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True)
     frame_nr: Mapped[int]
     bbox_x_center_n: Mapped[float]
