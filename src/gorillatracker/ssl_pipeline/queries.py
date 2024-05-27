@@ -55,6 +55,13 @@ def associated_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tupl
     return query.where(TrackingFrameFeature.tracking_id.isnot(None))
 
 
+def cached_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[TrackingFrameFeature]]:
+    """
+    Filters the query to include only TrackingFrameFeature instances that were cropped.
+    """
+    return query.where(TrackingFrameFeature.cached)
+
+
 def min_count_filter(
     query: Select[tuple[TrackingFrameFeature]], min_feature_count: int, feature_type: Optional[str] = None
 ) -> Select[tuple[TrackingFrameFeature]]:
