@@ -1,0 +1,18 @@
+{
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        ".venv",
+        "build",
+        "dist"
+    ], 
+    "include": [
+        "src/**/*",
+        "tests/**/*",
+        "pyproject.toml",
+        "setup.cfg",
+        "setup.py",
+        "README.md",
+        "LICENSE"
+    ]
+}

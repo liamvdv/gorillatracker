@@ -249,16 +249,21 @@ class BaseModule(L.LightningModule):
             self.loss_module_train.loss.set_using_memory_bank(True)
             logger.info("Using memory bank")
 
+    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels_tuple = batch
+        ids, images, labels = batch
 
-        # assert isinstance(labels, list) and isinstance(labels[0], torch.tensor), f"Labels should be a list of tensor batches with ints, got {type(labels)}"
-        labels: torch.Tensor = torch.cat(list(labels_tuple), dim=0).to(self.device)  # type: ignore
+        # HACK(memben): We'll allow this for now, but we should correct it later
+        if torch.is_tensor(labels[0]):
+            flat_labels = torch.cat(labels, dim=0)  # type: ignore
+        else:
+            # NOTE(memben): this is the expected shape
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)  # type: ignore
 
         vec = torch.cat(images, dim=0)
         embeddings = self.forward(vec)
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, labels)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -288,13 +293,19 @@ class BaseModule(L.LightningModule):
         )
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
+    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
         n_anchors = len(images[0])
         vec = torch.cat(images, dim=0)
-        flat_labels = (
-            torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
-        )
+
+        # HACK(memben): We'll allow this for now, but we should correct it later
+        if torch.is_tensor(labels[0]):
+            flat_labels = torch.cat(labels, dim=0)  # type: ignore
+        else:
+            # NOTE(memben): this is the expected shape
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)  # type: ignore
+
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx)  # type: ignore
@@ -324,9 +335,17 @@ class BaseModule(L.LightningModule):
             for i, table in enumerate(self.embeddings_table_list):
                 logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
-                # get weights for all classes by averaging over all embeddings
-                loss_module_val = self.loss_module_val if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss  # type: ignore
-                num_classes = self.loss_module_val.num_classes if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss.num_classes  # type: ignore
+            # get weights for all classes by averaging over all embeddings
+            loss_module_val = (
+                self.loss_module_val
+                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                else self.loss_module_val.loss
+            )  # type: ignore
+            num_classes = (
+                self.loss_module_val.num_classes
+                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                else self.loss_module_val.loss.num_classes
+            )  # type: ignore
 
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
             lse = LinearSequenceEncoder()
@@ -348,7 +367,8 @@ class BaseModule(L.LightningModule):
             losses = []
             for _, row in table.iterrows():
                 loss, _, _ = loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(lse.decode(row["label"])).unsqueeze(0)  # type: ignore
+                    torch.tensor(row["embedding"]).unsqueeze(0),
+                    torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()

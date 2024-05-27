@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 class SSLDataModule(L.LightningDataModule):
     def __init__(
         self,
+        data_dir: str,
         batch_size: int = 32,
         transforms: gtypes.Transform = lambda x: x,
         training_transforms: gtypes.Transform = lambda x: x,
-        data_dir: str = "/workspaces/gorillatracker/cropped_images/2024-04-09",
         additional_dataset_class_ids: Optional[List[str]] = None,
         additional_data_dirs: Optional[List[str]] = None,
     ) -> None:
@@ -88,7 +88,9 @@ class SSLDataModule(L.LightningDataModule):
         self.val_data_module.setup("fit")
 
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn)
+        return DataLoader(
+            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=40
+        )
 
     # TODO(memben): we want to use SSL Data for validation
     def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
@@ -105,19 +107,3 @@ class SSLDataModule(L.LightningDataModule):
         values = tuple(torch.stack(nlet[1]) for nlet in batch)
         labels = tuple(nlet[2] for nlet in batch)
         return ids, values, labels
-
-
-if __name__ == "__main__":
-    dm = SSLDataModule(transforms=transforms.ToTensor())
-    print("Data Module created")
-    dm.setup("fit")
-    print("Data Module setup")
-    train_loader = dm.train_dataloader()
-    val_loader = dm.val_dataloader()
-    print("Data Loaders created")
-    for batch in train_loader:
-        print(batch)
-        break
-    for batch in val_loader:
-        print(batch)
-        break

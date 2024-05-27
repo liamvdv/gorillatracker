@@ -21,7 +21,6 @@ from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
-warnings.filterwarnings("ignore", ".*does not have many workers.*")
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
@@ -86,20 +85,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        # args.video_data,
-        model_transforms,
-        model.get_training_transforms(),
-        args.additional_val_dataset_classes,
-        args.additional_val_data_dirs,
-    )
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
