@@ -59,6 +59,7 @@
     ],
     "remoteEnv": {
         "WANDB_API_KEY": "${localEnv:WANDB_API_KEY}",
+        "POSTGRESQL_URI": "{POSTGRESQL_URI}"
         // "WANDB_DATA_DIR": "${localEnv:WANDB_DATA_DIR}",
         // "WANDB_DIR": "${localEnv:WANDB_DIR}",
         // "HF_DATASETS_CACHE": "${localEnv:HF_DATASETS_CACHE}",

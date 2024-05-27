@@ -4,19 +4,21 @@ import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from itertools import groupby
+from pathlib import Path
 from typing import Any
 
 from PIL import Image
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
 @dataclass(frozen=True, order=True)
 class ContrastiveImage:
     id: str
-    image_path: str
+    image_path: Path
     class_label: int
 
     @property
@@ -77,6 +79,23 @@ class ContrastiveClassSampler(ContrastiveSampler):
         negatives = self.classes[negative_class]
         return random.choice(negatives)
 
+    class CliqueGraphSampler(ContrastiveSampler):
+        def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
+            self.graph = graph
+
+        def __getitem__(self, idx: int) -> ContrastiveImage:
+            return self.graph[idx]
+
+        def __len__(self) -> int:
+            return len(self.graph)
+
+        def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
+            return self.graph.get_random_clique_member(sample, exclude=[sample])
+
+        def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
+            random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
+            return self.graph.get_random_clique_member(random_adjacent_clique)
+
 
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
 def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
@@ -98,7 +117,8 @@ def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
             .all()
         )
         contrastive_images = [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id) for f in tracked_features  # type: ignore
+            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
+            for f in tracked_features
         ]
         groups = groupby(contrastive_images, lambda x: x.class_label)
         classes: dict[Any, list[ContrastiveImage]] = {}
