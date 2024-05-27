@@ -114,8 +114,8 @@ def sampling_strategy(
     query = video_filter(video_id)
     query = cached_filter(query)
     query = associated_filter(query)
-    query = min_count_filter(query, min_n_images_per_tracking)
     query = feature_type_filter(query, feature_types)
+    # query = min_count_filter(query, min_n_images_per_tracking)
     query = confidence_filter(query, min_confidence)
     return query
 
@@ -165,7 +165,7 @@ def get_random_ssl_sampler(
 if __name__ == "__main__":
     version = "2024-04-18"
     sampler = get_random_ssl_sampler(
-        f"/workspaces/gorillatracker/data/cropped-images/{version}", "equidistant", 200, 15, 15, ["body"], 0.5
+        f"/workspaces/gorillatracker/video_data/cropped-images/{version}", "equidistant", 10, 15, 15, ["body"], 0.5
     )
     print(len(sampler))
     sample = sampler[0]
