@@ -20,7 +20,6 @@ from gorillatracker.ssl_pipeline.queries import (
     cached_filter,
     confidence_filter,
     feature_type_filter,
-    min_count_filter,
     video_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler
@@ -116,7 +115,6 @@ def sampling_strategy(
     query = cached_filter(query)
     query = associated_filter(query)
     query = feature_type_filter(query, feature_types)
-    query = min_count_filter(query, min_n_images_per_tracking)
     query = confidence_filter(query, min_confidence)
     return query
 
