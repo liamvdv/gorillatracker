@@ -87,12 +87,14 @@ class TrainingArgs:
         "online/semi-hard",
         "softmax/arcface",
         "softmax/vpl",
+        "combined",
         "offline/native/l2sp",
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
+        "combined/l2sp",
     ] = field(default="offline")
     kfold: bool = field(default=False)
 

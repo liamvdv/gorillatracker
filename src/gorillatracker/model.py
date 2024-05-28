@@ -207,7 +207,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
-            log_func=self.log,
+            log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -224,6 +224,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
+            log_func=lambda x, y: self.log("val/"+ x, y, on_epoch=True),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -290,21 +291,26 @@ class BaseModule(L.LightningModule):
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-            self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
-            self.log("val/positive_distance", pos_dist, on_step=True)
-            self.log("val/negative_distance", neg_dist, on_step=True)
+            self.log("val/loss", loss, sync_dist=True, prog_bar=True)
+            self.log("val/positive_distance", pos_dist, )
+            self.log("val/negative_distance", neg_dist, )
             return loss
         else:
             return torch.tensor(0.0)
 
     def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
-        if "softmax" in self.loss_mode:
+        if "softmax" in self.loss_mode or "combined" in self.loss_mode:
+            
+            
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
             loss_module_val = self.loss_module_val if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss  # type: ignore
-            num_classes = self.loss_module_val.num_classes if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss.num_classes  # type: ignore
+            if "combined" in self.loss_mode:
+                loss_module_val = loss_module_val.arcface  # type: ignore
+            
+            num_classes = loss_module_val.num_classes
 
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
             lse = LinearSequenceEncoder()

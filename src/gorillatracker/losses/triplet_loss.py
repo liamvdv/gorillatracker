@@ -177,6 +177,15 @@ def euclidean_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     return distance_matrix_stable
 
 
+def cosine_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
+    # formula: 1 - cosine similarity = 1 - (A.B / |A||B|) (range: [0, 2])
+    
+    dot_product = torch.mm(embeddings, embeddings.t()) # shape: (batch_size, batch_size)
+    norm = torch.sqrt(torch.diag(dot_product)) # shape: (batch_size,)
+    norm = norm.unsqueeze(0) * norm.unsqueeze(1) # shape: (batch_size, batch_size)
+    
+    return (1 - dot_product / norm) / 2 
+
 class TripletLossOnline(nn.Module):
     """
     TripletLossOnline operates on Quadlets and does batch optimization.
@@ -193,7 +202,7 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor, dist_calc=euclidean_distance_matrix) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -206,7 +215,7 @@ class TripletLossOnline(nn.Module):
 
         # step 1 - get distance matrix
         # shape: (batch_size, batch_size)
-        distance_matrix = euclidean_distance_matrix(embeddings)
+        distance_matrix = dist_calc(embeddings)
 
         # step 2 - compute loss values for all triplets by applying broadcasting to distance matrix
 
@@ -272,6 +281,7 @@ class TripletLossOnline(nn.Module):
             hard_mask = hard_mask.to(mask.device)
             # combine with base mask
             mask = torch.logical_and(mask, hard_mask)
+
 
         elif (
             self.mode == "semi-hard"
@@ -364,6 +374,24 @@ class L2SPRegularization_Wrapper(nn.Module):
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
 
 
+class CombinedLoss(nn.Module):
+    def __init__(self, arcface_loss: ArcFaceLoss, triplet_loss: TripletLossOnline, lambda_: float = 0.5, log_func: Callable[[str, float], None] = lambda x, y, on_epoch: None):
+        super().__init__()
+        self.arcface = arcface_loss
+        self.triplet = triplet_loss
+        self.lambda_ = lambda_
+        self.log_func = log_func
+        
+    def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
+        loss_arcface, _, _ = self.arcface(*args, **kwargs)
+        loss_triplet, pos_dist, neg_dist = self.triplet(*args, **kwargs, dist_calc=cosine_distance_matrix)
+        loss_triplet = torch.clamp(loss_triplet, min=0.0, max=1.0)
+        
+        self.log_func("arcface", loss_arcface.item())
+        self.log_func("triplet", loss_triplet.item())
+        return loss_arcface + self.lambda_ * loss_triplet, pos_dist, neg_dist
+
+
 def get_loss(
     loss_mode: str,
     log_func: Callable[[str, float], None] = lambda x, y: None,
@@ -404,6 +432,19 @@ def get_loss(
             delta_t=kw_args["delta_t"],
             mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
             accelerator=kw_args["accelerator"],
+        )
+    elif loss_mode == "combined":
+        loss_module = CombinedLoss(
+            arcface_loss=ArcFaceLoss(
+                embedding_size=kw_args["embedding_size"],
+                num_classes=kw_args["num_classes"],
+                s=kw_args["s"],
+                margin=kw_args["margin"],
+                accelerator=kw_args["accelerator"],
+            ),
+            triplet_loss=TripletLossOnline(mode="soft", margin=1.0),
+            lambda_=10.0,
+            log_func=log_func,
         )
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
@@ -479,3 +520,5 @@ if __name__ == "__main__":
     print(f"Hard Loss {loss}")
     print(f"Correct Semi Hard Loss {loss_semi_manual}")
     print(f"Semi Hard Loss {loss_semi}")
+
+
