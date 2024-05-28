@@ -145,16 +145,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Effective batch size: {args.batch_size} | "
         )
 
-    if args.pretrained_weights_file is not None:
-        # delete everything in model except model.model
-        for k in list(model.__dict__.keys()):
-            if k != "model" and not k.startswith("_"):
-                del model.__dict__[k]
-        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
-        torch.save(model.state_dict(), args.pretrained_weights_file)
-        logger.info("Model saved")
-        exit(0)
-
     ### Preperation for quantization aware training ###
     if args.use_quantization_aware_training:
         logger.info("Preperation for quantization aware training...")
@@ -219,5 +209,5 @@ if __name__ == "__main__":
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()
-    with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+    # with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
+    main(parsed_arg_groups)
