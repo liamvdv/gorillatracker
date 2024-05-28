@@ -43,9 +43,9 @@ class SplitArgs:
     max_val_videos: int = field(default=1000000)
     max_test_videos: int = field(default=1000000)
 
-    _train_video_ids: list[int] = field(init=False, default=[])
-    _val_video_ids: list[int] = field(init=False, default=[])
-    _test_video_ids: list[int] = field(init=False, default=[])
+    _train_video_ids: list[int] = field(init=False, default_factory=lambda: [])
+    _val_video_ids: list[int] = field(init=False, default_factory=lambda: [])
+    _test_video_ids: list[int] = field(init=False, default_factory=lambda: [])
 
     def train_video_ids(self) -> list[int]:
         return self._train_video_ids
@@ -163,7 +163,8 @@ class SplitArgs:
         with open(file_path, "wb") as file:
             pickle.dump(self, file)
 
-    def load_pickle(self, path: str) -> None:
+    @classmethod
+    def load_pickle(cls, path: str) -> None:
         """Load the class instance from a pickle file."""
         with open(path, "rb") as file:
             return pickle.load(file)
@@ -171,12 +172,12 @@ class SplitArgs:
 
 if __name__ == "__main__":
     args = SplitArgs(
-        db_uri="db_uri_here",
+        db_uri="db-uri",
         version="2024-04-18",
         save_path="/workspaces/gorillatracker/data/splits/SSL/",
-        split_by="percentage",
-        train_split=80,
-        val_split=10,
+        split_by="camera",
+        train_split=10,
+        val_split=80,
         test_split=10,
         train_starttime=dt.datetime(2010, 1, 1),
         train_endtime=dt.datetime(2030, 1, 1),
@@ -190,3 +191,8 @@ if __name__ == "__main__":
         max_val_videos=1000000,  # max videos in val bucket
         max_test_videos=1000000,  # max videos in test bucket
     )
+    args.create_split()
+    args.save_to_pickle()
+    print("Split created and saved")
+    # args = SplitArgs.load_pickle("path.pkl")
+    print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))
