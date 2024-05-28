@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
@@ -23,7 +24,6 @@ from gorillatracker.ssl_pipeline.queries import (
     video_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler
-from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 
 
 @dataclass(frozen=True, order=True)

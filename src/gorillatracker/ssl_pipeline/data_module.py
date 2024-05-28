@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
 from gorillatracker.datasets.cxl import CXLDataset
+from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.ssl_pipeline.ssl_dataset import SSLDataset, build_triplet
 
 # logging.basicConfig(level=logging.INFO)
@@ -17,28 +18,18 @@ logger = logging.getLogger(__name__)
 class SSLDataModule(L.LightningDataModule):
     def __init__(
         self,
+        ssl_config: SSLConfig,
         batch_size: int = 32,
         transforms: gtypes.Transform = lambda x: x,
         training_transforms: gtypes.Transform = lambda x: x,
         data_dir: str = "/workspaces/gorillatracker/cropped_images/2024-04-09",
-        tff_selection: str = "random",
-        n_videos: int = 200,
-        n_samples: int = 15,
-        min_n_images_per_tracking: int = 15,
-        feature_types: list[str] = ["body"],
-        min_confidence: float = 0.5,
     ) -> None:
         super().__init__()
         self.transforms = transforms
         self.training_transforms = training_transforms
         self.batch_size = batch_size
         self.data_dir = data_dir
-        self.tff_selection = tff_selection
-        self.n_videos = n_videos
-        self.n_samples = n_samples
-        self.min_n_images_per_tracking = min_n_images_per_tracking
-        self.feature_types = feature_types
-        self.min_confidence = min_confidence
+        self.ssl_config = ssl_config
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
@@ -47,12 +38,7 @@ class SSLDataModule(L.LightningDataModule):
                 build_triplet,
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
-                tff_selection=self.tff_selection,
-                n_videos=self.n_videos,
-                n_samples=self.n_samples,
-                min_n_images_per_tracking=self.min_n_images_per_tracking,
-                feature_types=self.feature_types,
-                min_confidence=self.min_confidence,
+                ssl_config=self.ssl_config,
             )
             self.setup_val()
         elif stage == "test":
@@ -99,7 +85,15 @@ class SSLDataModule(L.LightningDataModule):
 
 
 if __name__ == "__main__":
-    dm = SSLDataModule(transforms=transforms.ToTensor())
+    ssl_config = SSLConfig(
+            tff_selection="random",
+            n_videos=20,
+            n_samples=15,
+            feature_types=["body"],
+            min_confidence=0.5,
+            split=None,
+        )
+    dm = SSLDataModule(ssl_config = ssl_config, transforms=transforms.ToTensor())
     print("Data Module created")
     dm.setup("fit")
     print("Data Module setup")
