@@ -49,8 +49,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.knn_with_train = knn_with_train
         self.run = wandb_run
         self.kfold_k = kfold_k if kfold_k is not None else None
-        dm.setup("fit")
-        self.train_dataloader = dm.train_dataloader()
+        if knn_with_train:
+            dm.setup("fit")
+            self.train_dataloader = dm.train_dataloader()
 
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
@@ -253,7 +254,6 @@ def knn(
     train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[torch.Tensor] = None,
 ) -> Dict[str, Any]:
-
     if use_train_embeddings and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
 

@@ -122,9 +122,6 @@ class TrainingArgs:
     feature_types: list[str] = field(default=["body"])
     min_confidence: float = field(default=0.5)
 
-    pretrained_weights_file: Union[str, None] = field(default=None)
-    # Add any additional fields as needed.
-
     def __post_init__(self) -> None:
         assert self.num_devices > 0
         assert self.batch_size > 0

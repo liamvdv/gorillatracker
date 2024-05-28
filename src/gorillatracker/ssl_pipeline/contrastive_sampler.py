@@ -14,16 +14,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
-from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.queries import (
-    associated_filter,
-    cached_filter,
-    confidence_filter,
-    feature_type_filter,
-    video_filter,
-)
-from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
 @dataclass(frozen=True, order=True)
@@ -90,22 +81,23 @@ class ContrastiveClassSampler(ContrastiveSampler):
         negatives = self.classes[negative_class]
         return random.choice(negatives)
 
-    class CliqueGraphSampler(ContrastiveSampler):
-        def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
-            self.graph = graph
 
-        def __getitem__(self, idx: int) -> ContrastiveImage:
-            return self.graph[idx]
+class CliqueGraphSampler(ContrastiveSampler):
+    def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
+        self.graph = graph
 
-        def __len__(self) -> int:
-            return len(self.graph)
+    def __getitem__(self, idx: int) -> ContrastiveImage:
+        return self.graph[idx]
 
-        def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
-            return self.graph.get_random_clique_member(sample, exclude=[sample])
+    def __len__(self) -> int:
+        return len(self.graph)
 
-        def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
-            random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
-            return self.graph.get_random_clique_member(random_adjacent_clique)
+    def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
+        return self.graph.get_random_clique_member(sample, exclude=[sample])
+
+    def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
+        random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
+        return self.graph.get_random_clique_member(random_adjacent_clique)
 
 
 def sampling_strategy(
@@ -120,32 +112,24 @@ def sampling_strategy(
 
 
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
-def get_random_ssl_sampler(
-    base_path: str,
-    tff_selection: str,
-    n_videos: int,
-    n_samples: int,
-    min_n_images_per_tracking: int,
-    feature_types: list[str],
-    min_confidence: float,
-) -> ContrastiveClassSampler:
-    engine = create_engine(GorillaDatasetKISZ.DB_URI)
-    query_builder = partial(
-        sampling_strategy,
-        feature_types=feature_types,
-        min_confidence=min_confidence,
-    )
-    sampler = (
-        EquidistantSampler(query_builder, n_samples=n_samples)
-        if tff_selection == "equidistant"
-        else RandomSampler(query_builder, n_samples=n_samples)
-    )
+def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
+    WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
+    PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
+    engine = create_engine(PUBLIC_DB_URI)
     with Session(engine) as session:
-        video_ids = session.execute(select(Video.video_id)).scalars().all()
-        tracked_features = []
-        for video_id in tqdm(video_ids[:n_videos], unit="video", desc="Selecting TFFs"):
-            for tracked_feature in sampler.sample(video_id, session):
-                tracked_features.append(tracked_feature)
+        tracked_features = list(
+            session.execute(
+                select(TrackingFrameFeature)
+                .where(
+                    TrackingFrameFeature.cached,
+                    TrackingFrameFeature.tracking_id.isnot(None),
+                    TrackingFrameFeature.feature_type == "body",
+                )
+                .order_by(TrackingFrameFeature.tracking_id)
+            )
+            .scalars()
+            .all()
+        )
         contrastive_images = [
             ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
             for f in tracked_features
@@ -161,10 +145,8 @@ def get_random_ssl_sampler(
 
 
 if __name__ == "__main__":
-    version = "2024-04-18"
-    sampler = get_random_ssl_sampler(
-        f"/workspaces/gorillatracker/video_data/cropped-images/{version}", "equidistant", 20, 15, 15, ["body"], 0.5
-    )
+    version = "2024-04-09"
+    sampler = get_random_ssl_sampler(f"/workspaces/gorillatracker/cropped_images/{version}")
     print(len(sampler))
     sample = sampler[0]
     print(sample)
