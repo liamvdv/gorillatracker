@@ -44,7 +44,7 @@ s: 64.0                             # Scale for the softmax losses
 delta_t: 50                         # Delta t for the vpl loss
 mem_bank_start_epoch: 10            # Epoch to start using the memory bank
 lambda_membank: 0.5                 # Lambda for the memory bank loss
-loss_mode: "offline/native/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
+loss_mode: "offline/native"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 
@@ -63,7 +63,7 @@ max_epochs: 10                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-val_check_interval: 1.0
+val_check_interval: 100
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
 knn_with_train: False           
@@ -73,3 +73,4 @@ knn_with_train: False
 use_ssl: True
 
 data_resize_transform: 192
+data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"

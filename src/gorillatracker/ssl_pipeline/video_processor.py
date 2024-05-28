@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import multiprocessing
 from collections import defaultdict
@@ -116,9 +117,8 @@ def track_worker(
 
     with Session(engine) as session:
         for task in get_next_task(session, TaskType.TRACK, task_subtype=feature_type):
-            with transactional_task(session, task):
-                video = task.video
-                track_and_update(session, video, yolo_model, yolo_kwargs, tracker_config, feature_type)
+            video = task.video
+            track_and_update(session, video, yolo_model, yolo_kwargs, tracker_config, feature_type)
 
 
 def predict_worker(
@@ -134,9 +134,8 @@ def predict_worker(
 
     with Session(engine) as session:
         for task in get_next_task(session, TaskType.PREDICT, task_subtype=feature_type):
-            with transactional_task(session, task):
-                video = task.video
-                predict_and_update(session, video, yolo_model, yolo_kwargs, feature_type)
+            video = task.video
+            predict_and_update(session, video, yolo_model, yolo_kwargs, feature_type)
 
 
 def multiprocess_track(

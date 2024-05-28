@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
@@ -79,37 +80,39 @@ class ContrastiveClassSampler(ContrastiveSampler):
         negatives = self.classes[negative_class]
         return random.choice(negatives)
 
-    class CliqueGraphSampler(ContrastiveSampler):
-        def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
-            self.graph = graph
 
-        def __getitem__(self, idx: int) -> ContrastiveImage:
-            return self.graph[idx]
+class CliqueGraphSampler(ContrastiveSampler):
+    def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
+        self.graph = graph
 
-        def __len__(self) -> int:
-            return len(self.graph)
+    def __getitem__(self, idx: int) -> ContrastiveImage:
+        return self.graph[idx]
 
-        def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
-            return self.graph.get_random_clique_member(sample, exclude=[sample])
+    def __len__(self) -> int:
+        return len(self.graph)
 
-        def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
-            random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
-            return self.graph.get_random_clique_member(random_adjacent_clique)
+    def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
+        return self.graph.get_random_clique_member(sample, exclude=[sample])
+
+    def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
+        random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
+        return self.graph.get_random_clique_member(random_adjacent_clique)
 
 
 # TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
 def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
-    WHATEVER_PWD = "DEV_PWD_139u02riowenfgiw4y589wthfn"
-    PUBLIC_DB_URI = f"postgresql+psycopg2://postgres:{WHATEVER_PWD}@postgres:5432/postgres"
-    engine = create_engine(PUBLIC_DB_URI)
+    engine = create_engine(GorillaDatasetKISZ.DB_URI)
     with Session(engine) as session:
         tracked_features = list(
             session.execute(
                 select(TrackingFrameFeature)
                 .where(
+                    TrackingFrameFeature.tracking_frame_feature_id < 10000000,
                     TrackingFrameFeature.cached,
                     TrackingFrameFeature.tracking_id.isnot(None),
-                    TrackingFrameFeature.feature_type == "body",
+                    TrackingFrameFeature.feature_type == "face_90",
+                    TrackingFrameFeature.bbox_width > 65,
+                    TrackingFrameFeature.bbox_height > 65,
                 )
                 .order_by(TrackingFrameFeature.tracking_id)
             )
