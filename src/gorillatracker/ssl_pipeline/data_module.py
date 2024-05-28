@@ -34,7 +34,7 @@ class SSLDataModule(L.LightningDataModule):
         self.data_dir = data_dir
         self.additional_dataset_class_ids = additional_dataset_class_ids
         self.additional_data_dirs = additional_data_dirs
-        
+
         assert (additional_dataset_class_ids is None and additional_data_dirs is None) or len(
             additional_dataset_class_ids  # type: ignore
         ) == len(
