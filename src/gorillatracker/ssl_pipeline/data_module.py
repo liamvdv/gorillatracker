@@ -86,14 +86,14 @@ class SSLDataModule(L.LightningDataModule):
 
 if __name__ == "__main__":
     ssl_config = SSLConfig(
-            tff_selection="random",
-            n_videos=20,
-            n_samples=15,
-            feature_types=["body"],
-            min_confidence=0.5,
-            split=None,
-        )
-    dm = SSLDataModule(ssl_config = ssl_config, transforms=transforms.ToTensor())
+        tff_selection="random",
+        n_videos=20,
+        n_samples=15,
+        feature_types=["body"],
+        min_confidence=0.5,
+        split=None,
+    )
+    dm = SSLDataModule(ssl_config=ssl_config, transforms=transforms.ToTensor())
     print("Data Module created")
     dm.setup("fit")
     print("Data Module setup")
