@@ -34,9 +34,9 @@ TripletBatch = Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]
 QuadletBatch = Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]
 # WRONG ensd here
 
-NletBatchIds = Tuple[NletId, ...] # e.g. ((anchor_id_1, positive_id_1, negative_id_1), ...)
-NletBatchValues = Tuple[NletValue, ...] # e.g. ((anchor_image_1, positive_image_1, negative_image_1), ...)
-NletBatchLabels = Tuple[NletLabel, ...] # e.g. ((anchor_label_1, positive_label_1, negative_label_1), ...)
+NletBatchIds = Tuple[NletId, ...]  # e.g. ((anchor_id_1, positive_id_1, negative_id_1), ...)
+NletBatchValues = Tuple[NletValue, ...]  # e.g. ((anchor_image_1, positive_image_1, negative_image_1), ...)
+NletBatchLabels = Tuple[NletLabel, ...]  # e.g. ((anchor_label_1, positive_label_1, negative_label_1), ...)
 
 NletBatch = Tuple[NletBatchIds, NletBatchValues, NletBatchLabels]
 

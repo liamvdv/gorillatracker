@@ -1,7 +1,6 @@
 import logging
 
 import lightning as L
-import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
