@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore", ".*was configured so validation will run at th
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
 
-def main(args: TrainingArgs) -> None:  # noqa: C901
+def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
