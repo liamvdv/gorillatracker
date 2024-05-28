@@ -1,3 +1,4 @@
+import datetime as dt
 from typing import Union
 
 from sqlalchemy import Integer, Select, and_, case, extract, func, or_, select
@@ -27,24 +28,6 @@ def video_count_filter(query: Select[tuple[Video]], num_videos: int) -> Select[t
     return query.limit(num_videos)
 
 
-def year_filter(query: Select[tuple[Video]], years: list[Union[int, None]]) -> Select[tuple[Video]]:
-    """Filter the query to return videos from a specific year."""
-    if None in years:
-        years = [year for year in years if year is not None]
-        return query.where(or_(extract("year", Video.start_time).in_(years), Video.start_time.is_(None)))
-    else:
-        return query.where(extract("year", Video.start_time).in_(years))
-
-
-def month_filter(query: Select[tuple[Video]], months: list[Union[int, None]]) -> Select[tuple[Video]]:
-    """Filter the query to return videos from specific months."""
-    if None in months:
-        months = [month for month in months if month is not None]
-        return query.where(or_(extract("month", Video.start_time).in_(months), Video.start_time.is_(None)))
-    else:
-        return query.where(extract("month", Video.start_time).in_(months))
-
-
 def hour_filter(query: Select[tuple[Video]], hours: list[Union[int, None]]) -> Select[tuple[Video]]:
     """Filter the query to return videos from a specific time of the day."""
     if None in hours:
@@ -52,6 +35,17 @@ def hour_filter(query: Select[tuple[Video]], hours: list[Union[int, None]]) -> S
         return query.where(or_(extract("hour", Video.start_time).in_(hours), Video.start_time.is_(None)))
     else:
         return query.where(extract("hour", Video.start_time).in_(hours))
+
+
+def date_filter(
+    query: Select[tuple[Video]], range: tuple[dt.datetime, dt.datetime], allow_none: bool = False
+) -> Select[tuple[Video]]:
+    if allow_none:
+        return query.where(
+            or_(and_(Video.start_time >= range[0], Video.start_time <= range[1]), Video.start_time.is_(None))
+        )
+    else:
+        return query.where(and_(Video.start_time >= range[0], Video.start_time <= range[1]))
 
 
 def video_length_filter(query: Select[tuple[Video]], min_length: int, max_length: int) -> Select[tuple[Video]]:
@@ -68,6 +62,10 @@ def camera_id_filter(query: Select[tuple[Video]], camera_ids: list[int]) -> Sele
 def video_not_in(query: Select[tuple[Video]], video_ids: list[int]) -> Select[tuple[Video]]:
     """Filter the query to return videos not in the list of video_ids."""
     return query.where(Video.video_id.notin_(video_ids))
+
+
+def order_by_time(query: Select[tuple[Video]]) -> Select[tuple[Video]]:
+    return query.order_by(Video.start_time)
 
 
 if __name__ == "__main__":
