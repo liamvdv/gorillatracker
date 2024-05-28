@@ -9,7 +9,7 @@ CT = TypeVar("CT")
 
 
 class Comparable(Protocol):
-    def __lt__(self: CT, other: CT) -> bool: ...
+    def __lt__(self: CT, other: CT, /) -> bool: ...
 
 
 T = TypeVar("T")
@@ -157,6 +157,7 @@ class IndexedCliqueGraph(CliqueGraph[K]):
     def get_clique_representative(self, v: K) -> K:
         return min(self.get_clique(v))
 
+    # override
     def get_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
         adjacent_clique_roots = self._get_adjacent_clique_roots(v)
         adjacent_cliques = {}
@@ -178,10 +179,10 @@ P = TypeVar("P", bound=Comparable)
 class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
     """Indexed Clique Graph supporting multiple layers of cut edges.
     This allows for hierarchical or multi-layered connections between cliques.
-    A clique in a parent layer does not guarantee that the children are connected,
+    A clique in a parent layer does not guarantee that the children are connected
     but a partition in a parent layer ensures a partition in the child layers."""
 
-    def __init__(self, vertices: list[K], parent: CliqueGraph[P], parent_edges: dict[K, P]) -> None:
+    def __init__(self, vertices: list[K], parent: CliqueGraph[P], parent_edges: dict[K, P | None]) -> None:
         """
         Args:
             vertices: List of vertices in the current layer
@@ -193,13 +194,24 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         self.parent_edges = parent_edges
         self.inverse_parent_edges: defaultdict[P, set[K]] = defaultdict(set)
         for child_r, parent_r in parent_edges.items():
-            self.inverse_parent_edges[parent_r].add(child_r)
+            if parent_r is not None:
+                self.inverse_parent_edges[parent_r].add(child_r)
 
-    def _find_root(self, v: K) -> K:
-        return super()._find_root(v)
+    # override
+    def merge(self, u: K, v: K) -> None:
+        u_root, v_root = self._find_root(u), self._find_root(v)
+        super().merge(u, v)
+        parent_u, parent_v = self.parent_edges.pop(u_root, None), self.parent_edges.pop(v_root, None)
+        if parent_u is not None and parent_v is not None:
+            assert parent_u == parent_v, "MultiParent merge not supported"
+        new_root = self._find_root(u)
+        self.parent_edges[new_root] = parent_u or parent_v
 
-    def is_partioned(self, u: K, v: K) -> bool:
-        return super().is_partitioned(u, v) or self._is_parent_partitioned(u, v)
+    # override
+    def is_partitioned(self, u: K, v: K) -> bool:
+        self_p = super().is_partitioned(u, v)
+        parent_p = self._is_parent_partitioned(u, v)
+        return self_p or parent_p
 
     def _is_parent_partitioned(self, u: K, v: K) -> bool:
         root_u, root_v = self._find_root(u), self._find_root(v)
@@ -208,6 +220,7 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
             return False
         return self.parent.is_partitioned(parent_u, parent_v)
 
+    # override
     def get_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
         return super().get_adjacent_cliques(v) | self._get_adjacent_cliques_via_parent(v)
 
@@ -215,6 +228,7 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         adjacent_clique_representatives = self._get_adjacent_clique_roots_via_parent(v)
         return {r: self.get_clique(r) for r in adjacent_clique_representatives}
 
+    # override
     def _get_adjacent_clique_roots(self, v: K) -> set[K]:
         return super()._get_adjacent_clique_roots(v) | self._get_adjacent_clique_roots_via_parent(v)
 
@@ -239,5 +253,4 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         assert len(adjacent_clique_representatives) == len(
             set(adjacent_clique_representatives)
         ), "Must be unique. Logic Error."
-
         return set(adjacent_clique_representatives)
