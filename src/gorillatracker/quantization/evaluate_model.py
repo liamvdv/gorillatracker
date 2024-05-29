@@ -2,14 +2,12 @@ from typing import Union
 
 import torch
 import ai_edge_torch
-import torchvision
 from torch.fx import GraphModule
 
 import gorillatracker.quantization.performance_evaluation as performance_evaluation
 import gorillatracker.quantization.quantization_functions as quantization_functions
 from gorillatracker.datasets.cxl import CXLDataset
 from gorillatracker.model import BaseModule
-from gorillatracker.quantization.export_model import convert_model_to_onnx
 from gorillatracker.quantization.utils import get_model_input, log_model_to_file
 from gorillatracker.utils.embedding_generator import get_model_for_run_url
 
