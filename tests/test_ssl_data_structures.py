@@ -128,10 +128,11 @@ def three_layer_clique_graph(
 ) -> MultiLayerCliqueGraph[int]:
     second_layer = two_layer_clique_graph
     third_layer = MultiLayerCliqueGraph(
-        [111, 112, 113, 211, 212, 213, 311, 312, 313], second_layer, {111: 11, 211: 21, 311: 31}
+        [111, 112, 113, 121, 122, 211, 212, 213, 311, 312, 313], second_layer, {111: 11, 121: 12, 211: 21, 311: 31}
     )
     third_layer.merge(111, 112)
     third_layer.merge(112, 113)
+    third_layer.merge(121, 122)
     third_layer.merge(211, 212)
     third_layer.merge(212, 213)
     third_layer.merge(311, 312)
@@ -156,5 +157,9 @@ def test_three_layer_clique_graph_connections(three_layer_clique_graph: MultiLay
     assert ttcg.is_connected(211, 212)
     assert ttcg.is_connected(311, 312)
 
+    # Check that partitioning works from the middle layer
+    assert ttcg.is_partitioned(111, 121)
+
+    # Check that partitioning works from the top down
     assert ttcg.is_partitioned(111, 211)
     assert ttcg.is_partitioned(111, 212)
