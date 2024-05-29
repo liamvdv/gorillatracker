@@ -23,6 +23,7 @@ from gorillatracker.ssl_pipeline.queries import (
     video_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
+import gorillatracker.type_helper as gtypes
 
 
 @dataclass(kw_only=True)  # type: ignore
@@ -51,11 +52,12 @@ class SSLConfig:
             return ContrastiveClassSampler(classes)
 
     def _create_tff_sampler(self, query_builder: Callable[[int], Select[tuple[TrackingFrameFeature]]]) -> Sampler:
-        return (
-            EquidistantSampler(query_builder, n_samples=self.n_samples)
-            if self.tff_selection == "equidistant"
-            else RandomSampler(query_builder, n_samples=self.n_samples)
-        )
+        if self.tff_selection == "random":
+            return RandomSampler(query_builder, self.n_samples)
+        elif self.tff_selection == "equidistant":
+            return EquidistantSampler(query_builder, self.n_samples)
+        else:
+            raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
 
     def _build_query(
         self, video_id: int, feature_types: List[str], min_confidence: float
@@ -86,14 +88,13 @@ class SSLConfig:
 
     def _group_contrastive_images(
         self, contrastive_images: List[ContrastiveImage]
-    ) -> dict[Any, List[ContrastiveImage]]:
+    ) -> dict[gtypes.Label, List[ContrastiveImage]]:
         groups = groupby(contrastive_images, lambda x: x.class_label)
-        classes: dict[Any, List[ContrastiveImage]] = {}
+        classes: dict[gtypes.Label, List[ContrastiveImage]] = {}
         for group in groups:
             class_label, sample_iter = group
             samples = list(sample_iter)
-            if len(samples) > 1:
-                classes[class_label] = samples
+            classes[class_label] = samples
         return classes
 
 
