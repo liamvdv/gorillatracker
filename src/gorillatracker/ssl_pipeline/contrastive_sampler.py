@@ -16,7 +16,7 @@ from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, order=True, slots=True)
 class ContrastiveImage:
     id: str
     image_path: Path
