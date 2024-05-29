@@ -1,21 +1,14 @@
-# NOTE(memben): let's worry about how we parse configs from the yaml file later
-
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import partial
-from itertools import groupby
 from pathlib import Path
 from typing import Any
 
 from PIL import Image
-from sqlalchemy import Select, create_engine, select
-from sqlalchemy.orm import Session
-from tqdm import tqdm
+from sqlalchemy import Select
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
-from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
     cached_filter,
@@ -23,7 +16,6 @@ from gorillatracker.ssl_pipeline.queries import (
     feature_type_filter,
     video_filter,
 )
-from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler
 
 
 @dataclass(frozen=True, order=True)
@@ -118,55 +110,3 @@ def sampling_strategy(
     query = feature_type_filter(query, feature_types)
     query = confidence_filter(query, min_confidence)
     return query
-
-
-# TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
-def get_random_ssl_sampler(
-    base_path: str,
-    tff_selection: str,
-    n_videos: int,
-    n_samples: int,
-    min_n_images_per_tracking: int,
-    feature_types: list[str],
-    min_confidence: float,
-) -> ContrastiveClassSampler:
-    engine = create_engine(GorillaDatasetKISZ.DB_URI)
-    query_builder = partial(
-        sampling_strategy,
-        feature_types=feature_types,
-        min_confidence=min_confidence,
-    )
-    sampler = (
-        EquidistantSampler(query_builder, n_samples=n_samples)
-        if tff_selection == "equidistant"
-        else RandomSampler(query_builder, n_samples=n_samples)
-    )
-    with Session(engine) as session:
-        video_ids = session.execute(select(Video.video_id)).scalars().all()
-        tracked_features = []
-        for video_id in tqdm(video_ids[:n_videos], unit="video", desc="Selecting TFFs"):
-            for tracked_feature in sampler.sample(video_id, session):
-                tracked_features.append(tracked_feature)
-        contrastive_images = [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
-            for f in tracked_features
-        ]
-        groups = groupby(contrastive_images, lambda x: x.class_label)
-        classes: dict[Any, list[ContrastiveImage]] = {}
-        for group in groups:
-            class_label, sample_iter = group
-            samples = list(sample_iter)
-            if len(samples) > 1:
-                classes[class_label] = samples
-        return ContrastiveClassSampler(classes)
-
-
-if __name__ == "__main__":
-    version = "2024-04-18"
-    sampler = get_random_ssl_sampler(
-        f"/workspaces/gorillatracker/video_data/cropped-images/{version}", "equidistant", 20, 15, 15, ["body"], 0.5
-    )
-    print(len(sampler))
-    sample = sampler[0]
-    print(sample)
-    print(sampler.positive)
