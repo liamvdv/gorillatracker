@@ -119,7 +119,7 @@ class TrainingArgs:
     tff_selection: Literal["random", "equidistant"] = field(default="random")
     n_videos: int = field(default=200)
     n_samples: int = field(default=15)
-    feature_types: list[str] = field(default=["body"])
+    feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)
 
     def __post_init__(self) -> None:
