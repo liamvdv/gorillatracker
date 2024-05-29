@@ -1,7 +1,7 @@
 from typing import Union
 
-import torch
 import ai_edge_torch
+import torch
 from torch.fx import GraphModule
 
 import gorillatracker.quantization.performance_evaluation as performance_evaluation
