@@ -94,7 +94,9 @@ if __name__ == "__main__":
         min_confidence=0.5,
         split=None,
     )
-    dm = SSLDataModule(ssl_config=ssl_config, data_dir="video_data/cropped-images/2024-04-18", transforms=transforms.ToTensor())
+    dm = SSLDataModule(
+        ssl_config=ssl_config, data_dir="video_data/cropped-images/2024-04-18", transforms=transforms.ToTensor()
+    )
     print("Data Module created")
     dm.setup("fit")
     print("Data Module setup")
