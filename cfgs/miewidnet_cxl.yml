@@ -35,7 +35,7 @@ use_wildme_model: False          # Use the WildMe model
 # L2SP Arguments
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
-path_to_pretrained_weights: ""    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/miewidnet.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 1.0                     # Margin for the contrastive loss (triplet loss)
 loss_mode: "softmax/arcface"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 

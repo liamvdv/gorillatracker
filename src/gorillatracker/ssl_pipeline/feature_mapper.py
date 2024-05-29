@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from gorillatracker.ssl_pipeline.data_structures import DirectedBipartiteGraph
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, groupby_frame
 from gorillatracker.ssl_pipeline.models import TaskType, TrackingFrameFeature
-from gorillatracker.ssl_pipeline.queries import get_next_task, load_features, load_tracked_features
+from gorillatracker.ssl_pipeline.queries import get_next_task, load_features, load_tracked_features, transactional_task
 
 log = logging.getLogger(__name__)
 
@@ -84,12 +84,13 @@ def correlate_worker(
     session_cls = sessionmaker(bind=engine)
     with session_cls() as session:
         for task in get_next_task(session, TaskType.CORRELATE, task_subtype=feature_type):
-            tracked = task.get_key_value("tracked_feature_type")
-            untracked = task.get_key_value("untracked_feature_type")
-            threshold = float(task.get_key_value("threshold"))
-            tracked_features = load_tracked_features(session, task.video_id, [tracked])
-            untracked_features = load_features(session, task.video_id, [untracked])
-            correlate_and_update(list(tracked_features), list(untracked_features), correlator, threshold)
+            with transactional_task(session, task):
+                tracked = task.get_key_value("tracked_feature_type")
+                untracked = task.get_key_value("untracked_feature_type")
+                threshold = float(task.get_key_value("threshold"))
+                tracked_features = load_tracked_features(session, task.video_id, [tracked])
+                untracked_features = load_features(session, task.video_id, [untracked])
+                correlate_and_update(list(tracked_features), list(untracked_features), correlator, threshold)
 
 
 def multiprocess_correlate(

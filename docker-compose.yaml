@@ -1,20 +1,10 @@
-version: "3.8"
-
-
 services:
   postgres:
-      image: postgres:16-alpine
-      environment:
-        POSTGRES_PASSWORD: DEV_PWD_139u02riowenfgiw4y589wthfn
-      ports:
-        - "5432:5432"
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-      restart: always
-
-
-volumes:
-  postgres_data:
-
-      
-
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: "REDACTED"
+    ports:
+      - "5432:5432"
+    volumes:
+      - /mnt/vast-gorilla/pgdata:/var/lib/postgresql/data
+    restart: always

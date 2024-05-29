@@ -58,11 +58,19 @@ def preprocess_and_store(
     metadata_extractor: MetadataExtractor,
     video_insert_hook: InsertHook,
 ) -> None:
-    metadata = metadata_extractor(video_path)
-    properties = video_properties_extractor(video_path)
+    try:
+        metadata = metadata_extractor(video_path)
+        properties = video_properties_extractor(video_path)
+    except Exception as e:
+        log.warning(f"Failed to extract metadata from video {video_path}: {e}")
+        return
 
     if properties.fps < 1:
         log.warning(f"Video {video_path} has an invalid FPS of {properties.fps}, skipping")
+        return
+
+    if properties.frames < 1:
+        log.warning(f"Video {video_path} has an invalid number of frames {properties.frames}, skipping")
         return
 
     video = Video(
@@ -91,7 +99,6 @@ def preprocess_videos(
     metadata_extractor: MetadataExtractor,
     video_insert_hook: InsertHook,
 ) -> None:
-
     session_cls = sessionmaker(bind=engine)
     assert all(video_path.exists() for video_path in video_paths), "All videos must exist"
     for video_path in tqdm(video_paths, desc="Preprocessing videos"):

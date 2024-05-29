@@ -35,7 +35,7 @@ class SSLDataset(Dataset[Nlet]):
         return self.stack_flat_nlet(flat_nlet)
 
     def stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
-        ids = tuple(img.image_path for img in flat_nlet)
+        ids = tuple(str(img.image_path) for img in flat_nlet)
         labels = tuple(img.class_label for img in flat_nlet)
         values = tuple(self.transform(img.image) for img in flat_nlet)
         return ids, values, labels
