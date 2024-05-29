@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import groupby
 from pathlib import Path
-from typing import Any, Callable, List, Sequence
+from typing import Callable, List, Sequence
 
 from sqlalchemy import Select, create_engine, select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
+import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
@@ -23,7 +24,6 @@ from gorillatracker.ssl_pipeline.queries import (
     video_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
-import gorillatracker.type_helper as gtypes
 
 
 @dataclass(kw_only=True)  # type: ignore
