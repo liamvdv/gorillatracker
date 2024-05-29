@@ -24,8 +24,6 @@ from gorillatracker.ssl_pipeline.queries import (
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
 
-# dataclass SSLConfig
-
 
 @dataclass(kw_only=True)  # type: ignore
 class SSLConfig:
