@@ -5,17 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image
-from sqlalchemy import Select
 
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
-from gorillatracker.ssl_pipeline.queries import (
-    associated_filter,
-    cached_filter,
-    confidence_filter,
-    feature_type_filter,
-    video_filter,
-)
 
 
 @dataclass(frozen=True, order=True)
@@ -99,14 +90,3 @@ class CliqueGraphSampler(ContrastiveSampler):
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
         random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
         return self.graph.get_random_clique_member(random_adjacent_clique)
-
-
-def sampling_strategy(
-    video_id: int, feature_types: list[str], min_confidence: float
-) -> Select[tuple[TrackingFrameFeature]]:
-    query = video_filter(video_id)
-    query = cached_filter(query)
-    query = associated_filter(query)
-    query = feature_type_filter(query, feature_types)
-    query = confidence_filter(query, min_confidence)
-    return query
