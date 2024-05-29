@@ -91,7 +91,7 @@ def min_count_filter(
     subquery = (
         select(TrackingFrameFeature.tracking_id)
         .group_by(TrackingFrameFeature.tracking_id)
-        .having(func.count(TrackingFrameFeature.tracking_id) >= min_feature_count)
+        .having(func.count() >= min_feature_count)
     )
 
     if feature_type is not None:
