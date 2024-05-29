@@ -241,11 +241,8 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         parent_v = self.parent_edges.get(root_v)
         if parent_v is None:
             return set()
-        # Adjacent cliques of the parent layer
         parent_adjacent_cliques = self.parent.get_adjacent_cliques(parent_v)
-        # All parents of the adjacent cliques of the intermediate layer (self)
         adjacent_clique_parents = chain.from_iterable(parent_adjacent_cliques.values())
-        # All representatives of the adjacent cliques of the intermediate layer (self)
         adjacent_clique_representatives = list(
             chain.from_iterable([self.inverse_parent_edges[p] for p in adjacent_clique_parents])
         )
