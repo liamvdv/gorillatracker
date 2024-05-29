@@ -42,6 +42,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         wandb_run: Runner,
         dm: L.LightningDataModule,
         kfold_k: Optional[int] = None,
+        use_quantization_aware_training: bool = False,
     ) -> None:
         super().__init__()
         self.embedding_artifacts: List[str] = []
@@ -51,6 +52,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.kfold_k = kfold_k if kfold_k is not None else None
         dm.setup("fit")
         self.train_dataloader = dm.train_dataloader()
+        self.use_quantization_aware_training = use_quantization_aware_training
 
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
@@ -119,7 +121,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        if trainer.model.dtype == torch.float32:  # type: ignore
+        if trainer.model.dtype == torch.float32 and not self.use_quantization_aware_training:  # type: ignore
             log_grad_cam_images_to_wandb(self.run, trainer)
 
 

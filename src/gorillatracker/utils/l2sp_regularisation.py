@@ -138,7 +138,6 @@ class L2_SP(nn.Module):
         self.alpha = alpha
         self.beta = beta
         # assert cfg.train.regularization.style == 'l2_sp'
-
         assert os.path.isfile(path_to_pretrained_weights)
         # state = torch.load(path_to_pretrained_weights, map_location='cpu')
         state = torch.load(path_to_pretrained_weights)

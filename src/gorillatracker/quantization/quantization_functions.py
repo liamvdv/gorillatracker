@@ -2,6 +2,9 @@ import torch
 import torch.ao.quantization
 import torch.ao.quantization.quantize_fx as quantize_fx
 import torch.nn as nn
+from torch._export import capture_pre_autograd_graph
+from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
+from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 from torch.fx import GraphModule
 
 from gorillatracker.model import BaseModule
@@ -60,11 +63,16 @@ def ptsq_quantization_fx(model: BaseModule, calibration_input: torch.Tensor) -> 
     return model_int8
 
 
-# def pt2e_quantization(model, dtype=torch.qint8):
-#     """https://pytorch.org/tutorials/prototype/pt2e_quant_ptq.html"""
-#     m = capture_pre_autograd_graph(model, *example_inputs)
+def pt2e_quantization(model: BaseModule, calibration_input: torch.Tensor) -> GraphModule:
+    """https://pytorch.org/tutorials/prototype/pt2e_quant_ptq.html"""
+    calibration_input_tuple = (calibration_input,)
+    prepared_model = capture_pre_autograd_graph(model, calibration_input_tuple)
 
-#     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())
-#     m = prepare_pt2e(m, quantizer)
-#     m = convert_pt2e(m)
-#     return m
+    quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
+    prepared_model = prepare_pt2e(prepared_model, quantizer)
+    torch.ao.quantization.allow_exported_model_train_eval(prepared_model)
+    calibrate(prepared_model, calibration_input)
+
+    quantized_model = convert_pt2e(prepared_model)
+    torch.ao.quantization.allow_exported_model_train_eval(quantized_model)
+    return quantized_model
