@@ -1,6 +1,7 @@
 import collections
 import logging
 import os
+from copy import deepcopy
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
@@ -138,9 +139,23 @@ class L2_SP(nn.Module):
         self.alpha = alpha
         self.beta = beta
         # assert cfg.train.regularization.style == 'l2_sp'
+        assert (
+            "pretrained_weights/" in path_to_pretrained_weights
+        ), "Weights should be in pretrained_weights/ to not litter your project folder, (add to devcontainer.json)"
 
-        assert os.path.isfile(path_to_pretrained_weights)
-        # state = torch.load(path_to_pretrained_weights, map_location='cpu')
+        if not os.path.exists(path_to_pretrained_weights):
+            model_copy = deepcopy(model)
+            for k in list(model_copy.__dict__.keys()):
+                if k != "model" and not k.startswith("_"):
+                    del model_copy.__dict__[k]
+            torch.save(model_copy.state_dict(), path_to_pretrained_weights)
+            log.warning(
+                f"Pretrained weights not found. Saving current model as pretrained weights at: \n {path_to_pretrained_weights}"
+            )
+
+        assert os.path.isfile(
+            path_to_pretrained_weights
+        ), f"Pretrained weights not found at: {path_to_pretrained_weights}"
         state = torch.load(path_to_pretrained_weights)
 
         if "state_dict" in state:

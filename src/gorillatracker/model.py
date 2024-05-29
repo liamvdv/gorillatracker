@@ -1,4 +1,5 @@
 import importlib
+from itertools import chain
 from typing import Any, Callable, Dict, List, Literal, Tuple, Type
 
 import lightning as L
@@ -252,11 +253,13 @@ class BaseModule(L.LightningModule):
         # HACK(memben): We'll allow this for now, but we should correct it later
         if torch.is_tensor(labels[0]):  # type: ignore
             flat_labels = torch.cat(labels, dim=0)  # type: ignore
+            vec = torch.cat(images, dim=0)  # type: ignore
         else:
             # NOTE(memben): this is the expected shape
+            # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
             flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-
-        vec = torch.cat(images, dim=0)
+            # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
         embeddings = self.forward(vec)
 
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
@@ -287,16 +290,17 @@ class BaseModule(L.LightningModule):
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
         n_anchors = len(images[0])
-        vec = torch.cat(images, dim=0)
 
         # HACK(memben): We'll allow this for now, but we should correct it later
         if torch.is_tensor(labels[0]):  # type: ignore
             flat_labels = torch.cat(labels, dim=0)  # type: ignore
+            vec = torch.cat(images, dim=0)  # type: ignore
         else:
             # NOTE(memben): this is the expected shape
             flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
+            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
 
-        flat_ids = [id for nlet in ids for id in nlet]
+        flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])
         if "softmax" not in self.loss_mode:

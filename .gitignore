@@ -164,9 +164,4 @@ mnist/
 *mp4
 *MP4
 *AVI
-<<<<<<< HEAD
-cropped_images/*
-=======
 cropped-images/*
-
->>>>>>> origin/general-hotfixes

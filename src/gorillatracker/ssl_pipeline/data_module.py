@@ -1,7 +1,6 @@
 import logging
 
 import lightning as L
-import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
@@ -77,6 +76,6 @@ class SSLDataModule(L.LightningDataModule):
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
         ids = tuple(nlet[0] for nlet in batch)
-        values = tuple(torch.stack(nlet[1]) for nlet in batch)
+        values = tuple(nlet[1] for nlet in batch)
         labels = tuple(nlet[2] for nlet in batch)
         return ids, values, labels

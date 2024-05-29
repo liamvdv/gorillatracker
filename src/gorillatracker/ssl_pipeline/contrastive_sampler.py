@@ -107,12 +107,12 @@ def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
             session.execute(
                 select(TrackingFrameFeature)
                 .where(
-                    TrackingFrameFeature.tracking_frame_feature_id < 10000000,
+                    TrackingFrameFeature.tracking_frame_feature_id < 1000000,
                     TrackingFrameFeature.cached,
                     TrackingFrameFeature.tracking_id.isnot(None),
-                    TrackingFrameFeature.feature_type == "face_90",
-                    TrackingFrameFeature.bbox_width > 65,
-                    TrackingFrameFeature.bbox_height > 65,
+                    TrackingFrameFeature.feature_type == "body",
+                    TrackingFrameFeature.bbox_width > 100,
+                    TrackingFrameFeature.bbox_height > 100,
                 )
                 .order_by(TrackingFrameFeature.tracking_id)
             )
@@ -131,12 +131,3 @@ def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
             if len(samples) > 1:
                 classes[class_label] = samples
         return ContrastiveClassSampler(classes)
-
-
-if __name__ == "__main__":
-    version = "2024-04-09"
-    sampler = get_random_ssl_sampler(f"/workspaces/gorillatracker/cropped_images/{version}")
-    print(len(sampler))
-    sample = sampler[0]
-    print(sample)
-    print(sampler.positive)
