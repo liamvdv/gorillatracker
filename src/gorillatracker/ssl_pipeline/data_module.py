@@ -92,6 +92,7 @@ if __name__ == "__main__":
         n_samples=15,
         feature_types=["body"],
         min_confidence=0.5,
+        min_images_per_tracking=10,
         split=None,
     )
     dm = SSLDataModule(

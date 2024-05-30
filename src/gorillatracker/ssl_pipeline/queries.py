@@ -52,6 +52,19 @@ def video_filter(video_id: int) -> Select[tuple[TrackingFrameFeature]]:
     return select(TrackingFrameFeature).where(TrackingFrameFeature.video_id == video_id)
 
 
+def multiple_videos_filter(video_ids: list[int]) -> Select[tuple[TrackingFrameFeature]]:
+    """
+    Filters the query to include only TrackingFrameFeature instances from the specified videos.
+
+    Equivalent to python:
+    ```python
+    def filter(self, video_ids: list[int]) -> Iterator[TrackingFrameFeature]:
+        return filter(lambda x: x.tracking.video_id in video_ids, frame_features)
+    ```
+    """
+    return select(TrackingFrameFeature).where(TrackingFrameFeature.video_id.in_(video_ids))
+
+
 def associated_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[TrackingFrameFeature]]:
     """
     Filters the query to include only TrackingFrameFeature instances that are associated with a tracking.
@@ -382,12 +395,21 @@ def reset_dependent_tasks_status(session: Session, dependent: TaskType, provider
 
 
 if __name__ == "__main__":
+    import os
+
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
-    engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
+    DB_URI = os.environ.get("POSTGRESQL_URI") or "sqlite:///:memory:"
+    engine = create_engine(DB_URI)
 
     session_cls = sessionmaker(bind=engine)
 
     with session_cls() as session:
-        reset_dependent_tasks_status(session, TaskType.CORRELATE, TaskType.TRACK)
+        query = multiple_videos_filter(list(range(200)))
+        query = cached_filter(query)
+        query = feature_type_filter(query, ["body"])
+        query = confidence_filter(query, 0.5)
+        query = min_count_filter(query, 10)
+        tffs = session.execute(query).scalars().all()
+        print("Success!")

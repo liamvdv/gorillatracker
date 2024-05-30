@@ -66,6 +66,7 @@ def main(args: TrainingArgs) -> None:
             n_samples=args.n_samples,
             feature_types=args.feature_types,
             min_confidence=args.min_confidence,
+            min_images_per_tracking=args.min_images_per_tracking,
             split=None,
         )
         dm = SSLDataModule(
