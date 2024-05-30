@@ -2,7 +2,6 @@ import logging
 from typing import List, Optional
 
 import lightning as L
-import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, ToTensor
@@ -94,7 +93,7 @@ class SSLDataModule(L.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
         return DataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=40
+            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=100
         )
 
     # TODO(memben): we want to use SSL Data for validation
@@ -109,6 +108,6 @@ class SSLDataModule(L.LightningDataModule):
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
         ids = tuple(nlet[0] for nlet in batch)
-        values = tuple(torch.stack(nlet[1]) for nlet in batch)
+        values = tuple(nlet[1] for nlet in batch)
         labels = tuple(nlet[2] for nlet in batch)
         return ids, values, labels

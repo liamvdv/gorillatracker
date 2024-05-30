@@ -37,7 +37,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 1.0                       # Alpha for the l2sp loss
 l2_beta: 1.0                       # Beta for the l2sp loss
-path_to_pretrained_weights: "/workspaces/gorillatracker/models/swin_base_untrained.ckpt"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/swinv2_base.pth"    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 

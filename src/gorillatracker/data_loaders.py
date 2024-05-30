@@ -74,6 +74,7 @@ def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
     return labelsection
 
 
+# NOTE(memben): Unused?
 def iter_index_permutations_generator(n: int) -> Iterator[Tuple[int, ...]]:
     """
     returns all possibel index permutations in a systematic order.
@@ -303,34 +304,3 @@ def SimpleDataLoader(
 ) -> gtypes.BatchSimpleDataLoader:
     final_dataset = ToNthDataset(dataset)
     return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size)
-
-
-# TODO(V1nce1): deprecated?
-# def VideoTripletDataLoader(
-#     dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, data_dir: str, shuffle: bool = True
-# ) -> gtypes.BatchTripletDataLoader:
-#     """
-#     VideoTripletDataLoader will take any Dataset that returns a single sample in the form of
-#     (value, label) on __getitem__ and transform it into an efficient Triplet DataLoader.
-#     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
-#     dataset will be shuffled once at the start and not after that.
-#     """
-#     sampler = TripletSampler(dataset, data_dir=data_dir)
-#     if not shuffle:
-#         sampler = FreezeSampler(sampler)  # type: ignore
-#     final_dataset = ToNthDataset(dataset)
-#     return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)  # type: ignore
-
-
-# if __name__ == "__main__":
-#     dataset = SPACVideosDataset(
-#         "data/derived_data/spac_gorillas_converted_labels_cropped_faces",
-#         "train",
-#         SPACVideosDataset.get_transforms(),
-#     )
-#     data_dir = "data/derived_data/spac_gorillas_converted_labels_cropped_faces/train"
-#     print("creating DataLoader")
-#     dataloader = VideoTripletDataLoader(dataset, 12, data_dir=data_dir, shuffle=True)
-#     print("created DataLoader")
-#     # print first batch label
-#     next(iter(dataloader))

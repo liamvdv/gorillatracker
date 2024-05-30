@@ -54,7 +54,11 @@ class NletDataModule(L.LightningDataModule):
         )
 
         if stage == "fit":
-            self.train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            self.train = self.dataset_class(
+                self.data_dir,
+                partition="train",
+                transform=transforms.Compose([self.transforms, self.training_transforms]),
+            )  # type: ignore
             self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
             if self.additional_dataset_classes is not None:
                 self.val_list = [self.val]
@@ -107,7 +111,11 @@ class NletDataModule(L.LightningDataModule):
 
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
-            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            train = self.dataset_class(
+                self.data_dir,
+                partition="train",
+                transform=transforms.Compose([self.transforms, self.training_transforms]),
+            )  # type: ignore
             return train.get_num_classes()  # type: ignore
         elif mode == "val":
             val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]  # type: ignore
@@ -127,14 +135,6 @@ class NletDataModule(L.LightningDataModule):
 class TripletDataModule(NletDataModule):
     def get_dataloader(self) -> Callable[[Dataset[Any], int, bool], gtypes.BatchTripletDataLoader]:
         return TripletDataLoader
-
-
-# TODO(V1nce1): deprecated?
-# class VideoTripletDataModule(TripletDataModule):
-#     def train_dataloader(self) -> BatchNletDataLoader:
-#         return VideoTripletDataLoader(
-#             self.train, batch_size=self.batch_size, shuffle=True, data_dir=self.data_dir + "/train"
-#         )
 
 
 class QuadletDataModule(NletDataModule):
@@ -169,12 +169,24 @@ class NLetKFoldDataModule(NletDataModule):
         )
 
         if stage == "fit":
-            self.train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
-            self.val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            self.train = self.dataset_class(
+                self.data_dir,
+                partition="train",
+                val_i=self.val_fold,
+                k=self.k,
+                transform=transforms.Compose([self.transforms, self.training_transforms]),
+            )  # type: ignore
+            self.val = self.dataset_class(
+                self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms
+            )  # type: ignore
         elif stage == "test":
-            self.test = self.dataset_class(self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            self.test = self.dataset_class(
+                self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms
+            )  # type: ignore
         elif stage == "validate":
-            self.val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            self.val = self.dataset_class(
+                self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms
+            )  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None
@@ -184,13 +196,23 @@ class NLetKFoldDataModule(NletDataModule):
 
     def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
-            train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            train = self.dataset_class(
+                self.data_dir,
+                partition="train",
+                val_i=self.val_fold,
+                k=self.k,
+                transform=transforms.Compose([self.transforms, self.training_transforms]),
+            )  # type: ignore
             return train.get_num_classes()  # type: ignore
         elif mode == "val":
-            val = self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            val = self.dataset_class(
+                self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms
+            )  # type: ignore
             return val.get_num_classes()  # type: ignore
         elif mode == "test":
-            test = self.dataset_class(self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms)  # type: ignore
+            test = self.dataset_class(
+                self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms
+            )  # type: ignore
             return test.get_num_classes()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")

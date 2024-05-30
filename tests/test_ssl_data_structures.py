@@ -1,6 +1,11 @@
 import pytest
 
-from gorillatracker.ssl_pipeline.data_structures import CliqueGraph, IndexedCliqueGraph, UnionFind
+from gorillatracker.ssl_pipeline.data_structures import (
+    CliqueGraph,
+    IndexedCliqueGraph,
+    MultiLayerCliqueGraph,
+    UnionFind,
+)
 
 
 @pytest.fixture
@@ -99,3 +104,67 @@ def test_indexed_clique_graph_adjacent_cliques(
     adjacent_cliques = icg.get_adjacent_cliques(0)
     assert 3 in adjacent_cliques, "Adjacent cliques not identified correctly."
     assert set(adjacent_cliques[3]) == {3}, "Adjacent clique members incorrect."
+
+
+@pytest.fixture
+def two_layer_clique_graph() -> MultiLayerCliqueGraph[int]:
+    """Prefixed numbers always describe the relationship to their parent clique. For example, 11, 12 is a child of 1."""
+    first_layer = CliqueGraph([1, 2, 3])
+    first_layer.partition(1, 2)
+    second_layer = MultiLayerCliqueGraph(
+        [11, 12, 13, 21, 22, 23, 31, 32, 33],
+        first_layer,
+        {11: 1, 12: 1, 13: 1, 21: 2, 22: 2, 23: 2, 31: 3, 32: 3, 33: 3},
+    )
+    second_layer.partition(11, 12)
+    second_layer.partition(21, 22)
+    second_layer.merge(12, 13)
+    return second_layer
+
+
+@pytest.fixture
+def three_layer_clique_graph(
+    two_layer_clique_graph: MultiLayerCliqueGraph[int],
+) -> MultiLayerCliqueGraph[int]:
+    second_layer = two_layer_clique_graph
+    third_layer = MultiLayerCliqueGraph(
+        [111, 112, 113, 121, 122, 211, 212, 213, 311, 312, 313],
+        second_layer,
+        {111: 11, 121: 12, 211: 21, 311: 31, 313: 31},
+    )
+    third_layer.merge(111, 112)
+    third_layer.merge(112, 113)
+    third_layer.merge(121, 122)
+    third_layer.merge(211, 212)
+    third_layer.merge(212, 213)
+    third_layer.merge(311, 312)
+    third_layer.partition(312, 313)
+
+    return third_layer
+
+
+def test_two_layer_clique_graph_connections(two_layer_clique_graph: MultiLayerCliqueGraph[int]) -> None:
+    tlcg = two_layer_clique_graph
+    assert tlcg.is_partitioned(11, 12)
+    assert not tlcg.is_connected(11, 21)
+    assert tlcg.is_connected(12, 13)
+    assert not tlcg.is_partitioned(12, 13)
+    assert tlcg.is_partitioned(11, 21)
+    assert not tlcg.is_connected(11, 22)
+
+
+def test_three_layer_clique_graph_connections(three_layer_clique_graph: MultiLayerCliqueGraph[int]) -> None:
+    ttcg = three_layer_clique_graph
+    assert ttcg.is_connected(111, 112)
+    assert ttcg.is_connected(111, 113)
+    assert ttcg.is_connected(211, 212)
+    assert ttcg.is_connected(311, 312)
+
+    assert ttcg.is_partitioned(311, 313)
+
+    # Check that partitioning works from the middle layer
+    assert ttcg.is_partitioned(111, 121)
+
+    # Check that partitioning works from the top down
+    assert ttcg.is_partitioned(111, 211)
+    assert ttcg.is_partitioned(111, 212)

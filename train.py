@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore", ".*was configured so validation will run at th
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
 
-def main(args: TrainingArgs) -> None:  # noqa: C901
+def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -136,16 +136,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
         )
-
-    if args.pretrained_weights_file is not None:
-        # delete everything in model except model.model
-        for k in list(model.__dict__.keys()):
-            if k != "model" and not k.startswith("_"):
-                del model.__dict__[k]
-        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
-        torch.save(model.state_dict(), args.pretrained_weights_file)
-        logger.info("Model saved")
-        exit(0)
 
     ### Preperation for quantization aware training ###
     if args.use_quantization_aware_training:
