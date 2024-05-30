@@ -169,8 +169,6 @@ if __name__ == "__main__":
             dataset="ground_truth/bristol/full_images",
             mode="openset",
             seed=69,
-            reid_factor_test=0,
-            reid_factor_val=0,
         )
     )
     bristol_split_dir = str(os.path.abspath(bristol_split_dir))

@@ -1,6 +1,6 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 from urllib.parse import urlparse
 
 import cv2
@@ -56,7 +56,11 @@ def get_run(url: str) -> wandbRun:
 
 
 def load_model_from_wandb(
-    wandb_fullname: str, model_cls: Type[BaseModule], model_config: Dict[str, Any], device: str = "cpu"
+    wandb_fullname: str,
+    model_cls: Type[BaseModule],
+    model_config: Dict[str, Any],
+    device: str = "cpu",
+    eval_mode: bool = True,
 ) -> BaseModule:
     api = get_wandb_api()
 
@@ -76,13 +80,62 @@ def load_model_from_wandb(
     ):  # necessary because arcface loss also saves prototypes
         model.loss_module_train.prototypes = torch.nn.Parameter(model_state_dict["loss_module_train.prototypes"])
         model.loss_module_val.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.prototypes"])
-    # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
-    # easiest fix is to just use the old embedding structure in the model class
+        # note the following lines can fail if your model was not trained with the same 'embedding structure' as the current model class
+        # easiest fix is to just use the old embedding structure in the model class
+    elif (
+        "loss_module_train.loss.prototypes" in model_state_dict or "loss_module_val.loss.prototypes" in model_state_dict
+    ):
+        model.loss_module_train.loss.prototypes = torch.nn.Parameter(
+            model_state_dict["loss_module_train.loss.prototypes"]
+        )
+        model.loss_module_val.loss.prototypes = torch.nn.Parameter(model_state_dict["loss_module_val.loss.prototypes"])
     model.load_state_dict(model_state_dict)
 
     model.to(device)
-    model.eval()
+    if eval_mode:
+        model.eval()
     return model
+
+
+def get_model_for_run_url(run_url: str, eval_mode: bool = True) -> BaseModule:
+    run = get_run(run_url)
+    print("Using model from run:", run.name)
+    print("Config:", run.config)
+    # args = TrainingArgs(**run.config) # NOTE(liamvdv): contains potenially unknown keys / missing keys (e. g. l2_beta)
+    args = {
+        k: run.config[k]
+        for k in (
+            # Others:
+            "model_name_or_path",
+            "dataset_class",
+            "data_dir",
+            # Model Params:
+            "embedding_size",
+            "from_scratch",
+            "loss_mode",
+            "weight_decay",
+            "lr_schedule",
+            "warmup_mode",
+            "warmup_epochs",
+            "max_epochs",
+            "initial_lr",
+            "start_lr",
+            "end_lr",
+            "beta1",
+            "beta2",
+            "stepwise_schedule",
+            "lr_interval",
+            "l2_alpha",
+            "l2_beta",
+            "path_to_pretrained_weights",
+            # NOTE(liamvdv): might need be extended by other keys if model keys change
+        )
+    }
+
+    print("Loading model from latest checkpoint")
+    model_path = get_latest_model_checkpoint(run).qualified_name
+    model_cls = get_model_cls(args["model_name_or_path"])
+    return load_model_from_wandb(model_path, model_cls=model_cls, model_config=args, eval_mode=eval_mode)
 
 
 def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", norm_input: bool = False) -> pd.DataFrame:
@@ -90,7 +143,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
     df = pd.DataFrame(columns=["embedding", "label", "input", "label_string"])
     with torch.no_grad():
         print("Generating embeddings...")
-        for imgs, labels in tqdm(dataset):
+        for ids, imgs, labels in tqdm(dataset):
             if isinstance(imgs, torch.Tensor):
                 imgs = [imgs]
                 labels = [labels]
@@ -118,6 +171,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
                         df,
                         pd.DataFrame(
                             {
+                                "id": [ids],
                                 "embedding": [embeddings[i]],
                                 "label": [labels[i]],
                                 "input": [input_img],
@@ -158,7 +212,9 @@ def get_latest_model_checkpoint(run: wandbRun) -> wandb.Artifact:
     return max(models, key=lambda a: a.created_at)
 
 
-def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
+def generate_embeddings_from_run(
+    run_url: str, outpath: str, dataset_cls: Optional[str], data_dir: Optional[str]
+) -> pd.DataFrame:
     """
     generate a pandas df that generates embeddings for all images in the dataset partitions train and val.
     stores to DataFrame
@@ -171,51 +227,17 @@ def generate_embeddings_from_run(run_url: str, outpath: str) -> pd.DataFrame:
         assert out.parent.exists(), "outpath parent must exist"
         assert out.suffix == ".pkl", "outpath must be a pickle file"
 
-    run = get_run(run_url)
-    print("Using model from run:", run.name)
-    print("Config:", run.config)
-    # args = TrainingArgs(**run.config) # NOTE(liamvdv): contains potenially unknown keys / missing keys (e. g. l2_beta)
-    args = {
-        k: run.config[k]
-        for k in (
-            # Others:
-            "model_name_or_path",
-            "dataset_class",
-            "data_dir",
-            # Model Params:
-            "embedding_size",
-            "from_scratch",
-            "loss_mode",
-            "weight_decay",
-            "lr_schedule",
-            "warmup_mode",
-            "warmup_epochs",
-            "max_epochs",
-            "initial_lr",
-            "start_lr",
-            "end_lr",
-            "beta1",
-            "beta2",
-            "stepwise_schedule",
-            "lr_interval",
-            "l2_alpha",
-            "l2_beta",
-            "path_to_pretrained_weights",
-            # NOTE(liamvdv): might need be extended by other keys if model keys change
-        )
-    }
+    model = get_model_for_run_url(run_url)
+    args = model.config
 
-    print("Loading model from latest checkpoint")
-    model_path = get_latest_model_checkpoint(run).qualified_name
-    model_cls = get_model_cls(args["model_name_or_path"])
-    model = load_model_from_wandb(model_path, model_cls=model_cls, model_config=args)
+    if data_dir is None:
+        data_dir = args["data_dir"]
 
-    train_dataset = get_dataset(
-        partition="train", data_dir=args["data_dir"], model=model, dataset_class=args["dataset_class"]
-    )
-    val_dataset = get_dataset(
-        partition="val", data_dir=args["data_dir"], model=model, dataset_class=args["dataset_class"]
-    )
+    if dataset_cls is None:
+        dataset_cls = args["dataset_class"]
+
+    train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"
@@ -299,7 +321,7 @@ def get_embedding_from_frame(
 
     # convert to pil image
     img = cv2.cvtColor(frame_cropped, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(img)  # type: ignore
+    img = Image.fromarray(img)
     transformed_image: torch.Tensor = model_transforms(img)
 
     model.eval()

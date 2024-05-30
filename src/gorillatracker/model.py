@@ -1,5 +1,6 @@
 import importlib
-from typing import Any, Callable, Dict, Literal, Tuple, Type
+from itertools import chain
+from typing import Any, Callable, Dict, List, Literal, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -25,9 +26,10 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
-from gorillatracker.losses.triplet_loss import get_loss
+from gorillatracker.losses.arcface_loss import VariationalPrototypeLearning
+from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
+from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
 def warmup_lr(
@@ -167,8 +169,14 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
 
+        self.quant = torch.quantization.QuantStub()  # type: ignore
+
         ##### Create Table embeddings_table
-        self.embeddings_table_columns = ["label", "embedding"]
+        self.embeddings_table_columns = [
+            "label",
+            "embedding",
+            "id",
+        ]  # note that the dataloader usually returns the order (id, embedding, label)
         self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
 
     def set_losses(
@@ -200,6 +208,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
+            log_func=self.log,
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -219,6 +228,7 @@ class BaseModule(L.LightningModule):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
@@ -228,50 +238,72 @@ class BaseModule(L.LightningModule):
         ):
             self.loss_module_train.set_using_memory_bank(True)
             logger.info("Using memory bank")
+        elif (
+            isinstance(self.loss_module_train, L2SPRegularization_Wrapper)
+            and isinstance(self.loss_module_train.loss, VariationalPrototypeLearning)
+            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch
+        ):  # is wrapped in l2sp regularization
+            self.loss_module_train.loss.set_using_memory_bank(True)
+            logger.info("Using memory bank")
 
+    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        images, labels = batch
-        vec = torch.cat(images, dim=0)
+        ids, images, labels = batch
+
+        # HACK(memben): We'll allow this for now, but we should correct it later
+        if torch.is_tensor(labels[0]):  # type: ignore
+            flat_labels = torch.cat(labels, dim=0)  # type: ignore
+            vec = torch.cat(images, dim=0)  # type: ignore
+        else:
+            # NOTE(memben): this is the expected shape
+            # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
+            # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
         embeddings = self.forward(vec)
-        flat_labels = (
-            torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
-        )
+
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
         return loss
 
-    def add_validation_embeddings(self, anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels) -> None:
+    def add_validation_embeddings(
+        self, anchor_ids: List[str], anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels
+    ) -> None:
         # save anchor embeddings of validation step for later analysis in W&B
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
         embeddings = embeddings.cpu()
 
-        assert len(self.embeddings_table_columns) == 2
+        assert len(self.embeddings_table_columns) == 3
         data = {
-            self.embeddings_table_columns[0]: (
-                anchor_labels.tolist()  # type: ignore
-                if torch.is_tensor(anchor_labels)  # type: ignore
-                else anchor_labels
-            ),
+            self.embeddings_table_columns[0]: (anchor_labels.tolist()),  # type: ignore
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
+            self.embeddings_table_columns[2]: anchor_ids,
         }
 
         df = pd.DataFrame(data)
         self.embeddings_table = pd.concat([df, self.embeddings_table], ignore_index=True)
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
+    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
-        n_achors = len(images[0])
-        vec = torch.cat(images, dim=0)
-        flat_labels = (
-            torch.cat(labels, dim=0) if torch.is_tensor(labels[0]) else [label for group in labels for label in group]  # type: ignore
-        )
-        embeddings = self.forward(vec)
+        ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
+        n_anchors = len(images[0])
 
-        self.add_validation_embeddings(embeddings[:n_achors], flat_labels[:n_achors])  # type: ignore
-        if not isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+        # HACK(memben): We'll allow this for now, but we should correct it later
+        if torch.is_tensor(labels[0]):  # type: ignore
+            flat_labels = torch.cat(labels, dim=0)  # type: ignore
+            vec = torch.cat(images, dim=0)  # type: ignore
+        else:
+            # NOTE(memben): this is the expected shape
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
+            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+
+        flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
+        embeddings = self.forward(vec)
+        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])
+        if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
             self.log("val/positive_distance", pos_dist, on_step=True)
@@ -282,25 +314,43 @@ class BaseModule(L.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
-        if isinstance(self.loss_module_val, (ArcFaceLoss, VariationalPrototypeLearning)):
+        if "softmax" in self.loss_mode:
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
-            class_weights = torch.zeros(self.loss_module_val.num_classes, self.embedding_size).to(self.device)
-            for label in range(self.loss_module_val.num_classes):
-                class_weights[label] = torch.tensor(
-                    self.embeddings_table[self.embeddings_table["label"] == torch.tensor(label)]["embedding"].tolist()
-                ).mean(dim=0)
+            loss_module_val = (
+                self.loss_module_val
+                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                else self.loss_module_val.loss  # type: ignore
+            )
+            num_classes = (
+                self.loss_module_val.num_classes  # type: ignore
+                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                else self.loss_module_val.loss.num_classes  # type: ignore
+            )
+
+            class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+            lse = LinearSequenceEncoder()
+            self.embeddings_table["label"] = self.embeddings_table["label"].apply(lse.encode)
+
+            for label in range(num_classes):
+                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == label]["embedding"].tolist()
+                class_embeddings = (
+                    np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                )
+                class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
                 if torch.isnan(class_weights[label]).any():
                     class_weights[label] = 0.0
 
             # calculate loss for all embeddings
-            self.loss_module_val.set_weights(class_weights)
+            loss_module_val.set_weights(class_weights)  # type: ignore
+            loss_module_val.le = lse  # type: ignore
 
             losses = []
             for _, row in self.embeddings_table.iterrows():
-                loss, _, _ = self.loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0), torch.tensor(row["label"]).unsqueeze(0)
+                loss, _, _ = loss_module_val(
+                    torch.tensor(row["embedding"]).unsqueeze(0),
+                    torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
@@ -328,6 +378,12 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
+
+        # optimizer = torch.optim.RMSprop(
+        #     self.model.parameters(),
+        #     lr=self.initial_lr,
+        #     weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
+        # )
 
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
@@ -389,6 +445,7 @@ class BaseModule(L.LightningModule):
         """
         return lambda x: x
 
+    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         """Add your data augmentations here. Function will be called after get_tensor_transforms in the training loop"""
         return lambda x: x
@@ -421,6 +478,43 @@ class EfficientNetV2Wrapper(BaseModule):
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv
         return self.model.features[-1][0]  # TODO(liamvdv)
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+            ]
+        )
+
+
+class EfficientNetRW_M(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        is_from_scratch = kwargs.get("from_scratch", False)
+        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
+
+        self.model.classifier = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.classifier.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.conv_head
 
     @classmethod
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -743,8 +837,10 @@ class SwinV2BaseWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 
@@ -933,6 +1029,43 @@ class ResNet50DinoV2Wrapper(BaseModule):
         )
 
 
+class InceptionV3Wrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model = timm.create_model("inception_v3", pretrained=not self.from_scratch)
+
+        # self.model.reset_classifier(self.embedding_size) # TODO
+        self.model.fc = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.fc.in_features),
+            torch.nn.Dropout(p=self.dropout_p),
+            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
+            torch.nn.BatchNorm1d(self.embedding_size),
+        )
+
+        self.set_losses(self.model, **kwargs)
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.Mixed_7c.branch_pool
+
+    @classmethod
+    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+            ]
+        )
+
+
 class FaceNetWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -1056,6 +1189,8 @@ custom_model_cls = {
     "VisionTransformerClip": VisionTransformerClipWrapper,
     "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
+    "EfficientNet_RW_M": EfficientNetRW_M,
+    "InceptionV3": InceptionV3Wrapper,
 }
 
 

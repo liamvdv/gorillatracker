@@ -9,9 +9,11 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import (
     NletDataModule,
     QuadletDataModule,
+    QuadletKFoldDataModule,
     SimpleDataModule,
+    SimpleKFoldDataModule,
     TripletDataModule,
-    VideoTripletDataModule,
+    TripletKFoldDataModule,
 )
 
 
@@ -36,17 +38,18 @@ def get_data_module(
     data_dir: str,
     batch_size: int,
     loss_mode: str,
-    video_data: bool,
     model_transforms: gtypes.Transform,
     training_transforms: gtypes.Transform = None,  # type: ignore
 ) -> NletDataModule:
     base: Type[NletDataModule]
-    if video_data:
-        base = VideoTripletDataModule
-    else:
-        base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
-        base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
-        base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
+    base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
+    base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
+    base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
+
+    if "kfold" in data_dir:
+        base = QuadletKFoldDataModule if loss_mode.startswith("online") else None  # type: ignore
+        base = TripletKFoldDataModule if loss_mode.startswith("offline") else base  # type: ignore
+        base = SimpleKFoldDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     dataset_class = get_dataset_class(dataset_class_id)
     transforms = Compose(

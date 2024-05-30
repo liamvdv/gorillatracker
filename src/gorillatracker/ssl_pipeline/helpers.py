@@ -6,13 +6,12 @@ import subprocess
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime
 from itertools import groupby
 from pathlib import Path
-from typing import Generator, Optional, Sequence
+from typing import Generator, Iterator, Optional, Sequence
 
 import cv2
-import easyocr
 from shapely.geometry import Polygon
 
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
@@ -45,7 +44,7 @@ def video_frame_iterator(cap: cv2.VideoCapture, frame_step: int) -> Generator[Vi
 
 
 @contextmanager
-def video_reader(video_path: Path, frame_step: int = 1) -> Generator[Generator[VideoFrame, None, None], None, None]:
+def video_reader(video_path: Path, frame_step: int = 1) -> Iterator[Generator[VideoFrame, None, None]]:
     """
     Context manager for reading frames from a video file.
 
@@ -126,13 +125,13 @@ class BoundingBox:
     @classmethod
     def from_tracking_frame_feature(cls, frame_feature: TrackingFrameFeature) -> BoundingBox:
         return cls(
-            frame_feature.bbox_x_center,
-            frame_feature.bbox_y_center,
-            frame_feature.bbox_width,
-            frame_feature.bbox_height,
+            frame_feature.bbox_x_center_n,
+            frame_feature.bbox_y_center_n,
+            frame_feature.bbox_width_n,
+            frame_feature.bbox_height_n,
             frame_feature.confidence,
-            frame_feature.video.width,
-            frame_feature.video.height,
+            int(frame_feature.bbox_width / frame_feature.bbox_width_n),
+            int(frame_feature.bbox_height / frame_feature.bbox_height_n),
         )
 
 
@@ -147,7 +146,7 @@ def groupby_frame(
 
 
 def remove_processed_videos(video_paths: list[Path], processed_videos: list[Video]) -> list[Path]:
-    processed_video_paths = [Path(v.path) for v in processed_videos]
+    processed_video_paths = set(Path(v.path) for v in processed_videos)
     return [v for v in video_paths if v not in processed_video_paths]
 
 
@@ -158,44 +157,6 @@ def crop_frame(frame: cv2.typing.MatLike, bbox: BoundingBox) -> cv2.typing.MatLi
         bbox.x_top_left : bbox.x_bottom_right,
     ]
     return cropped_frame
-
-
-def read_timestamp(video_path: Path, bbox: BoundingBox, ocr_reader: Optional[easyocr.Reader] = None) -> time:
-    """
-    Extracts the time stamp from the video file.
-
-    Args:
-        video_path (Path): path to the video file
-        bbox (BoundingBox): bounding box for the time stamp
-        ocr_reader (Optional[easyocr.Reader]): OCR reader
-
-    Returns:
-        time: time stamp as time object
-    """
-    with video_reader(video_path) as video_feed:
-        frame = next(video_feed).frame
-
-    cropped_frame = crop_frame(frame, bbox)
-    ocr_reader = ocr_reader or easyocr.Reader(["en"], gpu=False, verbose=False)
-    time_stamp = _extract_time_stamp(cropped_frame, ocr_reader)
-
-    return time_stamp
-
-
-def _extract_time_stamp(cropped_frame: cv2.typing.MatLike, reader: easyocr.Reader) -> time:
-    """Extracts the time stamp from the cropped frame."""
-    TIMESTAMP_CHARS = "0123456789APM:"
-    rgb_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB)
-    extracted_time_stamp_raw = reader.readtext(rgb_frame, allowlist=TIMESTAMP_CHARS)
-    time_stamp = "".join(text[1] for text in extracted_time_stamp_raw).replace(":", "")
-    return _extract_time(time_stamp)
-
-
-def _extract_time(time_stamp: str) -> time:
-    try:
-        return datetime.strptime(time_stamp, "%I%M%p").time()
-    except ValueError:
-        raise ValueError("Could not extract time stamp from frame")
 
 
 def extract_meta_data_time(video_path: Path) -> Optional[datetime]:

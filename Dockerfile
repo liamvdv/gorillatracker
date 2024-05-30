@@ -57,7 +57,7 @@ COPY ppc64le.cenvironment.yml /locks/environment.yml
 # -----------------
 # Final build image - we choose the correct base image based on the target architecture and OS
 # -----------------
-ARG TARGETARCH
+ARG TARGETARCH=amd64
 FROM ${TARGETARCH}${OS_SELECTOR} as final
 # From https://github.com/mamba-org/micromamba-docker#adding-micromamba-to-an-existing-docker-image
 # The commands below add micromamba to an existing image to give the capability to ad-hoc install new dependencies

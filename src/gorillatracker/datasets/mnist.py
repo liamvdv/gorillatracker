@@ -8,7 +8,7 @@ from torchvision.datasets import MNIST
 import gorillatracker.type_helper as gtypes
 
 
-class MNISTDataset(Dataset[Tuple[torch.Tensor, int]]):
+class MNISTDataset(Dataset[Tuple[gtypes.Id, torch.Tensor, gtypes.Label]]):
     def __init__(
         self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
     ) -> None:
@@ -35,8 +35,10 @@ class MNISTDataset(Dataset[Tuple[torch.Tensor, int]]):
     def __len__(self) -> int:
         return len(getattr(self, self.partition))
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        return getattr(self, self.partition)[idx]
+    def __getitem__(self, idx: int) -> Tuple[str, torch.Tensor, int]:
+        tensor, label = getattr(self, self.partition)[idx]
+        id = str(idx)
+        return id, tensor, label
 
     def get_num_classes(self) -> int:
         return 10
