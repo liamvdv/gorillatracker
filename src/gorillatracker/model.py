@@ -312,7 +312,9 @@ class BaseModule(L.LightningModule):
 
         flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
         embeddings = self.forward(vec)
-        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])
+        self.add_validation_embeddings(
+            flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
+        )
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log(
