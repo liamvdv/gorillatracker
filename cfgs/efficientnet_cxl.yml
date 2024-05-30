@@ -46,7 +46,7 @@ initial_lr: 1e-4                # Initial learning rate before warmup(must be > 
 start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 6                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 8                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
@@ -65,3 +65,9 @@ save_model_to_wandb: True       # Save the model checkpoint to wandb
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 data_resize_transform: 224
+
+additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null
