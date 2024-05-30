@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Literal, Optional, Type
+from typing import Any, Callable, Dict, Literal, Optional, Type, Tuple
 
 import lightning as L
 import torchvision.transforms as transforms
@@ -76,16 +76,16 @@ class NletDataModule(L.LightningDataModule):
         # NOTE(liamvdv): used to clean-up when the run is finished
         pass
 
-    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
+    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> Tuple[int, Dict[int, int]]:  # HACK
         if mode == "train":
             train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
-            return train.get_num_classes()  # type: ignore
+            return train.get_num_classes(), train.get_class_distribution()  # type: ignore
         elif mode == "val":
             val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
-            return val.get_num_classes()  # type: ignore
+            return val.get_num_classes(), val.get_class_distribution()  # type: ignore
         elif mode == "test":
             test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
-            return test.get_num_classes()  # type: ignore
+            return test.get_num_classes(), test.get_class_distribution()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
 

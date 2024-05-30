@@ -83,6 +83,11 @@ class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def get_num_classes(self) -> int:
         labels = [label for _, label in self.samples]
         return len(set(labels))
+    
+    def get_class_distribution(self) -> List[int]:
+        labels = [label for _, label in self.samples]
+        class_distribution = {label: labels.count(label) for label in set(labels)}
+        return class_distribution
 
 
 if __name__ == "__main__":

@@ -21,6 +21,11 @@ class ModelConstructor:
 
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
+        
+        num_classes_dist = (self.dm.get_num_classes("train"), self.dm.get_num_classes("val"), self.dm.get_num_classes("test")) if not args.use_ssl else ((-1,[]), (-1,[]), (-1,[]))
+        num_classes = (num_classes_dist[0][0], num_classes_dist[1][0], num_classes_dist[2][0])
+        class_distribution = (num_classes_dist[0][1], num_classes_dist[1][1], num_classes_dist[2][1])
+        
         return dict(
             model_name_or_path=args.model_name_or_path,
             from_scratch=args.from_scratch,
@@ -45,17 +50,15 @@ class ModelConstructor:
             delta_t=args.delta_t,
             mem_bank_start_epoch=args.mem_bank_start_epoch,
             lambda_membank=args.lambda_membank,
-            num_classes=(
-                (self.dm.get_num_classes("train"), self.dm.get_num_classes("val"), self.dm.get_num_classes("test"))  # type: ignore
-                if not args.use_ssl
-                else (-1, -1, -1)
-            ),
+            num_classes=num_classes,
+            class_distribution=class_distribution,
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,
             l2_beta=args.l2_beta,
             path_to_pretrained_weights=args.path_to_pretrained_weights,
             use_wildme_model=args.use_wildme_model,
+            k_subcenters=args.k_subcenters,
         )
 
     def construct(

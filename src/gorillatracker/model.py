@@ -137,6 +137,7 @@ class BaseModule(L.LightningModule):
         embedding_size: int = 256,
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
+        class_distribution: Dict[int, int] = {},
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
         **kwargs: Dict[str, Any],
@@ -189,6 +190,8 @@ class BaseModule(L.LightningModule):
         embedding_size: int = 256,
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
+        class_distribution: Dict[int, int] = {},
+        k_subcenters: int = 2,
         accelerator: str = "cpu",
         **kwargs: Dict[str, Any],
     ) -> None:
@@ -200,6 +203,7 @@ class BaseModule(L.LightningModule):
             delta_t=delta_t,
             s=s,
             num_classes=num_classes[0],
+            class_distribution=class_distribution[0],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -208,6 +212,7 @@ class BaseModule(L.LightningModule):
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
             log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
+            k_subcenters=k_subcenters,
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -217,15 +222,18 @@ class BaseModule(L.LightningModule):
             delta_t=delta_t,
             s=s,
             num_classes=num_classes[1],
+            class_distribution=class_distribution[1],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
-            accelerator=accelerator,
+            accelerator="cpu",
             l2_alpha=kwargs["l2_alpha"],
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
             log_func=lambda x, y: self.log("val/"+ x, y, on_epoch=True),
+            k_subcenters=1,
         )
+        self.loss_module_val.eval()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.quant(x)
@@ -289,7 +297,7 @@ class BaseModule(L.LightningModule):
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
-        if "softmax" not in self.loss_mode:
+        if "softmax" not in self.loss_mode and "combined" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log("val/loss", loss, sync_dist=True, prog_bar=True)
             self.log("val/positive_distance", pos_dist, )
@@ -301,8 +309,6 @@ class BaseModule(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
         if "softmax" in self.loss_mode or "combined" in self.loss_mode:
-            
-            
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
@@ -822,7 +828,7 @@ class SwinV2BaseWrapper(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
+                transforms_v2.RandomCrop(192, scale=(0.75, 1.0)),
             ]
         )
 
@@ -854,17 +860,19 @@ class SwinV2LargeWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.Resize((192), antialias=True),
+                # transforms.Resize((192), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
 
     @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]: # TODO
         return transforms.Compose(
             [
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 

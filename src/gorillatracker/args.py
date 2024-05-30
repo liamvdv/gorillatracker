@@ -74,6 +74,7 @@ class TrainingArgs:
 
     save_model_to_wandb: bool = field(default=False)
 
+    k_subcenters: int = field(default=2)
     margin: float = field(default=0.5)
     s: float = field(default=64.0)
     delta_t: int = field(default=100)
@@ -86,6 +87,8 @@ class TrainingArgs:
         "online/hard",
         "online/semi-hard",
         "softmax/arcface",
+        "softmax/adaface",
+        "softmax/elasticface",
         "softmax/vpl",
         "combined",
         "offline/native/l2sp",
@@ -94,7 +97,13 @@ class TrainingArgs:
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
-        "combined/l2sp",
+        "softmax/adaface/l2sp",
+        "softmax/elasticface/l2sp",
+        "softmax/arcface/combined/l2sp",
+        "softmax/vpl/combined/l2sp",
+        "softmax/adaface/combined/l2sp",
+        "softmax/elasticface/combined/l2sp",
+        # "combined/l2sp",
     ] = field(default="offline")
     kfold: bool = field(default=False)
 
