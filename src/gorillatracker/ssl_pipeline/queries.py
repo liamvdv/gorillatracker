@@ -102,7 +102,7 @@ def min_count_filter(
     ```
     """
 
-    alias_query = alias(query)
+    alias_query = alias(query.subquery())
     subquery = (
         select(
             alias_query.c.tracking_id,
