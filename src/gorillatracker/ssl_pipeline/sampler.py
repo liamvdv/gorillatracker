@@ -107,7 +107,7 @@ if __name__ == "__main__":
         sampler = Sampler(query)
         frame_features = sampler.sample(session)
         grouped = sampler.group_by_tracking_id(list(frame_features))
-    
+
     for tracking_id, features in grouped.items():
         print(f"Tracking ID: {tracking_id}")
         for feature in features:

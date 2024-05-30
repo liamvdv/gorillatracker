@@ -86,9 +86,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             artifact.add(table, "embeddings_table_step_{}".format(current_step))
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
-
-            if self.use_ssl and dataloader_idx == 0:
-                continue
+            # TODO(V1nce1): Add back in when SSL Validation is working
+            # if self.use_ssl and dataloader_idx == 0:
+            #     continue
 
             train_embeddings, train_labels = (
                 self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)

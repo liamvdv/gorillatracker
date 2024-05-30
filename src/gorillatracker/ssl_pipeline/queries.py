@@ -6,7 +6,7 @@ import datetime as dt
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional, Sequence
+from typing import Iterator, Sequence
 
 from sqlalchemy import ColumnElement, Select, alias, and_, func, or_, select, update
 from sqlalchemy.orm import Session, aliased
@@ -80,7 +80,7 @@ def cached_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[Tr
 
 
 def min_count_filter(
-    query: Select[tuple[TrackingFrameFeature]], min_feature_count: int, feature_type: Optional[str] = None
+    query: Select[tuple[TrackingFrameFeature]], min_feature_count: int
 ) -> Select[tuple[TrackingFrameFeature]]:
     """
     Filters the query to include only TrackingFrameFeature instances that belong to trackings with at least `min_feature_count` features of the specified `feature_type`.
@@ -101,17 +101,17 @@ def min_count_filter(
 
     ```
     """
+
+    alias_query = alias(query)
     subquery = (
-        select(TrackingFrameFeature.tracking_id)
-        .group_by(TrackingFrameFeature.tracking_id)
-        .having(func.count(TrackingFrameFeature.tracking_id) >= min_feature_count)
-    )
+        select(
+            alias_query.c.tracking_id,
+            func.count().label("feature_count"),
+        ).group_by(alias_query.c.tracking_id)
+    ).subquery()
 
-    if feature_type is not None:
-        subquery = subquery.where(TrackingFrameFeature.feature_type == feature_type)
-
-    query = query.where(TrackingFrameFeature.tracking_id.in_(subquery))
-
+    query = query.join(subquery, subquery.c.tracking_id == TrackingFrameFeature.tracking_id)
+    query = query.where(subquery.c.feature_count >= min_feature_count)
     return query
 
 
