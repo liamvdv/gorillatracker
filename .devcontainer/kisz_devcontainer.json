@@ -53,6 +53,7 @@
         "source=${localEnv:HOME}/data,target=/workspaces/gorillatracker/data,type=bind,ro",
         "source=${localEnv:HOME}/data/embeddings,target=/workspaces/gorillatracker/data/embeddings,type=bind",
         "source=${localEnv:HOME}/data/splits/,target=/workspaces/gorillatracker/data/splits,type=bind",
+        "source=${localEnv:HOME}/pretrained_weights/,target=/workspaces/gorillatracker/pretrained_weights,type=bind",
         "source=/mnt/vast-gorilla/,target=/workspaces/gorillatracker/video_data,type=bind,ro",
         // NOTE(liamvdv): Allow write.
         "source=${localEnv:HOME}/models/,target=/workspaces/gorillatracker/models,type=bind"

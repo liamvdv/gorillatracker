@@ -21,12 +21,11 @@ from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
-warnings.filterwarnings("ignore", ".*does not have many workers.*")
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 
 
-def main(args: TrainingArgs) -> None:  # noqa: C901
+def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -82,18 +81,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        # args.video_data,
-        model_transforms,
-        model.get_training_transforms(),
-    )
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -144,16 +131,6 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
         )
-
-    if args.pretrained_weights_file is not None:
-        # delete everything in model except model.model
-        for k in list(model.__dict__.keys()):
-            if k != "model" and not k.startswith("_"):
-                del model.__dict__[k]
-        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
-        torch.save(model.state_dict(), args.pretrained_weights_file)
-        logger.info("Model saved")
-        exit(0)
 
     ### Preperation for quantization aware training ###
     if args.use_quantization_aware_training:

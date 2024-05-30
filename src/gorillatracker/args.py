@@ -117,9 +117,6 @@ class TrainingArgs:
     # SSL Config
     use_ssl: bool = field(default=False)
 
-    pretrained_weights_file: Union[str, None] = field(default=None)
-    # Add any additional fields as needed.
-
     def __post_init__(self) -> None:
         assert self.num_devices > 0
         assert self.batch_size > 0

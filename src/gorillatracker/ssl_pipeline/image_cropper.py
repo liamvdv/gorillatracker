@@ -4,17 +4,17 @@ import logging
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
-from functools import partial
 from pathlib import Path
 
 import cv2
-from sqlalchemy import Engine, Select, select, update
+from sqlalchemy import Engine, Select, update
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.queries import load_video
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+from gorillatracker.ssl_pipeline.queries import load_preprocessed_videos, load_video
 from gorillatracker.ssl_pipeline.sampler import Sampler
 
 log = logging.getLogger(__name__)
@@ -88,8 +88,12 @@ def crop(
         log.warning(f"No frames to crop for video: {video_path}")
         return
 
-    crop_from_video(video_path, crop_tasks)
-    update_cached_tff(crop_tasks, session_cls)
+    try:
+        crop_from_video(video_path, crop_tasks)
+        update_cached_tff(crop_tasks, session_cls)
+    except cv2.error as e:
+        log.error(f"Error cropping video: {video_path}")
+        log.error(e)
 
 
 _version = None
@@ -133,37 +137,26 @@ def multiprocess_crop_from_video(
 
 
 if __name__ == "__main__":
-    import shutil
-
     from sqlalchemy import create_engine
 
     from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter
 
-    # engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
-    engine = create_engine("sqlite:///test.db")
+    engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
-    def sampling_strategy(video_id: int, min_n_images_per_tracking: int) -> Select[tuple[TrackingFrameFeature]]:
+    def sampling_strategy(video_id: int) -> Select[tuple[TrackingFrameFeature]]:
         query = video_filter(video_id)
         query = associated_filter(query)
         return query
 
-    abs_path = "/workspaces/gorillatracker/cropped_images"
-    shutil.rmtree(abs_path)
-    Path(abs_path).mkdir(parents=True, exist_ok=True)
+    abs_path = "/workspaces/gorillatracker/video_data/cropped-images"
 
     session_cls = sessionmaker(bind=engine)
-    version = "2024-04-09"  # TODO(memben)
+    version = "2024-04-18"  # TODO(memben)
 
     with session_cls() as session:
-        videos = session.execute(select(Video)).scalars().all()
+        videos = load_preprocessed_videos(session, version)
         video_paths = [video.path for video in videos]
 
-    query = partial(sampling_strategy, min_n_images_per_tracking=10)
-    sampler = Sampler(query_builder=query)
+    sampler = Sampler(query_builder=sampling_strategy)
 
-    multiprocess_crop_from_video(video_paths[:20], version, engine, sampler, Path(abs_path), max_workers=10)
-
-    with session_cls() as session:
-        tracking_frame_features = session.execute(select(TrackingFrameFeature)).scalars().all()
-        for feature in tracking_frame_features[:50]:
-            print(feature.cached)
+    multiprocess_crop_from_video(video_paths, version, engine, sampler, Path(abs_path), max_workers=80)
