@@ -6,7 +6,7 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
 precision: 16                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 4                      # Number of workers for data loading
+workers: 40                      # Number of workers for data loading
 
 
 # Model and Training Arguments
@@ -59,7 +59,7 @@ end_lr: 1e-7                    # End learning rate (for the learning rate sched
 batch_size: 128                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
+max_epochs: 2                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -73,4 +73,8 @@ knn_with_train: False
 use_ssl: True
 
 data_resize_transform: 192
+
+additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
