@@ -118,6 +118,12 @@ class TrainingArgs:
 
     # SSL Config
     use_ssl: bool = field(default=False)
+    tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    n_videos: int = field(default=200)
+    n_samples: int = field(default=15)
+    feature_types: list[str] = field(default_factory=lambda: ["body"])
+    min_confidence: float = field(default=0.5)
+    min_images_per_tracking: int = field(default=3)
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0

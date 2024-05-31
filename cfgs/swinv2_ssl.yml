@@ -59,11 +59,11 @@ end_lr: 1e-7                    # End learning rate (for the learning rate sched
 batch_size: 128                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 2                  # Training goal (large number)
+max_epochs: 4                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-val_check_interval: 100
+val_check_interval: 1.0
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
 knn_with_train: False           

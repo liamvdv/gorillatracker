@@ -86,9 +86,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             artifact.add(table, "embeddings_table_step_{}".format(current_step))
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
-
-            if self.use_ssl and dataloader_idx == 0:
-                continue
+            # TODO(V1nce1): Add back in when SSL Validation is working
+            # if self.use_ssl and dataloader_idx == 0:
+            #     continue
 
             train_embeddings, train_labels = (
                 self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
@@ -447,6 +447,7 @@ def pca(
     # plot.figure.savefig("pca.png")
     plot = wandb.Image(plot.figure)
     # print("pca done")
+    plt.close("all")
     return plot
 
 
@@ -486,6 +487,7 @@ def tsne(
     # plot.figure.savefig("tnse.png")
     plot = wandb.Image(plot.figure)
     # print("tsne done")
+    plt.close("all")
     return plot
 
 
