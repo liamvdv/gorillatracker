@@ -447,6 +447,7 @@ def pca(
     # plot.figure.savefig("pca.png")
     plot = wandb.Image(plot.figure)
     # print("pca done")
+    plt.close("all")
     return plot
 
 
@@ -486,6 +487,7 @@ def tsne(
     # plot.figure.savefig("tnse.png")
     plot = wandb.Image(plot.figure)
     # print("tsne done")
+    plt.close("all")
     return plot
 
 
