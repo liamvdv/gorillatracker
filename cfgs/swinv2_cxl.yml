@@ -6,13 +6,13 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
 precision: "32-true"            # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 16                     # Number of workers for data loading
+workers: 32                    # Number of workers for data loading
 
 
 # Model and Training Arguments
 
 project_name: "Embedding-SwinV2-CXL-Open"  # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "209-swinbase-l2sp" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "baseline-offline-loss" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["l2sp-sweep"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2Base"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -37,14 +37,14 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 1.0                       # Alpha for the l2sp loss
 l2_beta: 1.0                       # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/swinv2_base.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: ""    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
 delta_t: 50                         # Delta t for the vpl loss
 mem_bank_start_epoch: 10            # Epoch to start using the memory bank
 lambda_membank: 0.5                 # Lambda for the memory bank loss
-loss_mode: "softmax/arcface/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
+loss_mode: "offline/native"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 

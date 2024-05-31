@@ -207,6 +207,7 @@ class BaseModule(L.LightningModule):
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
             log_func=self.log,
+            teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -223,6 +224,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
+            teacher_model_wand_link=kwargs["teacher_model_wandb_link"],
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -259,7 +261,7 @@ class BaseModule(L.LightningModule):
             vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
         embeddings = self.forward(vec)
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -301,7 +303,7 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])
         if "softmax" not in self.loss_mode:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)  # type: ignore
             self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
             self.log("val/positive_distance", pos_dist, on_step=True)
             self.log("val/negative_distance", neg_dist, on_step=True)

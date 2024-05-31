@@ -49,6 +49,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
+        self.use_quantization_aware_training = use_quantization_aware_training
         self.kfold_k = kfold_k if kfold_k is not None else None
         if knn_with_train:
             dm.setup("fit")
