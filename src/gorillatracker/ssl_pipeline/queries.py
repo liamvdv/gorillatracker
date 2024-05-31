@@ -250,28 +250,24 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[Tracking, Tra
             TrackingFrameFeature.video_id,
         )
         .where(TrackingFrameFeature.tracking_id.isnot(None))
-        .group_by(TrackingFrameFeature.tracking_id)
+        .group_by(TrackingFrameFeature.tracking_id, TrackingFrameFeature.video_id)
     ).subquery()
 
     left_subquery = alias(subquery)
     right_subquery = alias(subquery)
 
-    left_tracking = aliased(Tracking)
-    right_tracking = aliased(Tracking)
-
     stmt = (
-        select(left_tracking, right_tracking)
-        .join(left_subquery, left_tracking.tracking_id == left_subquery.c.tracking_id)
-        .join(right_subquery, right_tracking.tracking_id == right_subquery.c.tracking_id)
+        select(left_subquery.c.tracking_id, right_subquery.c.tracking_id)
+        .join(right_subquery, left_subquery.c.video_id == right_subquery.c.video_id)
         .where(
             (left_subquery.c.min_frame_nr <= right_subquery.c.max_frame_nr)
             & (right_subquery.c.min_frame_nr <= left_subquery.c.max_frame_nr)
-            & (left_subquery.c.video_id == right_subquery.c.video_id)
             & (left_subquery.c.tracking_id < right_subquery.c.tracking_id)
         )
     )
-
+    print("Starting query...")
     overlapping_trackings = session.execute(stmt).fetchall()
+    print("Done")
     return [(row[0], row[1]) for row in overlapping_trackings]
 
 
@@ -384,10 +380,12 @@ def reset_dependent_tasks_status(session: Session, dependent: TaskType, provider
 if __name__ == "__main__":
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+    import os
 
-    engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
+    engine = create_engine(os.environ.get("POSTGRESQL_URI") or "sqlite:///:memory:")
 
     session_cls = sessionmaker(bind=engine)
 
     with session_cls() as session:
-        reset_dependent_tasks_status(session, TaskType.CORRELATE, TaskType.TRACK)
+        overlapping_trackings = find_overlapping_trackings(session)
+        print(overlapping_trackings[:10])
