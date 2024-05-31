@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Any, Callable, List, Literal, Optional, Type
+from typing import Callable, Literal, Type
 
 import lightning as L
 import torch
@@ -11,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.contrastive_sampler import ContrastiveImage, ContrastiveSampler, get_random_ssl_sampler
+from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler
 from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Nlet
 
@@ -107,7 +108,7 @@ class NletDataModule(L.LightningDataModule):
         return (-1, -1, -1)
 
 
-class NletDataset(Dataset[Nlet]):
+class NletDataset(Dataset[Nlet], ABC):
     def __init__(
         self,
         base_dir: str,
@@ -115,7 +116,7 @@ class NletDataset(Dataset[Nlet]):
         partition: Literal["train", "val", "test"],
         transform: gtypes.Transform,
     ):
-        self.contrastive_sampler = get_random_ssl_sampler(base_dir)
+        self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
         self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition
@@ -129,6 +130,15 @@ class NletDataset(Dataset[Nlet]):
             return self._get_cached_item(idx)
         else:
             return self._get_item(idx)
+
+    @property
+    @abstractmethod
+    def num_classes(self) -> int:
+        pass
+
+    @abstractmethod
+    def create_contrastive_sampler(self, base_dir) -> ContrastiveSampler:
+        pass
 
     @lru_cache(maxsize=None)
     def _get_cached_item(self, idx: int) -> Nlet:
