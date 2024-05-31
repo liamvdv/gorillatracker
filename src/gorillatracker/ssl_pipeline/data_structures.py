@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from itertools import chain
 from typing import Generic, Protocol, TypeVar
 
 CT = TypeVar("CT")
 
 
 class Comparable(Protocol):
-    def __lt__(self: CT, other: CT) -> bool: ...
+    def __lt__(self: CT, other: CT, /) -> bool: ...
 
 
 T = TypeVar("T")
-K = TypeVar("K", bound=Comparable)
 
 
 class DirectedBipartiteGraph(Generic[T]):
@@ -100,7 +100,7 @@ class CliqueGraph(Generic[T]):
         return self.union_find.get_members(v)
 
     def get_adjacent_cliques(self, v: T) -> dict[T, list[T]]:
-        adjacent_clique_roots = self._get_adjacent_partitions(v)
+        adjacent_clique_roots = self._get_adjacent_clique_roots(v)
         return {r: self.get_clique(r) for r in adjacent_clique_roots}
 
     def get_random_clique_member(self, v: T, exclude: list[T] = []) -> T:
@@ -108,7 +108,7 @@ class CliqueGraph(Generic[T]):
         return random.choice([m for m in clique if m not in exclude])
 
     def get_random_adjacent_clique(self, v: T) -> T:
-        adjacent_clique_roots = self._get_adjacent_partitions(v)
+        adjacent_clique_roots = self._get_adjacent_clique_roots(v)
         return random.choice(list(adjacent_clique_roots))
 
     def merge(self, u: T, v: T) -> None:
@@ -135,13 +135,16 @@ class CliqueGraph(Generic[T]):
     def _find_root(self, v: T) -> T:
         return self.union_find.find(v)
 
-    def _get_adjacent_partitions(self, v: T) -> set[T]:
+    def _get_adjacent_clique_roots(self, v: T) -> set[T]:
         root_v = self._find_root(v)
         return self.cut_edges[root_v]
 
 
+K = TypeVar("K", bound=Comparable)
+
+
 class IndexedCliqueGraph(CliqueGraph[K]):
-    """CliqueGraph with reproducible clique identifiers and order of verticies
+    """CliqueGraph with reproducible clique roots named representatives and order of verticies
     independent of the edge insertion order."""
 
     def __init__(self, vertices: list[K]) -> None:
@@ -154,8 +157,9 @@ class IndexedCliqueGraph(CliqueGraph[K]):
     def get_clique_representative(self, v: K) -> K:
         return min(self.get_clique(v))
 
+    # override
     def get_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
-        adjacent_clique_roots = self._get_adjacent_partitions(v)
+        adjacent_clique_roots = self._get_adjacent_clique_roots(v)
         adjacent_cliques = {}
         for r in adjacent_clique_roots:
             clique = self.get_clique(r)
@@ -167,3 +171,83 @@ class IndexedCliqueGraph(CliqueGraph[K]):
 
     def __len__(self) -> int:
         return len(self.vertices)
+
+
+P = TypeVar("P", bound=Comparable)
+
+
+class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
+    """Indexed Clique Graph supporting multiple layers of cut edges.
+    This allows for hierarchical or multi-layered connections between cliques.
+    A clique in a parent layer does not guarantee that the children are connected
+    but a partition in a parent layer ensures a partition in the child layers."""
+
+    def __init__(self, vertices: list[K], parent: CliqueGraph[P], parent_edges: dict[K, P | None]) -> None:
+        """
+        Args:
+            vertices: List of vertices in the current layer
+            parent: Parent CliqueGraph
+            parent_edges: Mapping from the current layer vertices to the parent layer vertices
+        """
+        super().__init__(vertices)
+        self.parent = parent
+        self.parent_edges = parent_edges
+        self.inverse_parent_edges: defaultdict[P, set[K]] = defaultdict(set)
+        for child_r, parent_r in parent_edges.items():
+            if parent_r is not None:
+                self.inverse_parent_edges[parent_r].add(child_r)
+
+    # override
+    def merge(self, u: K, v: K) -> None:
+        u_root, v_root = self._find_root(u), self._find_root(v)
+        super().merge(u, v)
+        parent_u, parent_v = self.parent_edges.pop(u_root, None), self.parent_edges.pop(v_root, None)
+        if parent_u is not None and parent_v is not None:
+            assert parent_u == parent_v, "MultiParent merge not supported"
+        new_root = self._find_root(u)
+        self.parent_edges[new_root] = parent_u or parent_v
+
+    # override
+    def is_partitioned(self, u: K, v: K) -> bool:
+        self_p = super().is_partitioned(u, v)
+        parent_p = self._is_parent_partitioned(u, v)
+        return self_p or parent_p
+
+    def _is_parent_partitioned(self, u: K, v: K) -> bool:
+        root_u, root_v = self._find_root(u), self._find_root(v)
+        parent_u, parent_v = self.parent_edges.get(root_u), self.parent_edges.get(root_v)
+        if parent_u is None or parent_v is None:
+            return False
+        return self.parent.is_partitioned(parent_u, parent_v)
+
+    # override
+    def get_adjacent_cliques(self, v: K) -> dict[K, list[K]]:
+        return super().get_adjacent_cliques(v) | self._get_adjacent_cliques_via_parent(v)
+
+    def _get_adjacent_cliques_via_parent(self, v: K) -> dict[K, list[K]]:
+        adjacent_clique_representatives = self._get_adjacent_clique_roots_via_parent(v)
+        return {r: self.get_clique(r) for r in adjacent_clique_representatives}
+
+    # override
+    def _get_adjacent_clique_roots(self, v: K) -> set[K]:
+        return super()._get_adjacent_clique_roots(v) | self._get_adjacent_clique_roots_via_parent(v)
+
+    def _get_adjacent_clique_roots_via_parent(self, v: K) -> set[K]:
+        # 1. We go one layer up and collect all adjacent cliques in the parent layer => parent_adjacent_cliques
+        #       This might be done recursively
+        # 2. We get all nodes in the parent layer that are adjacent to the parent clique => adjacent_clique_parents
+        # 3. We get all children of the adjacent parent cliques elements => adjacent_clique_representatives
+        root_v = self._find_root(v)
+        parent_v = self.parent_edges.get(root_v)
+        if parent_v is None:
+            return set()
+        parent_adjacent_cliques = self.parent.get_adjacent_cliques(parent_v)
+        adjacent_clique_parents = chain.from_iterable(parent_adjacent_cliques.values())
+        adjacent_clique_representatives = list(
+            chain.from_iterable([self.inverse_parent_edges[p] for p in adjacent_clique_parents])
+        )
+
+        assert len(adjacent_clique_representatives) == len(
+            set(adjacent_clique_representatives)
+        ), "Must be unique. Logic Error."
+        return set(adjacent_clique_representatives)
