@@ -68,3 +68,6 @@ embedding_save_interval: 2      # Embedding save interval
 
 data_dir: "./mnist"
 dataset_class: "gorillatracker.datasets.mnist.MNISTDataset"
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

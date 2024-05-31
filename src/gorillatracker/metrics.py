@@ -41,6 +41,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         knn_with_train: bool,
         wandb_run: Runner,
         dm: L.LightningDataModule,
+        use_ssl: bool = False,
         kfold_k: Optional[int] = None,
     ) -> None:
         super().__init__()
@@ -48,6 +49,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
+        self.use_ssl = use_ssl
         self.kfold_k = kfold_k if kfold_k is not None else None
         if knn_with_train:
             dm.setup("fit")
@@ -69,52 +71,56 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         return train_embeddings.cpu(), train_labels.cpu()
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        embeddings_table = pl_module.embeddings_table
+        embeddings_table_list = pl_module.embeddings_table_list
         current_step = trainer.global_step
 
         assert trainer.max_epochs is not None
+        for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
+            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
+            artifact = wandb.Artifact(
+                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_idx),
+                type="embeddings",
+                metadata={"step": current_step},
+                description="Embeddings from step {}".format(current_step),
+            )
+            artifact.add(table, "embeddings_table_step_{}".format(current_step))
+            self.run.log_artifact(artifact)
+            self.embedding_artifacts.append(artifact.name)
 
-        table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
-        artifact = wandb.Artifact(
-            name="run_{0}_step_{1}".format(self.run.name, current_step),
-            type="embeddings",
-            metadata={"step": current_step},
-            description="Embeddings from step {}".format(current_step),
-        )
-        artifact.add(table, "embeddings_table_step_{}".format(current_step))
-        self.run.log_artifact(artifact)
-        self.embedding_artifacts.append(artifact.name)
+            if self.use_ssl and dataloader_idx == 0:
+                continue
 
-        train_embeddings, train_labels = (
-            self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-        )
+            train_embeddings, train_labels = (
+                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+            )
 
-        metrics = {
-            "knn5": partial(knn, k=5),
-            "knn": partial(knn, k=1),
-            "pca": pca,
-            "tsne": tsne,
-            # "fc_layer": fc_layer,
-        }
-        metrics |= (
-            {
-                "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+            metrics = {
+                "knn5": partial(knn, k=5),
+                "knn": partial(knn, k=1),
+                "pca": pca,
+                "tsne": tsne,
+                # "fc_layer": fc_layer,
             }
-            if self.knn_with_train
-            else {}
-        )
-        # log to wandb
-        evaluate_embeddings(
-            data=embeddings_table,
-            embedding_name="val/embeddings",
-            metrics=metrics,
-            train_embeddings=train_embeddings,  # type: ignore
-            train_labels=train_labels,
-            kfold_k=self.kfold_k,
-        )
-        # clear the table where the embeddings are stored
-        # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # rese t embeddings table
+            metrics |= (
+                {
+                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                }
+                if self.knn_with_train
+                else {}
+            )
+            # log to wandb
+            evaluate_embeddings(
+                data=embeddings_table,
+                embedding_name="val/embeddings",
+                metrics=metrics,
+                train_embeddings=train_embeddings,  # type: ignore
+                train_labels=train_labels,
+                kfold_k=self.kfold_k,
+                dataloader_idx=dataloader_idx,
+            )
+            # clear the table where the embeddings are stored
+            # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
@@ -210,6 +216,7 @@ def evaluate_embeddings(
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
     kfold_k: Optional[int] = None,
+    dataloader_idx: int = 0,
 ) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
     assert (train_embeddings is not None and train_labels is not None) or (
         train_embeddings is None and train_labels is None
@@ -239,9 +246,9 @@ def evaluate_embeddings(
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/{key}": value})
+                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/dataloader_{dataloader_idx}/{key}": value})
         else:
-            wandb.log({f"{embedding_name}{kfold_str}{metric_name}": result})
+            wandb.log({f"{embedding_name}{kfold_str}{metric_name}/dataloader_{dataloader_idx}/": result})
 
     return results
 
