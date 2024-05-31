@@ -16,6 +16,7 @@ def test_offline_data_module() -> None:
         1,
         "offline",
         lambda x: x,
+        workers=4,
         training_transforms=lambda x: x,
     )
     dm.setup("fit")

@@ -39,19 +39,15 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
 
 sweeps = [
     {
-        "project_name": "Embedding-InceptionV3-CXL-OpenSet",
+        "project_name": "Embedding-SwinV2Large-CXL-Open",
         "entity": "gorillas",
-        "config_path": "./cfgs/inceptionv3_cxl.yml",
+        "config_path": "./cfgs/swinv2_cxl.yml",
         "parameters": {
-            # "embedding_size": {'values': [16, 32, 64, 128, 256, 512, 1024]},
-            # "initial_lr": {"values": [1e-3, 1e-4]},
-            "l2_alpha": {"values": [1e-4, 1e-5]},
-            "l2_beta": {"values": [1e-4, 1e-5]},
-            # "batch_size": {"values": [8, 16]},
-            "start_lr": {"values": [1e-4, 1e-5]},
-            "margin": {"values": [0.5, 1.0]},
-            "dropout_p": {"values": [0.5, 0.25]},
-            # "loss_mode": {"values": ["online/soft/l2sp", "softmax/arcface/l2sp"]},
+            "l2_alpha": {"values": [1.0, 1e-1, 1e-2]},
+            "l2_beta": {"values": [1.0, 1e-1, 1e-2]},
+            "batch_size": {"values": [16, 32]},
+            "loss_mode": {"values": ["softmax/arcface/l2sp"]},
+            "use_focal_loss": {"values": [True, False]},
         },
     },
 ]

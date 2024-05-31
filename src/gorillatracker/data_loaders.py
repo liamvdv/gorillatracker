@@ -265,7 +265,7 @@ class FreezeSampler(Sampler[T]):
 
 
 def TripletDataLoader(
-    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True, num_workers: int = 0
 ) -> gtypes.BatchTripletDataLoader:
     """
     TripletDataLoader will take any Dataset that returns a single sample in the form of
@@ -278,11 +278,11 @@ def TripletDataLoader(
     if not shuffle:
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
-    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size, num_workers=num_workers)
 
 
 def QuadletDataLoader(
-    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True, num_workers: int = 0
 ) -> gtypes.BatchQuadletDataLoader:
     """
     QuadletDataLoader will take any Dataset that returns a single sample in the form of
@@ -295,14 +295,14 @@ def QuadletDataLoader(
     if not shuffle:
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
-    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size, num_workers=num_workers)
 
 
 def SimpleDataLoader(
-    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True, num_workers: int = 0
 ) -> gtypes.BatchSimpleDataLoader:
     final_dataset = ToNthDataset(dataset)
-    return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size)
+    return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size, num_workers=num_workers)
 
 
 # TODO(V1nce1): deprecated?

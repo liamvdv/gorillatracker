@@ -12,18 +12,18 @@ from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 eps = 1e-16  # an arbitrary small value to be used for numerical stability
 
 class FocalLoss(torch.nn.Module):
-    def __init__(self, num_classes=182, gamma=2.0, *args, **kwargs):
+    def __init__(self, num_classes=182, gamma=2.0, label_smoothing=0.0, *args, **kwargs):
         super(FocalLoss, self).__init__()
         self.num_classes = num_classes
         self.gamma = gamma
-        self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=0.05)
+        self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=label_smoothing)
 
-    def forward(self, input, target, alphas=None):
-        assert len(alphas) == len(target), "Alphas must be the same length as the target"
+    def forward(self, input, target):
+        # assert len(alphas) == len(target), "Alphas must be the same length as the target"
         
         logpt = -self.ce(input, target)
         pt = torch.exp(logpt)
-        loss = -((1 - pt) ** self.gamma) * logpt * alphas
+        loss = -((1 - pt) ** self.gamma) * logpt
         return loss.mean()
 
 
@@ -40,6 +40,8 @@ class ArcFaceLoss(torch.nn.Module):
         additive_margin=0.0,
         accelerator="cpu",
         k_subcenters=2,
+        use_focal_loss=False,
+        label_smoothing=0.0,
         *args,
         **kwargs,
     ):
@@ -55,6 +57,7 @@ class ArcFaceLoss(torch.nn.Module):
         self.embedding_size = embedding_size
         self.k_subcenters = k_subcenters
         self.class_distribution = class_distribution
+        self.num_samples = sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0    
 
         self.prototypes = torch.nn.Parameter(
             torch.zeros(
@@ -67,7 +70,10 @@ class ArcFaceLoss(torch.nn.Module):
         tmp_rng = torch.Generator(device=accelerator)
         torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
         # self.ce = torch.nn.CrossEntropyLoss()
-        self.ce = FocalLoss(num_classes=num_classes, *args, **kwargs) # TODO
+        if not use_focal_loss:
+            self.ce = FocalLoss(num_classes=num_classes, label_smoothing=label_smoothing, *args, **kwargs)
+        else:
+            self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=label_smoothing)
 
         self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
@@ -84,6 +90,8 @@ class ArcFaceLoss(torch.nn.Module):
             class_freqs = torch.tensor(
                 [self.class_distribution[label.item()] for label in labels], device=labels.device
             )
+            class_freqs = class_freqs.float() / self.num_samples
+            class_freqs = class_freqs.clamp(eps, 1.0)
         
         labels_transformed: List[int] = self.le.encode_list(labels.tolist())
         labels = torch.tensor(labels_transformed, device=embeddings.device)
@@ -127,7 +135,8 @@ class ArcFaceLoss(torch.nn.Module):
             -1, self.k_subcenters, self.num_classes
         )  # batch x k_subcenters x num_classes
         output = torch.mean(output, dim=1)  # batch x num_classes
-        loss = self.ce(output, labels, class_freqs)
+        loss = self.ce(output, labels) * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
+        loss = torch.mean(loss)
 
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances

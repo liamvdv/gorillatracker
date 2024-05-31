@@ -59,6 +59,8 @@ class ModelConstructor:
             path_to_pretrained_weights=args.path_to_pretrained_weights,
             use_wildme_model=args.use_wildme_model,
             k_subcenters=args.k_subcenters,
+            use_focal_loss=args.use_focal_loss,
+            label_smoothing=args.label_smoothing,
         )
 
     def construct(

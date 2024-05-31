@@ -38,6 +38,7 @@ def get_data_module(
     data_dir: str,
     batch_size: int,
     loss_mode: str,
+    workers: int,
     model_transforms: gtypes.Transform,
     training_transforms: gtypes.Transform = None,  # type: ignore
 ) -> NletDataModule:
@@ -59,4 +60,4 @@ def get_data_module(
             model_transforms,
         ]
     )
-    return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
+    return base(data_dir, batch_size, dataset_class, workers=workers, transforms=transforms, training_transforms=training_transforms)

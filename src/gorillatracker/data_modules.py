@@ -22,6 +22,7 @@ class NletDataModule(L.LightningDataModule):
         data_dir: str,
         batch_size: int = 32,
         dataset_class: Optional[Type[Dataset[Any]]] = None,
+        workers: int = 4,
         transforms: Optional[gtypes.Transform] = None,
         training_transforms: Optional[gtypes.Transform] = None,
     ) -> None:
@@ -31,6 +32,7 @@ class NletDataModule(L.LightningDataModule):
         self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.workers = workers
 
     def get_dataloader(self) -> Any:
         raise Exception("logic error, ask liamvdv")
@@ -57,15 +59,15 @@ class NletDataModule(L.LightningDataModule):
 
     def train_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("fit")
-        return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True)
+        return self.get_dataloader()(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)
 
     def val_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("validate")
-        return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False)
+        return self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers)
 
     def test_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("test")
-        return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False)
+        return self.get_dataloader()(self.test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers)
 
     def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
         self.setup("predict")

@@ -72,6 +72,7 @@ def main(args: TrainingArgs) -> None:
             str(args.data_dir),
             args.batch_size,
             args.loss_mode,
+            args.workers,
             model_transforms,
             model_cls.get_training_transforms(),
         )
@@ -90,6 +91,7 @@ def main(args: TrainingArgs) -> None:
         str(args.data_dir),
         args.batch_size,
         args.loss_mode,
+        args.workers,
         # args.video_data,
         model_transforms,
         model.get_training_transforms(),
@@ -209,5 +211,5 @@ if __name__ == "__main__":
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()
-    with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+    # with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
+    main(parsed_arg_groups)

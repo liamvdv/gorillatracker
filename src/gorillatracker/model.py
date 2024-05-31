@@ -138,6 +138,7 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         class_distribution: Dict[int, int] = {},
+        use_focal_loss: bool = False,
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
         **kwargs: Dict[str, Any],
@@ -191,8 +192,10 @@ class BaseModule(L.LightningModule):
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
         class_distribution: Dict[int, int] = {},
+        use_focal_loss: bool = False,
         k_subcenters: int = 2,
         accelerator: str = "cpu",
+        label_smoothing: float = 0.0,
         **kwargs: Dict[str, Any],
     ) -> None:
         self.loss_module_train = get_loss(
@@ -210,6 +213,8 @@ class BaseModule(L.LightningModule):
             l2_alpha=kwargs["l2_alpha"],
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
+            use_focal_loss=use_focal_loss,
+            label_smoothing=label_smoothing,
             model=model,
             log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
             k_subcenters=k_subcenters,
@@ -229,6 +234,8 @@ class BaseModule(L.LightningModule):
             l2_alpha=kwargs["l2_alpha"],
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
+            use_focal_loss=use_focal_loss,
+            label_smoothing=label_smoothing,
             model=model,
             log_func=lambda x, y: self.log("val/"+ x, y, on_epoch=True),
             k_subcenters=1,
@@ -860,7 +867,7 @@ class SwinV2LargeWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                # transforms.Resize((192), antialias=True),
+                transforms.Resize((192), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
