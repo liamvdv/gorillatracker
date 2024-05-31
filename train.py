@@ -15,6 +15,7 @@ from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
+from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
@@ -57,7 +58,17 @@ def main(args: TrainingArgs) -> None:
     # TODO(memben): Unify SSLDatamodule and NletDataModule
     dm: Union[SSLDataModule, NletDataModule]
     if args.use_ssl:
+        ssl_config = SSLConfig(
+            tff_selection=args.tff_selection,
+            n_videos=args.n_videos,
+            n_samples=args.n_samples,
+            feature_types=args.feature_types,
+            min_confidence=args.min_confidence,
+            min_images_per_tracking=args.min_images_per_tracking,
+            split=None,
+        )
         dm = SSLDataModule(
+            ssl_config=ssl_config,
             batch_size=args.batch_size,
             transforms=model_transforms,
             training_transforms=model_cls.get_training_transforms(),

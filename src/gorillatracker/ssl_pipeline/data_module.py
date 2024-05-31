@@ -9,6 +9,7 @@ from torchvision.transforms import Compose, ToTensor
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data_modules import TripletDataModule
 from gorillatracker.datasets.cxl import CXLDataset
+from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.ssl_pipeline.ssl_dataset import SSLDataset, build_triplet
 from gorillatracker.train_utils import _assert_tensor, get_dataset_class
 
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 class SSLDataModule(L.LightningDataModule):
     def __init__(
         self,
+        ssl_config: SSLConfig,
         data_dir: str,
-        batch_size: int,
+        batch_size: int = 32,
         transforms: gtypes.Transform = lambda x: x,
         training_transforms: gtypes.Transform = lambda x: x,
         additional_dataset_class_ids: Optional[List[str]] = None,
@@ -31,6 +33,7 @@ class SSLDataModule(L.LightningDataModule):
         self.training_transforms = training_transforms
         self.batch_size = batch_size
         self.data_dir = data_dir
+        self.ssl_config = ssl_config
         self.additional_dataset_class_ids = additional_dataset_class_ids
         self.additional_data_dirs = additional_data_dirs
 
@@ -47,6 +50,7 @@ class SSLDataModule(L.LightningDataModule):
                 build_triplet,
                 "train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
+                ssl_config=self.ssl_config,
             )
             self.setup_val()
         elif stage == "test":
@@ -111,3 +115,30 @@ class SSLDataModule(L.LightningDataModule):
         values = tuple(nlet[1] for nlet in batch)
         labels = tuple(nlet[2] for nlet in batch)
         return ids, values, labels
+
+
+if __name__ == "__main__":
+    ssl_config = SSLConfig(
+        tff_selection="random",
+        n_videos=20,
+        n_samples=15,
+        feature_types=["body"],
+        min_confidence=0.5,
+        min_images_per_tracking=10,
+        split=None,
+    )
+    dm = SSLDataModule(
+        ssl_config=ssl_config, data_dir="video_data/cropped-images/2024-04-18", transforms=transforms.ToTensor()
+    )
+    print("Data Module created")
+    dm.setup("fit")
+    print("Data Module setup")
+    train_loader = dm.train_dataloader()
+    val_loader = dm.val_dataloader()
+    print("Data Loaders created")
+    for batch in train_loader:
+        print(batch)
+        break
+    for batch in val_loader:
+        print(batch)
+        break
