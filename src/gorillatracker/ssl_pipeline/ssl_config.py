@@ -66,7 +66,7 @@ class SSLConfig:
         return query
 
     def _sample_tracked_features(self, sampler: Sampler, session: Session) -> List[TrackingFrameFeature]:
-        print("Sampling tracked features")
+        print("Sampling TrackingFrameFeatures...")
         return list(sampler.sample(session))
 
     def _create_contrastive_images(
