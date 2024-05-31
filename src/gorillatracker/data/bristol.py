@@ -11,7 +11,7 @@ def get_groups(dirpath: Path) -> dict[Label, list[ContrastiveImage]]:
     Assumed directory structure:
         dirpath/
             <label>_<...>.jpg
-            or 
+            or
             <label>-<...>.jpg
 
     """

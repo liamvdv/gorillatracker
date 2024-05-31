@@ -1,17 +1,13 @@
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import List
+from typing import List, Literal
 
 from sqlalchemy import Select, create_engine, select
 from sqlalchemy.orm import Session
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.contrastive_sampler import (
-    ContrastiveClassSampler,
-    ContrastiveImage,
-    ContrastiveSampler,
-)
+from gorillatracker.data.contrastive_sampler import ContrastiveClassSampler, ContrastiveImage, ContrastiveSampler
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import (
@@ -36,7 +32,11 @@ class SSLConfig:
     min_images_per_tracking: int
     split: object
 
-    def get_contrastive_sampler(self, base_path: str) -> ContrastiveSampler:
+    def get_contrastive_sampler(
+        self,
+        base_path: str,
+        partition: Literal["train", "val", "test"],
+    ) -> ContrastiveSampler:
         engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
         with Session(engine) as session:

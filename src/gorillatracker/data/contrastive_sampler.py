@@ -10,7 +10,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, order=True, slots=True)
 class ContrastiveImage:
     id: str
     image_path: Path

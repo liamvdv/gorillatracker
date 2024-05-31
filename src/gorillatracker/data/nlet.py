@@ -34,6 +34,7 @@ class NletDataModule(L.LightningDataModule):
         training_transforms: gtypes.TensorTransform = lambda x: x,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[str] = [],
+        **kwargs,
     ) -> None:
         """
         The `eval_datasets` are used for evaluation purposes and are additional to the primary `dataset_class`.
@@ -52,6 +53,7 @@ class NletDataModule(L.LightningDataModule):
         self.training_transforms = training_transforms
         self.eval_datasets = [dataset_class] + eval_datasets
         self.eval_data_dirs = [data_dir] + eval_data_dirs
+        self.kwargs = kwargs
 
     def setup(self, stage: Literal["fit", "test", "validate", "predict"]) -> None:
         if stage == "fit":
@@ -60,17 +62,22 @@ class NletDataModule(L.LightningDataModule):
                 nlet_builder=self.nlet_builder,
                 partition="train",
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
+                **self.kwargs,
             )
 
         if stage == "fit" or stage == "validate":
             self.val = [
-                dataset_class(data_dir, nlet_builder=self.nlet_builder, partition="val", transform=self.transforms)
+                dataset_class(
+                    data_dir, nlet_builder=self.nlet_builder, partition="val", transform=self.transforms, **self.kwargs
+                )
                 for dataset_class, data_dir in zip(self.eval_datasets, self.eval_data_dirs)
             ]
 
         if stage == "test":
             self.test = [
-                dataset_class(data_dir, nlet_builder=self.nlet_builder, partition="test", transform=self.transforms)
+                dataset_class(
+                    data_dir, nlet_builder=self.nlet_builder, partition="test", transform=self.transforms, **self.kwargs
+                )
                 for dataset_class, data_dir in zip(self.eval_datasets, self.eval_data_dirs)
             ]
 
@@ -114,7 +121,8 @@ class NletDataset(Dataset[Nlet], ABC):
         base_dir: str,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
-        transform: gtypes.Transform,
+        transform: gtypes.TensorTransform,
+        **kwargs,
     ):
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
