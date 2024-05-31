@@ -119,6 +119,7 @@ class TrainingArgs:
     # SSL Config
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    negative_mining: Literal["random", "overlapping"] = field(default="random")
     n_videos: int = field(default=200)
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])

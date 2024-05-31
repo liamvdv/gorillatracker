@@ -60,6 +60,7 @@ def main(args: TrainingArgs) -> None:
     if args.use_ssl:
         ssl_config = SSLConfig(
             tff_selection=args.tff_selection,
+            negative_mining=args.negative_mining,
             n_videos=args.n_videos,
             n_samples=args.n_samples,
             feature_types=args.feature_types,

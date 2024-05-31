@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.contrastive_sampler import (
+    CliqueGraphSampler,
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
 )
+from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import (
@@ -22,12 +24,14 @@ from gorillatracker.ssl_pipeline.queries import (
     min_count_filter,
     multiple_videos_filter,
 )
+from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
 
 
 @dataclass(kw_only=True)  # type: ignore
 class SSLConfig:
     tff_selection: str
+    negative_mining: str
     # NOTE(v1nce1): This should be removed once we have a proper split object
     n_videos: int
     n_samples: int
@@ -46,7 +50,7 @@ class SSLConfig:
             tracked_features = self._sample_tracked_features(sampler, session)
             contrastive_images = self._create_contrastive_images(tracked_features, base_path)
             classes = self._group_contrastive_images(contrastive_images)
-            return ContrastiveClassSampler(classes)
+            return self._create_contrastive_sampler(classes, contrastive_images, session)
 
     def _create_tff_sampler(self, query: Select[tuple[TrackingFrameFeature]]) -> Sampler:
         if self.tff_selection == "random":
@@ -55,6 +59,32 @@ class SSLConfig:
             return EquidistantSampler(query, self.n_samples)
         else:
             raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
+
+    def _create_contrastive_sampler(
+        self,
+        classes: dict[gtypes.Label, List[ContrastiveImage]],
+        contrastive_images: List[ContrastiveImage],
+        session: Session,
+    ) -> ContrastiveSampler:
+        if self.negative_mining == "random":
+            return ContrastiveClassSampler(classes)
+        elif self.negative_mining == "overlapping":
+            # create two-layer Clique Graph
+            # negative edges from overlapping_trackings query
+            # filter out tffs without negatives or just take random negative
+            tracking_ids = classes.keys()
+            first_layer = IndexedCliqueGraph(tracking_ids)
+            overlapping_trackings = session.execute(find_overlapping_trackings(session))
+            for left, right in overlapping_trackings:
+                first_layer.partition(left, right)
+
+            parent_edges = {img.id: img.class_label for img in contrastive_images}
+            second_layer = MultiLayerCliqueGraph(
+                vertices=contrastive_images, parent=first_layer, parent_edges=parent_edges
+            )
+            return CliqueGraphSampler(second_layer)
+        else:
+            raise ValueError(f"Unknown negative mining method: {self.negative_mining}")
 
     def _build_query(self, video_ids: List[int]) -> Select[tuple[TrackingFrameFeature]]:
         query = multiple_videos_filter(video_ids)
@@ -92,6 +122,7 @@ class SSLConfig:
 if __name__ == "__main__":
     ssl_config = SSLConfig(
         tff_selection="equidistant",
+        negative_mining="random",
         n_videos=200,
         n_samples=15,
         feature_types=["body"],
