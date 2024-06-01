@@ -50,6 +50,9 @@ class ModelConstructor:
                 if not args.use_ssl
                 else (-1, -1, -1)
             ),
+            num_val_dataloaders=(
+                1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1
+            ),
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,

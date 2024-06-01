@@ -195,6 +195,14 @@ class GorillaDataset(SSLDataset):
 
 
 class GorillaDatasetKISZ(GorillaDataset):
+    DB_URI: str = os.environ.get("POSTGRESQL_URI") or "sqlite:///:memory:"
+
+    def __init__(self, db_uri: str = DB_URI) -> None:
+        assert os.environ.get(
+            "POSTGRESQL_URI"
+        ), "POSTGRESQL_URI environment variable not set, remove assertion if desired"
+        super().__init__(db_uri)
+
     @classmethod
     def get_social_group(cls, video: Video) -> Optional[str]:
         parent = video.path.parent
@@ -219,7 +227,7 @@ class GorillaDatasetGPUServer2(GorillaDataset):
     TIMESTAMPS = "data/derived_data/timestamps.json"
     SOCIAL_GROUPS = "data/ground_truth/cxl/misc/VideosGO_SPAC.csv"
 
-    def __init__(self) -> None:
+    def __init__(self, db_uri: str = DB_URI) -> None:
         super().__init__(self.DB_URI)
 
     @classmethod

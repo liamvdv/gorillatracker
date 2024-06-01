@@ -112,13 +112,18 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
+    additional_val_dataset_classes: Union[List[str], None] = field(default=None)
+    additional_val_data_dirs: Union[List[str], None] = field(default=None)
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config
     use_ssl: bool = field(default=False)
-
-    pretrained_weights_file: Union[str, None] = field(default=None)
-    # Add any additional fields as needed.
+    tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    n_videos: int = field(default=200)
+    n_samples: int = field(default=15)
+    feature_types: list[str] = field(default_factory=lambda: ["body"])
+    min_confidence: float = field(default=0.5)
+    min_images_per_tracking: int = field(default=3)
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0

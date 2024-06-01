@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, groupby_frame, jenkins_hash, video_reader
 from gorillatracker.ssl_pipeline.models import TaskType, TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.queries import get_next_task
+from gorillatracker.ssl_pipeline.queries import get_next_task, transactional_task
 
 log = logging.getLogger(__name__)
 
@@ -73,9 +73,10 @@ def visualize_worker(
 
     with Session(engine) as session:
         for task in get_next_task(session, TaskType.VISUALIZE):
-            video = task.video
-            dest = dest_base / video.path.name
-            visualize_video(video, dest)
+            with transactional_task(session, task):
+                video = task.video
+                dest = dest_base / video.path.name
+                visualize_video(video, dest)
 
 
 def multiprocess_visualize(
