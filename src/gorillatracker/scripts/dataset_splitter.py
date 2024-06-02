@@ -540,7 +540,7 @@ if __name__ == "__main__":
     # )
 
     dir = generate_split(
-        dataset="ground_truth/bristol/cropped_images_face", mode="closedset", seed=42, train=0, val=100, test=0
+        dataset="ground_truth/bristol/cropped_images_face", mode="closedset", seed=42, train=50, val=100, test=0
     )
 
     # merge_dataset_splits(

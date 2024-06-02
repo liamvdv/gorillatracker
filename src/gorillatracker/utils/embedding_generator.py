@@ -14,7 +14,6 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from gorillatracker.model import BaseModule, get_model_cls
-from gorillatracker.scripts.create_dataset_from_videos import _crop_image
 from gorillatracker.train_utils import get_dataset_class
 from gorillatracker.type_helper import Label
 
@@ -137,7 +136,7 @@ def get_model_from_run(run, eval_mode: bool = True) -> BaseModule:
     return load_model_from_wandb(model_path, model_cls=model_cls, model_config=args, eval_mode=eval_mode)
 
 
-def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", norm_input: bool = False) -> pd.DataFrame:
+def generate_embeddings(model: BaseModule, dataset: Any, device: str = "gpu") -> pd.DataFrame:
     embeddings = []
     df = pd.DataFrame(columns=["embedding", "label", "input", "label_string"])
     with torch.no_grad():
@@ -152,17 +151,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
                 batch_inputs = batch_inputs.unsqueeze(1)
             batch_inputs = batch_inputs.to(device)
 
-            model_inputs = batch_inputs
-            if norm_input:
-                model_inputs_list = [
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(img) for img in imgs
-                ]
-                model_inputs = torch.stack(model_inputs_list)
-                model_inputs = model_inputs.to(device)
-                if model_inputs.shape[0] != 1:
-                    model_inputs = model_inputs.unsqueeze(1)
-            embeddings = model(model_inputs)
-
+            embeddings = model(batch_inputs)
             for i in range(len(imgs)):
                 input_img = transforms.ToPILImage()(batch_inputs[i].cpu())
                 df = pd.concat(
@@ -238,7 +227,7 @@ def generate_embeddings_from_run(
         dataset_cls = run.config["dataset_class"]
 
     train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
-    val_dataset = get_dataset(partition="val", data_dir=run.config["data_dir"], model=model, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=data_dir, model=model, dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"
@@ -255,79 +244,6 @@ def generate_embeddings_from_run(
         df.to_pickle(outpath)
     print("done")
     return df
-
-
-def generate_embeddings_from_tracked_video(
-    model: BaseModule, video_path: str, tracking_data: IdFrameDict, model_transforms: DataTransforms = lambda x: x
-) -> pd.DataFrame:
-    """
-    Args:
-        model: The model to use for embedding generation.
-        video_path: Path to the video.
-        tracking_data: Dictionary of Individual IDs to frames. -> {id: List[(frame_idx, (bbox))]} (bbox = (x, y, w, h)
-
-    Returns:
-        DataFrame with columns: invididual_id, frame_id, bbox, embedding,
-    """
-    min_frames = 15  # discard if less than 5 images
-    max_per_individual = 15
-
-    tracking_data = {
-        id: frames for id, frames in tracking_data.items() if len(frames) >= min_frames
-    }  # discard if less than 5 images
-    print("Using", len(tracking_data), "individuals")
-
-    video = cv2.VideoCapture(video_path)
-    embedding_img_table = pd.DataFrame(columns=["embedding", "frame_id", "bbox", "invididual_id"])
-
-    for id, frames in tracking_data.items():
-        step_size = len(frames) // max_per_individual
-        if step_size == 0:
-            continue
-        frame_list = [frames[i] for i in range(0, max_per_individual * step_size, step_size)]
-        for frame_idx, bbox in frame_list:
-            video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-            frame = video.read()[1]  # read the frame. read() returns a tuple of (success, frame)
-            embedding = get_embedding_from_frame(model, frame, bbox, model_transforms)
-            embedding_img_table = pd.concat(
-                [
-                    embedding_img_table,
-                    pd.DataFrame(
-                        {
-                            "invididual_id": [id],
-                            "frame_id": [frame_idx],
-                            "bbox": [bbox],
-                            "embedding": [embedding],
-                        }
-                    ),
-                ],
-                ignore_index=True,
-            )
-    video.release()
-    embedding_img_table.reset_index(drop=False, inplace=True)
-    return embedding_img_table
-
-
-@torch.no_grad()
-def get_embedding_from_frame(
-    model: BaseModule, frame: cvt.MatLike, bbox: BBox, model_transforms: DataTransforms
-) -> torch.Tensor:
-    frame_cropped = _crop_image(
-        frame,
-        bbox[0],  # x
-        bbox[1],  # y
-        bbox[2],  # w
-        bbox[3],  # h
-    )
-
-    # convert to pil image
-    img = cv2.cvtColor(frame_cropped, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(img)
-    transformed_image: torch.Tensor = model_transforms(img)
-
-    model.eval()
-    embedding = model(transformed_image.unsqueeze(0))
-    return embedding
 
 
 def read_embeddings_from_disk(path: str) -> pd.DataFrame:

@@ -381,7 +381,8 @@ def k_fold_threshold_search(
         for threshold, metrics in function(dataset_df, query_df, thresholds, *function_args, **function_kwargs).items():
             for metric, value in metrics.items():
                 results[threshold][metric].append(value)
-        new_perc_folds.append(query_df["label"].value_counts(normalize=True)[new_label])
+        counts = query_df["label"].value_counts(normalize=True)
+        new_perc_folds.append(counts[new_label] if new_label in counts else 0)
     aggregated = {
         threshold: {name: np.mean(values) for name, values in metrics.items()} for threshold, metrics in results.items()
     }
