@@ -355,10 +355,10 @@ class BaseModule(L.LightningModule):
 
             class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
             lse = LinearSequenceEncoder()
-            self.embeddings_table["label"] = self.embeddings_table["label"].apply(lse.encode)
+            table["label"] = table["label"].apply(lse.encode)
 
             for label in range(num_classes):
-                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == label]["embedding"].tolist()
+                class_embeddings = table[table["label"] == label]["embedding"].tolist()
                 class_embeddings = (
                     np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
                 )
