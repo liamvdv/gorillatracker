@@ -10,6 +10,7 @@ from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
+from lightning.pytorch.callbacks import EarlyStopping
 
 from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
@@ -54,6 +55,9 @@ def train_and_validate_model(
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
         val_result = trainer.validate(model, dm)
+        for key, value in val_result.items():
+            wandb.log({key: value})
+        wandb.log(val_result[0]) # TODO fix val before training
         print(val_result)
         if args.only_val:
             return model, trainer
@@ -78,7 +82,7 @@ def train_and_validate_model(
 
 def train_and_validate_using_kfold(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
+    dm: Union[SSLDataModule, NletDataModule], # TODO: incorrect type hint
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
@@ -95,7 +99,23 @@ def train_and_validate_using_kfold(
         embeddings_logger_callback.kfold_k = i
         model_kfold = deepcopy(model)
         model_kfold.kfold_k = i
-        _, trainer = train_and_validate_model(args, dm, model_kfold, callbacks, wandb_logger, f"_fold_{i}")
+        
+        early_stopping_callback = EarlyStopping(
+            monitor=f"fold-{i}/val/loss/dataloader_0",
+            mode="min",
+            min_delta=args.min_delta,
+            patience=args.early_stopping_patience,
+        )
+        
+        checkpoint_callback = ModelCheckpoint(
+            filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
+            monitor=f"fold-{i}/val/loss/dataloader_0",
+            mode="min",
+            auto_insert_metric_name=False,
+            every_n_epochs=int(args.save_interval),
+        )
+        
+        _, trainer = train_and_validate_model(args, dm, model_kfold, [checkpoint_callback, *callbacks, early_stopping_callback], wandb_logger, f"_fold_{i}")
 
     if args.kfold and not args.fast_dev_run:
         kfold_averaging(wandb_logger)

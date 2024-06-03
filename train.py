@@ -22,6 +22,8 @@ from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
+warnings.filterwarnings("ignore", ".* does not have many workers.*")
+warnings.filterwarnings("ignore", ".*site-packages/torchmetrics/utilities/prints.py:43.*")
 
 
 def main(args: TrainingArgs) -> None:
@@ -129,7 +131,13 @@ def main(args: TrainingArgs) -> None:
         lr_monitor,
         early_stopping,
         embeddings_logger_callback,
+    ] if not args.kfold else [
+        wandb_disk_cleanup_callback,
+        lr_monitor,
+        embeddings_logger_callback,
     ]
+    
+    
     if args.accelerator == "cuda":
         callbacks.append(CUDAMetricsCallback())
 
@@ -188,5 +196,5 @@ if __name__ == "__main__":
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()
-    with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+    # with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
+    main(parsed_arg_groups)
