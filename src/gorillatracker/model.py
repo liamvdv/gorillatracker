@@ -218,6 +218,7 @@ class BaseModule(L.LightningModule):
             model=model,
             log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
             k_subcenters=k_subcenters,
+            use_class_weights=kwargs["use_class_weights"]
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -239,6 +240,7 @@ class BaseModule(L.LightningModule):
             model=model,
             log_func=lambda x, y: self.log("val/"+ x, y, on_epoch=True),
             k_subcenters=1,
+            use_class_weights=kwargs["use_class_weights"],
         )
         self.loss_module_val.eval()
 
@@ -379,6 +381,8 @@ class BaseModule(L.LightningModule):
         #     lr=self.initial_lr,
         #     weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         # )
+        
+        # TODO try AGC here
 
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(

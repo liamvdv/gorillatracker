@@ -9,8 +9,7 @@ from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 # import variational prototype learning from insightface
 
 
-eps = 1e-16  # an arbitrary small value to be used for numerical stability
-
+eps = 1e-8  # an arbitrary small value to be used for numerical stability
 class FocalLoss(torch.nn.Module):
     def __init__(self, num_classes=182, gamma=2.0, label_smoothing=0.0, *args, **kwargs):
         super(FocalLoss, self).__init__()
@@ -42,6 +41,7 @@ class ArcFaceLoss(torch.nn.Module):
         k_subcenters=2,
         use_focal_loss=False,
         label_smoothing=0.0,
+        use_class_weights=False,
         *args,
         **kwargs,
     ):
@@ -57,6 +57,7 @@ class ArcFaceLoss(torch.nn.Module):
         self.embedding_size = embedding_size
         self.k_subcenters = k_subcenters
         self.class_distribution = class_distribution
+        self.use_class_weights = use_class_weights
         self.num_samples = sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0    
 
         self.prototypes = torch.nn.Parameter(
@@ -135,7 +136,9 @@ class ArcFaceLoss(torch.nn.Module):
             -1, self.k_subcenters, self.num_classes
         )  # batch x k_subcenters x num_classes
         output = torch.mean(output, dim=1)  # batch x num_classes
-        loss = self.ce(output, labels) * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
+        loss = self.ce(output, labels)
+        if self.use_class_weights:
+            loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
 
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"

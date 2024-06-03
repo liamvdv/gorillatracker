@@ -430,6 +430,7 @@ def get_loss(
             k_subcenters=kw_args["k_subcenters"],
             use_focal_loss=kw_args["use_focal_loss"],
             label_smoothing=kw_args["label_smoothing"],
+            use_class_weights=kw_args["use_class_weights"],
         )
     elif loss_mode == "softmax/adaface": # TODO
         loss_module = AdaFaceLoss(
@@ -442,6 +443,7 @@ def get_loss(
             k_subcenters=kw_args["k_subcenters"],
             use_focal_loss=kw_args["use_focal_loss"],
             label_smoothing=kw_args["label_smoothing"],
+            use_class_weights=kw_args["use_class_weights"],
         )
             
     elif loss_mode == "softmax/elasticface": # TODO
@@ -456,6 +458,7 @@ def get_loss(
             k_subcenters=kw_args["k_subcenters"],
             use_focal_loss=kw_args["use_focal_loss"],
             label_smoothing=kw_args["label_smoothing"],
+            use_class_weights=kw_args["use_class_weights"],
         )
     elif loss_mode == "softmax/vpl":
         loss_module = VariationalPrototypeLearning(

@@ -61,6 +61,7 @@ class ModelConstructor:
             k_subcenters=args.k_subcenters,
             use_focal_loss=args.use_focal_loss,
             label_smoothing=args.label_smoothing,
+            use_class_weights=args.use_class_weights,
         )
 
     def construct(
