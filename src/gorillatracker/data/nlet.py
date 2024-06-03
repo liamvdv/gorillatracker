@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Literal, Type
+from typing import Any, Callable, Literal, Protocol, Type
 
 import lightning as L
 import torch
@@ -20,6 +20,10 @@ from gorillatracker.type_helper import Nlet
 FlatNlet = tuple[ContrastiveImage, ...]
 
 
+class FlatNletBuilder(Protocol):
+    def __call__(self, idx: int, contrastive_sampler: ContrastiveSampler) -> FlatNlet: ...
+
+
 # logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -29,13 +33,13 @@ class NletDataModule(L.LightningDataModule):
         self,
         data_dir: Path,
         dataset_class: Type[NletDataset],
-        nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
+        nlet_builder: FlatNletBuilder,
         batch_size: int = 32,
         transforms: gtypes.TensorTransform = lambda x: x,
         training_transforms: gtypes.TensorTransform = lambda x: x,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[Path] = [],
-        **kwargs: dict[str, Any],  # KFold args, SSLConfig, etc.
+        **kwargs: Any,  # KFold args, SSLConfig, etc.
     ) -> None:
         """
         The `eval_datasets` are used for evaluation purposes and are additional to the primary `dataset_class`.
@@ -189,6 +193,10 @@ class KFoldNletDataset(NletDataset):
         assert val_i < k, "val_i must be less than k"
         self.val_i = val_i
         self.k = k
+
+
+def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:
+    return (contrastive_sampler[idx],)
 
 
 def build_triplet(
