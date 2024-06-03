@@ -1,6 +1,6 @@
 import importlib
 from itertools import chain
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type
+from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Optional
 
 import lightning as L
 import numpy as np
@@ -141,6 +141,7 @@ class BaseModule(L.LightningModule):
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
         num_val_dataloaders: int = 1,
+        kfold_k: Optional[int] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
@@ -169,6 +170,8 @@ class BaseModule(L.LightningModule):
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
+        
+        self.kfold_k = kfold_k
 
         self.quant = torch.quantization.QuantStub()  # type: ignore
 
@@ -212,7 +215,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
-            log_func=self.log,
+            log_func=lambda x, y: self.log(f"fold-{self.kfold_k}/{x}", y),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -267,9 +270,9 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
 
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
-        self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log("train/positive_distance", pos_dist, on_step=True)
-        self.log("train/negative_distance", neg_dist, on_step=True)
+        self.log(f"train/fold-{self.kfold_k}/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
+        self.log(f"train/fold-{self.kfold_k}/positive_distance", pos_dist, on_step=True)
+        self.log(f"train/fold-{self.kfold_k}/negative_distance", neg_dist, on_step=True)
         return loss
 
     def add_validation_embeddings(
@@ -317,8 +320,9 @@ class BaseModule(L.LightningModule):
         )
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
+            log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
-                f"val/loss/dataloader_{dataloader_idx}",
+                f"{log_str_prefix}val/loss/dataloader_{dataloader_idx}",
                 loss,
                 on_step=True,
                 sync_dist=True,
@@ -326,10 +330,10 @@ class BaseModule(L.LightningModule):
                 add_dataloader_idx=False,
             )
             self.log(
-                f"val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False
+                f"{log_str_prefix}val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False # TODO: BAD
             )
             self.log(
-                f"val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False
+                f"{log_str_prefix}val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False
             )
             return loss
         else:
@@ -379,8 +383,10 @@ class BaseModule(L.LightningModule):
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
             assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
-
+            if self.kfold_k is not None:
+                self.log(f"fold-{self.kfold_k}/val/loss/dataloader_{i}", loss, sync_dist=True)
+            else:
+                self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)

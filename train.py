@@ -166,7 +166,7 @@ def main(args: TrainingArgs) -> None:
     ################# Start training #################
     logger.info(f"Rank {current_process_rank} | Starting training...")
     if args.kfold:
-        model, trainer = train_and_validate_using_kfold(
+        train_and_validate_using_kfold(
             args=args,
             dm=dm,
             model=model,
@@ -175,7 +175,7 @@ def main(args: TrainingArgs) -> None:
             embeddings_logger_callback=embeddings_logger_callback,
         )
     else:
-        model, trainer = train_and_validate_model(
+        train_and_validate_model(
             args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger
         )
 

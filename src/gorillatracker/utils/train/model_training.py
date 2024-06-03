@@ -1,3 +1,4 @@
+from copy import deepcopy
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Tuple, Union
@@ -90,16 +91,16 @@ def train_and_validate_using_kfold(
 
     for i in range(kfold_k):
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
-
-        model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger, f"_fold_{i}")
-
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
+        model_kfold = deepcopy(model)
+        model_kfold.kfold_k = i
+        _, trainer = train_and_validate_model(args, dm, model_kfold, callbacks, wandb_logger, f"_fold_{i}")
 
     if args.kfold and not args.fast_dev_run:
         kfold_averaging(wandb_logger)
 
-    return model, trainer
+    return model, trainer # TODO(rob2u): why return a single model?
 
 
 def kfold_averaging(wandb_logger: WandbLogger) -> None:
