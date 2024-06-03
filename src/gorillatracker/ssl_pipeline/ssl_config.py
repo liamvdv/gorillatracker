@@ -16,6 +16,7 @@ from gorillatracker.ssl_pipeline.contrastive_sampler import (
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
     cached_filter,
@@ -24,7 +25,6 @@ from gorillatracker.ssl_pipeline.queries import (
     min_count_filter,
     multiple_videos_filter,
 )
-from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
 
 
@@ -72,8 +72,8 @@ class SSLConfig:
             # create two-layer Clique Graph
             # negative edges from overlapping_trackings query
             # filter out tffs without negatives or just take random negative
-            tracking_ids = classes.keys()
-            first_layer = IndexedCliqueGraph(tracking_ids)
+            tracking_ids = list(classes.keys())
+            first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(tracking_ids)
             overlapping_trackings = session.execute(find_overlapping_trackings(session))
             for left, right in overlapping_trackings:
                 first_layer.partition(left, right)

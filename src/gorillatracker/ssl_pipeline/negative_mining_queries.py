@@ -15,7 +15,7 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[int, int]]:
             func.max(TrackingFrameFeature.frame_nr).label("max_frame_nr"),
             TrackingFrameFeature.video_id,
         )
-        .where(TrackingFrameFeature.tracking_id.isnot(None))
+        .where(TrackingFrameFeature.tracking_id.is_not(None))
         .group_by(TrackingFrameFeature.tracking_id, TrackingFrameFeature.video_id)
     ).subquery()
 
@@ -33,7 +33,6 @@ def find_overlapping_trackings(session: Session) -> Sequence[tuple[int, int]]:
     )
     print("Starting query...")
     overlapping_trackings = session.execute(stmt).fetchall()
-    print("Done")
     return [(row[0], row[1]) for row in overlapping_trackings]
 
 
@@ -127,3 +126,19 @@ def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Vid
     result = session.execute(stmt).all()
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
+
+
+if __name__ == "__main__":
+    import time
+
+    from sqlalchemy import create_engine
+
+    from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
+
+    engine = create_engine(GorillaDatasetKISZ.DB_URI)
+    with Session(engine) as session:
+        start = time.time()
+        overlapping_trackings = find_overlapping_trackings(session)
+        end = time.time()
+        print(f"Query took {end - start} seconds")
+        print(len(overlapping_trackings))
