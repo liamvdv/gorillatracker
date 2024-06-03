@@ -171,13 +171,14 @@ class SplitArgs:
 
 
 if __name__ == "__main__":
+    DB_URI = os.environ.get("POSTGRESQL_URI")
     args = SplitArgs(
-        db_uri="db-uri",
+        db_uri=DB_URI,
         version="2024-04-18",
         save_path="/workspaces/gorillatracker/data/splits/SSL/",
-        split_by="camera",
-        train_split=10,
-        val_split=80,
+        split_by="percentage",
+        train_split=80,
+        val_split=10,
         test_split=10,
         train_starttime=dt.datetime(2010, 1, 1),
         train_endtime=dt.datetime(2030, 1, 1),
@@ -187,9 +188,9 @@ if __name__ == "__main__":
         test_endtime=dt.datetime(2030, 1, 1),
         hours=list(range(0, 24)),  # only videos from certain hours of the day
         video_length=(0, 1000000),  # min, max video length in seconds
-        max_train_videos=1000000,  # max videos in train bucket
-        max_val_videos=1000000,  # max videos in val bucket
-        max_test_videos=1000000,  # max videos in test bucket
+        max_train_videos=1000,  # max videos in train bucket
+        max_val_videos=10,  # max videos in val bucket
+        max_test_videos=10,  # max videos in test bucket
     )
     args.create_split()
     args.save_to_pickle()

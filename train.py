@@ -60,12 +60,11 @@ def main(args: TrainingArgs) -> None:
     if args.use_ssl:
         ssl_config = SSLConfig(
             tff_selection=args.tff_selection,
-            n_videos=args.n_videos,
             n_samples=args.n_samples,
             feature_types=args.feature_types,
             min_confidence=args.min_confidence,
             min_images_per_tracking=args.min_images_per_tracking,
-            split=None,
+            split_path=args.split_path,
         )
         dm = SSLDataModule(
             ssl_config=ssl_config,

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import List
+from typing import List, Literal
 
 from sqlalchemy import Select, create_engine, select
 from sqlalchemy.orm import Session
@@ -23,31 +23,42 @@ from gorillatracker.ssl_pipeline.queries import (
     multiple_videos_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
+from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 
 
 @dataclass(kw_only=True)  # type: ignore
 class SSLConfig:
     tff_selection: str
-    # NOTE(v1nce1): This should be removed once we have a proper split object
-    n_videos: int
     n_samples: int
     feature_types: list[str]
     min_confidence: float
     min_images_per_tracking: int
-    split: object
+    split_path: str
 
-    def get_contrastive_sampler(self, base_path: str) -> ContrastiveSampler:
+    def get_contrastive_sampler(self, partition: Literal["train", "val", "test"], base_path: str) -> ContrastiveSampler:
         engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
         with Session(engine) as session:
-            video_ids = list(session.execute(select(Video.video_id)).scalars().all())
-            query = self._build_query(video_ids[: self.n_videos])
+            video_ids = self._get_video_ids(partition)
+            query = self._build_query(video_ids)
             sampler = self._create_tff_sampler(query)
             tracked_features = self._sample_tracked_features(sampler, session)
             contrastive_images = self._create_contrastive_images(tracked_features, base_path)
             classes = self._group_contrastive_images(contrastive_images)
             return ContrastiveClassSampler(classes)
-
+        
+        
+    def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
+        split = SplitArgs.load_pickle(self.split_path)
+        if partition == "train":
+            return split.train_video_ids()
+        elif partition == "val":
+            return split.val_video_ids()
+        elif partition == "test":
+            return split.test_video_ids()
+        else:
+            raise ValueError(f"Unknown partition: {partition}")
+        
     def _create_tff_sampler(self, query: Select[tuple[TrackingFrameFeature]]) -> Sampler:
         if self.tff_selection == "random":
             return RandomSampler(query, self.n_samples)
@@ -92,14 +103,13 @@ class SSLConfig:
 if __name__ == "__main__":
     ssl_config = SSLConfig(
         tff_selection="equidistant",
-        n_videos=200,
         n_samples=15,
         feature_types=["body"],
         min_confidence=0.5,
         min_images_per_tracking=10,
-        split=object(),
+        split_path=None,
     )
-    contrastive_sampler = ssl_config.get_contrastive_sampler("cropped-images/2024-04-18")
+    contrastive_sampler = ssl_config.get_contrastive_sampler("train", "cropped-images/2024-04-18")
     print(len(contrastive_sampler))
     contrastive_image = contrastive_sampler[0]
     print(contrastive_image)
