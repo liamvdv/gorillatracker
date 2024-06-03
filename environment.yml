@@ -80,6 +80,7 @@ dependencies:
       - typer
       - opencv-contrib-python
       - onnx
+      - tabulate
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:
