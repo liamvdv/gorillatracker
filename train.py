@@ -177,9 +177,10 @@ def main(args: TrainingArgs) -> None:
         train_and_validate_using_kfold(
             args=args,
             dm=dm,
-            model=model,
+            model_cls=model_cls,
             callbacks=callbacks,
             wandb_logger=wandb_logger,
+            wandb_logging_module=wandb_logging_module,
             embeddings_logger_callback=embeddings_logger_callback,
         )
     else:

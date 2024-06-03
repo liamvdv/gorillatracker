@@ -270,9 +270,10 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
 
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
-        self.log(f"train/fold-{self.kfold_k}/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log(f"train/fold-{self.kfold_k}/positive_distance", pos_dist, on_step=True)
-        self.log(f"train/fold-{self.kfold_k}/negative_distance", neg_dist, on_step=True)
+        log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
+        self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
+        self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         return loss
 
     def add_validation_embeddings(

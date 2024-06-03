@@ -17,6 +17,7 @@ from gorillatracker.args import TrainingArgs
 from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
+from gorillatracker.utils.train import ModelConstructor
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 
 
@@ -55,8 +56,8 @@ def train_and_validate_model(
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
         val_result = trainer.validate(model, dm)
-        for key, value in val_result.items():
-            wandb.log({key: value})
+        for elem in val_result:
+            wandb.log(elem)
         wandb.log(val_result[0]) # TODO fix val before training
         print(val_result)
         if args.only_val:
@@ -83,9 +84,10 @@ def train_and_validate_model(
 def train_and_validate_using_kfold(
     args: TrainingArgs,
     dm: Union[SSLDataModule, NletDataModule], # TODO: incorrect type hint
-    model: BaseModule,
+    model_cls: type,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
+    wandb_logging_module, 
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
 ) -> Tuple[BaseModule, Trainer]:
 
@@ -97,7 +99,8 @@ def train_and_validate_using_kfold(
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
-        model_kfold = deepcopy(model)
+        model_constructor = ModelConstructor(args, model_cls, dm)
+        model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
         model_kfold.kfold_k = i
         
         early_stopping_callback = EarlyStopping(
@@ -120,7 +123,7 @@ def train_and_validate_using_kfold(
     if args.kfold and not args.fast_dev_run:
         kfold_averaging(wandb_logger)
 
-    return model, trainer # TODO(rob2u): why return a single model?
+    return None, trainer # TODO(rob2u): why return a single model?
 
 
 def kfold_averaging(wandb_logger: WandbLogger) -> None:
