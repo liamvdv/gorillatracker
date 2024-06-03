@@ -1,6 +1,7 @@
+from __future__ import annotations
 import datetime as dt
 import os
-import pickle
+import dill as pickle
 import sys
 from dataclasses import dataclass
 from typing import Literal, Union
@@ -164,7 +165,7 @@ class SplitArgs:
             pickle.dump(self, file)
 
     @classmethod
-    def load_pickle(cls, path: str) -> None:
+    def load_pickle(cls, path: str) -> SplitArgs:
         """Load the class instance from a pickle file."""
         with open(path, "rb") as file:
             return pickle.load(file)
@@ -195,5 +196,5 @@ if __name__ == "__main__":
     args.create_split()
     args.save_to_pickle()
     print("Split created and saved")
-    # args = SplitArgs.load_pickle("path.pkl")
+    # args = SplitArgs.load_pickle("/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl")
     print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))
