@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 import datetime as dt
 import os
-import dill as pickle
 import sys
 from dataclasses import dataclass
 from typing import Literal, Union
 
+import dill as pickle
 from simple_parsing import field
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import sessionmaker
@@ -172,7 +173,9 @@ class SplitArgs:
 
 
 if __name__ == "__main__":
-    DB_URI = os.environ.get("POSTGRESQL_URI")
+    DB_URI = os.environ.get("DB_URI")
+    if DB_URI is None:
+        raise ValueError("Please set the DB_URI environment variable in devcontainer.json")
     args = SplitArgs(
         db_uri=DB_URI,
         version="2024-04-18",

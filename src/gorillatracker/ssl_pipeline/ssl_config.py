@@ -13,6 +13,7 @@ from gorillatracker.ssl_pipeline.contrastive_sampler import (
     ContrastiveSampler,
 )
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
+from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
@@ -23,7 +24,6 @@ from gorillatracker.ssl_pipeline.queries import (
     multiple_videos_filter,
 )
 from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
-from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 
 
 @dataclass(kw_only=True)  # type: ignore
@@ -46,8 +46,7 @@ class SSLConfig:
             contrastive_images = self._create_contrastive_images(tracked_features, base_path)
             classes = self._group_contrastive_images(contrastive_images)
             return ContrastiveClassSampler(classes)
-        
-        
+
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
         split = SplitArgs.load_pickle(self.split_path)
         if partition == "train":
@@ -58,7 +57,7 @@ class SSLConfig:
             return split.test_video_ids()
         else:
             raise ValueError(f"Unknown partition: {partition}")
-        
+
     def _create_tff_sampler(self, query: Select[tuple[TrackingFrameFeature]]) -> Sampler:
         if self.tff_selection == "random":
             return RandomSampler(query, self.n_samples)
@@ -107,7 +106,7 @@ if __name__ == "__main__":
         feature_types=["body"],
         min_confidence=0.5,
         min_images_per_tracking=10,
-        split_path=None,
+        split_path="/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl",
     )
     contrastive_sampler = ssl_config.get_contrastive_sampler("train", "cropped-images/2024-04-18")
     print(len(contrastive_sampler))

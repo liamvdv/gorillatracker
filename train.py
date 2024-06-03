@@ -58,6 +58,7 @@ def main(args: TrainingArgs) -> None:
     # TODO(memben): Unify SSLDatamodule and NletDataModule
     dm: Union[SSLDataModule, NletDataModule]
     if args.use_ssl:
+        assert args.split_path is not None, "Split path must be provided for SSL training."
         ssl_config = SSLConfig(
             tff_selection=args.tff_selection,
             n_samples=args.n_samples,
