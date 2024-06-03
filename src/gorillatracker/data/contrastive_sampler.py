@@ -10,7 +10,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 
 
-@dataclass(frozen=True, order=True, slots=True)
+@dataclass(frozen=True, order=True, slots=True)  # type: ignore
 class ContrastiveImage:
     id: str
     image_path: Path
@@ -21,11 +21,13 @@ class ContrastiveImage:
         return Image.open(self.image_path)
 
 
-def group_contrastive_images(contrastive_images: list[ContrastiveImage]) -> dict[gtypes.Label, list[ContrastiveImage]]:
-    classes = defaultdict(list)
+def group_contrastive_images(
+    contrastive_images: list[ContrastiveImage],
+) -> defaultdict[gtypes.Label, list[ContrastiveImage]]:
+    classes: defaultdict[gtypes.Label, list[ContrastiveImage]] = defaultdict(list)
     for image in contrastive_images:
         classes[image.class_label].append(image)
-    return dict(classes)
+    return classes
 
 
 class ContrastiveSampler(ABC):

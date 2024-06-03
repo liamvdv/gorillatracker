@@ -34,7 +34,7 @@ class SSLConfig:
 
     def get_contrastive_sampler(
         self,
-        base_path: str,
+        base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
         engine = create_engine(GorillaDatasetKISZ.DB_URI)
@@ -70,10 +70,10 @@ class SSLConfig:
         return list(sampler.sample(session))
 
     def _create_contrastive_images(
-        self, tracked_features: List[TrackingFrameFeature], base_path: str
+        self, tracked_features: List[TrackingFrameFeature], base_path: Path
     ) -> List[ContrastiveImage]:
         return [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
+            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id)  # type: ignore
             for f in tracked_features
         ]
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         min_images_per_tracking=10,
         split=object(),
     )
-    contrastive_sampler = ssl_config.get_contrastive_sampler("cropped-images/2024-04-18")
+    contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
     print(len(contrastive_sampler))
     contrastive_image = contrastive_sampler[0]
     print(contrastive_image)

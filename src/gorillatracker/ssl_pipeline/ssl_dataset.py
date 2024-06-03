@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable, Literal
 
 from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.contrastive_sampler import ContrastiveImage, ContrastiveSampler
+from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Nlet
@@ -24,7 +25,7 @@ class SSLDataset(Dataset[Nlet]):
         transform: gtypes.Transform,
         ssl_config: SSLConfig,
     ):
-        self.contrastive_sampler = ssl_config.get_contrastive_sampler(base_dir)
+        self.contrastive_sampler = ssl_config.get_contrastive_sampler(Path(base_dir), "train")
         self.nlet_builder = nlet_builder
         self.transform = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition

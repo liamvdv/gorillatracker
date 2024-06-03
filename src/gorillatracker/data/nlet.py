@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Callable, Literal, Type
+from pathlib import Path
+from typing import Any, Callable, Literal, Type
 
 import lightning as L
 import torch
@@ -26,15 +27,15 @@ logger = logging.getLogger(__name__)
 class NletDataModule(L.LightningDataModule):
     def __init__(
         self,
-        data_dir: str,
+        data_dir: Path,
         dataset_class: Type[NletDataset],
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         batch_size: int = 32,
         transforms: gtypes.TensorTransform = lambda x: x,
         training_transforms: gtypes.TensorTransform = lambda x: x,
         eval_datasets: list[Type[NletDataset]] = [],
-        eval_data_dirs: list[str] = [],
-        **kwargs,
+        eval_data_dirs: list[Path] = [],
+        **kwargs: dict[str, Any],  # KFold args, SSLConfig, etc.
     ) -> None:
         """
         The `eval_datasets` are used for evaluation purposes and are additional to the primary `dataset_class`.
@@ -55,7 +56,9 @@ class NletDataModule(L.LightningDataModule):
         self.eval_data_dirs = [data_dir] + eval_data_dirs
         self.kwargs = kwargs
 
-    def setup(self, stage: Literal["fit", "test", "validate", "predict"]) -> None:
+    def setup(self, stage: str) -> None:
+        assert stage in {"fit", "validate", "test", "predict"}
+
         if stage == "fit":
             self.train = self.dataset_class(
                 self.data_dir,
@@ -118,11 +121,11 @@ class NletDataModule(L.LightningDataModule):
 class NletDataset(Dataset[Nlet], ABC):
     def __init__(
         self,
-        base_dir: str,
+        base_dir: Path,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.TensorTransform,
-        **kwargs,
+        **kwargs: dict[str, Any],
     ):
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
@@ -145,7 +148,7 @@ class NletDataset(Dataset[Nlet], ABC):
         pass
 
     @abstractmethod
-    def create_contrastive_sampler(self, base_dir) -> ContrastiveSampler:
+    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveSampler:
         pass
 
     @lru_cache(maxsize=None)
@@ -170,6 +173,22 @@ class NletDataset(Dataset[Nlet], ABC):
                 transforms.ToTensor(),
             ]
         )
+
+
+class KFoldNletDataset(NletDataset):
+    def __init__(
+        self,
+        data_dir: Path,
+        nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
+        partition: Literal["train", "val", "test"],
+        val_i: int,
+        k: int,
+        transform: gtypes.TensorTransform,
+    ):
+        super().__init__(data_dir, nlet_builder, partition, transform)
+        assert val_i < k, "val_i must be less than k"
+        self.val_i = val_i
+        self.k = k
 
 
 def build_triplet(

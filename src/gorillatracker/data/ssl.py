@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable, Literal
 
 import torch
@@ -15,7 +16,7 @@ from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 class SSLDataset(NletDataset):
     def __init__(
         self,
-        base_dir: str,
+        base_dir: Path,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.TensorTransform,
@@ -31,5 +32,5 @@ class SSLDataset(NletDataset):
     def num_classes(self) -> int:
         raise NotImplementedError
 
-    def create_contrastive_sampler(self, base_dir: str) -> ContrastiveSampler:
+    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveSampler:
         return self.ssl_config.get_contrastive_sampler(base_dir, self.partition)
