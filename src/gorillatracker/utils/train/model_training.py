@@ -96,7 +96,7 @@ def train_and_validate_using_kfold(
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
 
-    if args.kfold:
+    if args.kfold and not args.fast_dev_run:
         kfold_averaging(wandb_logger)
 
     return model, trainer
