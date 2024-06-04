@@ -7,33 +7,50 @@ from sqlalchemy.orm import Session, aliased
 from gorillatracker.ssl_pipeline.models import Camera, TrackingFrameFeature, Video, VideoFeature
 
 
-def find_overlapping_trackings(session: Session) -> Sequence[tuple[int, int]]:
-    subquery = (
+def find_overlapping_trackings(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
+    tracking_frame_feature_cte = (
+        select(TrackingFrameFeature.tracking_id, TrackingFrameFeature.frame_nr, TrackingFrameFeature.video_id)
+        .where(TrackingFrameFeature.video_id.in_(video_ids))
+        .cte("tracking_frame_feature")
+    )
+    
+    tracking_summary_cte = (
         select(
-            TrackingFrameFeature.tracking_id,
-            func.min(TrackingFrameFeature.frame_nr).label("min_frame_nr"),
-            func.max(TrackingFrameFeature.frame_nr).label("max_frame_nr"),
-            TrackingFrameFeature.video_id,
+            tracking_frame_feature_cte.c.tracking_id,
+            func.min(tracking_frame_feature_cte.c.frame_nr).label("min_frame_nr"),
+            func.max(tracking_frame_feature_cte.c.frame_nr).label("max_frame_nr"),
+            tracking_frame_feature_cte.c.video_id
         )
-        .where(TrackingFrameFeature.tracking_id.is_not(None))
-        .group_by(TrackingFrameFeature.tracking_id, TrackingFrameFeature.video_id)
-    ).subquery()
+        .where(tracking_frame_feature_cte.c.tracking_id.isnot(None))
+        .group_by(
+            TrackingFrameFeature.tracking_id,
+            TrackingFrameFeature.video_id
+        )
+        .cte("tracking_summary")
+    )
+    
+    left_summary = aliased(tracking_summary_cte, name="anon_1")
+    right_summary = aliased(tracking_summary_cte, name="anon_2")
 
-    left_subquery = alias(subquery)
-    right_subquery = alias(subquery)
-
+    # Main query to find overlapping trackings
     stmt = (
-        select(left_subquery.c.tracking_id, right_subquery.c.tracking_id)
-        .join(right_subquery, left_subquery.c.video_id == right_subquery.c.video_id)
+        select(left_summary.c.tracking_id, right_summary.c.tracking_id)
+        .join(
+            right_summary,
+            left_summary.c.video_id == right_summary.c.video_id
+        )
         .where(
-            (left_subquery.c.min_frame_nr <= right_subquery.c.max_frame_nr)
-            & (right_subquery.c.min_frame_nr <= left_subquery.c.max_frame_nr)
-            & (left_subquery.c.tracking_id < right_subquery.c.tracking_id)
+            (left_summary.c.min_frame_nr <= right_summary.c.max_frame_nr) &
+            (right_summary.c.min_frame_nr <= left_summary.c.max_frame_nr) &
+            (left_summary.c.tracking_id < right_summary.c.tracking_id)
         )
     )
+    print(stmt)
     print("Starting query...")
     overlapping_trackings = session.execute(stmt).fetchall()
-    return [(row[0], row[1]) for row in overlapping_trackings]
+
+    result = [(row[0], row[1]) for row in overlapping_trackings]
+    return result
 
 
 def great_circle_distance(
@@ -136,9 +153,9 @@ if __name__ == "__main__":
     from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 
     engine = create_engine(GorillaDatasetKISZ.DB_URI)
+    video_ids = list(range(60000, 61000))
     with Session(engine) as session:
         start = time.time()
-        overlapping_trackings = find_overlapping_trackings(session)
+        overlapping_trackings = find_overlapping_trackings(session, video_ids)
         end = time.time()
-        print(f"Query took {end - start} seconds")
-        print(len(overlapping_trackings))
+        print(f"Found {len(overlapping_trackings)} overlapping trackings in {end - start:.2f} seconds")

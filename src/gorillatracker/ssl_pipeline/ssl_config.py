@@ -50,7 +50,7 @@ class SSLConfig:
             tracked_features = self._sample_tracked_features(sampler, session)
             contrastive_images = self._create_contrastive_images(tracked_features, base_path)
             classes = self._group_contrastive_images(contrastive_images)
-            return self._create_contrastive_sampler(classes, contrastive_images, session)
+            return self._create_contrastive_sampler(classes, contrastive_images, video_ids, session)
 
     def _create_tff_sampler(self, query: Select[tuple[TrackingFrameFeature]]) -> Sampler:
         if self.tff_selection == "random":
@@ -64,6 +64,7 @@ class SSLConfig:
         self,
         classes: dict[gtypes.Label, List[ContrastiveImage]],
         contrastive_images: List[ContrastiveImage],
+        video_ids: List[int],
         session: Session,
     ) -> ContrastiveSampler:
         if self.negative_mining == "random":
@@ -74,7 +75,7 @@ class SSLConfig:
             # filter out tffs without negatives or just take random negative
             tracking_ids = list(classes.keys())
             first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(tracking_ids)
-            overlapping_trackings = session.execute(find_overlapping_trackings(session))
+            overlapping_trackings = session.execute(find_overlapping_trackings(session, video_ids))
             for left, right in overlapping_trackings:
                 first_layer.partition(left, right)
 
