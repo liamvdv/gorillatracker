@@ -38,7 +38,7 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __init__(
         self,
         data_dir: str,
-        partition: Literal["train", "val", "test", "complete"] = "complete",
+        partition: Literal["train", "val", "test"] = "train",
         transform: Optional[gtypes.Transform] = None,
     ):
         """
@@ -51,7 +51,7 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
                 test/
                     ...
         """
-        dirpath = data_dir / Path(partition) if partition != "complete" else Path(data_dir)
+        dirpath = data_dir / Path(partition)
         samples = get_samples(dirpath)
 
         # new
@@ -61,7 +61,6 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
         self.samples = list(zip([path for path, _ in samples], labels_int))
 
         self.transform = transform
-
         self.partition = partition
 
     def __len__(self) -> int:

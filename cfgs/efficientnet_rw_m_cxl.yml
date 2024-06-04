@@ -5,8 +5,7 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 64                      # Number of workers for data loading
-
+workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
@@ -15,7 +14,7 @@ wandb_tags: ["sweep-2"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: True             # Enable fast development run
+fast_dev_run: False             # Enable fast development run
 profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
@@ -69,6 +68,5 @@ data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-k
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
-
-# additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-# additional_val_data_dirs: ["/workspaces/gorillatracker/data/ground_truth/bristol/cropped_images_face"]
+additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]

@@ -269,8 +269,6 @@ class BaseModule(L.LightningModule):
             # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
             vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
 
-        # set possible nan values to 0
-        vec[torch.isnan(vec)] = 0.0  # HACK(rob2u): This is a temporary fix, we should investigate why we get NaNs
         embeddings = self.forward(vec)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"

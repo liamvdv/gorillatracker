@@ -200,7 +200,7 @@ class NLetKFoldDataModule(NletDataModule):
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="complete", transform=transform))  # type: ignore
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
 
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
@@ -225,7 +225,7 @@ class NLetKFoldDataModule(NletDataModule):
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    val_list.append(dataset_class(data_dir, partition="complete", transform=transform))  # type: ignore
+                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
             return sum(val.get_num_classes() for val in val_list)  # type: ignore
         elif mode == "test":
             test = self.dataset_class(

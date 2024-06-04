@@ -104,15 +104,6 @@ def main(args: TrainingArgs) -> None:
     model_transforms = model.get_tensor_transforms()
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        # args.video_data,
-        model_transforms,
-        model.get_training_transforms(),
-    )
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
