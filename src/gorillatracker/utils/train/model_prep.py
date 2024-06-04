@@ -59,6 +59,7 @@ class ModelConstructor:
             l2_beta=args.l2_beta,
             path_to_pretrained_weights=args.path_to_pretrained_weights,
             use_wildme_model=args.use_wildme_model,
+            teacher_model_wandb_link=args.teacher_model_wandb_link,
         )
 
     def construct(

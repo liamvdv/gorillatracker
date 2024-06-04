@@ -93,7 +93,9 @@ class TrainingArgs:
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
+        "distillation/offline/response-based",
     ] = field(default="offline")
+    teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
 
     batch_size: int = field(default=8)

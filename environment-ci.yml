@@ -4,11 +4,13 @@ channels:
   - conda-forge
   - nodefaults
   - pyviz/label/dev
+  - pytorch-nightly
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
   # ML libraries
-  - pytorch::pytorch>=2.0 # or don't specify the version and use latest stable
+  - pytorch=2.4.0
+  - torchvision=0.19.0
   # CUDA only on linux and windows
   - wandb
   - lightning
@@ -45,7 +47,7 @@ dependencies:
   - black
   - ruff
   - isort
-  - mypy
+  - mypy=1.10.0
   - pytest
   - typer
   - ipywidgets

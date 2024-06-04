@@ -21,9 +21,9 @@ FROM --platform=$TARGETPLATFORM mambaorg/micromamba:1.4.2 as micromamba
 # -----------------
 # base image for amd64
 # -----------------
-FROM --platform=linux/amd64 nvidia/cuda:11.8.0-cudnn8-runtime-ubi8 as amd64ubi8
+FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as amd64ubi8
 # Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
-RUN yum install -y git gcc gcc-c++ nano && yum clean all
+RUN yum install -y git gcc gcc-c++ nano wget && yum clean all
 # Copy lockfile to container
 COPY environment.yml /locks/environment.yml
 
@@ -33,16 +33,16 @@ COPY environment.yml /locks/environment.yml
 # But Ubuntu works better for devcontainers than ubi8
 # So we use Ubuntu for devcontainers and ubi8 for actual deployment on the cluster
 # -----------------
-FROM --platform=linux/amd64 nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 as amd64ubuntu
+FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04 as amd64ubuntu
 # Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
-RUN apt-get update && apt-get install -y git gcc g++ nano openssh-client && apt-get clean
+RUN apt-get update && apt-get install -y git gcc wget g++ nano openssh-client && apt-get clean
 # Copy lockfile to container
 COPY environment.yml /locks/environment.yml
 
 # -----------------
 # base image for ppc64le
 # -----------------
-FROM --platform=linux/ppc64le nvidia/cuda:11.8.0-cudnn8-runtime-ubi8 as ppc64leubi8
+FROM --platform=linux/ppc64le nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as ppc64leubi8
 # Install compiler for .compile() with PyTorch 2.0
 RUN yum install -y gcc gcc-c++ && yum clean all
 # Copy ppc64le specififc lockfile to container
@@ -96,7 +96,7 @@ RUN apt-get update && apt-get install bash-completion -y
 RUN echo "source /usr/share/bash-completion/bash_completion" >> /root/.bashrc
 
 # Install postgresql-client for database access
-RUN apt update && apt-get install -y postgresql-client
+RUN apt update && apt-get install -y postgresql-client libpython3.10
 
 USER $MAMBA_USER
 
@@ -133,8 +133,9 @@ ARG TARGETPLATFORM
 # Use line below to debug if cache is correctly mounted
 # RUN --mount=type=cache,target=$MAMBA_ROOT_PREFIX/pkgs,id=conda-$TARGETPLATFORM,uid=$MAMBA_USER_ID,gid=$MAMBA_USER_GID ls -al /opt/conda/pkgs
 # Install dependencies from lockfile into environment, cache packages in /opt/conda/pkgs
+
 RUN --mount=type=cache,target=$MAMBA_ROOT_PREFIX/pkgs,id=conda-$TARGETPLATFORM,uid=$MAMBA_USER_ID,gid=$MAMBA_USER_GID \
-    micromamba create --name research --yes --file /locks/environment.yml
+micromamba create --name research --yes --file /locks/environment.yml
 
 # Set conda-forge as default channel (otherwise no default channel is set)
 ARG MAMBA_DOCKERFILE_ACTIVATE=1

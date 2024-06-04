@@ -6,15 +6,12 @@ channels:
   # which may be different for different users. All required channels should
   # be listed explicitly here.
   - nodefaults
+  - pytorch-nightly
   - pyviz/label/dev
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
-
-  # ML libraries
-  - pytorch::pytorch>=2.0 # or don't specify the version and use latest stable
-  # CUDA only on linux and windows
-  - pytorch::pytorch-cuda=12.1 # [linux]
-  - pytorch::pytorch-cuda=12.1 # [win]
+  - pytorch=2.4.0
+  - torchvision=0.19.0
   - wandb
   - lightning
   - transformers
@@ -51,7 +48,7 @@ dependencies:
   - black
   - ruff
   - isort
-  - mypy
+  - mypy=1.10.0
   - pytest
   - typer
   - ipywidgets
@@ -80,6 +77,12 @@ dependencies:
       - typer
       - opencv-contrib-python
       - onnx
+      - pyyaml
+      - tf-nightly==2.17.0.dev20240520 -f https://download.pytorch.org/whl/nightly/torch_nightly.html
+      - torch_xla@https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-nightly+20240429-cp310-cp310-linux_x86_64.whl
+      - ai-edge-torch==0.1.1
+
+
 
 # Non-standard section listing target platforms for conda-lock:
 platforms:

@@ -69,7 +69,7 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
-        return str(img_path), img, label
+        return str(img_path), img, label  # type: ignore
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:

@@ -5,13 +5,13 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 16                      # Number of workers for data loading
+workers: 64                      # Number of workers for data loading
 
 
 # Model and Training Arguments
 project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
-run_name: "284-train-export-evaluate-EfficientNetRWM"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["pure-openset"]            # WandB tags for experiment tracking
+run_name: "326-train-using-quantization-aware-training"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["sweep-2"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -22,9 +22,10 @@ data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 10      # Early stopping patience (number of epochs)
+early_stopping_patience: 3      # Early stopping patience (number of epochs)
 embedding_size: 256
 dropout_p: 0.32
+use_quantization_aware_training: True
 
 weight_decay: 0.5               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
@@ -34,7 +35,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 0.5                   # Margin for the contrastive loss (triplet loss)
 loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
@@ -45,7 +46,7 @@ initial_lr: 1e-4                # Initial learning rate before warmup(must be > 
 start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 16                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
@@ -53,7 +54,7 @@ gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-check_val_every_n_epoch: 10     # Perform validation every n epochs
+check_val_every_n_epoch: 2     # Perform validation every n epochs
 save_interval: 10              # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 10      # Embedding save interval
 save_model_to_wandb: True       # Save the model checkpoint to wandb
