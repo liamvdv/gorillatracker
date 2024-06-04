@@ -100,7 +100,9 @@ class TrainingArgs:
         "softmax/elasticface/l2sp",
         "softmax/elasticface",
         "softmax/vpl",
+        "distillation/offline/response-based",
     ] = field(default="offline")
+    teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
     label_smoothing: float = field(default=0.0)
@@ -123,10 +125,18 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
+    additional_val_dataset_classes: Union[List[str], None] = field(default=None)
+    additional_val_data_dirs: Union[List[str], None] = field(default=None)
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config
     use_ssl: bool = field(default=False)
+    tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    split_path: Union[str, None] = field(default=None)
+    n_samples: int = field(default=15)
+    feature_types: list[str] = field(default_factory=lambda: ["body"])
+    min_confidence: float = field(default=0.5)
+    min_images_per_tracking: int = field(default=3)
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0

@@ -1,12 +1,12 @@
 import logging
-from typing import Any, Callable, Dict, List, Literal
+from typing import Literal
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import ArcFaceLoss
+
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -192,7 +192,9 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor, dist_calc=euclidean_distance_matrix) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor(), dist_calc=euclidean_distance_matrix
+    ) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -293,7 +295,9 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         """
         Compute loss.
 
@@ -327,7 +331,9 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]

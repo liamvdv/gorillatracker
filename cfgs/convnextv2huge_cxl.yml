@@ -70,3 +70,6 @@ embedding_save_interval: 2      # Embedding save interval
 
 data_dir: "data/splits/ground_truth-rohan-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

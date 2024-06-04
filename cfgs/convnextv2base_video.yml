@@ -62,3 +62,6 @@ data_dir: "/workspaces/gorillatracker/data/derived_data/spac_gorillas_converted_
 dataset_class: "gorillatracker.datasets.spac_videos.SPACVideosDataset"
 data_resize_transform: 224
 video_data: True
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

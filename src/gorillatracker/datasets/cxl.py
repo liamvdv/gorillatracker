@@ -62,7 +62,7 @@ class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[Id, Tensor, Label]:
+    def __getitem__(self, idx: int) -> tuple[Id, Tensor, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:

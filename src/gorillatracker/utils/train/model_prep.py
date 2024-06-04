@@ -52,6 +52,9 @@ class ModelConstructor:
             lambda_membank=args.lambda_membank,
             num_classes=num_classes,
             class_distribution=class_distribution,
+            num_val_dataloaders=(
+                1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1
+            ),
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,
@@ -63,6 +66,7 @@ class ModelConstructor:
             label_smoothing=args.label_smoothing,
             use_class_weights=args.use_class_weights,
             use_dist_term=args.use_dist_term,
+            teacher_model_wandb_link=args.teacher_model_wandb_link,
         )
 
     def construct(
