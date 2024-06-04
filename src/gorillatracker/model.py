@@ -11,7 +11,7 @@ import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
-from torch.optim import AdamW
+from torch.optim.adamw import AdamW
 from torchvision import transforms
 from torchvision.models import (
     EfficientNet_V2_L_Weights,
@@ -173,7 +173,7 @@ class BaseModule(L.LightningModule):
 
         self.kfold_k = kfold_k
 
-        self.quant = torch.quantization.QuantStub()  # type: ignore
+        # self.quant = torch.quantization.QuantStub()  # type: ignore
 
         ##### Create List of embeddings_tables
         self.embeddings_table_columns = [
@@ -216,6 +216,7 @@ class BaseModule(L.LightningModule):
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
             log_func=lambda x, y: self.log(f"fold-{self.kfold_k}/{x}", y),
+            teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -232,10 +233,10 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
+            teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
@@ -273,12 +274,14 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(vec)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
+        
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)  # type: ignore
+        
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
-        self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
+        self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
+        self.log("train/positive_distance", pos_dist, on_step=True)
+        self.log("train/negative_distance", neg_dist, on_step=True)
         return loss
 
     def add_validation_embeddings(
@@ -325,7 +328,7 @@ class BaseModule(L.LightningModule):
             flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
         )
         if "softmax" not in self.loss_mode:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)  # type: ignore
             log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{log_str_prefix}val/loss/dataloader_{dataloader_idx}",

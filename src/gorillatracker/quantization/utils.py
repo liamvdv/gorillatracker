@@ -61,3 +61,13 @@ def log_model_to_file(model: nn.Module, file_name: str = "model.txt") -> None:
 def print_model_parameters(model: torch.nn.Module) -> None:
     for name, param in model.named_parameters():
         print(f"{name}: {param.nelement()} parameters")
+
+
+def load_quantized_model(model: nn.Module, model_path: str) -> nn.Module:
+    """Load a quantized model from a file.
+    Args:
+        model: The model to load the parameters into.
+        model_path: The path to the model file.
+    """
+    model.load_state_dict(torch.load(model_path))
+    return model
