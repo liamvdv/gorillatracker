@@ -50,7 +50,7 @@ label_smoothing: 0.05                # Label smoothing value
 loss_mode: "softmax/arcface/combined/l2sp"          # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 use_class_weights: False                # Use class weights for the loss
-
+use_dist_term: False                     # Use the distance term for the loss
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "cosine"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")

@@ -6,8 +6,6 @@ import torch
 import gorillatracker.type_helper as gtypes
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
-# import variational prototype learning from insightface
-
 
 eps = 1e-8  # an arbitrary small value to be used for numerical stability
 class FocalLoss(torch.nn.Module):

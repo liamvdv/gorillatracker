@@ -26,7 +26,7 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
     sweep_config = {
         "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": project_name,
-        "method": "grid",  # Specify the search method (random search in this case)
+        "method": "bayes",  # Specify the search method (random search in this case)
         "metric": {"goal": "maximize", "name": "val/embeddings/knn5/auroc"},  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
@@ -39,15 +39,13 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
 
 sweeps = [
     {
-        "project_name": "Embedding-SwinV2Large-CXL-Open",
+        "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
         "entity": "gorillas",
-        "config_path": "./cfgs/swinv2_cxl.yml",
+        "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
         "parameters": {
-            "l2_alpha": {"values": [1.0, 1e-1, 1e-2]},
-            "l2_beta": {"values": [1.0, 1e-1, 1e-2]},
-            "batch_size": {"values": [16, 32]},
-            "loss_mode": {"values": ["softmax/arcface/l2sp"]},
-            "use_focal_loss": {"values": [True, False]},
+            "weight_decay": {"values": [0.5, 0.1, 0.01]},
+            "initial_lr": {"values": [1e-3, 1e-4, 1e-5]},
+            "dropout_p": {"values": [0.5, 0.3, 0.1]},
         },
     },
 ]

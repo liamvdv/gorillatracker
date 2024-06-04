@@ -45,7 +45,7 @@ def get_data_module(
     base: Type[NletDataModule]
     base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
     base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
-    base = SimpleDataModule if loss_mode.startswith("softmax") or loss_mode.startswith("combined") else base  # type: ignore
+    base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     if "kfold" in data_dir:
         base = QuadletKFoldDataModule if loss_mode.startswith("online") else None  # type: ignore

@@ -78,7 +78,7 @@ class NletDataModule(L.LightningDataModule):
         # NOTE(liamvdv): used to clean-up when the run is finished
         pass
 
-    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> Tuple[int, Dict[int, int]]:  # HACK
+    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> Tuple[int, Dict[int, int]]:
         if mode == "train":
             train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             return train.get_num_classes(), train.get_class_distribution()  # type: ignore
@@ -150,7 +150,7 @@ class NLetKFoldDataModule(NletDataModule):
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    def get_num_classes(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
+    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
         if mode == "train":
             train = self.dataset_class(self.data_dir, partition="train", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
             return train.get_num_classes()  # type: ignore

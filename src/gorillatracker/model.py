@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type
+from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Union
 
 import lightning as L
 import numpy as np
@@ -25,8 +25,7 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import VariationalPrototypeLearning
-from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
+from gorillatracker.losses import get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -111,8 +110,6 @@ class BaseModule(L.LightningModule):
 
     def __init__(
         self,
-        model_name_or_path: str,
-        # model_kwargs: dict,
         from_scratch: bool,
         loss_mode: str,
         weight_decay: float,
@@ -129,18 +126,9 @@ class BaseModule(L.LightningModule):
         beta2: float,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
-        margin: float = 0.5,
-        s: float = 64.0,
-        delta_t: int = 200,
-        mem_bank_start_epoch: int = 2,
-        lambda_membank: float = 0.5,
         embedding_size: int = 256,
-        batch_size: int = 32,
-        num_classes: Tuple[int, int, int] = (0, 0, 0),
-        class_distribution: Dict[int, int] = {},
-        use_focal_loss: bool = False,
-        accelerator: str = "cpu",
         dropout_p: float = 0.0,
+        use_dist_term: bool = False,
         **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
@@ -159,17 +147,16 @@ class BaseModule(L.LightningModule):
         self.end_lr = end_lr
         self.stepwise_schedule = stepwise_schedule
         self.lr_interval = lr_interval
-
         self.beta1 = beta1
         self.beta2 = beta2
         self.epsilon = epsilon
-        self.margin = margin
-
+        
         self.from_scratch = from_scratch
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
-
+        self.use_dist_term = use_dist_term
+        
         self.quant = torch.quantization.QuantStub()  # type: ignore
 
         ##### Create Table embeddings_table
@@ -184,6 +171,7 @@ class BaseModule(L.LightningModule):
         self,
         model: nn.Module,
         loss_mode: str,
+        margin: float = 0.5,
         s: float = 64.0,
         delta_t: int = 200,
         mem_bank_start_epoch: int = 2,
@@ -196,12 +184,17 @@ class BaseModule(L.LightningModule):
         k_subcenters: int = 2,
         accelerator: str = "cpu",
         label_smoothing: float = 0.0,
+        l2_alpha: float = 0.1,
+        l2_beta: float = 0.01,
+        path_to_pretrained_weights: str = "",
+        use_class_weights: Union[List[float], None] = None,
+        use_dist_term: bool = False,
         **kwargs: Dict[str, Any],
     ) -> None:
         self.loss_module_train = get_loss(
             loss_mode,
-            margin=self.margin,
-            embedding_size=self.embedding_size,
+            margin=margin,
+            embedding_size=embedding_size,
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
@@ -210,20 +203,21 @@ class BaseModule(L.LightningModule):
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
-            l2_alpha=kwargs["l2_alpha"],
-            l2_beta=kwargs["l2_beta"],
-            path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
+            l2_alpha=l2_alpha,
+            l2_beta=l2_beta,
+            path_to_pretrained_weights=path_to_pretrained_weights,
             use_focal_loss=use_focal_loss,
             label_smoothing=label_smoothing,
             model=model,
             log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
             k_subcenters=k_subcenters,
-            use_class_weights=kwargs["use_class_weights"]
+            use_class_weights=use_class_weights,
+            use_dist_term=use_dist_term,
         )
         self.loss_module_val = get_loss(
             loss_mode,
-            margin=self.margin,
-            embedding_size=self.embedding_size,
+            margin=margin,
+            embedding_size=embedding_size,
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
@@ -231,16 +225,17 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[1],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
-            accelerator="cpu",
-            l2_alpha=kwargs["l2_alpha"],
-            l2_beta=kwargs["l2_beta"],
-            path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
+            accelerator=accelerator,
+            l2_alpha=l2_alpha,
+            l2_beta=l2_beta,
+            path_to_pretrained_weights=path_to_pretrained_weights,
             use_focal_loss=use_focal_loss,
             label_smoothing=label_smoothing,
             model=model,
             log_func=lambda x, y: self.log("val/"+ x, y, on_epoch=True),
             k_subcenters=1,
-            use_class_weights=kwargs["use_class_weights"],
+            use_class_weights=use_class_weights,
+            use_dist_term=use_dist_term,
         )
         self.loss_module_val.eval()
 
@@ -250,14 +245,13 @@ class BaseModule(L.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         if (
-            isinstance(self.loss_module_train, VariationalPrototypeLearning)
+            self.loss_mode.endswith("vpl")
             and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
         ):
             self.loss_module_train.set_using_memory_bank(True)
             logger.info("Using memory bank")
         elif (
-            isinstance(self.loss_module_train, L2SPRegularization_Wrapper)
-            and isinstance(self.loss_module_train.loss, VariationalPrototypeLearning)
+            self.loss_mode.endswith("vpl/l2sp")
             and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch
         ):  # is wrapped in l2sp regularization
             self.loss_module_train.loss.set_using_memory_bank(True)
@@ -306,23 +300,23 @@ class BaseModule(L.LightningModule):
         flat_ids = [id for nlet in ids for id in nlet]
         embeddings = self.forward(vec)
         self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])  # type: ignore
-        if "softmax" not in self.loss_mode and "combined" not in self.loss_mode:
+        if "softmax" not in self.loss_mode and not self.use_dist_term:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-            self.log("val/loss", loss, sync_dist=True, prog_bar=True)
-            self.log("val/positive_distance", pos_dist, )
-            self.log("val/negative_distance", neg_dist, )
+            self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
+            self.log("val/positive_distance", pos_dist, on_step=True)
+            self.log("val/negative_distance", neg_dist, on_step=True)
             return loss
         else:
             return torch.tensor(0.0)
 
     def on_validation_epoch_end(self) -> None:
         # calculate loss after all embeddings have been processed
-        if "softmax" in self.loss_mode or "combined" in self.loss_mode:
+        if "softmax" in self.loss_mode:
             logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
 
             # get weights for all classes by averaging over all embeddings
-            loss_module_val = self.loss_module_val if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper) else self.loss_module_val.loss  # type: ignore
-            if "combined" in self.loss_mode:
+            loss_module_val = self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss  # type: ignore
+            if self.use_dist_term:
                 loss_module_val = loss_module_val.arcface  # type: ignore
             
             num_classes = loss_module_val.num_classes
@@ -375,14 +369,6 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
-
-        # optimizer = torch.optim.RMSprop(
-        #     self.model.parameters(),
-        #     lr=self.initial_lr,
-        #     weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
-        # )
-        
-        # TODO try AGC here
 
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
@@ -839,7 +825,7 @@ class SwinV2BaseWrapper(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomCrop(192, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 

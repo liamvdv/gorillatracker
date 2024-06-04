@@ -90,7 +90,6 @@ class TrainingArgs:
         "softmax/adaface",
         "softmax/elasticface",
         "softmax/vpl",
-        "combined",
         "offline/native/l2sp",
         "online/soft/l2sp",
         "online/hard/l2sp",
@@ -99,16 +98,14 @@ class TrainingArgs:
         "softmax/vpl/l2sp",
         "softmax/adaface/l2sp",
         "softmax/elasticface/l2sp",
-        "softmax/arcface/combined/l2sp",
-        "softmax/vpl/combined/l2sp",
-        "softmax/adaface/combined/l2sp",
-        "softmax/elasticface/combined/l2sp",
-        # "combined/l2sp",
+        "softmax/elasticface",
+        "softmax/vpl",
     ] = field(default="offline")
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
     label_smoothing: float = field(default=0.0)
     use_class_weights: Union[List[float], None] = field(default=None)
+    use_dist_term: bool = field(default=False)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

@@ -1,13 +1,12 @@
 import logging
-from typing import Any, Callable, Dict, List, Literal, Union
+from typing import Any, Callable, Dict, List, Literal
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
-import gorillatracker.utils.l2sp_regularisation as l2
-from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning, AdaFaceLoss, ElasticArcFaceLoss
+from gorillatracker.losses.arcface_loss import ArcFaceLoss
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -177,15 +176,6 @@ def euclidean_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     return distance_matrix_stable
 
 
-def cosine_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
-    # formula: 1 - cosine similarity = 1 - (A.B / |A||B|) (range: [0, 2]) -> divide by 2 to get range [0, 1]
-    
-    dot_product = torch.mm(embeddings, embeddings.t()) # shape: (batch_size, batch_size)
-    norm = torch.sqrt(torch.diag(dot_product)) # shape: (batch_size,)
-    norm = norm.unsqueeze(0) * norm.unsqueeze(1) # shape: (batch_size, batch_size)
-    
-    return (1 - dot_product / norm) / 2 
-
 class TripletLossOnline(nn.Module):
     """
     TripletLossOnline operates on Quadlets and does batch optimization.
@@ -343,157 +333,6 @@ class TripletLossOfflineNative(nn.Module):
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
         NO_VALUE = torch.tensor([-1])
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
-
-
-class L2SPRegularization_Wrapper(nn.Module):
-    """Wrapper that adds L2SP regularization to any loss"""
-
-    def __init__(
-        self,
-        loss: nn.Module,
-        model: nn.Module,
-        path_to_pretrained_weights: str,
-        alpha: float,
-        beta: float,
-        log_func: Callable[[str, float], None] = lambda x, y: None,
-    ):
-        super().__init__()
-        assert path_to_pretrained_weights is not None, "Path to pretrained weights must be provided"
-        self.loss = loss
-        self.model = model
-        self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
-        self.log = log_func
-
-    def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
-        standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
-        l2sp_loss = self.l2sp_loss(self.model)
-        if type(l2sp_loss) == torch.Tensor:
-            self.log("l2_sp", l2sp_loss.item())
-        else:
-            self.log("l2_sp", l2sp_loss)
-        return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
-
-
-class CombinedLoss(nn.Module):
-    def __init__(self, arcface_loss: ArcFaceLoss, triplet_loss: TripletLossOnline, lambda_: float = 0.5, log_func: Callable[[str, float], None] = lambda x, y: None):
-        super().__init__()
-        self.arcface = arcface_loss
-        self.triplet = triplet_loss
-        self.lambda_ = lambda_
-        self.log_func = log_func
-        
-    def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
-        loss_arcface, _, _ = self.arcface(*args, **kwargs)
-        loss_triplet, pos_dist, neg_dist = self.triplet(*args, **kwargs, dist_calc=cosine_distance_matrix)
-        loss_triplet = torch.clamp(loss_triplet, min=0.0, max=1.0).to(loss_arcface.device)
-        
-        self.log_func("arcface", loss_arcface.item())
-        self.log_func("triplet", loss_triplet.item())
-        return loss_arcface + self.lambda_ * loss_triplet, pos_dist, neg_dist
-
-
-def get_loss(
-    loss_mode: str,
-    log_func: Callable[[str, float], None] = lambda x, y: None,
-    **kw_args: Any,
-) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
-    l2sp = False
-    if "l2sp" in loss_mode:
-        loss_mode = loss_mode.replace("/l2sp", "")
-        l2sp = True
-    combined = False
-    if "combined" in loss_mode:
-        loss_mode = loss_mode.replace("/combined", "")
-        combined = True
-        
-
-    loss_module: Union[torch.nn.Module, None] = None
-
-    if loss_mode == "online/hard":
-        loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
-    elif loss_mode == "online/semi-hard":
-        loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
-    elif loss_mode == "online/soft":
-        loss_module = TripletLossOnline(mode="soft", margin=kw_args["margin"])
-    elif loss_mode == "offline":
-        loss_module = TripletLossOffline(margin=kw_args["margin"])
-    elif loss_mode == "offline/native":
-        loss_module = TripletLossOfflineNative(margin=kw_args["margin"])
-    elif loss_mode == "softmax/arcface":
-        loss_module = ArcFaceLoss(
-            embedding_size=kw_args["embedding_size"],
-            angle_margin=kw_args["margin"],
-            num_classes=kw_args["num_classes"],
-            class_distribution=kw_args["class_distribution"],
-            s=kw_args["s"],
-            accelerator=kw_args["accelerator"],
-            k_subcenters=kw_args["k_subcenters"],
-            use_focal_loss=kw_args["use_focal_loss"],
-            label_smoothing=kw_args["label_smoothing"],
-            use_class_weights=kw_args["use_class_weights"],
-        )
-    elif loss_mode == "softmax/adaface": # TODO
-        loss_module = AdaFaceLoss(
-            embedding_size=kw_args["embedding_size"],
-            angle_margin=kw_args["margin"],
-            num_classes=kw_args["num_classes"],
-            class_distribution=kw_args["class_distribution"],
-            s=kw_args["s"],
-            accelerator=kw_args["accelerator"],
-            k_subcenters=kw_args["k_subcenters"],
-            use_focal_loss=kw_args["use_focal_loss"],
-            label_smoothing=kw_args["label_smoothing"],
-            use_class_weights=kw_args["use_class_weights"],
-        )
-            
-    elif loss_mode == "softmax/elasticface": # TODO
-        loss_module = ElasticArcFaceLoss(
-            embedding_size=kw_args["embedding_size"],
-            angle_margin=kw_args["margin"],
-            num_classes=kw_args["num_classes"],
-            class_distribution=kw_args["class_distribution"],
-            s=kw_args["s"],
-            margin_sigma=0.078,
-            accelerator=kw_args["accelerator"],
-            k_subcenters=kw_args["k_subcenters"],
-            use_focal_loss=kw_args["use_focal_loss"],
-            label_smoothing=kw_args["label_smoothing"],
-            use_class_weights=kw_args["use_class_weights"],
-        )
-    elif loss_mode == "softmax/vpl":
-        loss_module = VariationalPrototypeLearning(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            class_distribution=kw_args["class_distribution"],
-            batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-            accelerator=kw_args["accelerator"],
-        )
-    else:
-        raise ValueError(f"Loss mode {loss_mode} not supported")
-
-    if combined:
-        loss_module = CombinedLoss(
-            arcface_loss=loss_module,
-            triplet_loss=TripletLossOnline(mode="soft", margin=1.0),
-            lambda_=10.0,
-            log_func=log_func,
-        )
-
-    if l2sp:
-        return L2SPRegularization_Wrapper(
-            loss=loss_module,
-            model=kw_args["model"],
-            path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
-            alpha=kw_args["l2_alpha"],
-            beta=kw_args["l2_beta"],
-            log_func=log_func,
-        )
-
-    return loss_module
 
 
 if __name__ == "__main__":
