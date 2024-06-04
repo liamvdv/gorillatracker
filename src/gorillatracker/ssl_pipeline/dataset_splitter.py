@@ -173,7 +173,7 @@ class SplitArgs:
 
 
 if __name__ == "__main__":
-    DB_URI = os.environ.get("DB_URI")
+    DB_URI = os.environ.get("POSTGRESQL_URI")
     if DB_URI is None:
         raise ValueError("Please set the DB_URI environment variable in devcontainer.json")
     args = SplitArgs(
