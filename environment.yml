@@ -6,12 +6,12 @@ channels:
   # which may be different for different users. All required channels should
   # be listed explicitly here.
   - nodefaults
-  - pyviz/label/dev
   - pytorch-nightly
+  - pyviz/label/dev
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
-  - pytorch=2.4.0.dev20240523
-  - torchvision=0.19.0.dev20240523
+  - pytorch=2.4.0
+  - torchvision=0.19.0
   - wandb
   - lightning
   - transformers
@@ -48,7 +48,7 @@ dependencies:
   - black
   - ruff
   - isort
-  - mypy
+  - mypy=1.10.0
   - pytest
   - typer
   - ipywidgets
