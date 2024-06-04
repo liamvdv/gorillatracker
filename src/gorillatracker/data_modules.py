@@ -157,7 +157,7 @@ class NLetKFoldDataModule(NletDataModule):
         training_transforms: Optional[gtypes.Transform] = None,
         val_fold: int = 0,
         k: int = 5,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms, **kwargs)
         self.val_fold = val_fold
@@ -180,7 +180,7 @@ class NLetKFoldDataModule(NletDataModule):
             self.val = self.dataset_class(
                 self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms
             )  # type: ignore
-            
+
             if self.additional_dataset_classes is not None:
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
@@ -201,8 +201,7 @@ class NLetKFoldDataModule(NletDataModule):
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
                     self.val_list.append(dataset_class(data_dir, partition="complete", transform=transform))  # type: ignore
-            
-            
+
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None

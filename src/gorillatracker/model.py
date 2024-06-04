@@ -1,6 +1,6 @@
 import importlib
 from itertools import chain
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -170,7 +170,7 @@ class BaseModule(L.LightningModule):
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
-        
+
         self.kfold_k = kfold_k
 
         self.quant = torch.quantization.QuantStub()  # type: ignore
@@ -267,11 +267,11 @@ class BaseModule(L.LightningModule):
             flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
             # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
             vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
-            
+
         # set possible nan values to 0
-        vec[torch.isnan(vec)] = 0.0 # HACK(rob2u): This is a temporary fix, we should investigate why we get NaNs
+        vec[torch.isnan(vec)] = 0.0  # HACK(rob2u): This is a temporary fix, we should investigate why we get NaNs
         embeddings = self.forward(vec)
-        
+
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
 
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
@@ -336,10 +336,16 @@ class BaseModule(L.LightningModule):
                 add_dataloader_idx=False,
             )
             self.log(
-                f"{log_str_prefix}val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False # TODO: BAD
+                f"{log_str_prefix}val/positive_distance/dataloader_{dataloader_idx}",
+                pos_dist,
+                on_step=True,
+                add_dataloader_idx=False,  # TODO: BAD
             )
             self.log(
-                f"{log_str_prefix}val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False
+                f"{log_str_prefix}val/negative_distance/dataloader_{dataloader_idx}",
+                neg_dist,
+                on_step=True,
+                add_dataloader_idx=False,
             )
             return loss
         else:
@@ -352,7 +358,7 @@ class BaseModule(L.LightningModule):
                 logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
                 assert len(table) > 0, f"Empty table for dataloader {i}"
-                
+
                 # get weights for all classes by averaging over all embeddings
                 loss_module_val = (
                     self.loss_module_val
