@@ -58,7 +58,6 @@ def train_and_validate_model(
         val_result = trainer.validate(model, dm)
         for elem in val_result:
             wandb.log(elem)
-        wandb.log(val_result[0]) # TODO fix val before training
         print(val_result)
         if args.only_val:
             return model, trainer
@@ -132,14 +131,14 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
 
     summary = read_access_run.summary
 
-    metrics = [(key, value) for key, value in summary.items() if "val/embeddings/fold" in key]
+    metrics = [(key, value) for key, value in summary.items() if "/val/embeddings" in key]
 
     aggregated_metrics = defaultdict(list)
 
     # Step 1: Extract metrics by fold and group them
     for key, value in metrics:
         if isinstance(value, (int, float)):
-            base_key = "/".join(key.split("/")[:2] + ["averaged"] + key.split("/")[3:])  # Remove fold part
+            base_key = "/".join(key.split("/")[1:]) 
             aggregated_metrics[base_key].append(value)
 
     # Step 2: Compute averages
@@ -148,6 +147,7 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
         average_metrics[key] = np.mean(values)
 
     wandb.log(average_metrics)
+    print(average_metrics)
 
 
 def save_model(

@@ -267,7 +267,12 @@ class BaseModule(L.LightningModule):
             flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
             # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
             vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+            
+        # set possible nan values to 0
+        vec[torch.isnan(vec)] = 0.0 # HACK(rob2u): This is a temporary fix, we should investigate why we get NaNs
         embeddings = self.forward(vec)
+        
+        assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
 
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
@@ -346,48 +351,50 @@ class BaseModule(L.LightningModule):
             for i, table in enumerate(self.embeddings_table_list):
                 logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
-            # get weights for all classes by averaging over all embeddings
-            loss_module_val = (
-                self.loss_module_val
-                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss  # type: ignore
-            )
-            num_classes = (
-                self.loss_module_val.num_classes  # type: ignore
-                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss.num_classes  # type: ignore
-            )
-
-            class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
-            lse = LinearSequenceEncoder()
-            table["label"] = table["label"].apply(lse.encode)
-
-            for label in range(num_classes):
-                class_embeddings = table[table["label"] == label]["embedding"].tolist()
-                class_embeddings = (
-                    np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                assert len(table) > 0, f"Empty table for dataloader {i}"
+                
+                # get weights for all classes by averaging over all embeddings
+                loss_module_val = (
+                    self.loss_module_val
+                    if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                    else self.loss_module_val.loss  # type: ignore
                 )
-                class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
-                if torch.isnan(class_weights[label]).any():
-                    class_weights[label] = 0.0
-
-            # calculate loss for all embeddings
-            loss_module_val.set_weights(class_weights)  # type: ignore
-            loss_module_val.le = lse  # type: ignore
-
-            losses = []
-            for _, row in table.iterrows():
-                loss, _, _ = loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0),
-                    torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
+                num_classes = (
+                    self.loss_module_val.num_classes  # type: ignore
+                    if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                    else self.loss_module_val.loss.num_classes  # type: ignore
                 )
-                losses.append(loss)
-            loss = torch.tensor(losses).mean()
-            assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            if self.kfold_k is not None:
-                self.log(f"fold-{self.kfold_k}/val/loss/dataloader_{i}", loss, sync_dist=True)
-            else:
-                self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
+
+                class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+                lse = LinearSequenceEncoder()
+                table["label"] = table["label"].apply(lse.encode)
+
+                for label in range(num_classes):
+                    class_embeddings = table[table["label"] == label]["embedding"].tolist()
+                    class_embeddings = (
+                        np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                    )
+                    class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
+                    if torch.isnan(class_weights[label]).any():
+                        class_weights[label] = 0.0
+
+                # calculate loss for all embeddings
+                loss_module_val.set_weights(class_weights)  # type: ignore
+                loss_module_val.le = lse  # type: ignore
+
+                losses = []
+                for _, row in table.iterrows():
+                    loss, _, _ = loss_module_val(
+                        torch.tensor(row["embedding"]).unsqueeze(0),
+                        torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
+                    )
+                    losses.append(loss)
+                loss = torch.tensor(losses).mean()
+                assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
+                if self.kfold_k is not None:
+                    self.log(f"fold-{self.kfold_k}/val/loss/dataloader_{i}", loss, sync_dist=True)
+                else:
+                    self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
@@ -561,6 +568,8 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
+                transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
             ]
         )
 

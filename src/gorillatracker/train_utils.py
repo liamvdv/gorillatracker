@@ -65,7 +65,7 @@ def get_data_module(
         return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
     else:
         assert additional_data_dirs is not None, "additional_data_dirs must be set"
-        assert "kfold" not in data_dir, "kfold not supported for additional datasets"
+        # assert "kfold" not in data_dir, "kfold not supported for additional datasets" # TODO(rob2u): why?
         dataset_classes = [get_dataset_class(cls_id) for cls_id in additional_dataset_class_ids]
         transforms_list = []
         for cls in dataset_classes:
