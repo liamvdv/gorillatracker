@@ -440,8 +440,8 @@ def pca(
     embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
 ) -> wandb.Image:  # generate a 2D plot of the embeddings
     num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()  # type: ignore
-    labels = labels.numpy()  # type: ignore
+    embeddings = embeddings.numpy()
+    labels = labels.numpy()
 
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
@@ -469,8 +469,8 @@ def tsne(
     embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()  # type: ignore
-    labels = labels.numpy()  # type: ignore
+    embeddings = embeddings.numpy()
+    labels = labels.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]

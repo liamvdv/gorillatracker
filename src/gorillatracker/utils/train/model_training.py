@@ -124,7 +124,7 @@ def train_using_quantization_aware_training(
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
     model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
 
-    torch.ao.quantization.allow_exported_model_train_eval(model.model)
+    torch.ao.quantization.allow_exported_model_train_eval(model.model)  # type: ignore
 
     torch.use_deterministic_algorithms(True, warn_only=True)
     model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
