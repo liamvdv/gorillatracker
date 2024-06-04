@@ -3,7 +3,7 @@ from itertools import groupby
 from pathlib import Path
 from typing import List, Literal
 
-from sqlalchemy import Select, create_engine, select
+from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session
 
 import gorillatracker.type_helper as gtypes
@@ -14,7 +14,7 @@ from gorillatracker.ssl_pipeline.contrastive_sampler import (
 )
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
     cached_filter,
