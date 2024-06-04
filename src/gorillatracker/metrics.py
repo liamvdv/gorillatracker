@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -97,6 +97,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             metrics = {
                 "knn5": partial(knn, k=5),
                 "knn": partial(knn, k=1),
+                "knn5_macro": partial(knn, k=5, average="macro"),
+                "knn_macro": partial(knn, k=1, average="macro"),
                 "pca": pca,
                 "tsne": tsne,
                 # "fc_layer": fc_layer,
@@ -105,6 +107,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 {
                     "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
                     "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                    "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
+                    "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
                 }
                 if self.knn_with_train
                 else {}
@@ -260,6 +264,7 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[torch.Tensor] = None,
+    average: Literal['micro', 'macro', 'weighted', 'none'] = "weighted",
 ) -> Dict[str, Any]:
     if use_train_embeddings and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
@@ -277,9 +282,10 @@ def knn(
             k=k,
             train_embeddings=train_embeddings,  # type: ignore
             train_labels=train_labels_encoded,
+            average=average,
         )
     else:
-        return knn_naive(val_embeddings, val_labels_encoded, k=k)
+        return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
 
 
 def knn_with_train(
@@ -287,6 +293,7 @@ def knn_with_train(
     val_labels: torch.Tensor,
     train_embeddings: torch.Tensor,
     train_labels: torch.Tensor,
+    average: Literal['micro', 'macro', 'weighted', 'none'],
     k: int = 5,
 ) -> Dict[str, Any]:
     """
@@ -338,7 +345,7 @@ def knn_with_train(
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
@@ -348,11 +355,11 @@ def knn_with_train(
     auroc = tm.functional.auroc(val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
     assert auroc is not None
     f1 = tm.functional.f1_score(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert precision is not None
 
@@ -365,7 +372,7 @@ def knn_with_train(
     }
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5) -> Dict[str, Any]:
+def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, average: Literal['micro', 'macro', 'weighted', 'none'], k: int = 5) -> Dict[str, Any]:
     num_classes = len(torch.unique(val_labels))
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
@@ -395,7 +402,7 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
     assert classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
@@ -405,11 +412,11 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
     auroc = tm.functional.auroc(classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
     assert auroc is not None
     f1 = tm.functional.f1_score(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert precision is not None
 
