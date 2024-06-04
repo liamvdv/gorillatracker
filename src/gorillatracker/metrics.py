@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Optional, Tuple, Union, Literal
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -264,7 +264,7 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[torch.Tensor] = None,
-    average: Literal['micro', 'macro', 'weighted', 'none'] = "weighted",
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
 ) -> Dict[str, Any]:
     if use_train_embeddings and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
@@ -293,7 +293,7 @@ def knn_with_train(
     val_labels: torch.Tensor,
     train_embeddings: torch.Tensor,
     train_labels: torch.Tensor,
-    average: Literal['micro', 'macro', 'weighted', 'none'],
+    average: Literal["micro", "macro", "weighted", "none"],
     k: int = 5,
 ) -> Dict[str, Any]:
     """
@@ -372,7 +372,12 @@ def knn_with_train(
     }
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, average: Literal['micro', 'macro', 'weighted', 'none'], k: int = 5) -> Dict[str, Any]:
+def knn_naive(
+    val_embeddings: torch.Tensor,
+    val_labels: torch.Tensor,
+    average: Literal["micro", "macro", "weighted", "none"],
+    k: int = 5,
+) -> Dict[str, Any]:
     num_classes = len(torch.unique(val_labels))
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
