@@ -239,7 +239,7 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[1],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
-            accelerator=accelerator,
+            accelerator="cpu", # HACK HACK HACK (rob2u): yet to do
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
             path_to_pretrained_weights=path_to_pretrained_weights,
@@ -385,17 +385,6 @@ class BaseModule(L.LightningModule):
                 assert len(table) > 0, f"Empty table for dataloader {i}"
 
                 # get weights for all classes by averaging over all embeddings
-                loss_module_val = (
-                    self.loss_module_val
-                    if "l2sp" not in self.loss_mode
-                    else self.loss_module_val.loss  # type: ignore
-                )
-                num_classes = (
-                    self.loss_module_val.num_classes  # type: ignore
-                    if "l2sp" not in self.loss_mode
-                    else self.loss_module_val.loss.num_classes  # type: ignore
-                )
-
                 class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
                 lse = LinearSequenceEncoder()
                 table["label"] = table["label"].apply(lse.encode)

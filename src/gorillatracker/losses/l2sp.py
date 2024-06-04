@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.utils.l2sp_regularisation import l2
+from gorillatracker.utils.l2sp_regularisation import L2_SP
 
 class L2SPRegularization_Wrapper(nn.Module):
     """Wrapper that adds L2SP regularization to any loss"""
@@ -22,7 +22,7 @@ class L2SPRegularization_Wrapper(nn.Module):
         assert path_to_pretrained_weights is not None, "Path to pretrained weights must be provided"
         self.loss = loss
         self.model = model
-        self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
+        self.l2sp_loss = L2_SP(model, path_to_pretrained_weights, alpha, beta)
         self.log = log_func
 
     def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:

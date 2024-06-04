@@ -3,9 +3,10 @@ from typing import Any, Callable, Union
 import torch
 import gorillatracker.type_helper as gtypes
 from .arcface_loss import ArcFaceLoss, VariationalPrototypeLearning, AdaFaceLoss, ElasticArcFaceLoss
-from .triplet_loss import TripletLossOfflineNative, TripletLossOffline, TripletLossOnline, OfflineResponseBasedLoss
+from .triplet_loss import TripletLossOfflineNative, TripletLossOffline, TripletLossOnline
 from .l2sp import L2SPRegularization_Wrapper
 from .dist_term_loss import CombinedLoss
+from .offline_distillation_loss import OfflineResponseBasedLoss
 
 __all__ = ["get_loss"]
 
@@ -93,7 +94,7 @@ def get_loss(
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
 
-    if kw_args.get("combined", False):
+    if kw_args.get("use_dist_term", False):
         loss_module = CombinedLoss(
             arcface_loss=loss_module,
             triplet_loss=TripletLossOnline(mode="soft", margin=1.0),

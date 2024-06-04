@@ -125,7 +125,7 @@ class NletDataModule(L.LightningDataModule):
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
                     val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
-            return sum(val.get_num_classes() for val in val_list), sum([val_ds.get_class_distribution() for val_ds in val_list], [])  # type: ignore
+            return sum(val.get_num_classes() for val in val_list), {k: v for val_ds in val_list for k, v in val_ds.get_class_distribution().items()}  # type: ignore
         elif mode == "test":
             test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
             return test.get_num_classes(), test.get_class_distribution()  # type: ignore
@@ -160,7 +160,7 @@ class NLetKFoldDataModule(NletDataModule):
         k: int = 5,
         **kwargs: Any,
     ) -> None:
-        super().__init__(data_dir, batch_size, dataset_class, transforms, training_transforms, **kwargs)
+        super().__init__(data_dir=data_dir, batch_size=batch_size, dataset_class=dataset_class, transforms=transforms, training_transforms=training_transforms, **kwargs)
         self.val_fold = val_fold
         self.k = k
 
@@ -210,7 +210,7 @@ class NLetKFoldDataModule(NletDataModule):
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> int:  # HACK
+    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> int:  # TODO
         if mode == "train":
             train = self.dataset_class(
                 self.data_dir,
@@ -219,7 +219,7 @@ class NLetKFoldDataModule(NletDataModule):
                 k=self.k,
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
             )  # type: ignore
-            return train.get_num_classes()  # type: ignore
+            return train.get_num_classes(), train.get_class_distribution() # type: ignore
         elif mode == "val":
             val_list = [self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)]  # type: ignore
             if self.additional_dataset_classes is not None:
@@ -227,12 +227,12 @@ class NLetKFoldDataModule(NletDataModule):
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
                     val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
-            return sum(val.get_num_classes() for val in val_list)  # type: ignore
+            return sum(val.get_num_classes() for val in val_list), {k: v for val_ds in val_list for k, v in val_ds.get_class_distribution().items()}  # type: ignore
         elif mode == "test":
             test = self.dataset_class(
                 self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms
             )  # type: ignore
-            return test.get_num_classes()  # type: ignore
+            return test.get_num_classes(), test.get_class_distribution() # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
 
