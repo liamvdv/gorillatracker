@@ -3,7 +3,7 @@ from typing import Any, Callable, Union
 import torch
 import gorillatracker.type_helper as gtypes
 from .arcface_loss import ArcFaceLoss, VariationalPrototypeLearning, AdaFaceLoss, ElasticArcFaceLoss
-from .triplet_loss import TripletLossOfflineNative, TripletLossOffline, TripletLossOnline
+from .triplet_loss import TripletLossOfflineNative, TripletLossOffline, TripletLossOnline, OfflineResponseBasedLoss
 from .l2sp import L2SPRegularization_Wrapper
 from .dist_term_loss import CombinedLoss
 
@@ -35,6 +35,8 @@ def get_loss(
         loss_module = TripletLossOffline(margin=kw_args["margin"])
     elif loss_mode == "offline/native":
         loss_module = TripletLossOfflineNative(margin=kw_args["margin"])
+    elif loss_mode == "distillation/offline/response-based":
+        loss_module = OfflineResponseBasedLoss(teacher_model_wandb_link=kw_args["teacher_model_wandb_link"])
     elif loss_mode == "softmax/arcface":
         loss_module = ArcFaceLoss(
             embedding_size=kw_args["embedding_size"],
