@@ -36,7 +36,7 @@ def cast_label_to_int(labels: List[str]) -> List[int]:
 
 class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __init__(
-        self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
+        self, data_dir: str, partition: Literal["train", "val", "test", "complete"] = "complete", transform: Optional[gtypes.Transform] = None
     ):
         """
         Assumes directory structure:
@@ -48,7 +48,7 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
                 test/
                     ...
         """
-        dirpath = data_dir / Path(partition)
+        dirpath = data_dir / Path(partition) if partition != "complete" else Path(data_dir)
         samples = get_samples(dirpath)
 
         # new
