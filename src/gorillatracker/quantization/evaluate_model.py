@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import Union, Dict, Any
+from typing import Any, Dict, Union
 
 import pandas as pd
 import torch

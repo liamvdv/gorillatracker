@@ -228,7 +228,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
-            teacher_model_wand_link=kwargs["teacher_model_wandb_link"],
+            teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

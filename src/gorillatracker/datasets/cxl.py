@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
@@ -62,7 +62,7 @@ class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[str, Tensor, Union[str, int]]:
+    def __getitem__(self, idx: int) -> tuple[Id, Tensor, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:

@@ -1,9 +1,9 @@
-import torch.ao.quantization
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
 import numpy as np
+import torch.ao.quantization
 import wandb
 from fsspec import Callback
 from lightning import Trainer
@@ -143,6 +143,7 @@ def train_using_quantization_aware_training(
         artifact.add_file(save_path, name="quantized_model_dict.pth")
 
     return model, trainer
+
 
 def kfold_averaging(wandb_logger: WandbLogger) -> None:
     run_path = wandb_logger.experiment.path
