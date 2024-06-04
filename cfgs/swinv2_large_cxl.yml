@@ -12,8 +12,8 @@ workers: 4                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-SwinV2Large-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "291-bristol-as-validation" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["bristol_val"]            # WandB tags for experiment tracking
+run_name: "233-baseline" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2LargeWrapper"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -24,9 +24,10 @@ data_preprocessing_only: False    # Run only data preprocessing
 seed: 42                          # Random seed for reproducibility
 debug: False                      # Enable debug mode
 from_scratch: False               # Train the model from scratch
-early_stopping_patience: 10        # Early stopping patience (number of epochs)
-embedding_size: 128
+early_stopping_patience: 3        # Early stopping patience (number of epochs)
+embedding_size: 256
 dropout_p: 0.32
+use_quantization_aware_training: False
 
 weight_decay: 1.0               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
@@ -36,7 +37,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/swinv2_large.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: ""    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                   # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
@@ -54,10 +55,10 @@ start_lr: 1e-5                  # Learning Rate after warmup at the beginning of
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
 
-batch_size: 28                  # Training batch size
+batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
+max_epochs: 20                  # Training goal (large number)
 val_before_training: False       # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: False                     # Perform kfold cross validation
@@ -71,6 +72,3 @@ embedding_save_interval: 2      # Embedding save interval
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 data_resize_transform: 192
-
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]

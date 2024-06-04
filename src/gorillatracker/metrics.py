@@ -43,12 +43,14 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         dm: L.LightningDataModule,
         use_ssl: bool = False,
         kfold_k: Optional[int] = None,
+        use_quantization_aware_training: bool = False,
     ) -> None:
         super().__init__()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
+        self.use_quantization_aware_training = use_quantization_aware_training
         self.use_ssl = use_ssl
         self.kfold_k = kfold_k if kfold_k is not None else None
         if knn_with_train:
@@ -126,7 +128,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        if trainer.model.dtype == torch.float32:  # type: ignore
+        if trainer.model.dtype == torch.float32 and not self.use_quantization_aware_training:  # type: ignore
             log_grad_cam_images_to_wandb(self.run, trainer)
 
 
@@ -426,8 +428,8 @@ def pca(
     embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
 ) -> wandb.Image:  # generate a 2D plot of the embeddings
     num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()
-    labels = labels.numpy()
+    embeddings = embeddings.numpy()  # type: ignore
+    labels = labels.numpy()  # type: ignore
 
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
@@ -455,8 +457,8 @@ def tsne(
     embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()
-    labels = labels.numpy()
+    embeddings = embeddings.numpy()  # type: ignore
+    labels = labels.numpy()  # type: ignore
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]

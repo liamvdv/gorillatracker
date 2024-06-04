@@ -1,0 +1,11 @@
+name: efficientnet_rw
+model_wandb_url: "https://wandb.ai/gorillas/Embedding-EfficientNetRWM-CXL-OpenSet/runs/ku8wje3q/workspace?nw=nwuserkajohpi"
+
+save_quantized_model: False
+load_quantized_model: False
+save_model_architecture: False
+base_dir: "runs/"
+
+number_of_calibration_images: 100
+
+dataset_path: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
