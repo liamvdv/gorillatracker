@@ -934,7 +934,7 @@ class SwinV2LargeWrapper(BaseModule):
         )
 
     @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:  # TODO
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
