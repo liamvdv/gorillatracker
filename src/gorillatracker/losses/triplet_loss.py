@@ -8,6 +8,7 @@ from torch import nn
 import gorillatracker.type_helper as gtypes
 import gorillatracker.utils.l2sp_regularisation as l2
 from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
+from gorillatracker.losses.offline_distillation_loss import OfflineResponseBasedLoss
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -193,7 +194,9 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -293,7 +296,9 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         """
         Compute loss.
 
@@ -327,7 +332,9 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
@@ -405,6 +412,8 @@ def get_loss(
             mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
             accelerator=kw_args["accelerator"],
         )
+    elif loss_mode == "distillation/offline/response-based":
+        loss_module = OfflineResponseBasedLoss(teacher_model_wandb_link=kw_args["teacher_model_wandb_link"])
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
 

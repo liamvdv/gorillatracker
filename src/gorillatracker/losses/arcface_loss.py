@@ -44,7 +44,9 @@ class ArcFaceLoss(torch.nn.Module):
         self.ce = torch.nn.CrossEntropyLoss()
         self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
 
         assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
@@ -216,7 +218,9 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
         return prototypes
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         """Forward pass of the Variational Prototype Learning loss function"""
 
         # NOTE(rob2u): necessary for range 0:n-1

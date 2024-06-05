@@ -1,6 +1,6 @@
 import importlib
 from itertools import chain
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -11,7 +11,7 @@ import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
-from torch.optim import AdamW
+from torch.optim.adamw import AdamW
 from torchvision import transforms
 from torchvision.models import (
     EfficientNet_V2_L_Weights,
@@ -141,6 +141,7 @@ class BaseModule(L.LightningModule):
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
         num_val_dataloaders: int = 1,
+        kfold_k: Optional[int] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
@@ -170,7 +171,9 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
         self.loss_mode = loss_mode
 
-        self.quant = torch.quantization.QuantStub()  # type: ignore
+        self.kfold_k = kfold_k
+
+        # self.quant = torch.quantization.QuantStub()  # type: ignore
 
         ##### Create List of embeddings_tables
         self.embeddings_table_columns = [
@@ -212,7 +215,8 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
-            log_func=self.log,
+            log_func=lambda x, y: self.log(f"fold-{self.kfold_k}/{x}", y),
+            teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -229,10 +233,10 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
+            teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
@@ -264,9 +268,15 @@ class BaseModule(L.LightningModule):
             flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
             # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
             vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+
         embeddings = self.forward(vec)
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
+        assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
+
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)  # type: ignore
+
+        log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -316,9 +326,10 @@ class BaseModule(L.LightningModule):
             flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
         )
         if "softmax" not in self.loss_mode:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)  # type: ignore
+            log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
-                f"val/loss/dataloader_{dataloader_idx}",
+                f"{log_str_prefix}val/loss/dataloader_{dataloader_idx}",
                 loss,
                 on_step=True,
                 sync_dist=True,
@@ -326,10 +337,16 @@ class BaseModule(L.LightningModule):
                 add_dataloader_idx=False,
             )
             self.log(
-                f"val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False
+                f"{log_str_prefix}val/positive_distance/dataloader_{dataloader_idx}",
+                pos_dist,
+                on_step=True,
+                add_dataloader_idx=False,  # TODO: BAD
             )
             self.log(
-                f"val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False
+                f"{log_str_prefix}val/negative_distance/dataloader_{dataloader_idx}",
+                neg_dist,
+                on_step=True,
+                add_dataloader_idx=False,
             )
             return loss
         else:
@@ -341,46 +358,50 @@ class BaseModule(L.LightningModule):
             for i, table in enumerate(self.embeddings_table_list):
                 logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
-            # get weights for all classes by averaging over all embeddings
-            loss_module_val = (
-                self.loss_module_val
-                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss  # type: ignore
-            )
-            num_classes = (
-                self.loss_module_val.num_classes  # type: ignore
-                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss.num_classes  # type: ignore
-            )
+                assert len(table) > 0, f"Empty table for dataloader {i}"
 
-            class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
-            lse = LinearSequenceEncoder()
-            self.embeddings_table["label"] = self.embeddings_table["label"].apply(lse.encode)
-
-            for label in range(num_classes):
-                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == label]["embedding"].tolist()
-                class_embeddings = (
-                    np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                # get weights for all classes by averaging over all embeddings
+                loss_module_val = (
+                    self.loss_module_val
+                    if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                    else self.loss_module_val.loss  # type: ignore
                 )
-                class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
-                if torch.isnan(class_weights[label]).any():
-                    class_weights[label] = 0.0
-
-            # calculate loss for all embeddings
-            loss_module_val.set_weights(class_weights)  # type: ignore
-            loss_module_val.le = lse  # type: ignore
-
-            losses = []
-            for _, row in table.iterrows():
-                loss, _, _ = loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0),
-                    torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
+                num_classes = (
+                    self.loss_module_val.num_classes  # type: ignore
+                    if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
+                    else self.loss_module_val.loss.num_classes  # type: ignore
                 )
-                losses.append(loss)
-            loss = torch.tensor(losses).mean()
-            assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
 
+                class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+                lse = LinearSequenceEncoder()
+                table["label"] = table["label"].apply(lse.encode)
+
+                for label in range(num_classes):
+                    class_embeddings = table[table["label"] == label]["embedding"].tolist()
+                    class_embeddings = (
+                        np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                    )
+                    class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
+                    if torch.isnan(class_weights[label]).any():
+                        class_weights[label] = 0.0
+
+                # calculate loss for all embeddings
+                loss_module_val.set_weights(class_weights)  # type: ignore
+                loss_module_val.le = lse  # type: ignore
+
+                losses = []
+                for _, row in table.iterrows():
+                    loss, _, _ = loss_module_val(
+                        torch.tensor(row["embedding"]).unsqueeze(0),
+                        torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
+                    )
+                    losses.append(loss)
+                loss = torch.tensor(losses).mean()
+                assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
+                if self.kfold_k is not None:
+                    self.log(f"fold-{self.kfold_k}/val/loss/dataloader_{i}", loss, sync_dist=True)
+                else:
+                    self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
@@ -554,6 +575,8 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
+                transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
             ]
         )
 

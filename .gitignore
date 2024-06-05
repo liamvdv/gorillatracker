@@ -10,6 +10,7 @@ ignored/
 results/
 **/checkpoints/*.ckpt
 **/*.pth
+**/*.tflite
 **/*.onnx
 
 # Byte-compiled / optimized / DLL files

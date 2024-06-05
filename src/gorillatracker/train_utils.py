@@ -46,11 +46,13 @@ def get_data_module(
     base: Type[NletDataModule]
     base = QuadletDataModule if loss_mode.startswith("online") else None  # type: ignore
     base = TripletDataModule if loss_mode.startswith("offline") else base  # type: ignore
+    base = TripletDataModule if loss_mode.startswith("distillation") else base  # type: ignore
     base = SimpleDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     if "kfold" in data_dir:
         base = QuadletKFoldDataModule if loss_mode.startswith("online") else None  # type: ignore
         base = TripletKFoldDataModule if loss_mode.startswith("offline") else base  # type: ignore
+        base = TripletKFoldDataModule if loss_mode.startswith("distillation") else base  # type: ignore
         base = SimpleKFoldDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     dataset_class = get_dataset_class(dataset_class_id)
@@ -65,7 +67,7 @@ def get_data_module(
         return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
     else:
         assert additional_data_dirs is not None, "additional_data_dirs must be set"
-        assert "kfold" not in data_dir, "kfold not supported for additional datasets"
+        # assert "kfold" not in data_dir, "kfold not supported for additional datasets" # TODO(rob2u): why?
         dataset_classes = [get_dataset_class(cls_id) for cls_id in additional_dataset_class_ids]
         transforms_list = []
         for cls in dataset_classes:

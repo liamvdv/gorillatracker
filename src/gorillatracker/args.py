@@ -93,7 +93,9 @@ class TrainingArgs:
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
+        "distillation/offline/response-based",
     ] = field(default="offline")
+    teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
 
     batch_size: int = field(default=8)
@@ -120,7 +122,7 @@ class TrainingArgs:
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
     negative_mining: Literal["random", "overlapping"] = field(default="random")
-    n_videos: int = field(default=200)
+    split_path: Union[str, None] = field(default=None)
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)

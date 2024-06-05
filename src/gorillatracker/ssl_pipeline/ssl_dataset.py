@@ -24,7 +24,7 @@ class SSLDataset(Dataset[Nlet]):
         transform: gtypes.Transform,
         ssl_config: SSLConfig,
     ):
-        self.contrastive_sampler = ssl_config.get_contrastive_sampler(base_dir)
+        self.contrastive_sampler = ssl_config.get_contrastive_sampler(partition, base_dir)
         self.nlet_builder = nlet_builder
         self.transform = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition
