@@ -48,6 +48,7 @@ dependencies:
   - ruff
   - isort
   - mypy=1.10.0
+  - mypy-extensions=1.0.0
   - pytest
   - typer
   - ipywidgets
