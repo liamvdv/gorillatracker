@@ -98,8 +98,6 @@ class TrainingArgs:
         "softmax/vpl/l2sp",
         "softmax/adaface/l2sp",
         "softmax/elasticface/l2sp",
-        "softmax/elasticface",
-        "softmax/vpl",
         "distillation/offline/response-based",
     ] = field(default="offline")
     teacher_model_wandb_link: str = field(default="")
