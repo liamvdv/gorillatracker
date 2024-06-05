@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import List, Optional, Literal
+from typing import List, Literal, Optional
 
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session
@@ -15,9 +15,9 @@ from gorillatracker.ssl_pipeline.contrastive_sampler import (
 )
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
+from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings, tracking_ids_from_videos
-from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
     cached_filter,
