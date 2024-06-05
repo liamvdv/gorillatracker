@@ -1,5 +1,5 @@
 import logging
-from typing import Literal
+from typing import Callable, Literal
 
 import torch
 import torch.nn.functional as F
@@ -196,7 +196,7 @@ class TripletLossOnline(nn.Module):
         embeddings: torch.Tensor,
         labels: torch.Tensor,
         images: torch.Tensor = torch.Tensor(),
-        dist_calc=euclidean_distance_matrix,
+        dist_calc: Callable[[torch.Tensor], torch.Tensor] = euclidean_distance_matrix,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.
 

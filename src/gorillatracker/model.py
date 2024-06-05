@@ -26,7 +26,7 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses import get_loss
+from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -288,7 +288,7 @@ class BaseModule(L.LightningModule):
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
@@ -342,7 +342,7 @@ class BaseModule(L.LightningModule):
             flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
         )
         if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)
             log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{log_str_prefix}val/loss/dataloader_{dataloader_idx}",
@@ -375,9 +375,11 @@ class BaseModule(L.LightningModule):
                 logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
                 # get weights for all classes by averaging over all embeddings
-                loss_module_val = self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss  # type: ignore
+                loss_module_val = (
+                    self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss
+                )
                 if self.use_dist_term:
-                    loss_module_val = loss_module_val.arcface  # type: ignore
+                    loss_module_val = loss_module_val.arcface
 
                 num_classes = loss_module_val.num_classes
                 assert len(table) > 0, f"Empty table for dataloader {i}"
@@ -397,14 +399,14 @@ class BaseModule(L.LightningModule):
                         class_weights[label] = 0.0
 
                 # calculate loss for all embeddings
-                loss_module_val.set_weights(class_weights)  # type: ignore
-                loss_module_val.le = lse  # type: ignore
+                loss_module_val.set_weights(class_weights)
+                loss_module_val.le = lse
 
                 losses = []
                 for _, row in table.iterrows():
                     loss, _, _ = loss_module_val(
                         torch.tensor(row["embedding"]).unsqueeze(0),
-                        torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
+                        torch.tensor(lse.decode(row["label"])).unsqueeze(0),
                     )
                     losses.append(loss)
                 loss = torch.tensor(losses).mean()
