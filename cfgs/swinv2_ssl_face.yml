@@ -11,8 +11,8 @@ workers: 40                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-SwinV2-SSL-Unknown" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "288-test-ssl-data-module" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-SwinV2-SSL-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "379-use-ssl-split-face_45_90" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["baseline"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2Base"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -24,7 +24,7 @@ data_preprocessing_only: False    # Run only data preprocessing
 seed: 42                          # Random seed for reproducibility
 debug: False                      # Enable debug mode
 from_scratch: False               # Train the model from scratch
-early_stopping_patience: 4        # Early stopping patience (number of epochs)
+early_stopping_patience: 3        # Early stopping patience (number of epochs)
 embedding_size: 256
 dropout_p: 0.32
 
@@ -59,18 +59,20 @@ end_lr: 1e-7                    # End learning rate (for the learning rate sched
 batch_size: 128                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 4                  # Training goal (large number)
+max_epochs: 10                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
 val_check_interval: 1.0
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
-embedding_save_interval: 2      # Embedding save interval
+embedding_save_interval: 1      # Embedding save interval
 knn_with_train: False           
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
+split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-100-0-0_split.pkl"
+feature_types: ["face_45", "face_90"]
 
 data_resize_transform: 192
 

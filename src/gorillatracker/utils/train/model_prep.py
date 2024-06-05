@@ -18,6 +18,17 @@ class ModelConstructor:
 
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
+        # TODO(memben)
+        assert "softmax" not in args.loss_mode or not args.use_ssl, "softmax loss not supported for SSL training"
+
+        num_classes_dist = (
+            (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test"))  # type: ignore
+            if not args.use_ssl
+            else ((-1, {}), (-1, {}), (-1, {}))
+        )
+        num_classes = (num_classes_dist[0][0], num_classes_dist[1][0], num_classes_dist[2][0])
+        class_distribution = (num_classes_dist[0][1], num_classes_dist[1][1], num_classes_dist[2][1])
+
         return dict(
             model_name_or_path=args.model_name_or_path,
             from_scratch=args.from_scratch,
@@ -46,14 +57,21 @@ class ModelConstructor:
                 (self.dm.get_num_classes("train"), self.dm.get_num_classes("val"), self.dm.get_num_classes("test"))  # type: ignore
                 if not args.use_ssl
                 else (-1, -1, -1)
-            ),
+            ), # TODO(memben)
             dataset_names=(self.dm.get_dataset_class_names()),
+            # TODO(memben): add dataset for class_distribution here
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,
             l2_beta=args.l2_beta,
             path_to_pretrained_weights=args.path_to_pretrained_weights,
             use_wildme_model=args.use_wildme_model,
+            k_subcenters=args.k_subcenters,
+            use_focal_loss=args.use_focal_loss,
+            label_smoothing=args.label_smoothing,
+            use_class_weights=args.use_class_weights,
+            use_dist_term=args.use_dist_term,
+            teacher_model_wandb_link=args.teacher_model_wandb_link,
         )
 
     def construct(

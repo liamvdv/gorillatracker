@@ -74,6 +74,7 @@ class TrainingArgs:
 
     save_model_to_wandb: bool = field(default=False)
 
+    k_subcenters: int = field(default=2)
     margin: float = field(default=0.5)
     s: float = field(default=64.0)
     delta_t: int = field(default=100)
@@ -86,6 +87,8 @@ class TrainingArgs:
         "online/hard",
         "online/semi-hard",
         "softmax/arcface",
+        "softmax/adaface",
+        "softmax/elasticface",
         "softmax/vpl",
         "offline/native/l2sp",
         "online/soft/l2sp",
@@ -93,8 +96,16 @@ class TrainingArgs:
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
+        "softmax/adaface/l2sp",
+        "softmax/elasticface/l2sp",
+        "distillation/offline/response-based",
     ] = field(default="offline")
+    teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
+    use_focal_loss: bool = field(default=False)
+    label_smoothing: float = field(default=0.0)
+    use_class_weights: Union[List[float], None] = field(default=None)
+    use_dist_term: bool = field(default=False)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)
@@ -119,7 +130,7 @@ class TrainingArgs:
     # SSL Config
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
-    n_videos: int = field(default=200)
+    split_path: Union[str, None] = field(default=None)
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)
