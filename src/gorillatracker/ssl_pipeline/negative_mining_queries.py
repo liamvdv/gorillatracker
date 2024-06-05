@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, aliased
 
 from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video, VideoFeature
 
+
 def build_overlapping_trackings_query(video_ids: Sequence[int]) -> Select[tuple[int, int]]:
     tracking_frame_feature_cte = (
         select(TrackingFrameFeature.tracking_id, TrackingFrameFeature.frame_nr, TrackingFrameFeature.video_id)
