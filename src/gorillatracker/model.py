@@ -138,9 +138,9 @@ class BaseModule(L.LightningModule):
 
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
-
+        
+        ####### Optimizer and Scheduler
         self.weight_decay = weight_decay
-
         self.lr_schedule = lr_schedule
         self.warmup_mode = warmup_mode
         self.warmup_epochs = warmup_epochs
@@ -154,17 +154,18 @@ class BaseModule(L.LightningModule):
         self.beta2 = beta2
         self.epsilon = epsilon
         
+        ####### Embedding Layers
         self.from_scratch = from_scratch
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
+        
+        ####### Losses
         self.loss_mode = loss_mode
         self.use_dist_term = use_dist_term
         
+        ####### Other
         self.quant = torch.quantization.QuantStub()  # type: ignore
-
         self.kfold_k = kfold_k
-
-        # self.quant = torch.quantization.QuantStub()  # type: ignore
 
         ##### Create List of embeddings_tables
         self.embeddings_table_columns = [
