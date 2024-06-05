@@ -7,7 +7,7 @@ import torch.ao.quantization
 import wandb
 from fsspec import Callback
 from lightning import Trainer
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
 from torch._export import capture_pre_autograd_graph
@@ -21,6 +21,8 @@ from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
 from gorillatracker.quantization.utils import get_model_input
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
+from gorillatracker.utils.train import ModelConstructor
+from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 def train_and_validate_model(
@@ -60,6 +62,8 @@ def train_and_validate_model(
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
         val_result = trainer.validate(model, dm)
+        for elem in val_result:
+            wandb.log(elem)
         print(val_result)
         if args.only_val:
             return model, trainer
@@ -84,12 +88,13 @@ def train_and_validate_model(
 
 def train_and_validate_using_kfold(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
-    model: BaseModule,
+    dm: Union[SSLDataModule, NletDataModule],  # TODO: incorrect type hint
+    model_cls: type,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
+    wandb_logging_module: WandbLoggingModule,
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
-) -> Tuple[BaseModule, Trainer]:
+) -> Trainer:
 
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
@@ -97,16 +102,40 @@ def train_and_validate_using_kfold(
 
     for i in range(kfold_k):
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
-
-        model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger, f"_fold_{i}")
-
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
+        model_constructor = ModelConstructor(args, model_cls, dm)
+        model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
+        model_kfold.kfold_k = i
+
+        early_stopping_callback = EarlyStopping(
+            monitor=f"fold-{i}/val/loss/dataloader_0",
+            mode="min",
+            min_delta=args.min_delta,
+            patience=args.early_stopping_patience,
+        )
+
+        checkpoint_callback = ModelCheckpoint(
+            filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
+            monitor=f"fold-{i}/val/loss/dataloader_0",
+            mode="min",
+            auto_insert_metric_name=False,
+            every_n_epochs=int(args.save_interval),
+        )
+
+        _, trainer = train_and_validate_model(
+            args,
+            dm,
+            model_kfold,
+            [checkpoint_callback, *callbacks, early_stopping_callback],
+            wandb_logger,
+            f"_fold_{i}",
+        )
 
     if args.kfold and not args.fast_dev_run:
         kfold_averaging(wandb_logger)
 
-    return model, trainer
+    return trainer  # TODO(rob2u): why return a single model?
 
 
 def train_using_quantization_aware_training(
@@ -124,7 +153,7 @@ def train_using_quantization_aware_training(
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
     model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
 
-    torch.ao.quantization.allow_exported_model_train_eval(model.model)
+    torch.ao.quantization.allow_exported_model_train_eval(model.model)  # type: ignore
 
     torch.use_deterministic_algorithms(True, warn_only=True)
     model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
@@ -151,14 +180,14 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
 
     summary = read_access_run.summary
 
-    metrics = [(key, value) for key, value in summary.items() if "val/embeddings/fold" in key]
+    metrics = [(key, value) for key, value in summary.items() if "/val/embeddings" in key]
 
     aggregated_metrics = defaultdict(list)
 
     # Step 1: Extract metrics by fold and group them
     for key, value in metrics:
         if isinstance(value, (int, float)):
-            base_key = "/".join(key.split("/")[:2] + ["averaged"] + key.split("/")[3:])  # Remove fold part
+            base_key = "/".join(key.split("/")[1:])
             aggregated_metrics[base_key].append(value)
 
     # Step 2: Compute averages
@@ -167,6 +196,7 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
         average_metrics[key] = np.mean(values)
 
     wandb.log(average_metrics)
+    print(average_metrics)
 
 
 def save_model(

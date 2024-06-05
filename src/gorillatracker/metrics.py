@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -52,7 +52,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.run = wandb_run
         self.use_quantization_aware_training = use_quantization_aware_training
         self.use_ssl = use_ssl
-        self.kfold_k = kfold_k if kfold_k is not None else None
+        self.kfold_k = kfold_k
         if knn_with_train:
             dm.setup("fit")
             self.train_dataloader = dm.train_dataloader()
@@ -99,6 +99,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             metrics = {
                 "knn5": partial(knn, k=5),
                 "knn": partial(knn, k=1),
+                "knn5_macro": partial(knn, k=5, average="macro"),
+                "knn_macro": partial(knn, k=1, average="macro"),
                 "pca": pca,
                 "tsne": tsne,
                 # "fc_layer": fc_layer,
@@ -107,6 +109,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 {
                     "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
                     "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                    "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
+                    "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
                 }
                 if self.knn_with_train
                 else {}
@@ -244,13 +248,15 @@ def evaluate_embeddings(
         for metric_name, metric in metrics.items()
     }
 
-    kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
+    kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/dataloader_{dataloader_idx}/{key}": value})
+                wandb.log(
+                    {f"{kfold_str_prefix}{embedding_name}/{metric_name}/dataloader_{dataloader_idx}/{key}": value}
+                )
         else:
-            wandb.log({f"{embedding_name}{kfold_str}{metric_name}/dataloader_{dataloader_idx}/": result})
+            wandb.log({f"{kfold_str_prefix}{embedding_name}/{metric_name}/dataloader_{dataloader_idx}": result})
 
     return results
 
@@ -262,6 +268,7 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[torch.Tensor] = None,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
 ) -> Dict[str, Any]:
     if use_train_embeddings and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
@@ -279,9 +286,10 @@ def knn(
             k=k,
             train_embeddings=train_embeddings,  # type: ignore
             train_labels=train_labels_encoded,
+            average=average,
         )
     else:
-        return knn_naive(val_embeddings, val_labels_encoded, k=k)
+        return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
 
 
 def knn_with_train(
@@ -289,6 +297,7 @@ def knn_with_train(
     val_labels: torch.Tensor,
     train_embeddings: torch.Tensor,
     train_labels: torch.Tensor,
+    average: Literal["micro", "macro", "weighted", "none"],
     k: int = 5,
 ) -> Dict[str, Any]:
     """
@@ -340,21 +349,25 @@ def knn_with_train(
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, top_k=5
+        val_classification_matrix,
+        val_labels,
+        task="multiclass",
+        num_classes=num_classes,
+        top_k=5 if num_classes >= 5 else num_classes,
     )
     assert accuracy_top5 is not None
     auroc = tm.functional.auroc(val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
     assert auroc is not None
     f1 = tm.functional.f1_score(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert precision is not None
 
@@ -367,7 +380,12 @@ def knn_with_train(
     }
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5) -> Dict[str, Any]:
+def knn_naive(
+    val_embeddings: torch.Tensor,
+    val_labels: torch.Tensor,
+    average: Literal["micro", "macro", "weighted", "none"],
+    k: int = 5,
+) -> Dict[str, Any]:
     num_classes = len(torch.unique(val_labels))
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
@@ -397,21 +415,25 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
     assert classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, top_k=5
+        classification_matrix,
+        val_labels,
+        task="multiclass",
+        num_classes=num_classes,
+        top_k=5 if num_classes >= 5 else num_classes,
     )
     assert accuracy_top5 is not None
     auroc = tm.functional.auroc(classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
     assert auroc is not None
     f1 = tm.functional.f1_score(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert precision is not None
 
@@ -428,8 +450,8 @@ def pca(
     embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
 ) -> wandb.Image:  # generate a 2D plot of the embeddings
     num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()  # type: ignore
-    labels = labels.numpy()  # type: ignore
+    embeddings = embeddings.numpy()
+    labels = labels.numpy()
 
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
@@ -457,8 +479,8 @@ def tsne(
     embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()  # type: ignore
-    labels = labels.numpy()  # type: ignore
+    embeddings = embeddings.numpy()
+    labels = labels.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]

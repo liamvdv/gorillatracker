@@ -73,9 +73,9 @@ def pt2e_quantization(model: BaseModule, calibration_input: torch.Tensor) -> Tup
 
     quantizer = PT2EQuantizer().set_global(get_symmetric_quantization_config(is_per_channel=True, is_dynamic=True))
     prepared_model = prepare_pt2e(prepared_model, quantizer)
-    torch.ao.quantization.allow_exported_model_train_eval(prepared_model)
+    torch.ao.quantization.allow_exported_model_train_eval(prepared_model)  # type: ignore
     calibrate(prepared_model, calibration_input)
 
     quantized_model = convert_pt2e(prepared_model, fold_quantize=False)
-    torch.ao.quantization.allow_exported_model_train_eval(quantized_model)
+    torch.ao.quantization.allow_exported_model_train_eval(quantized_model)  # type: ignore
     return quantized_model, quantizer

@@ -120,12 +120,11 @@ class SSLDataModule(L.LightningDataModule):
 if __name__ == "__main__":
     ssl_config = SSLConfig(
         tff_selection="random",
-        n_videos=20,
         n_samples=15,
         feature_types=["body"],
         min_confidence=0.5,
         min_images_per_tracking=10,
-        split=None,
+        split_path="/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl",
     )
     dm = SSLDataModule(
         ssl_config=ssl_config, data_dir="video_data/cropped-images/2024-04-18", transforms=transforms.ToTensor()

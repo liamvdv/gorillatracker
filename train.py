@@ -5,7 +5,7 @@ import torch
 from lightning import seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.plugins import BitsandbytesPrecision
-from print_on_steroids import graceful_exceptions, logger
+from print_on_steroids import logger
 from simple_parsing import parse
 from torchvision.transforms import Compose, Resize
 
@@ -27,6 +27,8 @@ from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
+warnings.filterwarnings("ignore", ".* does not have many workers.*")
+warnings.filterwarnings("ignore", ".*site-packages/torchmetrics/utilities/prints.py:43.*")
 
 
 def main(args: TrainingArgs) -> None:
@@ -63,14 +65,14 @@ def main(args: TrainingArgs) -> None:
     # TODO(memben): Unify SSLDatamodule and NletDataModule
     dm: Union[SSLDataModule, NletDataModule]
     if args.use_ssl:
+        assert args.split_path is not None, "Split path must be provided for SSL training."
         ssl_config = SSLConfig(
             tff_selection=args.tff_selection,
-            n_videos=args.n_videos,
             n_samples=args.n_samples,
             feature_types=args.feature_types,
             min_confidence=args.min_confidence,
             min_images_per_tracking=args.min_images_per_tracking,
-            split=None,
+            split_path=args.split_path,
         )
         dm = SSLDataModule(
             ssl_config=ssl_config,
@@ -87,6 +89,7 @@ def main(args: TrainingArgs) -> None:
             str(args.data_dir),
             args.batch_size,
             args.loss_mode,
+            args.workers,
             model_transforms,
             model_cls.get_training_transforms(),
             args.additional_val_dataset_classes,
@@ -102,15 +105,6 @@ def main(args: TrainingArgs) -> None:
     model_transforms = model.get_tensor_transforms()
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        # args.video_data,
-        model_transforms,
-        model.get_training_transforms(),
-    )
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -141,13 +135,22 @@ def main(args: TrainingArgs) -> None:
         patience=args.early_stopping_patience,
     )
 
-    callbacks = [
-        checkpoint_callback,  # keep this at the top
-        wandb_disk_cleanup_callback,
-        lr_monitor,
-        early_stopping,
-        embeddings_logger_callback,
-    ]
+    callbacks = (
+        [
+            checkpoint_callback,  # keep this at the top
+            wandb_disk_cleanup_callback,
+            lr_monitor,
+            early_stopping,
+            embeddings_logger_callback,
+        ]
+        if not args.kfold
+        else [
+            wandb_disk_cleanup_callback,
+            lr_monitor,
+            embeddings_logger_callback,
+        ]
+    )
+
     if args.accelerator == "cuda":
         callbacks.append(CUDAMetricsCallback())
 
@@ -167,12 +170,13 @@ def main(args: TrainingArgs) -> None:
     ################# Start training #################
     logger.info(f"Rank {current_process_rank} | Starting training...")
     if args.kfold:
-        model, trainer = train_and_validate_using_kfold(
+        train_and_validate_using_kfold(
             args=args,
             dm=dm,
-            model=model,
+            model_cls=model_cls,
             callbacks=callbacks,
             wandb_logger=wandb_logger,
+            wandb_logging_module=wandb_logging_module,
             embeddings_logger_callback=embeddings_logger_callback,
         )
     elif args.use_quantization_aware_training:
@@ -185,9 +189,7 @@ def main(args: TrainingArgs) -> None:
             checkpoint_callback=checkpoint_callback,
         )
     else:
-        model, trainer = train_and_validate_model(
-            args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger
-        )
+        train_and_validate_model(args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger)
 
 
 if __name__ == "__main__":
@@ -198,5 +200,4 @@ if __name__ == "__main__":
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()
-    with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+    main(parsed_arg_groups)
