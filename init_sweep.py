@@ -27,7 +27,10 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
         "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": project_name,
         "method": "bayes",  # Specify the search method (random search in this case)
-        "metric": {"goal": "maximize", "name": "val/embeddings/knn5/auroc"},  # Specify the metric to optimize
+        "metric": {
+            "goal": "maximize",
+            "name": "val/embeddings/knn/dataloader_0/accuracy",
+        },  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
     }
