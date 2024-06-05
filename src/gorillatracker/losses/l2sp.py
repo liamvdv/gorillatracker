@@ -1,10 +1,11 @@
-from typing import List, Dict, Any, Callable
+from typing import Any, Callable, Dict, List
 
 import torch
 import torch.nn as nn
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.utils.l2sp_regularisation import L2_SP
+
 
 class L2SPRegularization_Wrapper(nn.Module):
     """Wrapper that adds L2SP regularization to any loss"""
@@ -33,4 +34,3 @@ class L2SPRegularization_Wrapper(nn.Module):
         else:
             self.log("l2_sp", l2sp_loss)
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
-

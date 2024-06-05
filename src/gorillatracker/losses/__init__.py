@@ -1,14 +1,17 @@
 from typing import Any, Callable, Union
 
 import torch
+
 import gorillatracker.type_helper as gtypes
-from .arcface_loss import ArcFaceLoss, VariationalPrototypeLearning, AdaFaceLoss, ElasticArcFaceLoss
-from .triplet_loss import TripletLossOfflineNative, TripletLossOffline, TripletLossOnline
-from .l2sp import L2SPRegularization_Wrapper
+
+from .arcface_loss import AdaFaceLoss, ArcFaceLoss, ElasticArcFaceLoss, VariationalPrototypeLearning
 from .dist_term_loss import CombinedLoss
+from .l2sp import L2SPRegularization_Wrapper
 from .offline_distillation_loss import OfflineResponseBasedLoss
+from .triplet_loss import TripletLossOffline, TripletLossOfflineNative, TripletLossOnline
 
 __all__ = ["get_loss"]
+
 
 def get_loss(
     loss_mode: str,
@@ -19,12 +22,13 @@ def get_loss(
     if "l2sp" in loss_mode:
         loss_mode = loss_mode.replace("/l2sp", "")
         l2sp = True
-    
 
     loss_module: Union[torch.nn.Module, None] = None
-    
-    assert (kw_args["num_classes"] != -1 or "softmax" not in loss_mode), "num_classes must be set for softmax loss"
-    assert (len(kw_args["class_distribution"]) > 0 or not kw_args["use_class_weights"]), "class_distribution must be set for class weights"
+
+    assert kw_args["num_classes"] != -1 or "softmax" not in loss_mode, "num_classes must be set for softmax loss"
+    assert (
+        len(kw_args["class_distribution"]) > 0 or not kw_args["use_class_weights"]
+    ), "class_distribution must be set for class weights"
 
     if loss_mode == "online/hard":
         loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
@@ -51,7 +55,7 @@ def get_loss(
             label_smoothing=kw_args["label_smoothing"],
             use_class_weights=kw_args["use_class_weights"],
         )
-    elif loss_mode == "softmax/adaface": # TODO
+    elif loss_mode == "softmax/adaface":  # TODO
         loss_module = AdaFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],
@@ -64,8 +68,8 @@ def get_loss(
             label_smoothing=kw_args["label_smoothing"],
             use_class_weights=kw_args["use_class_weights"],
         )
-            
-    elif loss_mode == "softmax/elasticface": # TODO
+
+    elif loss_mode == "softmax/elasticface":  # TODO
         loss_module = ElasticArcFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],

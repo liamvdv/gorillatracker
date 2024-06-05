@@ -6,8 +6,9 @@ import torch
 import gorillatracker.type_helper as gtypes
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
-
 eps = 1e-8  # an arbitrary small value to be used for numerical stability
+
+
 class FocalLoss(torch.nn.Module):
     def __init__(self, num_classes=182, gamma=2.0, label_smoothing=0.0, *args, **kwargs):
         super(FocalLoss, self).__init__()
@@ -17,7 +18,7 @@ class FocalLoss(torch.nn.Module):
 
     def forward(self, input, target):
         # assert len(alphas) == len(target), "Alphas must be the same length as the target"
-        
+
         logpt = -self.ce(input, target)
         pt = torch.exp(logpt)
         loss = -((1 - pt) ** self.gamma) * logpt
@@ -45,9 +46,7 @@ class ArcFaceLoss(torch.nn.Module):
     ):
         super(ArcFaceLoss, self).__init__()
         self.s = s
-        self.angle_margin = torch.Tensor([angle_margin]).to(
-            accelerator
-        )
+        self.angle_margin = torch.Tensor([angle_margin]).to(accelerator)
         self.additive_margin = torch.Tensor([additive_margin]).to(accelerator)
         self.cos_m = torch.cos(torch.Tensor([angle_margin])).to(accelerator)
         self.sin_m = torch.sin(torch.Tensor([angle_margin])).to(accelerator)
@@ -56,7 +55,9 @@ class ArcFaceLoss(torch.nn.Module):
         self.k_subcenters = k_subcenters
         self.class_distribution = class_distribution
         self.use_class_weights = use_class_weights
-        self.num_samples = sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0    
+        self.num_samples = (
+            sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0
+        )
 
         self.accelerator = accelerator
         self.prototypes = torch.nn.Parameter(
@@ -88,13 +89,15 @@ class ArcFaceLoss(torch.nn.Module):
         # get class frequencies
         class_freqs = torch.ones_like(labels)
         if self.class_distribution is not None:
-            class_freqs = torch.tensor([self.class_distribution[label.item()] for label in labels]).to(embeddings.device)
+            class_freqs = torch.tensor([self.class_distribution[label.item()] for label in labels]).to(
+                embeddings.device
+            )
             class_freqs = class_freqs.float() / self.num_samples
             class_freqs = class_freqs.clamp(eps, 1.0)
-        
+
         labels_transformed: List[int] = self.le.encode_list(labels.tolist())
         labels = torch.tensor(labels_transformed).to(embeddings.device)
-        
+
         cos_theta = torch.einsum("bj,knj->bnk", embeddings, self.prototypes)  # batch x num_classes x k_subcenters
 
         sine_theta = torch.sqrt(
@@ -108,15 +111,15 @@ class ArcFaceLoss(torch.nn.Module):
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
         phi = phi - self.additive_margin.unsqueeze(1)
 
-        mask = torch.zeros((cos_theta.shape[0], self.num_classes, self.k_subcenters), device=cos_theta.device) # batch x num_classes x k_subcenters
+        mask = torch.zeros(
+            (cos_theta.shape[0], self.num_classes, self.k_subcenters), device=cos_theta.device
+        )  # batch x num_classes x k_subcenters
         mask.scatter_(1, labels.view(1, -1, 1).long(), 1)
-        
-        output = (mask * phi) + (
-            (1.0 - mask) * cos_theta
-        )  # NOTE: the margin is only added to the correct class
+
+        output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: the margin is only added to the correct class
         output *= self.s
         output = torch.mean(output, dim=2)  # batch x num_classes
-        
+
         assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
         loss = self.ce(output, labels)
         if self.use_class_weights:
@@ -147,8 +150,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         if not self.is_eval:
             angle_margin = (
                 self.angle_margin
-                + torch.randn_like(labels, device=labels.device, dtype=torch.float32)
-                * self.margin_sigma
+                + torch.randn_like(labels, device=labels.device, dtype=torch.float32) * self.margin_sigma
             )  # batch -> scale by self.margin_sigma
         else:
             angle_margin
@@ -156,7 +158,8 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         self.cos_m = torch.cos(angle_margin)
         self.sin_m = torch.sin(angle_margin)
         return super().forward(
-            embeddings, labels,
+            embeddings,
+            labels,
         )
 
     def eval(self):
@@ -171,15 +174,12 @@ class AdaFaceLoss(ArcFaceLoss):
         self.h = h
         self.m1 = self.angle_margin
         self.m2 = self.additive_margin
-        self.norm = torch.nn.BatchNorm1d(
-            1, affine=False, momentum=momentum
-        ).to(kwargs.get("accelerator", "cpu"))
-        
+        self.norm = torch.nn.BatchNorm1d(1, affine=False, momentum=momentum).to(kwargs.get("accelerator", "cpu"))
 
     def forward(self, embeddings, labels, class_freqs=None):
         if self.norm.running_mean.device != embeddings.device:
             self.norm = self.norm.to(embeddings.device)
-        
+
         if not self.is_eval:
             g = (embeddings.detach() ** 2).sum(dim=1).sqrt()
             g = self.norm(g.unsqueeze(1)).squeeze(1)
@@ -190,9 +190,7 @@ class AdaFaceLoss(ArcFaceLoss):
             self.cos_m = torch.cos(g_angle)
             self.sin_m = torch.sin(g_angle)
             self.additive_margin = g_additive
-        return super().forward(
-            embeddings, labels, class_freqs
-        )
+        return super().forward(embeddings, labels, class_freqs)
 
     def eval(self):
         self.is_eval = True

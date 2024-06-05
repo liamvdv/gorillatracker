@@ -21,11 +21,15 @@ class ModelConstructor:
 
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
-        
-        num_classes_dist = (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test")) if not args.use_ssl else ((-1,[]), (-1,[]), (-1,[]))
+
+        num_classes_dist = (
+            (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test"))
+            if not args.use_ssl
+            else ((-1, []), (-1, []), (-1, []))
+        )
         num_classes = (num_classes_dist[0][0], num_classes_dist[1][0], num_classes_dist[2][0])
         class_distribution = (num_classes_dist[0][1], num_classes_dist[1][1], num_classes_dist[2][1])
-        
+
         return dict(
             model_name_or_path=args.model_name_or_path,
             from_scratch=args.from_scratch,

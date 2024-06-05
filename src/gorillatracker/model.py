@@ -1,6 +1,6 @@
 import importlib
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 from itertools import chain
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import lightning as L
 import numpy as np
@@ -138,7 +138,7 @@ class BaseModule(L.LightningModule):
 
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
-        
+
         ####### Optimizer and Scheduler
         self.weight_decay = weight_decay
         self.lr_schedule = lr_schedule
@@ -153,16 +153,16 @@ class BaseModule(L.LightningModule):
         self.beta1 = beta1
         self.beta2 = beta2
         self.epsilon = epsilon
-        
+
         ####### Embedding Layers
         self.from_scratch = from_scratch
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
-        
+
         ####### Losses
         self.loss_mode = loss_mode
         self.use_dist_term = use_dist_term
-        
+
         ####### Other
         self.quant = torch.quantization.QuantStub()  # type: ignore
         self.kfold_k = kfold_k
@@ -202,7 +202,7 @@ class BaseModule(L.LightningModule):
         use_dist_term: bool = False,
         **kwargs: Dict[str, Any],
     ) -> None:
-        
+
         kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.loss_module_train = get_loss(
             loss_mode,
@@ -259,10 +259,7 @@ class BaseModule(L.LightningModule):
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
-        if (
-            self.loss_mode.endswith("vpl")
-            and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
-        ):
+        if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:
             self.loss_module_train.set_using_memory_bank(True)
             logger.info("Using memory bank")
         elif (
@@ -340,7 +337,7 @@ class BaseModule(L.LightningModule):
 
         flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
         embeddings = self.forward(vec)
-        
+
         self.add_validation_embeddings(
             flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
         )
@@ -381,7 +378,7 @@ class BaseModule(L.LightningModule):
                 loss_module_val = self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss  # type: ignore
                 if self.use_dist_term:
                     loss_module_val = loss_module_val.arcface  # type: ignore
-                
+
                 num_classes = loss_module_val.num_classes
                 assert len(table) > 0, f"Empty table for dataloader {i}"
 
@@ -935,7 +932,7 @@ class SwinV2LargeWrapper(BaseModule):
         )
 
     @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]: # TODO
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:  # TODO
         return transforms.Compose(
             [
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),

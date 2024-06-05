@@ -353,7 +353,11 @@ def knn_with_train(
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, top_k=5 if num_classes >= 5 else num_classes
+        val_classification_matrix,
+        val_labels,
+        task="multiclass",
+        num_classes=num_classes,
+        top_k=5 if num_classes >= 5 else num_classes,
     )
     assert accuracy_top5 is not None
     auroc = tm.functional.auroc(val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
@@ -415,7 +419,11 @@ def knn_naive(
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, top_k=5 if num_classes >= 5 else num_classes
+        classification_matrix,
+        val_labels,
+        task="multiclass",
+        num_classes=num_classes,
+        top_k=5 if num_classes >= 5 else num_classes,
     )
     assert accuracy_top5 is not None
     auroc = tm.functional.auroc(classification_matrix, val_labels, task="multiclass", num_classes=num_classes)

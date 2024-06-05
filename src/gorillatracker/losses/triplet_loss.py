@@ -7,7 +7,6 @@ from torch import nn
 
 import gorillatracker.type_helper as gtypes
 
-
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
 logger = logging.getLogger(__name__)
@@ -193,7 +192,11 @@ class TripletLossOnline(nn.Module):
         self.mode = mode
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor(), dist_calc=euclidean_distance_matrix
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        images: torch.Tensor = torch.Tensor(),
+        dist_calc=euclidean_distance_matrix,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.
 
@@ -273,7 +276,6 @@ class TripletLossOnline(nn.Module):
             hard_mask = hard_mask.to(mask.device)
             # combine with base mask
             mask = torch.logical_and(mask, hard_mask)
-
 
         elif (
             self.mode == "semi-hard"
@@ -399,5 +401,3 @@ if __name__ == "__main__":
     print(f"Hard Loss {loss}")
     print(f"Correct Semi Hard Loss {loss_semi_manual}")
     print(f"Semi Hard Loss {loss_semi}")
-
-

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, List, Dict, Literal, Optional, Type, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type
 
 import lightning as L
 import torchvision.transforms as transforms
@@ -91,10 +91,15 @@ class NletDataModule(L.LightningDataModule):
 
     def val_dataloader(self) -> List[gtypes.BatchNletDataLoader]:
         self.setup("validate")
-        dataloaders = [self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers)]
+        dataloaders = [
+            self.get_dataloader()(self.val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers)
+        ]
         if self.additional_dataset_classes is not None:
             dataloaders.extend(
-                [self.get_dataloader()(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val_list[1:]]
+                [
+                    self.get_dataloader()(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers)
+                    for val in self.val_list[1:]
+                ]
             )
         return dataloaders
 
@@ -160,7 +165,14 @@ class NLetKFoldDataModule(NletDataModule):
         k: int = 5,
         **kwargs: Any,
     ) -> None:
-        super().__init__(data_dir=data_dir, batch_size=batch_size, dataset_class=dataset_class, transforms=transforms, training_transforms=training_transforms, **kwargs)
+        super().__init__(
+            data_dir=data_dir,
+            batch_size=batch_size,
+            dataset_class=dataset_class,
+            transforms=transforms,
+            training_transforms=training_transforms,
+            **kwargs,
+        )
         self.val_fold = val_fold
         self.k = k
 
@@ -219,7 +231,7 @@ class NLetKFoldDataModule(NletDataModule):
                 k=self.k,
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
             )  # type: ignore
-            return train.get_num_classes(), train.get_class_distribution() # type: ignore
+            return train.get_num_classes(), train.get_class_distribution()  # type: ignore
         elif mode == "val":
             val_list = [self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)]  # type: ignore
             if self.additional_dataset_classes is not None:
@@ -232,7 +244,7 @@ class NLetKFoldDataModule(NletDataModule):
             test = self.dataset_class(
                 self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms
             )  # type: ignore
-            return test.get_num_classes(), test.get_class_distribution() # type: ignore
+            return test.get_num_classes(), test.get_class_distribution()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
 
