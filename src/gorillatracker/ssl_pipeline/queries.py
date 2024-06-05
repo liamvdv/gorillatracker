@@ -104,23 +104,11 @@ def min_count_filter(
 
     alias_query = alias(query.subquery())
     subquery = (
-<<<<<<< HEAD
-        select(TrackingFrameFeature.tracking_id)
-        .group_by(TrackingFrameFeature.tracking_id)
-        .having(func.count() >= min_feature_count)
-    )
-
-    if feature_type is not None:
-        subquery = subquery.where(TrackingFrameFeature.feature_type == feature_type)
-
-    query = query.where(TrackingFrameFeature.tracking_id.in_(subquery))
-=======
         select(
             alias_query.c.tracking_id,
             func.count().label("feature_count"),
         ).group_by(alias_query.c.tracking_id)
     ).subquery()
->>>>>>> main
 
     query = query.join(subquery, subquery.c.tracking_id == TrackingFrameFeature.tracking_id)
     query = query.where(subquery.c.feature_count >= min_feature_count)
