@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 import gorillatracker.type_helper as gtypes
 
 
