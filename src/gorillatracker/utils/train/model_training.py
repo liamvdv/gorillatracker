@@ -1,16 +1,28 @@
-from typing import Tuple, Union
+from collections import defaultdict
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
+import numpy as np
+import torch.ao.quantization
+import wandb
 from fsspec import Callback
 from lightning import Trainer
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
+from torch._export import capture_pre_autograd_graph
+from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
+from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
 from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
+from gorillatracker.quantization.utils import get_model_input
 from gorillatracker.ssl_pipeline.data_module import SSLDataModule
+from gorillatracker.utils.train import ModelConstructor
+from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 def train_and_validate_model(
@@ -19,6 +31,7 @@ def train_and_validate_model(
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
+    model_name_suffix: Optional[str] = "",
 ) -> Tuple[BaseModule, Trainer]:
     trainer = Trainer(
         num_sanity_val_steps=0,
@@ -29,7 +42,9 @@ def train_and_validate_model(
         accelerator=args.accelerator,
         strategy=str(args.distributed_strategy),
         logger=wandb_logger,
-        deterministic=args.force_deterministic,
+        deterministic=(
+            args.force_deterministic if args.force_deterministic and not args.use_quantization_aware_training else False
+        ),
         callbacks=callbacks,
         precision=args.precision,  # type: ignore
         gradient_clip_val=args.grad_clip,
@@ -47,6 +62,8 @@ def train_and_validate_model(
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
         val_result = trainer.validate(model, dm)
+        for elem in val_result:
+            wandb.log(elem)
         print(val_result)
         if args.only_val:
             return model, trainer
@@ -57,17 +74,27 @@ def train_and_validate_model(
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")
     else:
         logger.success("Fit complete")
+
+    ########### Save checkpoint ###########
+    current_process_rank = get_rank()
+
+    if current_process_rank == 0:
+        save_model(args, callbacks[0], wandb_logger, trainer, model_name_suffix)
+    else:
+        logger.info("Rank is not 0, skipping checkpoint saving...")
+
     return model, trainer
 
 
 def train_and_validate_using_kfold(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
-    model: BaseModule,
+    dm: Union[SSLDataModule, NletDataModule],  # TODO: incorrect type hint
+    model_cls: type,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
+    wandb_logging_module: WandbLoggingModule,
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
-) -> Tuple[BaseModule, Trainer]:
+) -> Trainer:
 
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
@@ -75,12 +102,124 @@ def train_and_validate_using_kfold(
 
     for i in range(kfold_k):
         logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
-        logger.info(f"Rank {current_process_rank} | max_epochs: {model.max_epochs}")
-
-        # TODO(Emirhan): this model is currently NOT being saved, we should save it after each fold
-        model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
-
         dm.val_fold = i  # type: ignore
         embeddings_logger_callback.kfold_k = i
+        model_constructor = ModelConstructor(args, model_cls, dm)
+        model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
+        model_kfold.kfold_k = i
+
+        early_stopping_callback = EarlyStopping(
+            monitor=f"fold-{i}/val/loss/dataloader_0",
+            mode="min",
+            min_delta=args.min_delta,
+            patience=args.early_stopping_patience,
+        )
+
+        checkpoint_callback = ModelCheckpoint(
+            filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
+            monitor=f"fold-{i}/val/loss/dataloader_0",
+            mode="min",
+            auto_insert_metric_name=False,
+            every_n_epochs=int(args.save_interval),
+        )
+
+        _, trainer = train_and_validate_model(
+            args,
+            dm,
+            model_kfold,
+            [checkpoint_callback, *callbacks, early_stopping_callback],
+            wandb_logger,
+            f"_fold_{i}",
+        )
+
+    if args.kfold and not args.fast_dev_run:
+        kfold_averaging(wandb_logger)
+
+    return trainer  # TODO(rob2u): why return a single model?
+
+
+def train_using_quantization_aware_training(
+    args: TrainingArgs,
+    dm: Union[SSLDataModule, NletDataModule],
+    model: BaseModule,
+    callbacks: list[Callback],
+    wandb_logger: WandbLogger,
+    checkpoint_callback: ModelCheckpoint,
+) -> Tuple[BaseModule, Trainer]:
+    logger.info("Preperation for quantization aware training...")
+    example_inputs, _ = get_model_input(dm.dataset_class, str(args.data_dir), amount_of_tensors=100)  # type: ignore
+    example_inputs = (example_inputs,)  # type: ignore
+    model.model = capture_pre_autograd_graph(model.model, example_inputs)
+    quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
+    model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
+
+    torch.ao.quantization.allow_exported_model_train_eval(model.model)  # type: ignore
+
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
+
+    logger.info("Quantizing model...")
+    quantized_model = convert_pt2e(model.model)
+    torch.ao.quantization.move_exported_model_to_eval(quantized_model)
+    logger.info("Quantization finished! Saving quantized model...")
+    assert checkpoint_callback.dirpath is not None
+    save_path = str(Path(checkpoint_callback.dirpath) / "quantized_model_dict.pth")
+    torch.save(quantized_model.state_dict(), save_path)
+
+    if args.save_model_to_wandb:
+        logger.info("Saving quantized model to wandb...")
+        artifact = wandb.Artifact(name=f"quantized_model-{wandb_logger.experiment.id}", type="model")
+        artifact.add_file(save_path, name="quantized_model_dict.pth")
 
     return model, trainer
+
+
+def kfold_averaging(wandb_logger: WandbLogger) -> None:
+    run_path = wandb_logger.experiment.path
+    read_access_run = wandb.Api().run(run_path)  # type: ignore
+
+    summary = read_access_run.summary
+
+    metrics = [(key, value) for key, value in summary.items() if "/val/embeddings" in key]
+
+    aggregated_metrics = defaultdict(list)
+
+    # Step 1: Extract metrics by fold and group them
+    for key, value in metrics:
+        if isinstance(value, (int, float)):
+            base_key = "/".join(key.split("/")[1:])
+            aggregated_metrics[base_key].append(value)
+
+    # Step 2: Compute averages
+    average_metrics = {}
+    for key, values in aggregated_metrics.items():
+        average_metrics[key] = np.mean(values)
+
+    wandb.log(average_metrics)
+    print(average_metrics)
+
+
+def save_model(
+    args: TrainingArgs,
+    checkpoint_callback: ModelCheckpoint,
+    wandb_logger: WandbLogger,
+    trainer: Trainer,
+    name_suffix: Optional[str] = "",
+) -> None:
+    logger.info("Trying to save checkpoint....")
+
+    assert checkpoint_callback.dirpath is not None
+    save_path = str(Path(checkpoint_callback.dirpath) / f"last_model_ckpt{name_suffix}.ckpt")
+    trainer.save_checkpoint(save_path)
+    logger.info(f"Checkpoint saved to {save_path}")
+
+    if args.save_model_to_wandb:
+        logger.info("Collecting PL checkpoint for wandb...")
+        artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}{name_suffix}", type="model")
+        artifact.add_file(save_path, name="model.ckpt")
+
+        logger.info("Pushing to wandb...")
+        aliases = ["train_end", "latest", name_suffix]
+        wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
+
+        logger.success("Saving finished!")

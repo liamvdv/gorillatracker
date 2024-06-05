@@ -80,3 +80,6 @@ data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-o
 dataset_class: ""
 data_resize_transform: Null
 use_ssl: False
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

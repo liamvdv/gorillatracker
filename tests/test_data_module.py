@@ -11,11 +11,12 @@ def save_image(tensor: torch.Tensor, path: str) -> None:
 
 def test_offline_data_module() -> None:
     dm = get_data_module(
-        "gorillatracker.datasets.mnist.MNISTDataset",
-        "./mnist",
-        1,
-        "offline",
-        lambda x: x,
+        dataset_class_id="gorillatracker.datasets.mnist.MNISTDataset",
+        data_dir="./mnist",
+        batch_size=1,
+        loss_mode="offline",
+        workers=4,
+        model_transforms=lambda x: x,
         training_transforms=lambda x: x,
     )
     dm.setup("fit")
