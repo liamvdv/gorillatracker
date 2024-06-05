@@ -153,12 +153,14 @@ def bbox_filter(
     min_height: Optional[int],
     max_height: Optional[int],
 ) -> Select[tuple[TrackingFrameFeature]]:
-    query = query.where(
-        TrackingFrameFeature.bbox_width >= min_width,
-        TrackingFrameFeature.bbox_width <= max_width,
-        TrackingFrameFeature.bbox_height >= min_height,
-        TrackingFrameFeature.bbox_height <= max_height,
-    )
+    if min_width is not None:
+        query = query.where(TrackingFrameFeature.bbox_width >= min_width)
+    if max_width is not None:
+        query = query.where(TrackingFrameFeature.bbox_width <= max_width)
+    if min_height is not None:
+        query = query.where(TrackingFrameFeature.bbox_height >= min_height)
+    if max_height is not None:
+        query = query.where(TrackingFrameFeature.bbox_height <= max_height)
     return query
 
 
