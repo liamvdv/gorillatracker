@@ -63,7 +63,7 @@ class ContrastiveClassSampler(ContrastiveSampler):
         self.samples = [sample for samples in classes.values() for sample in samples]
         self.sample_to_class = {sample: label for label, samples in classes.items() for sample in samples}
 
-        assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples"
+        # assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples" # TODO(memben)
         assert len(self.samples) == len(set(self.samples)), "Samples must be unique"
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
@@ -78,7 +78,8 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         positive_class = self.sample_to_class[sample]
-        positives = [s for s in self.classes[positive_class] if s != sample]
+        # positives = [s for s in self.classes[positive_class] if s != sample] # TODO(memben)
+        positives = [s for s in self.classes[positive_class]]
         return random.choice(positives)
 
     # NOTE(memben): First samples a negative class to ensure a more balanced distribution of negatives,

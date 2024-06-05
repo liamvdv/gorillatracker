@@ -93,18 +93,18 @@ class NletDataModule(L.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
         return DataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=100
+            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=10
         )
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=100)
+            DataLoader(val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=10)
             for val in self.val
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=100)
+            DataLoader(test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=10)
             for test in self.test
         ]
 
@@ -117,9 +117,12 @@ class NletDataModule(L.LightningDataModule):
         labels = tuple(nlet[2] for nlet in batch)
         return ids, values, labels
 
+    def get_dataset_class_names(self) -> list[str]:
+        return [dataset_class.__name__ for dataset_class in self.eval_datasets]
+
     # TODO(memben): we probably want tuple[int, list[int], list[int]]
-    def get_num_classes(self) -> tuple[int, int, int]:
-        return (-1, -1, -1)
+    def get_num_classes(self, partition: Literal["train", "val", "test"]) -> int:
+        return -1
 
 
 class NletDataset(Dataset[Nlet], ABC):
@@ -131,10 +134,10 @@ class NletDataset(Dataset[Nlet], ABC):
         transform: gtypes.TensorTransform,
         **kwargs: dict[str, Any],
     ):
+        self.partition = partition
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
         self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(), transform])
-        self.partition = partition
 
     def __len__(self) -> int:
         return len(self.contrastive_sampler)

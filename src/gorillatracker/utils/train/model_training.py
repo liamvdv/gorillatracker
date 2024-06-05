@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import numpy as np
 import wandb
@@ -12,15 +12,14 @@ from print_on_steroids import logger
 
 from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 
 
 def train_and_validate_model(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
+    dm: NletDataModule,
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
@@ -77,13 +76,12 @@ def train_and_validate_model(
 
 def train_and_validate_using_kfold(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
+    dm: NletDataModule,
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
 ) -> Tuple[BaseModule, Trainer]:
-
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
     dm.k = kfold_k  # type: ignore

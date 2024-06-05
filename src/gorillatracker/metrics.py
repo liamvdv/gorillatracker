@@ -20,6 +20,7 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -40,7 +41,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         every_n_val_epochs: int,
         knn_with_train: bool,
         wandb_run: Runner,
-        dm: L.LightningDataModule,
+        dm: NletDataModule,
         use_ssl: bool = False,
         kfold_k: Optional[int] = None,
     ) -> None:
@@ -49,6 +50,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
+        self.dm = dm
         self.use_ssl = use_ssl
         self.kfold_k = kfold_k if kfold_k is not None else None
         if knn_with_train:
@@ -76,9 +78,10 @@ class LogEmbeddingsToWandbCallback(L.Callback):
 
         assert trainer.max_epochs is not None
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
+            dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
             table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
             artifact = wandb.Artifact(
-                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_idx),
+                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_name),
                 type="embeddings",
                 metadata={"step": current_step},
                 description="Embeddings from step {}".format(current_step),
@@ -117,7 +120,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 train_embeddings=train_embeddings,  # type: ignore
                 train_labels=train_labels,
                 kfold_k=self.kfold_k,
-                dataloader_idx=dataloader_idx,
+                dataloader_name=dataloader_name,
             )
             # clear the table where the embeddings are stored
             # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
@@ -216,7 +219,7 @@ def evaluate_embeddings(
     train_embeddings: Optional[npt.NDArray[np.float_]] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
     kfold_k: Optional[int] = None,
-    dataloader_idx: int = 0,
+    dataloader_name: str = "Unkonwn",
 ) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
     assert (train_embeddings is not None and train_labels is not None) or (
         train_embeddings is None and train_labels is None
@@ -242,13 +245,14 @@ def evaluate_embeddings(
         for metric_name, metric in metrics.items()
     }
 
+    # TODO(memben): Fix to adhere naming schema
     kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/dataloader_{dataloader_idx}/{key}": value})
+                wandb.log({f"{dataloader_name}/{embedding_name}{kfold_str}{metric_name}/{key}": value})
         else:
-            wandb.log({f"{embedding_name}{kfold_str}{metric_name}/dataloader_{dataloader_idx}/": result})
+            wandb.log({f"{dataloader_name}/{embedding_name}{kfold_str}{metric_name}/": result})
 
     return results
 

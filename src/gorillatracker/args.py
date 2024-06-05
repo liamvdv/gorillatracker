@@ -112,8 +112,8 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
-    additional_val_dataset_classes: Union[List[str], None] = field(default=None)
-    additional_val_data_dirs: Union[List[Path], None] = field(default=None)
+    additional_val_dataset_classes: list[str] = field(default_factory=lambda: [])
+    additional_val_data_dirs: list[Path] = field(default_factory=lambda: [])
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config

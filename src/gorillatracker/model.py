@@ -138,9 +138,9 @@ class BaseModule(L.LightningModule):
         embedding_size: int = 256,
         batch_size: int = 32,
         num_classes: Tuple[int, int, int] = (0, 0, 0),
+        dataset_names: list[str] = [],
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
-        num_val_dataloaders: int = 1,
         **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
@@ -178,9 +178,9 @@ class BaseModule(L.LightningModule):
             "embedding",
             "id",
         ]  # note that the dataloader usually returns the order (id, embedding, label)
-        self.num_val_dataloaders = num_val_dataloaders
+        self.dataset_names = dataset_names
         self.embeddings_table_list = [
-            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]
 
     def set_losses(
@@ -298,6 +298,7 @@ class BaseModule(L.LightningModule):
 
     # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
+        dataloader_name = self.dataset_names[dataloader_idx]
         ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
         n_anchors = len(images[0])
 
@@ -318,24 +319,21 @@ class BaseModule(L.LightningModule):
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log(
-                f"val/loss/dataloader_{dataloader_idx}",
+                f"{dataloader_name}/val/loss",
                 loss,
                 on_step=True,
                 sync_dist=True,
                 prog_bar=True,
                 add_dataloader_idx=False,
             )
-            self.log(
-                f"val/positive_distance/dataloader_{dataloader_idx}", pos_dist, on_step=True, add_dataloader_idx=False
-            )
-            self.log(
-                f"val/negative_distance/dataloader_{dataloader_idx}", neg_dist, on_step=True, add_dataloader_idx=False
-            )
+            self.log(f"{dataloader_name}/val/positive_distance", pos_dist, on_step=True, add_dataloader_idx=False)
+            self.log(f"{dataloader_name}/val/negative_distance", neg_dist, on_step=True, add_dataloader_idx=False)
             return loss
         else:
             return torch.tensor(0.0)
 
-    def on_validation_epoch_end(self) -> None:
+    def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
+        dataloader_name = self.dataset_names[dataloader_idx]
         # calculate loss after all embeddings have been processed
         if "softmax" in self.loss_mode:
             for i, table in enumerate(self.embeddings_table_list):
@@ -379,11 +377,11 @@ class BaseModule(L.LightningModule):
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
             assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
+            self.log(f"{dataloader_name}/val/loss", loss, sync_dist=True)
 
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
-            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]  # reset embeddings table
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:

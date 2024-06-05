@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 import torch
 from PIL.Image import Image
@@ -21,6 +21,7 @@ class SSLDataset(NletDataset):
         partition: Literal["train", "val", "test"],
         transform: gtypes.TensorTransform,
         ssl_config: SSLConfig,
+        **kwargs: Any,
     ):
         self.ssl_config = ssl_config
         self.nlet_builder = nlet_builder

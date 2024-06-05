@@ -11,13 +11,10 @@ from torchvision.transforms import Compose, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data.nlet import NletDataModule as NewNletDataModule
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.builder import build_data_module
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
-from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
@@ -56,38 +53,29 @@ def main(args: TrainingArgs) -> None:
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
 
-    # TODO(memben): Unify SSLDatamodule and NletDataModule
-    dm: Union[SSLDataModule, NletDataModule]
-    if args.use_ssl:
-        ssl_config = SSLConfig(
-            tff_selection=args.tff_selection,
-            n_videos=args.n_videos,
-            n_samples=args.n_samples,
-            feature_types=args.feature_types,
-            min_confidence=args.min_confidence,
-            min_images_per_tracking=args.min_images_per_tracking,
-            split=None,
-        )
-        dm = SSLDataModule(
-            ssl_config=ssl_config,
-            batch_size=args.batch_size,
-            transforms=model_transforms,
-            training_transforms=model_cls.get_training_transforms(),
-            data_dir=str(args.data_dir),
-            additional_dataset_class_ids=args.additional_val_dataset_classes,
-            additional_data_dirs=args.additional_val_data_dirs,
-        )
-    else:
-        dm = get_data_module(
-            args.dataset_class,
-            str(args.data_dir),
-            args.batch_size,
-            args.loss_mode,
-            model_transforms,
-            model_cls.get_training_transforms(),
-            args.additional_val_dataset_classes,
-            args.additional_val_data_dirs,
-        )
+    ssl_config = SSLConfig(
+        tff_selection=args.tff_selection,
+        n_videos=args.n_videos,
+        n_samples=args.n_samples,
+        feature_types=args.feature_types,
+        min_confidence=args.min_confidence,
+        min_images_per_tracking=args.min_images_per_tracking,
+        split=None,
+    )
+
+    dm = build_data_module(
+        dataset_class_id=args.dataset_class,
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        loss_mode=args.loss_mode,
+        model_transforms=model_transforms,
+        training_transforms=model_cls.get_training_transforms(),
+        additional_eval_datasets_ids=args.additional_val_dataset_classes,
+        additional_eval_data_dirs=args.additional_val_data_dirs,
+        ssl_config=ssl_config,
+        kfold_k=None,
+        kfold_val_i=None,
+    )
 
     ################# Construct model ##############
 
@@ -111,14 +99,14 @@ def main(args: TrainingArgs) -> None:
     )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor="val/loss/dataloader_0",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
         mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss/dataloader_0",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,

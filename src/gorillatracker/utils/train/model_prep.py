@@ -1,19 +1,16 @@
-from typing import Any, Type, Union
+from typing import Any, Type
 
 import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.model import BaseModule
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 class ModelConstructor:
-    def __init__(
-        self, args: TrainingArgs, model_cls: Type[BaseModule], dm: Union[SSLDataModule, NletDataModule]
-    ) -> None:
+    def __init__(self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule) -> None:
         self.args = args
         self.model_cls = model_cls
         self.dm = dm
@@ -50,9 +47,7 @@ class ModelConstructor:
                 if not args.use_ssl
                 else (-1, -1, -1)
             ),
-            num_val_dataloaders=(
-                1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1
-            ),
+            dataset_names=(self.dm.get_dataset_class_names()),
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,
