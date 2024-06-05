@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import logger
 from simple_parsing import parse
-from torchvision.transforms import Compose, Resize
+from torchvision.transforms import Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
@@ -58,9 +58,11 @@ def main(args: TrainingArgs) -> None:
     model_cls = get_model_cls(args.model_name_or_path)
 
     #################### Construct dataloaders #################
-    model_transforms = model_cls.get_tensor_transforms()
+    def resize_transform(x):
+        return x
+
     if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+        resize_transform = Resize(args.data_resize_transform, antialias=True)
 
     # TODO(memben): Unify SSLDatamodule and NletDataModule
     dm: Union[SSLDataModule, NletDataModule]
@@ -77,8 +79,9 @@ def main(args: TrainingArgs) -> None:
         dm = SSLDataModule(
             ssl_config=ssl_config,
             batch_size=args.batch_size,
-            transforms=model_transforms,
+            transforms=resize_transform,
             training_transforms=model_cls.get_training_transforms(),
+            tensor_transforms=model_cls.get_tensor_transforms(),
             data_dir=str(args.data_dir),
             additional_dataset_class_ids=args.additional_val_dataset_classes,
             additional_data_dirs=args.additional_val_data_dirs,
@@ -90,8 +93,9 @@ def main(args: TrainingArgs) -> None:
             args.batch_size,
             args.loss_mode,
             args.workers,
-            model_transforms,
+            resize_transform,
             model_cls.get_training_transforms(),
+            model_cls.get_tensor_transforms(),
             args.additional_val_dataset_classes,
             args.additional_val_data_dirs,
         )
@@ -102,10 +106,6 @@ def main(args: TrainingArgs) -> None:
     model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(

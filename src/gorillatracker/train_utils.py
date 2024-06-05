@@ -39,8 +39,9 @@ def get_data_module(
     batch_size: int,
     loss_mode: str,
     workers: int,
-    model_transforms: gtypes.Transform,
+    resize_transforms: gtypes.Transform = None,
     training_transforms: gtypes.Transform = None,  # type: ignore
+    tensor_transforms: gtypes.Transform = None,  # type: ignore
     additional_dataset_class_ids: Optional[List[str]] = None,
     additional_data_dirs: Optional[List[str]] = None,
 ) -> NletDataModule:
@@ -57,15 +58,16 @@ def get_data_module(
         base = SimpleKFoldDataModule if loss_mode.startswith("softmax") else base  # type: ignore
 
     dataset_class = get_dataset_class(dataset_class_id)
-    transforms = Compose(
+    transforms_base = Compose(
         [
             dataset_class.get_transforms() if hasattr(dataset_class, "get_transforms") else ToTensor(),
             _assert_tensor,
-            model_transforms,
         ]
     )
     if additional_dataset_class_ids is None:
-        return base(data_dir, batch_size, dataset_class, transforms=transforms, training_transforms=training_transforms)
+        return base(
+            data_dir, batch_size, dataset_class, transforms=transforms_base, training_transforms=training_transforms
+        )
     else:
         assert additional_data_dirs is not None, "additional_data_dirs must be set"
         # assert "kfold" not in data_dir, "kfold not supported for additional datasets" # TODO(rob2u): why?
@@ -77,7 +79,6 @@ def get_data_module(
                     [
                         cls.get_transforms() if hasattr(cls, "get_transforms") else ToTensor(),
                         _assert_tensor,
-                        model_transforms,
                     ]
                 )
             )
@@ -87,8 +88,9 @@ def get_data_module(
             batch_size,
             dataset_class,
             workers=workers,
-            transforms=transforms,
+            transforms=transforms_base,
             training_transforms=training_transforms,
+            tensor_transforms=Compose([resize_transforms, tensor_transforms]),
             additional_dataset_classes=dataset_classes,
             additional_data_dirs=additional_data_dirs,
             additional_transforms=transforms_list,

@@ -90,8 +90,6 @@ class KFoldCXLDataset(Dataset[Tuple[Id, Image.Image, Label]]):
         return transforms.Compose(
             [
                 SquarePad(),
-                # Uniform input, you may choose higher/lower sizes.
-                transforms.Resize(224),
                 transforms.ToTensor(),
             ]
         )

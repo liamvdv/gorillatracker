@@ -25,6 +25,7 @@ class NletDataModule(L.LightningDataModule):
         workers: int = 4,
         transforms: Optional[gtypes.Transform] = None,
         training_transforms: Optional[gtypes.Transform] = None,
+        tensor_transforms: Optional[gtypes.Transform] = None,
         additional_dataset_classes: Optional[List[Type[Dataset[Any]]]] = None,
         additional_data_dirs: Optional[List[str]] = None,
         additional_transforms: Optional[List[gtypes.Transform]] = None,
@@ -32,6 +33,7 @@ class NletDataModule(L.LightningDataModule):
         super().__init__()
         self.transforms = transforms
         self.training_transforms = training_transforms
+        self.tensor_transforms = tensor_transforms
         self.dataset_class = dataset_class
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -59,25 +61,25 @@ class NletDataModule(L.LightningDataModule):
             self.train = self.dataset_class(
                 self.data_dir,
                 partition="train",
-                transform=transforms.Compose([self.transforms, self.training_transforms]),
+                transform=transforms.Compose([self.transforms, self.training_transforms, self.tensor_transforms]),
             )  # type: ignore
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.transforms, self.tensor_transforms]))  # type: ignore
             if self.additional_dataset_classes is not None:
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transforms.Compose([transform, self.tensor_transforms])))  # type: ignore
         elif stage == "test":
-            self.test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            self.test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.transforms, self.tensor_transforms]))  # type: ignore
         elif stage == "validate":
-            self.val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            self.val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.transforms, self.tensor_transforms]))  # type: ignore
             if self.additional_dataset_classes is not None:
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transforms.Compose([transform, self.tensor_transforms])))  # type: ignore
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
             # self.predict = None
@@ -118,23 +120,33 @@ class NletDataModule(L.LightningDataModule):
 
     def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> Tuple[int, Dict[int, int]]:
         if mode == "train":
-            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms]))  # type: ignore
+            train = self.dataset_class(self.data_dir, partition="train", transform=transforms.Compose([self.transforms, self.training_transforms, self.tensor_transforms]))  # type: ignore
             return train.get_num_classes(), train.get_class_distribution()  # type: ignore
         elif mode == "val":
-            val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
+            val = self.dataset_class(self.data_dir, partition="val", transform=transforms.Compose([self.transforms, self.tensor_transforms]))  # type: ignore
             return val.get_num_classes(), val.get_class_distribution()  # type: ignore
         elif mode == "val":
-            val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]
+            val_list = [
+                self.dataset_class(
+                    self.data_dir,
+                    partition="val",
+                    transform=transforms.Compose([self.transforms, self.tensor_transforms]),
+                )
+            ]
             if self.additional_dataset_classes is not None:
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
                 ):
-                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))
+                    val_list.append(
+                        dataset_class(
+                            data_dir, partition="val", transform=transforms.Compose([transform, self.tensor_transforms])
+                        )
+                    )
             return sum(val.get_num_classes() for val in val_list), {
                 k: v for val_ds in val_list for k, v in val_ds.get_class_distribution().items()
             }
         elif mode == "test":
-            test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
+            test = self.dataset_class(self.data_dir, partition="test", transform=transforms.Compose([self.transforms, self.tensor_transforms]))  # type: ignore
             return test.get_num_classes(), test.get_class_distribution()  # type: ignore
         else:
             raise ValueError(f"unknown mode '{mode}'")
@@ -163,6 +175,7 @@ class NLetKFoldDataModule(NletDataModule):
         dataset_class: Optional[Type[Dataset[Any]]] = None,
         transforms: Optional[gtypes.Transform] = None,
         training_transforms: Optional[gtypes.Transform] = None,
+        tensor_transforms: Optional[gtypes.Transform] = None,
         val_fold: int = 0,
         k: int = 5,
         **kwargs: Any,
@@ -173,6 +186,7 @@ class NLetKFoldDataModule(NletDataModule):
             dataset_class=dataset_class,
             transforms=transforms,
             training_transforms=training_transforms,
+            tensor_transforms=tensor_transforms,
             **kwargs,
         )
         self.val_fold = val_fold
@@ -190,10 +204,14 @@ class NLetKFoldDataModule(NletDataModule):
                 partition="train",
                 val_i=self.val_fold,
                 k=self.k,
-                transform=transforms.Compose([self.transforms, self.training_transforms]),
+                transform=transforms.Compose([self.transforms, self.training_transforms, self.tensor_transforms]),
             )  # type: ignore
             self.val = self.dataset_class(
-                self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms
+                self.data_dir,
+                partition="val",
+                val_i=self.val_fold,
+                k=self.k,
+                transform=transforms.Compose([self.transforms, self.tensor_transforms]),
             )  # type: ignore
 
             if self.additional_dataset_classes is not None:
@@ -201,21 +219,29 @@ class NLetKFoldDataModule(NletDataModule):
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transforms.Compose([transform, self.tensor_transforms])))  # type: ignore
         elif stage == "test":
             self.test = self.dataset_class(
-                self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms
+                self.data_dir,
+                partition="test",
+                val_i=self.val_fold,
+                k=self.k,
+                transform=transforms.Compose([self.transforms, self.tensor_transforms]),
             )  # type: ignore
         elif stage == "validate":
             self.val = self.dataset_class(
-                self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms
+                self.data_dir,
+                partition="val",
+                val_i=self.val_fold,
+                k=self.k,
+                transform=transforms.Compose([self.transforms, self.tensor_transforms]),
             )  # type: ignore
             if self.additional_dataset_classes is not None:
                 self.val_list = [self.val]
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
+                    self.val_list.append(dataset_class(data_dir, partition="val", transform=transforms.Compose([transform, self.tensor_transforms])))  # type: ignore
 
         elif stage == "predict":
             # TODO(liamvdv): delay until we know how things should look.
@@ -235,16 +261,20 @@ class NLetKFoldDataModule(NletDataModule):
             )  # type: ignore
             return train.get_num_classes(), train.get_class_distribution()  # type: ignore
         elif mode == "val":
-            val_list = [self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=self.transforms)]  # type: ignore
+            val_list = [self.dataset_class(self.data_dir, partition="val", val_i=self.val_fold, k=self.k, transform=transforms.Compose([self.transforms, self.tensor_transforms]))]  # type: ignore
             if self.additional_dataset_classes is not None:
                 for data_dir, dataset_class, transform in zip(
                     self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
                 ):
-                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
+                    val_list.append(dataset_class(data_dir, partition="val", transform=transforms.Compose([transform, self.tensor_transforms])))  # type: ignore
             return sum(val.get_num_classes() for val in val_list), {k: v for val_ds in val_list for k, v in val_ds.get_class_distribution().items()}  # type: ignore
         elif mode == "test":
             test = self.dataset_class(
-                self.data_dir, partition="test", val_i=self.val_fold, k=self.k, transform=self.transforms
+                self.data_dir,
+                partition="test",
+                val_i=self.val_fold,
+                k=self.k,
+                transform=transforms.Compose([self.transforms, self.tensor_transforms]),
             )  # type: ignore
             return test.get_num_classes(), test.get_class_distribution()  # type: ignore
         else:

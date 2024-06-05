@@ -17,7 +17,7 @@ from gorillatracker.train_utils import _assert_tensor, get_dataset_class
 logger = logging.getLogger(__name__)
 
 
-class SSLDataModule(L.LightningDataModule):
+class SSLDataModule(L.LightningDataModule):  # TODO
     def __init__(
         self,
         ssl_config: SSLConfig,
@@ -25,12 +25,14 @@ class SSLDataModule(L.LightningDataModule):
         batch_size: int = 32,
         transforms: gtypes.Transform = lambda x: x,
         training_transforms: gtypes.Transform = lambda x: x,
+        tensor_transforms: gtypes.Transform = lambda x: x,
         additional_dataset_class_ids: Optional[List[str]] = None,
         additional_data_dirs: Optional[List[str]] = None,
     ) -> None:
         super().__init__()
-        self.transforms = transforms
+        self.resize_transforms = transforms
         self.training_transforms = training_transforms
+        self.tensor_transforms = tensor_transforms
         self.batch_size = batch_size
         self.data_dir = data_dir
         self.ssl_config = ssl_config
@@ -49,7 +51,9 @@ class SSLDataModule(L.LightningDataModule):
                 self.data_dir,
                 build_triplet,
                 "train",
-                transform=transforms.Compose([self.transforms, self.training_transforms]),
+                transform=transforms.Compose(
+                    [self.training_transforms, self.resize_transforms, self.tensor_transforms]
+                ),
                 ssl_config=self.ssl_config,
             )
             self.setup_val()
@@ -77,7 +81,8 @@ class SSLDataModule(L.LightningDataModule):
                         [
                             cls.get_transforms() if hasattr(cls, "get_transforms") else ToTensor(),
                             _assert_tensor,
-                            self.transforms,
+                            self.resize_transforms,
+                            self.tensor_transforms,
                         ]
                     )
                 )
@@ -87,7 +92,10 @@ class SSLDataModule(L.LightningDataModule):
             "/workspaces/gorillatracker/data/splits/derived_data-cxl-yolov8n_gorillabody_ybyh495y-body_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
             dataset_class=dataset_class,
             batch_size=self.batch_size,
-            transforms=transforms.Compose([dataset_class.get_transforms(), self.transforms]),
+            transforms=dataset_class.get_transforms(),
+            tensor_transforms=transforms.Compose(
+                [self.resize_transforms, self.tensor_transforms]
+            ),  # TODO(rob2u): check
             training_transforms=self.training_transforms,
             additional_dataset_classes=dataset_classes,
             additional_data_dirs=self.additional_data_dirs,

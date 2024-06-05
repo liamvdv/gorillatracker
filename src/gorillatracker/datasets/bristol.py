@@ -78,8 +78,6 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
         return transforms.Compose(
             [
                 SquarePad(),
-                # Uniform input, you may choose higher/lower sizes.
-                transforms.Resize(224),
                 transforms.ToTensor(),
             ]
         )
