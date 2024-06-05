@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import Select, create_engine, select
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from gorillatracker.ssl_pipeline.contrastive_sampler import (
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings
+from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings, tracking_ids_from_videos
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
     cached_filter,
@@ -45,12 +45,12 @@ class SSLConfig:
 
         with Session(engine) as session:
             video_ids = list(session.execute(select(Video.video_id)).scalars().all())
-            query = self._build_query(video_ids[: self.n_videos])
+            video_ids = video_ids[: self.n_videos]
+            query = self._build_query(video_ids)
             sampler = self._create_tff_sampler(query)
             tracked_features = self._sample_tracked_features(sampler, session)
             contrastive_images = self._create_contrastive_images(tracked_features, base_path)
-            classes = self._group_contrastive_images(contrastive_images)
-            return self._create_contrastive_sampler(classes, contrastive_images, video_ids, session)
+            return self._create_contrastive_sampler(contrastive_images, video_ids, session)
 
     def _create_tff_sampler(self, query: Select[tuple[TrackingFrameFeature]]) -> Sampler:
         if self.tff_selection == "random":
@@ -62,27 +62,26 @@ class SSLConfig:
 
     def _create_contrastive_sampler(
         self,
-        classes: dict[gtypes.Label, List[ContrastiveImage]],
         contrastive_images: List[ContrastiveImage],
         video_ids: List[int],
         session: Session,
     ) -> ContrastiveSampler:
         if self.negative_mining == "random":
+            classes = self._group_contrastive_images(contrastive_images)
             return ContrastiveClassSampler(classes)
         elif self.negative_mining == "overlapping":
-            # create two-layer Clique Graph
-            # negative edges from overlapping_trackings query
-            # filter out tffs without negatives or just take random negative
-            tracking_ids = list(classes.keys())
-            first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(tracking_ids)
-            overlapping_trackings = session.execute(find_overlapping_trackings(session, video_ids))
+            tracking_ids = session.execute(tracking_ids_from_videos(video_ids)).scalars().all()
+            first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(list(tracking_ids))
+            overlapping_trackings = find_overlapping_trackings(session, video_ids)
             for left, right in overlapping_trackings:
                 first_layer.partition(left, right)
 
-            parent_edges = {img.id: img.class_label for img in contrastive_images}
+            parent_edges: dict[ContrastiveImage, Optional[int]] = {img: img.class_label for img in contrastive_images}
             second_layer = MultiLayerCliqueGraph(
                 vertices=contrastive_images, parent=first_layer, parent_edges=parent_edges
             )
+            self._merge_same_class_vertices(second_layer)
+            second_layer.prune_cliques_without_neighbors()
             return CliqueGraphSampler(second_layer)
         else:
             raise ValueError(f"Unknown negative mining method: {self.negative_mining}")
@@ -119,11 +118,17 @@ class SSLConfig:
             classes[class_label] = samples
         return classes
 
+    def _merge_same_class_vertices(self, graph: MultiLayerCliqueGraph[ContrastiveImage]) -> None:
+        for _, childrens in graph.inverse_parent_edges.items():
+            children_list = list(childrens)
+            for i in range(len(children_list) - 1):
+                graph.merge(children_list[i], children_list[i + 1])
+
 
 if __name__ == "__main__":
     ssl_config = SSLConfig(
         tff_selection="equidistant",
-        negative_mining="random",
+        negative_mining="overlapping",
         n_videos=200,
         n_samples=15,
         feature_types=["body"],
@@ -133,7 +138,8 @@ if __name__ == "__main__":
     )
     contrastive_sampler = ssl_config.get_contrastive_sampler("cropped-images/2024-04-18")
     print(len(contrastive_sampler))
-    contrastive_image = contrastive_sampler[0]
-    print(contrastive_image)
-    print(contrastive_sampler.positive(contrastive_image))
-    print(contrastive_sampler.negative(contrastive_image))
+    for i in range(10):
+        contrastive_image = contrastive_sampler[i * 10]
+        print(contrastive_image)
+        print(contrastive_sampler.positive(contrastive_image))
+        print(contrastive_sampler.negative(contrastive_image))
