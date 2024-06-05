@@ -49,7 +49,6 @@ dependencies:
   - ruff
   - isort
   - mypy=1.10.0
-  - mypy-extensions=1.0.0
   - pytest
   - typer
   - ipywidgets
@@ -82,6 +81,7 @@ dependencies:
       - tf-nightly==2.17.0.dev20240520 -f https://download.pytorch.org/whl/nightly/torch_nightly.html
       - torch_xla@https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-nightly+20240429-cp310-cp310-linux_x86_64.whl
       - ai-edge-torch==0.1.1
+      - mypy-extensions
 
 
 
