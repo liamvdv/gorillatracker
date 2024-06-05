@@ -22,8 +22,10 @@ class ModelConstructor:
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
 
+        assert not args.use_ssl or isinstance(self.dm, SSLDataModule)
+
         num_classes_dist = (
-            (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test"))
+            (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test"))  # type: ignore
             if not args.use_ssl
             else ((-1, {}), (-1, {}), (-1, {}))
         )

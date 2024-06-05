@@ -253,20 +253,20 @@ class BaseModule(L.LightningModule):
             use_dist_term=use_dist_term,
             teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
         )
-        self.loss_module_val.eval()
+        self.loss_module_val.eval()  # type: ignore
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
-        if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:
-            self.loss_module_train.set_using_memory_bank(True)
+        if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:  # type: ignore
+            self.loss_module_train.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
         elif (
             self.loss_mode.endswith("vpl/l2sp")
-            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch
+            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch  # type: ignore
         ):  # is wrapped in l2sp regularization
-            self.loss_module_train.loss.set_using_memory_bank(True)
+            self.loss_module_train.loss.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
 
     # TODO(memben): ATTENTION: type hints NOT correct, only for SSL

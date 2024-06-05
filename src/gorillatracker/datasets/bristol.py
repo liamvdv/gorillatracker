@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 from PIL import Image
 from torch import Tensor
@@ -88,7 +88,7 @@ class BristolDataset(Dataset[Tuple[Id, Tensor, Label]]):
         labels = [label for _, label in self.samples]
         return len(set(labels))
 
-    def get_class_distribution(self) -> List[int]:
+    def get_class_distribution(self) -> Dict[int, int]:
         labels = [label for _, label in self.samples]
         class_distribution = {label: labels.count(label) for label in set(labels)}
         return class_distribution

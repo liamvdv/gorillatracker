@@ -224,7 +224,7 @@ class NLetKFoldDataModule(NletDataModule):
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> int:
+    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> Tuple[int, Dict[int, int]]:
         if mode == "train":
             train = self.dataset_class(
                 self.data_dir,
