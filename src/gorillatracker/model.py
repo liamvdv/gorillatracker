@@ -239,7 +239,7 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[1],
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
-            accelerator="cpu", # HACK HACK HACK (rob2u): yet to do
+            accelerator=accelerator,
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
             path_to_pretrained_weights=path_to_pretrained_weights,
