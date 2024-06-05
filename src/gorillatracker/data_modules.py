@@ -124,13 +124,15 @@ class NletDataModule(L.LightningDataModule):
             val = self.dataset_class(self.data_dir, partition="val", transform=self.transforms)  # type: ignore
             return val.get_num_classes(), val.get_class_distribution()  # type: ignore
         elif mode == "val":
-            val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]  # type: ignore
+            val_list = [self.dataset_class(self.data_dir, partition="val", transform=self.transforms)]
             if self.additional_dataset_classes is not None:
                 for data_dir, dataset_class, transform in zip(
-                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms  # type: ignore
+                    self.additional_data_dirs, self.additional_dataset_classes, self.additional_transforms
                 ):
-                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))  # type: ignore
-            return sum(val.get_num_classes() for val in val_list), {k: v for val_ds in val_list for k, v in val_ds.get_class_distribution().items()}  # type: ignore
+                    val_list.append(dataset_class(data_dir, partition="val", transform=transform))
+            return sum(val.get_num_classes() for val in val_list), {
+                k: v for val_ds in val_list for k, v in val_ds.get_class_distribution().items()
+            }
         elif mode == "test":
             test = self.dataset_class(self.data_dir, partition="test", transform=self.transforms)  # type: ignore
             return test.get_num_classes(), test.get_class_distribution()  # type: ignore
@@ -222,7 +224,7 @@ class NLetKFoldDataModule(NletDataModule):
         else:
             raise ValueError(f"unknown stage '{stage}'")
 
-    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> int:  # TODO
+    def get_ds_stats(self, mode: Literal["train", "val", "test"]) -> int:
         if mode == "train":
             train = self.dataset_class(
                 self.data_dir,

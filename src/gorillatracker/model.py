@@ -376,7 +376,7 @@ class BaseModule(L.LightningModule):
 
                 # get weights for all classes by averaging over all embeddings
                 loss_module_val = (
-                    self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss
+                    self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss  # type: ignore
                 )
                 if self.use_dist_term:
                     loss_module_val = loss_module_val.arcface

@@ -15,7 +15,7 @@ def get_loss(
     loss_mode: str,
     log_func: Callable[[str, float], None] = lambda x, y: None,
     **kw_args: Any,
-) -> Callable[[torch.Tensor, gtypes.BatchLabel, torch.Tensor], gtypes.LossPosNegDist]:
+) -> Callable[[torch.Tensor, gtypes.BatchLabel, gtypes.NletBatchValues], gtypes.LossPosNegDist]:
     l2sp = False
     if "l2sp" in loss_mode:
         loss_mode = loss_mode.replace("/l2sp", "")
@@ -98,7 +98,7 @@ def get_loss(
 
     if kw_args.get("use_dist_term", False):
         loss_module = CombinedLoss(
-            arcface_loss=loss_module,
+            arcface_loss=loss_module,  # type: ignore
             triplet_loss=TripletLossOnline(mode="soft", margin=1.0),
             lambda_=10.0,
             log_func=log_func,
