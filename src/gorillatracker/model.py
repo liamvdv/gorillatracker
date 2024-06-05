@@ -253,19 +253,11 @@ class BaseModule(L.LightningModule):
     # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         ids, images, labels = batch
-
-        # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):  # type: ignore
-            flat_labels = torch.cat(labels, dim=0)  # type: ignore
-            vec = torch.cat(images, dim=0)  # type: ignore
-        else:
-            # NOTE(memben): this is the expected shape
-            # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+        # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+        flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
+        # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+        vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
         embeddings = self.forward(vec)
-
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
@@ -274,7 +266,7 @@ class BaseModule(L.LightningModule):
 
     def add_validation_embeddings(
         self,
-        anchor_ids: List[str],
+        anchor_ids: list[str],
         anchor_embeddings: torch.Tensor,
         anchor_labels: gtypes.MergedLabels,
         dataloader_idx: int,
@@ -296,26 +288,20 @@ class BaseModule(L.LightningModule):
         )
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
-    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         dataloader_name = self.dataset_names[dataloader_idx]
         ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
-        n_anchors = len(images[0])
+        batch_size = len(images)
 
-        # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):  # type: ignore
-            flat_labels = torch.cat(labels, dim=0)  # type: ignore
-            vec = torch.cat(images, dim=0)  # type: ignore
-        else:
-            # NOTE(memben): this is the expected shape
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+        # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+        flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
+        # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
+        vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
 
-        flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
+        anchor_ids = [nlet[0] for nlet in ids]
+
         embeddings = self.forward(vec)
-        self.add_validation_embeddings(
-            flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
-        )
+        self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
             self.log(
