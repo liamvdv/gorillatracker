@@ -15,7 +15,7 @@ from gorillatracker.ssl_pipeline.contrastive_sampler import (
 )
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings, tracking_ids_from_videos
 from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 from gorillatracker.ssl_pipeline.queries import (
@@ -49,17 +49,6 @@ class SSLConfig:
             tracked_features = self._sample_tracked_features(sampler, session)
             contrastive_images = self._create_contrastive_images(tracked_features, base_path)
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
-
-    def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
-        split = SplitArgs.load_pickle(self.split_path)
-        if partition == "train":
-            return split.train_video_ids()
-        elif partition == "val":
-            return split.val_video_ids()
-        elif partition == "test":
-            return split.test_video_ids()
-        else:
-            raise ValueError(f"Unknown partition: {partition}")
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
         split = SplitArgs.load_pickle(self.split_path)
