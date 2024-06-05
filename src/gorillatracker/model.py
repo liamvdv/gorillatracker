@@ -228,7 +228,7 @@ class BaseModule(L.LightningModule):
             l2_beta=kwargs["l2_beta"],
             path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
             model=model,
-            teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
+            teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -265,7 +265,7 @@ class BaseModule(L.LightningModule):
             vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
         embeddings = self.forward(vec)
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, vec)  # type: ignore
         self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/positive_distance", pos_dist, on_step=True)
         self.log("train/negative_distance", neg_dist, on_step=True)
@@ -315,7 +315,7 @@ class BaseModule(L.LightningModule):
             flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
         )
         if "softmax" not in self.loss_mode:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, vec)  # type: ignore
             self.log(
                 f"val/loss/dataloader_{dataloader_idx}",
                 loss,
@@ -552,7 +552,7 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 

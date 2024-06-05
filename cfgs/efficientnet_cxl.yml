@@ -1,4 +1,5 @@
 # Device Arguments
+
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
@@ -25,7 +26,7 @@ from_scratch: False             # Train the model from scratch
 early_stopping_patience: 5      # Early stopping patience (number of epochs)
 embedding_size: 256
 dropout_p: 0.32
-use_quantization_aware_training: True
+use_quantization_aware_training: False
 
 weight_decay: 0.5               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
@@ -47,7 +48,7 @@ initial_lr: 1e-4                # Initial learning rate before warmup(must be > 
 start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 6                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 8                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value

@@ -44,8 +44,8 @@ sweeps = [
         "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
         "parameters": {
             "weight_decay": {"values": [0.5, 0.1, 0.01]},
-            "initial_lr": {"values": [1e-3, 1e-4, 1e-5]},
-            "dropout_p": {"values": [0.5, 0.3, 0.1]},
+            "start_lr": {"values": [1e-3, 1e-4, 1e-5]},
+            "end_lr": {"values": [1e-5, 1e-6, 1e-7]},
         },
     },
 ]
