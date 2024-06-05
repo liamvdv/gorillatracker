@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
+    bbox_filter,
     cached_filter,
     confidence_filter,
     feature_type_filter,
@@ -33,6 +34,8 @@ class SSLConfig:
     feature_types: list[str]
     min_confidence: float
     min_images_per_tracking: int
+    width_range: tuple[Optional[int], Optional[int]]
+    height_range: tuple[Optional[int], Optional[int]]
     split_path: str
 
     def get_contrastive_sampler(self, partition: Literal["train", "val", "test"], base_path: str) -> ContrastiveSampler:
@@ -72,6 +75,7 @@ class SSLConfig:
         query = associated_filter(query)
         query = feature_type_filter(query, self.feature_types)
         query = confidence_filter(query, self.min_confidence)
+        query = bbox_filter(query, self.width_range[0], self.width_range[1], self.height_range[0], self.height_range[1])
         query = min_count_filter(query, self.min_images_per_tracking)
         return query
 
@@ -106,6 +110,8 @@ if __name__ == "__main__":
         feature_types=["body"],
         min_confidence=0.5,
         min_images_per_tracking=10,
+        width_range=(None, None),
+        height_range=(None, None),
         split_path="/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl",
     )
     contrastive_sampler = ssl_config.get_contrastive_sampler("train", "cropped-images/2024-04-18")

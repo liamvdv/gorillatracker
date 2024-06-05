@@ -6,7 +6,7 @@ import datetime as dt
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Iterator, Optional, Sequence
 
 from sqlalchemy import ColumnElement, Select, alias, and_, func, or_, select, update
 from sqlalchemy.orm import Session, aliased
@@ -143,6 +143,22 @@ def confidence_filter(
     ```
     """
     query = query.where(TrackingFrameFeature.confidence >= min_confidence)
+    return query
+
+
+def bbox_filter(
+    query: Select[tuple[TrackingFrameFeature]],
+    min_width: Optional[int],
+    max_width: Optional[int],
+    min_height: Optional[int],
+    max_height: Optional[int],
+) -> Select[tuple[TrackingFrameFeature]]:
+    query = query.where(
+        TrackingFrameFeature.bbox_width >= min_width,
+        TrackingFrameFeature.bbox_width <= max_width,
+        TrackingFrameFeature.bbox_height >= min_height,
+        TrackingFrameFeature.bbox_height <= max_height,
+    )
     return query
 
 
@@ -410,6 +426,9 @@ if __name__ == "__main__":
         query = cached_filter(query)
         query = feature_type_filter(query, ["body"])
         query = confidence_filter(query, 0.5)
+        query = bbox_filter(query, 10, 100, 10, 100)
         query = min_count_filter(query, 10)
         tffs = session.execute(query).scalars().all()
-        print("Success!")
+        # print out some bbox widths and heights
+        for tff in tffs:
+            print(tff.bbox_width, tff.bbox_height)
