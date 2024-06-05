@@ -74,7 +74,6 @@ dependencies:
       - facenet_pytorch
       - typer
       - opencv-contrib-python
-      - mypy-extensions
 
 
 # Non-standard section listing target platforms for conda-lock:
