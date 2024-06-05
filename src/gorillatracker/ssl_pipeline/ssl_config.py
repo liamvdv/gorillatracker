@@ -31,8 +31,8 @@ from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSample
 
 @dataclass(kw_only=True)  # type: ignore
 class SSLConfig:
-    tff_selection: str
-    negative_mining: str
+    tff_selection: Literal["random", "equidistant"]
+    negative_mining: Literal["random", "overlapping"]
     n_samples: int
     feature_types: list[str]
     min_confidence: float
@@ -128,6 +128,7 @@ class SSLConfig:
         return classes
 
     def _merge_same_class_vertices(self, graph: MultiLayerCliqueGraph[ContrastiveImage]) -> None:
+        # NOTE(V1nce1): Should be functionality of MultiLayerCliqueGraph and could be extended
         for _, childrens in graph.inverse_parent_edges.items():
             children_list = list(childrens)
             for i in range(len(children_list) - 1):
