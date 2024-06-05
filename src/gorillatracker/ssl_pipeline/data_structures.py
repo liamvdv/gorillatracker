@@ -78,7 +78,7 @@ class UnionFind(Generic[T]):
     def get_members(self, x: T) -> list[T]:
         return self.members[self.find(x)]
 
-    def delete_root(self, root: T) -> None:
+    def delete_set(self, root: T) -> None:
         members_to_delete = self.members.pop(root)
         for member in members_to_delete:
             self.root.pop(member)
@@ -264,5 +264,5 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         for root in list(roots):
             if len(self.get_adjacent_cliques(root)) == 0:
                 deleted_vertices.update(self.get_clique(root))
-                self.union_find.delete_root(root)
+                self.union_find.delete_set(root)
         self.vertices = list(set(self.vertices) - deleted_vertices)
