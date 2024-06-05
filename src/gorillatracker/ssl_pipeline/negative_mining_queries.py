@@ -6,8 +6,7 @@ from sqlalchemy.orm import Session, aliased
 
 from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video, VideoFeature
 
-
-def find_overlapping_trackings(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
+def build_overlapping_trackings_query(video_ids: Sequence[int]) -> Select[tuple[int, int]]:
     tracking_frame_feature_cte = (
         select(TrackingFrameFeature.tracking_id, TrackingFrameFeature.frame_nr, TrackingFrameFeature.video_id)
         .where(TrackingFrameFeature.video_id.in_(video_ids))
@@ -39,6 +38,11 @@ def find_overlapping_trackings(session: Session, video_ids: Sequence[int]) -> Se
             & (left_summary.c.tracking_id < right_summary.c.tracking_id)
         )
     )
+    return stmt
+
+
+def find_overlapping_trackings(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
+    stmt = build_overlapping_trackings_query(video_ids)
     print("Sampling negatives...")
     overlapping_trackings = session.execute(stmt).fetchall()
     result = [(row[0], row[1]) for row in overlapping_trackings]
@@ -154,7 +158,6 @@ if __name__ == "__main__":
 
     engine = create_engine(GorillaDatasetKISZ.DB_URI)
     video_ids = list(range(1, 201))
-    print(video_ids)
     with Session(engine) as session:
         start = time.time()
         overlapping_trackings = find_overlapping_trackings(session, video_ids)
