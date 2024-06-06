@@ -47,8 +47,8 @@ class SSLConfig:
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
-            tracked_features = self._sample_tracked_features(video_ids, session)
-            contrastive_images = self._create_contrastive_images(tracked_features, base_path)
+            tracking_frame_features = self._sample_tracking_frame_features(video_ids, session)
+            contrastive_images = self._create_contrastive_images(tracking_frame_features, base_path)
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
@@ -106,10 +106,10 @@ class SSLConfig:
         query = min_count_filter(query, self.min_images_per_tracking)
         return query
 
-    def _sample_tracked_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
+    def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
         BATCH_SIZE = 200
-        num_batches = (len(video_ids) // BATCH_SIZE)
+        num_batches = len(video_ids) // BATCH_SIZE
         tffs = []
         for i in range(num_batches + 1):
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
