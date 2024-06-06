@@ -93,9 +93,7 @@ class SSLDataModule(L.LightningDataModule):  # TODO
             dataset_class=dataset_class,
             batch_size=self.batch_size,
             transforms=dataset_class.get_transforms(),
-            tensor_transforms=transforms.Compose(
-                [self.resize_transforms, self.tensor_transforms]
-            ),
+            tensor_transforms=transforms.Compose([self.resize_transforms, self.tensor_transforms]),
             training_transforms=self.training_transforms,
             additional_dataset_classes=dataset_classes,
             additional_data_dirs=self.additional_data_dirs,
