@@ -68,10 +68,13 @@ def main(args: TrainingArgs) -> None:
         assert args.split_path is not None, "Split path must be provided for SSL training."
         ssl_config = SSLConfig(
             tff_selection=args.tff_selection,
+            negative_mining=args.negative_mining,
             n_samples=args.n_samples,
             feature_types=args.feature_types,
             min_confidence=args.min_confidence,
             min_images_per_tracking=args.min_images_per_tracking,
+            width_range=args.width_range,
+            height_range=args.height_range,
             split_path=args.split_path,
         )
         dm = SSLDataModule(
