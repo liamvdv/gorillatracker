@@ -26,3 +26,16 @@ class OfflineResponseBasedLoss(nn.Module):
             torch.Tensor([-1.0]),
             torch.Tensor([-1.0]),
         )  # dummy values for pos/neg distances
+
+
+if __name__ == "__main__":
+    # Test the OfflineResponseBasedLoss
+    teacher_model_wandb_link = "https://wandb.ai/gorillas/Embedding-SwinV2-SSL-Face/runs/mqhtj5r5"
+    offline_response_based_loss = OfflineResponseBasedLoss(teacher_model_wandb_link)
+
+    embeddings = torch.randn(10, 256)
+    labels = torch.randint(0, 10, (10,))
+    images = torch.randn(10, 3, 192, 192)
+
+    loss, pos_dist, neg_dist = offline_response_based_loss(embeddings, labels, images)
+    print(loss, pos_dist, neg_dist)
