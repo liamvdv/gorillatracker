@@ -54,10 +54,10 @@ class SplitArgs:
             self.name = f"{self.name}_{self.version}_{self.split_by}-{self.train_split}-{self.val_split}-{self.test_split}_split"
         else:
             self.name = f"{self.name}_{self.version}_{self.split_by}_split"
-            
+
         current_time = dt.datetime.now().strftime("%Y%m%d_%H%M")
         self.name = f"{self.name}_{current_time}"
-        
+
     def train_video_ids(self) -> list[int]:
         return self._train_video_ids
 
@@ -176,6 +176,7 @@ class SplitArgs:
         with open(path, "rb") as file:
             return pickle.load(file)
 
+
 if __name__ == "__main__":
     DB_URI = os.environ.get("POSTGRESQL_URI")
     if DB_URI is None:
@@ -200,11 +201,13 @@ if __name__ == "__main__":
         max_val_videos=10,  # max videos in val bucket
         max_test_videos=10,  # max videos in test bucket
     )
-    if(True):
+    if True:
         args.create_split()
         args.save_to_pickle()
         print("Split created and saved")
     else:
-        split_path = "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+        split_path = (
+            "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+        )
         args = SplitArgs.load_pickle(split_path)
     print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))
