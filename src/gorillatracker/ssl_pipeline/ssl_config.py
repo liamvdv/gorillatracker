@@ -109,9 +109,9 @@ class SSLConfig:
     def _sample_tracked_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
         BATCH_SIZE = 200
-        num_batches = (len(video_ids) // BATCH_SIZE) + 1
+        num_batches = (len(video_ids) // BATCH_SIZE)
         tffs = []
-        for i in range(num_batches):
+        for i in range(num_batches + 1):
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
             sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
             tffs.extend(list(sampler.sample(session)))
