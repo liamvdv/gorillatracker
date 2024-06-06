@@ -124,12 +124,14 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
 
+
 def social_group_negatives(video_ids: Sequence[int], version: str) -> Select[tuple[int, int]]:
     relevant_videos_cte = (
         select(Video.video_id)
         .where(
             # Video.video_id.in_(video_ids),
-            Video.version == version
+            Video.version
+            == version
         )
         .cte("relevant_videos")
     )
@@ -150,7 +152,6 @@ def social_group_negatives(video_ids: Sequence[int], version: str) -> Select[tup
         .where(left_cte.c.value != right_cte.c.value)
     )
     return stmt
-    
 
 
 def find_social_group_negatives(session: Session, version: str, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
