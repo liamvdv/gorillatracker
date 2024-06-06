@@ -58,7 +58,7 @@ def main(args: TrainingArgs) -> None:
     model_cls = get_model_cls(args.model_name_or_path)
 
     #################### Construct dataloaders #################
-    def resize_transform(x):
+    def resize_transform(x: torch.Tensor) -> torch.Tensor:
         return x
 
     if args.data_resize_transform is not None:

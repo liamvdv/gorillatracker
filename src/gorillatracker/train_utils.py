@@ -39,9 +39,9 @@ def get_data_module(
     batch_size: int,
     loss_mode: str,
     workers: int,
-    resize_transforms: gtypes.Transform = None,
-    training_transforms: gtypes.Transform = None,  # type: ignore
-    tensor_transforms: gtypes.Transform = None,  # type: ignore
+    resize_transforms: gtypes.Transform = lambda x: x,
+    training_transforms: gtypes.Transform = lambda x: x,
+    tensor_transforms: gtypes.Transform = lambda x: x,
     additional_dataset_class_ids: Optional[List[str]] = None,
     additional_data_dirs: Optional[List[str]] = None,
 ) -> NletDataModule:

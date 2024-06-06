@@ -16,7 +16,8 @@ def test_offline_data_module() -> None:
         batch_size=1,
         loss_mode="offline",
         workers=4,
-        model_transforms=lambda x: x,
+        resize_transforms=lambda x: x,
+        tensor_transforms=lambda x: x,
         training_transforms=lambda x: x,
     )
     dm.setup("fit")
