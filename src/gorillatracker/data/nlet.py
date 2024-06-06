@@ -34,9 +34,10 @@ class NletDataModule(L.LightningDataModule):
         data_dir: Path,
         dataset_class: Type[NletDataset],
         nlet_builder: FlatNletBuilder,
-        batch_size: int = 32,
-        transforms: gtypes.TensorTransform = lambda x: x,
-        training_transforms: gtypes.TensorTransform = lambda x: x,
+        batch_size: int,
+        workers: int,
+        model_transforms: gtypes.TensorTransform,
+        training_transforms: gtypes.TensorTransform,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[Path] = [],
         **kwargs: Any,  # KFold args, SSLConfig, etc.
@@ -54,7 +55,8 @@ class NletDataModule(L.LightningDataModule):
         self.dataset_class = dataset_class
         self.nlet_builder = nlet_builder
         self.batch_size = batch_size
-        self.transforms = transforms
+        self.workers = workers
+        self.model_transforms = model_transforms
         self.training_transforms = training_transforms
         self.eval_datasets = [dataset_class] + eval_datasets
         self.eval_data_dirs = [data_dir] + eval_data_dirs
@@ -68,14 +70,18 @@ class NletDataModule(L.LightningDataModule):
                 self.data_dir,
                 nlet_builder=self.nlet_builder,
                 partition="train",
-                transform=transforms.Compose([self.transforms, self.training_transforms]),
+                transform=transforms.Compose([self.model_transforms, self.training_transforms]),
                 **self.kwargs,
             )
 
         if stage == "fit" or stage == "validate":
             self.val = [
                 dataset_class(
-                    data_dir, nlet_builder=self.nlet_builder, partition="val", transform=self.transforms, **self.kwargs
+                    data_dir,
+                    nlet_builder=self.nlet_builder,
+                    partition="val",
+                    transform=self.model_transforms,
+                    **self.kwargs,
                 )
                 for dataset_class, data_dir in zip(self.eval_datasets, self.eval_data_dirs)
             ]
@@ -83,7 +89,11 @@ class NletDataModule(L.LightningDataModule):
         if stage == "test":
             self.test = [
                 dataset_class(
-                    data_dir, nlet_builder=self.nlet_builder, partition="test", transform=self.transforms, **self.kwargs
+                    data_dir,
+                    nlet_builder=self.nlet_builder,
+                    partition="test",
+                    transform=self.model_transforms,
+                    **self.kwargs,
                 )
                 for dataset_class, data_dir in zip(self.eval_datasets, self.eval_data_dirs)
             ]
@@ -93,22 +103,26 @@ class NletDataModule(L.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
         return DataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=10
+            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=self.workers
         )
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=10)
+            DataLoader(
+                val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=self.workers
+            )
             for val in self.val
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=10)
+            DataLoader(
+                test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=self.workers
+            )
             for test in self.test
         ]
 
-    def predict_dataloader(self) -> gtypes.BatchNletDataLoader:
+    def predict_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:  # TODO(memben)
         raise NotImplementedError
 
     def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
@@ -122,7 +136,23 @@ class NletDataModule(L.LightningDataModule):
 
     # TODO(memben): we probably want tuple[int, list[int], list[int]]
     def get_num_classes(self, partition: Literal["train", "val", "test"]) -> int:
-        return -1
+        if partition == "train":
+            return self.train.num_classes
+        elif partition == "val":
+            return self.val[0].num_classes
+        elif partition == "test":
+            return self.test[0].num_classes
+        else:
+            raise ValueError(f"unknown partition '{partition}'")
+
+    # TODO(memben): we probably want to return a list of dicts
+    def get_class_distribution(self, partition: Literal["train", "val", "test"]) -> dict[gtypes.Label, int]:
+        if partition == "train":
+            return self.train.class_distribution
+        elif partition == "val":
+            return self.val[0].class_distribution
+        elif partition == "test":
+            return self.test[0].class_distribution
 
 
 class NletDataset(Dataset[Nlet], ABC):
@@ -152,6 +182,11 @@ class NletDataset(Dataset[Nlet], ABC):
     @property
     @abstractmethod
     def num_classes(self) -> int:
+        pass
+
+    @property
+    @abstractmethod
+    def class_distribution(self) -> dict[gtypes.Label, int]:
         pass
 
     @abstractmethod

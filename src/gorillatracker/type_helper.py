@@ -9,7 +9,7 @@ BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
 Image = cvt.MatLike
 
 Id = str
-Label = Union[str, int]
+Label = int
 
 NletId = Tuple[Id, ...]  # e.g (anchor_id, positive_id, negative_id)
 NletLabel = Tuple[Label, ...]  # e.g (anchor_label, positive_label, negative_label)

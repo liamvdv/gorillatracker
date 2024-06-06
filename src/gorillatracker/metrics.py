@@ -1,5 +1,5 @@
 from functools import partial
-from itertools import islice
+from itertools import chain, islice
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import lightning as L
@@ -55,7 +55,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.use_quantization_aware_training = use_quantization_aware_training
         self.use_ssl = use_ssl
         self.kfold_k = kfold_k
-        if knn_with_train:
+        if knn_with_train:  # TODO(memben)
             dm.setup("fit")
             self.train_dataloader = dm.train_dataloader()
 
@@ -65,10 +65,14 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_labels = torch.tensor([])
         for batch in self.train_dataloader:
             ids, images, labels = batch
-            anchor_images = images[0].to(trainer.model.device)
+            batch_size = len(images)
+            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
+            anchor_images = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)[:batch_size].to(
+                trainer.model.device
+            )
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
-            anchor_labels = labels[0]
+            anchor_labels = flat_labels[:batch_size]
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
@@ -91,13 +95,13 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             artifact.add(table, "embeddings_table_step_{}".format(current_step))
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
-            # TODO(V1nce1): Add back in when SSL Validation is working
-            # if self.use_ssl and dataloader_idx == 0:
-            #     continue
 
-            train_embeddings, train_labels = (
-                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-            )
+            train_embeddings: Optional[torch.Tensor] = None
+            train_labels: Optional[gtypes.MergedLabels] = None
+            if self.knn_with_train:
+                train_embeddings, train_labels = (
+                    self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+                )
 
             metrics = {
                 "knn5": partial(knn, k=5),
@@ -123,7 +127,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 data=embeddings_table,
                 embedding_name="val/embeddings",
                 metrics=metrics,
-                train_embeddings=train_embeddings,  # type: ignore
+                train_embeddings=train_embeddings,
                 train_labels=train_labels,
                 kfold_k=self.kfold_k,
                 dataloader_name=dataloader_name,
@@ -222,7 +226,7 @@ def evaluate_embeddings(
     data: pd.DataFrame,
     embedding_name: str,
     metrics: Dict[str, Any],
-    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
+    train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
     kfold_k: Optional[int] = None,
     dataloader_name: str = "Unkonwn",
@@ -256,10 +260,10 @@ def evaluate_embeddings(
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}{metric_name}/{key}": value})
+                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value})
         else:
-            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}{metric_name}/": result})
-    
+            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result})
+
     return results
 
 

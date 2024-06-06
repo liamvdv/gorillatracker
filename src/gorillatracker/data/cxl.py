@@ -27,6 +27,10 @@ class CXLDataset(NletDataset):
     def num_classes(self) -> int:
         return len(self.contrastive_sampler.class_labels)
 
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.groups.items()}
+
     def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
@@ -39,13 +43,18 @@ class CXLDataset(NletDataset):
                     ...
         """
         dirpath = base_dir / Path(self.partition)
-        return ContrastiveClassSampler(get_groups(dirpath))
+        self.groups = get_groups(dirpath)
+        return ContrastiveClassSampler(self.groups)
 
 
 class KFoldCXLDataset(KFoldNletDataset):
     @property
     def num_classes(self) -> int:
         return len(self.contrastive_sampler.class_labels)
+
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.groups.items()}
 
     def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
         """
@@ -70,10 +79,10 @@ class KFoldCXLDataset(KFoldNletDataset):
                     groups[label].extend(samples)
         elif self.partition == "test":
             dirpath = base_dir / Path(self.partition)
-            groups = get_groups(dirpath)
+            self.groups = get_groups(dirpath)
         elif self.partition == "val":
             dirpath = base_dir / Path(f"fold-{self.val_i}")
-            groups = get_groups(dirpath)
+            self.groups = get_groups(dirpath)
         else:
             raise ValueError(f"Invalid partition: {self.partition}")
         return ContrastiveClassSampler(groups)

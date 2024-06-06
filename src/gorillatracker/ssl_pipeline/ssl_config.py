@@ -29,7 +29,7 @@ class SSLConfig:
     feature_types: list[str]
     min_confidence: float
     min_images_per_tracking: int
-    split_path: str
+    split_path: Path
 
     def get_contrastive_sampler(
         self,
@@ -48,7 +48,7 @@ class SSLConfig:
             return ContrastiveClassSampler(classes)
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
-        split = SplitArgs.load_pickle(self.split_path)
+        split = SplitArgs.load_pickle(str(self.split_path))
         if partition == "train":
             return split.train_video_ids()
         elif partition == "val":

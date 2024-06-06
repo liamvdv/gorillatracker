@@ -129,7 +129,6 @@ class BaseModule(L.LightningModule):
         save_hyperparameters: bool = True,
         embedding_size: int = 256,
         batch_size: int = 32,
-        num_classes: Tuple[int, int, int] = (0, 0, 0),
         dataset_names: list[str] = [],
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
@@ -185,27 +184,26 @@ class BaseModule(L.LightningModule):
         self,
         model: nn.Module,
         loss_mode: str,
-        margin: float = 0.5,
-        s: float = 64.0,
-        delta_t: int = 200,
-        mem_bank_start_epoch: int = 2,
-        lambda_membank: float = 0.5,
-        embedding_size: int = 256,
-        batch_size: int = 32,
-        num_classes: Tuple[int, int, int] = (0, 0, 0),
-        class_distribution: Dict[int, int] = {},
-        use_focal_loss: bool = False,
-        k_subcenters: int = 2,
-        accelerator: str = "cpu",
-        label_smoothing: float = 0.0,
-        l2_alpha: float = 0.1,
-        l2_beta: float = 0.01,
-        path_to_pretrained_weights: str = "",
-        use_class_weights: Union[List[float], None] = None,
-        use_dist_term: bool = False,
-        **kwargs: Dict[str, Any],
+        margin: float,
+        s: float,
+        delta_t: int,
+        mem_bank_start_epoch: int,
+        lambda_membank: float,
+        embedding_size: int,
+        batch_size: int,
+        num_classes: Optional[tuple[int, int, int]],
+        class_distribution: Optional[dict[int, int]],
+        use_focal_loss: bool,
+        k_subcenters: int,
+        accelerator: str,
+        label_smoothing: float,
+        l2_alpha: float,
+        l2_beta: float,
+        path_to_pretrained_weights: str,
+        use_class_weights: Union[List[float], None],
+        use_dist_term: bool,
+        **kwargs: Any,
     ) -> None:
-
         kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.loss_module_train = get_loss(
             loss_mode,
@@ -214,8 +212,8 @@ class BaseModule(L.LightningModule):
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
-            num_classes=num_classes[0],
-            class_distribution=class_distribution[0],
+            num_classes=num_classes[0] if num_classes is not None else None,  # TODO(memben)
+            class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -239,8 +237,8 @@ class BaseModule(L.LightningModule):
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
-            num_classes=num_classes[1],
-            class_distribution=class_distribution[1],
+            num_classes=num_classes[1] if num_classes is not None else None,  # TODO(memben)
+            class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -272,7 +270,6 @@ class BaseModule(L.LightningModule):
             self.loss_module_train.loss.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
 
-    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         ids, images, labels = batch
         # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)

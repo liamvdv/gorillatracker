@@ -18,16 +18,23 @@ class ModelConstructor:
 
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
-        # TODO(memben)
-        assert "softmax" not in args.loss_mode or not args.use_ssl, "softmax loss not supported for SSL training"
 
-        num_classes_dist = (
-            (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test"))  # type: ignore
-            if not args.use_ssl
-            else ((-1, {}), (-1, {}), (-1, {}))
-        )
-        num_classes = (num_classes_dist[0][0], num_classes_dist[1][0], num_classes_dist[2][0])
-        class_distribution = (num_classes_dist[0][1], num_classes_dist[1][1], num_classes_dist[2][1])
+        num_classes = None
+        class_distribution = None
+        # TODO(memben): this is not logical for multiple datasets
+        if "softmax" in args.loss_mode:
+            num_classes = (
+                self.dm.get_num_classes("train"),
+                self.dm.get_num_classes("val"),
+                self.dm.get_num_classes("test"),
+            )
+            class_distribution = (
+                self.dm.get_class_distribution("train"),
+                self.dm.get_class_distribution("val"),
+                self.dm.get_class_distribution("test"),
+            )
+
+        dataset_names = self.dm.get_dataset_class_names()
 
         return dict(
             model_name_or_path=args.model_name_or_path,
@@ -53,13 +60,9 @@ class ModelConstructor:
             delta_t=args.delta_t,
             mem_bank_start_epoch=args.mem_bank_start_epoch,
             lambda_membank=args.lambda_membank,
-            num_classes=(
-                (self.dm.get_num_classes("train"), self.dm.get_num_classes("val"), self.dm.get_num_classes("test"))  # type: ignore
-                if not args.use_ssl
-                else (-1, -1, -1)
-            ), # TODO(memben)
-            dataset_names=(self.dm.get_dataset_class_names()),
-            # TODO(memben): add dataset for class_distribution here
+            num_classes=num_classes,
+            class_distribution=class_distribution,
+            dataset_names=dataset_names,
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,

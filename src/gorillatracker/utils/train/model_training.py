@@ -94,8 +94,7 @@ def train_and_validate_using_kfold(
     wandb_logging_module: WandbLoggingModule,
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
 ) -> Trainer:
-
-    # TODO(memben): Fix kfold_k
+    # TODO(memben):!!! Fix kfold_k
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
     dm.k = kfold_k  # type: ignore

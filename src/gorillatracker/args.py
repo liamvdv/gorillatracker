@@ -130,7 +130,7 @@ class TrainingArgs:
     # SSL Config
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
-    split_path: Union[str, None] = field(default=None)
+    split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)

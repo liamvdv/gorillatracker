@@ -55,27 +55,25 @@ def main(args: TrainingArgs) -> None:
 
     ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
-
-    #################### Construct dataloaders #################
+    #################### Construct Data Module #################
     model_transforms = model_cls.get_tensor_transforms()
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
 
     ssl_config = SSLConfig(
         tff_selection=args.tff_selection,
-        n_videos=args.n_videos,
         n_samples=args.n_samples,
         feature_types=args.feature_types,
         min_confidence=args.min_confidence,
         min_images_per_tracking=args.min_images_per_tracking,
-        split=None,
+        split_path=args.split_path,
     )
-
     dm = build_data_module(
         dataset_class_id=args.dataset_class,
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         loss_mode=args.loss_mode,
+        workers=args.workers,
         model_transforms=model_transforms,
         training_transforms=model_cls.get_training_transforms(),
         additional_eval_datasets_ids=args.additional_val_dataset_classes,
@@ -90,11 +88,7 @@ def main(args: TrainingArgs) -> None:
     model_constructor = ModelConstructor(args, model_cls, dm)
     model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
-    #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-
+    #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(

@@ -1,9 +1,15 @@
 from collections import defaultdict
 from pathlib import Path
+from typing import Any, Callable, Literal
 
-from gorillatracker.data.contrastive_sampler import ContrastiveClassSampler, ContrastiveImage, group_contrastive_images
-from gorillatracker.data.nlet import NletDataset
-from gorillatracker.type_helper import Label
+from gorillatracker.data.contrastive_sampler import (
+    ContrastiveClassSampler,
+    ContrastiveImage,
+    ContrastiveSampler,
+    group_contrastive_images,
+)
+from gorillatracker.data.nlet import FlatNlet, NletDataset
+from gorillatracker.type_helper import Label, TensorTransform
 from gorillatracker.utils.labelencoder import LabelEncoder
 
 
@@ -32,6 +38,10 @@ class BristolDataset(NletDataset):
     def num_classes(self) -> int:
         return len(self.contrastive_sampler.class_labels)
 
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.groups.items()}
+
     def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
@@ -44,4 +54,5 @@ class BristolDataset(NletDataset):
                     ...
         """
         dirpath = base_dir / Path(self.partition)
-        return ContrastiveClassSampler(get_groups(dirpath))
+        self.groups = get_groups(dirpath)
+        return ContrastiveClassSampler(self.groups)

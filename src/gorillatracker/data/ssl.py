@@ -31,7 +31,11 @@ class SSLDataset(NletDataset):
 
     @property
     def num_classes(self) -> int:
-        raise NotImplementedError
+        raise ValueError("num classes unknown for SSLDataset")
+
+    @property
+    def class_distribution(self) -> dict[gtypes.Label, int]:
+        raise ValueError("class distribution unknown for SSLDataset")
 
     def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveSampler:
         return self.ssl_config.get_contrastive_sampler(base_dir, self.partition)
