@@ -42,8 +42,6 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         knn_with_train: bool,
         wandb_run: Runner,
         dm: NletDataModule,
-        use_ssl: bool = False,
-        kfold_k: Optional[int] = None,
         use_quantization_aware_training: bool = False,
     ) -> None:
         super().__init__()
@@ -53,9 +51,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.run = wandb_run
         self.dm = dm
         self.use_quantization_aware_training = use_quantization_aware_training
-        self.use_ssl = use_ssl
-        self.kfold_k = kfold_k
-        if knn_with_train:  # TODO(memben)
+        if knn_with_train:  # HACK(memben)
             dm.setup("fit")
             self.train_dataloader = dm.train_dataloader()
 
@@ -129,7 +125,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 metrics=metrics,
                 train_embeddings=train_embeddings,
                 train_labels=train_labels,
-                kfold_k=self.kfold_k,
+                kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
                 dataloader_name=dataloader_name,
             )
             # clear the table where the embeddings are stored
@@ -255,7 +251,6 @@ def evaluate_embeddings(
         for metric_name, metric in metrics.items()
     }
 
-    # TODO(memben): Fix to adhere naming schema
     kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
     for metric_name, result in results.items():
         if isinstance(result, dict):

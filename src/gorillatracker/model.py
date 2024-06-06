@@ -200,7 +200,7 @@ class BaseModule(L.LightningModule):
         l2_alpha: float,
         l2_beta: float,
         path_to_pretrained_weights: str,
-        use_class_weights: Union[List[float], None],
+        use_class_weights: bool,
         use_dist_term: bool,
         **kwargs: Any,
     ) -> None:
@@ -370,7 +370,7 @@ class BaseModule(L.LightningModule):
                 if self.use_dist_term:
                     loss_module_val = loss_module_val.arcface
 
-                num_classes = loss_module_val.num_classes
+                num_classes = loss_module_val.num_classes  # TODO(memben)
                 assert len(table) > 0, f"Empty table for dataloader {i}"
 
                 # get weights for all classes by averaging over all embeddings

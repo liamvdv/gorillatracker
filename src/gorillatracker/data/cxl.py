@@ -68,7 +68,7 @@ class KFoldCXLDataset(KFoldNletDataset):
                     ...
         """
         if self.partition == "train":
-            groups: defaultdict[Label, list[ContrastiveImage]] = defaultdict(list)
+            self.groups: defaultdict[Label, list[ContrastiveImage]] = defaultdict(list)
             for i in range(self.k):
                 if i == self.val_i:
                     continue
@@ -76,7 +76,7 @@ class KFoldCXLDataset(KFoldNletDataset):
                 new_groups = get_groups(dirpath)
                 for label, samples in new_groups.items():
                     # NOTE(memben): NO deduplication here (feel free to add it)
-                    groups[label].extend(samples)
+                    self.groups[label].extend(samples)
         elif self.partition == "test":
             dirpath = base_dir / Path(self.partition)
             self.groups = get_groups(dirpath)
@@ -85,4 +85,4 @@ class KFoldCXLDataset(KFoldNletDataset):
             self.groups = get_groups(dirpath)
         else:
             raise ValueError(f"Invalid partition: {self.partition}")
-        return ContrastiveClassSampler(groups)
+        return ContrastiveClassSampler(self.groups)

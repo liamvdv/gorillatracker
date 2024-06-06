@@ -40,7 +40,7 @@ class TrainingArgs:
     use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
-    fast_dev_run: bool = field(default=True)
+    fast_dev_run: bool = field(default=False)
     profiler: Union[Literal["simple", "advanced", "pytorch"], None] = field(default=None)
     offline: bool = field(default=True)
     data_preprocessing_only: bool = field(default=False)
@@ -104,7 +104,7 @@ class TrainingArgs:
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
     label_smoothing: float = field(default=0.0)
-    use_class_weights: Union[List[float], None] = field(default=None)
+    use_class_weights: bool = field(default=False)
     use_dist_term: bool = field(default=False)
 
     batch_size: int = field(default=8)

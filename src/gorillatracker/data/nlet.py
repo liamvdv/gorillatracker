@@ -40,7 +40,7 @@ class NletDataModule(L.LightningDataModule):
         training_transforms: gtypes.TensorTransform,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[Path] = [],
-        **kwargs: Any,  # KFold args, SSLConfig, etc.
+        **kwargs: Any,  # SSLConfig, etc.
     ) -> None:
         """
         The `eval_datasets` are used for evaluation purposes and are additional to the primary `dataset_class`.
@@ -162,7 +162,7 @@ class NletDataset(Dataset[Nlet], ABC):
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         transform: gtypes.TensorTransform,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ):
         self.partition = partition
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
@@ -226,11 +226,12 @@ class KFoldNletDataset(NletDataset):
         val_i: int,
         k: int,
         transform: gtypes.TensorTransform,
+        **kwargs: Any,
     ):
-        super().__init__(data_dir, nlet_builder, partition, transform)
         assert val_i < k, "val_i must be less than k"
-        self.val_i = val_i
         self.k = k
+        self.val_i = val_i
+        super().__init__(data_dir, nlet_builder, partition, transform)
 
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:

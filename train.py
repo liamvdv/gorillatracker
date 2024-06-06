@@ -79,25 +79,24 @@ def main(args: TrainingArgs) -> None:
         additional_eval_datasets_ids=args.additional_val_dataset_classes,
         additional_eval_data_dirs=args.additional_val_data_dirs,
         ssl_config=ssl_config,
-        kfold_k=None,  # TODO(memben)
-        kfold_val_i=None,  # TODO(memben)
     )
 
     ################# Construct model ##############
 
-    model_constructor = ModelConstructor(args, model_cls, dm)
-    model = model_constructor.construct(wandb_logging_module, wandb_logger)
+    if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
+        model_constructor = ModelConstructor(args, model_cls, dm)
+        model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
+    assert not (args.knn_with_train and args.kfold), "Cannot use knn_with_train and kfold at the same time."
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
         use_quantization_aware_training=args.use_quantization_aware_training,
-        use_ssl=args.use_ssl,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(

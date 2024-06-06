@@ -45,8 +45,6 @@ def build_data_module(
     additional_eval_datasets_ids: list[str] = [],
     additional_eval_data_dirs: list[Path] = [],
     ssl_config: Optional[SSLConfig] = None,
-    kfold_k: Optional[int] = None,
-    kfold_val_i: Optional[int] = None,
 ) -> NletDataModule:
     assert dataset_class_id in dataset_registry, f"Dataset class {dataset_class_id} not found in registry"
     assert all(
@@ -58,11 +56,6 @@ def build_data_module(
 
     if dataset_class_id == SSLDatasetId:
         assert ssl_config is not None, "ssl_config must be set for SSLDataset"
-
-    if dataset_class_id == KFoldCXLDatasetId:
-        assert kfold_k is not None and kfold_val_i is not None, "kfold_k and kfold_val_i must be set together"
-        assert 0 < kfold_k, "kfold_k must be greater than 0"
-        assert kfold_val_i < kfold_k, "kfold_val_i must be less than kfold_k"
 
     dataset_class = dataset_registry[dataset_class_id]
     eval_datasets = [dataset_registry[cls_id] for cls_id in additional_eval_datasets_ids]
@@ -81,6 +74,4 @@ def build_data_module(
         eval_datasets=eval_datasets,
         eval_data_dirs=additional_eval_data_dirs,
         ssl_config=ssl_config,
-        kfold_k=kfold_k,
-        kfold_val_i=kfold_val_i,
     )
