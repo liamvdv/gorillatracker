@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
 from typing import List, Literal, Optional
-import time
 
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session
