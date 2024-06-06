@@ -110,7 +110,7 @@ class SSLConfig:
     def _sample_tracked_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
         BATCH_SIZE = 200
-        num_batches = (len(video_ids) + BATCH_SIZE - 1) // BATCH_SIZE
+        num_batches = (len(video_ids) // BATCH_SIZE) + 1
         tffs = []
         for i in range(num_batches):
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
@@ -159,7 +159,6 @@ if __name__ == "__main__":
     )
     contrastive_sampler = ssl_config.get_contrastive_sampler("train", "cropped-images/2024-04-18")
     print(len(contrastive_sampler))
-    exit()
     for i in range(10):
         contrastive_image = contrastive_sampler[i * 10]
         print(contrastive_image)
