@@ -124,27 +124,37 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
 
+def social_group_negatives(video_ids: Sequence[int], version: str) -> Select[tuple[int, int]]:
+    relevant_videos_cte = (
+        select(Video.video_id)
+        .where(
+            # Video.video_id.in_(video_ids),
+            Video.version == version
+        )
+        .cte("relevant_videos")
+    )
 
-def social_group_negatives(session: Session, version: str) -> Sequence[tuple[Video, Video]]:
-    subquery = (
-        select(Video.video_id, VideoFeature.value)
-        .join(VideoFeature, Video.video_id == VideoFeature.video_id)
-        .where(Video.version == version, VideoFeature.feature_type == "social_group")
-        # Note: string can change
-    ).subquery()
+    video_social_groups_cte = (
+        select(relevant_videos_cte.c.video_id, VideoFeature.value)
+        .join(VideoFeature, relevant_videos_cte.c.video_id == VideoFeature.video_id)
+        .where(VideoFeature.feature_type == "social_group")
+        .cte("video_social_groups")
+    )
 
-    left_subquery = alias(subquery)
-    right_subquery = alias(subquery)
-
-    left_video = aliased(Video)
-    right_video = aliased(Video)
+    left_cte = aliased(video_social_groups_cte, name="left_cte")
+    right_cte = aliased(video_social_groups_cte, name="right_cte")
 
     stmt = (
-        select(left_video, right_video)
-        .join(left_subquery, left_video.video_id == left_subquery.c.video_id)
-        .join(right_subquery, right_video.video_id == right_subquery.c.video_id)
-        .where(left_subquery.c.value != right_subquery.c.value, left_subquery.c.video_id < right_subquery.c.video_id)
+        select(left_cte.c.video_id, right_cte.c.video_id)
+        .join(right_cte, left_cte.c.video_id < right_cte.c.video_id)
+        .where(left_cte.c.value != right_cte.c.value)
     )
+    return stmt
+    
+
+
+def find_social_group_negatives(session: Session, version: str, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
+    stmt = social_group_negatives(video_ids, version)
     result = session.execute(stmt).all()
     negative_tuples = [(row[0], row[1]) for row in result]
     return negative_tuples
@@ -158,9 +168,10 @@ if __name__ == "__main__":
     from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 
     engine = create_engine(GorillaDatasetKISZ.DB_URI)
-    video_ids = list(range(1, 201))
+    video_ids = list(range(1, 10000))
+    version = "2024-04-18"
     with Session(engine) as session:
         start = time.time()
-        overlapping_trackings = find_overlapping_trackings(session, video_ids)
+        video_negatives = find_social_group_negatives(session, version, video_ids)
         end = time.time()
-        print(f"Found {len(overlapping_trackings)} overlapping trackings in {end - start:.2f} seconds")
+        print(f"Found {len(video_negatives)} video negatives in {end - start:.2f} seconds")
