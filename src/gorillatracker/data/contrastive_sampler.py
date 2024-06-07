@@ -105,7 +105,7 @@ class CliqueGraphSampler(ContrastiveSampler):
     
     @property
     def class_labels(self) -> list[gtypes.Label]:
-        raise NotImplementedError
+        raise NotImplementedError("No logic yet implemented")
 
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         return self.graph.get_random_clique_member(sample, exclude=[sample])
