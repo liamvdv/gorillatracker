@@ -15,7 +15,6 @@ from gorillatracker.data.builder import build_data_module
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
-from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.train import (
     ModelConstructor,
     train_and_validate_model,
