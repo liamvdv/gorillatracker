@@ -131,15 +131,26 @@ class TrainingArgs:
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
+    negative_mining: Literal["random", "overlapping"] = field(default="random")
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)
     min_images_per_tracking: int = field(default=3)
+    width_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
+    height_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0
         assert self.batch_size > 0
         assert self.gradient_accumulation_steps > 0
         assert isinstance(self.grad_clip, float), "automatically set to None if < 0"
+        if not (
+            self.width_range[0] is None or self.width_range[1] is None or self.width_range[0] <= self.width_range[1]
+        ):
+            raise ValueError("min_width should be <= max_width")
+        if not (
+            self.height_range[0] is None or self.height_range[1] is None or self.height_range[0] <= self.height_range[1]
+        ):
+            raise ValueError("min_height should be <= max_height")
         if self.grad_clip <= 0:
             self.grad_clip = None
