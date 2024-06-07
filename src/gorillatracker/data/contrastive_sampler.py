@@ -102,6 +102,10 @@ class CliqueGraphSampler(ContrastiveSampler):
 
     def __len__(self) -> int:
         return len(self.graph)
+    
+    @property
+    def class_labels(self) -> list[gtypes.Label]:
+        raise NotImplementedError
 
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         return self.graph.get_random_clique_member(sample, exclude=[sample])
