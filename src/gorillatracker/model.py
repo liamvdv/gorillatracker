@@ -332,7 +332,7 @@ class BaseModule(L.LightningModule):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
-                f"{dataloader_name}{kfold_prefix}/val/loss",
+                f"{dataloader_name}/{kfold_prefix}val/loss",
                 loss,
                 on_step=True,
                 sync_dist=True,
@@ -340,13 +340,13 @@ class BaseModule(L.LightningModule):
                 add_dataloader_idx=False,
             )
             self.log(
-                f"{dataloader_name}{kfold_prefix}/val/positive_distance",
+                f"{dataloader_name}/{kfold_prefix}val/positive_distance",
                 pos_dist,
                 on_step=True,
                 add_dataloader_idx=False,
             )
             self.log(
-                f"{dataloader_name}{kfold_prefix}/val/negative_distance",
+                f"{dataloader_name}/{kfold_prefix}val/negative_distance",
                 neg_dist,
                 on_step=True,
                 add_dataloader_idx=False,
@@ -400,7 +400,7 @@ class BaseModule(L.LightningModule):
                     losses.append(loss)
                 loss = torch.tensor(losses).mean()
                 assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-                self.log(f"{dataloader_name}{kfold_prefix}/val/loss", loss, sync_dist=True)
+                self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss, sync_dist=True)
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
@@ -569,7 +569,7 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
                 # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
-                transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
+                # transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
             ]
         )
 

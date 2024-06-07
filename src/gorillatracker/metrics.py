@@ -51,17 +51,15 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.run = wandb_run
         self.dm = dm
         self.use_quantization_aware_training = use_quantization_aware_training
-        if knn_with_train:  # HACK(memben)
-            dm.setup("fit")
-            self.train_dataloader = dm.train_dataloader()
 
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
         train_labels = torch.tensor([])
-        for batch in self.train_dataloader:
+        for batch in self.dm.train_dataloader():
             ids, images, labels = batch
             batch_size = len(images)
+            # TODO(memben)
             flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
             anchor_images = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)[:batch_size].to(
                 trainer.model.device

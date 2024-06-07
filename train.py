@@ -90,7 +90,6 @@ def main(args: TrainingArgs) -> None:
     #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
-    assert not (args.knn_with_train and args.kfold), "Cannot use knn_with_train and kfold at the same time."
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
         every_n_val_epochs=args.embedding_save_interval,
         knn_with_train=args.knn_with_train,
