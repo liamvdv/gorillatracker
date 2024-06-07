@@ -69,13 +69,13 @@ def ptsq_quantization_fx(model: BaseModule, calibration_input: torch.Tensor) -> 
 def pt2e_quantization(model: BaseModule, calibration_input: torch.Tensor) -> Tuple[GraphModule, PT2EQuantizer]:
     """https://pytorch.org/tutorials/prototype/pt2e_quant_ptq.html"""
     calibration_input_tuple = (calibration_input,)
-    prepared_model = capture_pre_autograd_graph(model, calibration_input_tuple)
+    prepared_model_autograd = capture_pre_autograd_graph(model, calibration_input_tuple)
 
     quantizer = PT2EQuantizer().set_global(get_symmetric_quantization_config(is_per_channel=True, is_dynamic=True))
-    prepared_model = prepare_pt2e(prepared_model, quantizer)
-    torch.ao.quantization.allow_exported_model_train_eval(prepared_model)  # type: ignore
+    prepared_model = prepare_pt2e(prepared_model_autograd, quantizer)
+    torch.ao.quantization.allow_exported_model_train_eval(prepared_model) 
     calibrate(prepared_model, calibration_input)
 
     quantized_model = convert_pt2e(prepared_model, fold_quantize=False)
-    torch.ao.quantization.allow_exported_model_train_eval(quantized_model)  # type: ignore
+    torch.ao.quantization.allow_exported_model_train_eval(quantized_model)
     return quantized_model, quantizer
