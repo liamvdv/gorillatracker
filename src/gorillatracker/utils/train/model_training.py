@@ -158,7 +158,7 @@ def train_using_quantization_aware_training(
     example_inputs = (example_inputs,)  # type: ignore
     autograd_graph = capture_pre_autograd_graph(model.model, example_inputs)
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
-    model.model = prepare_qat_pt2e(autograd_graph, quantizer) 
+    model.model = prepare_qat_pt2e(autograd_graph, quantizer)
 
     torch.ao.quantization.allow_exported_model_train_eval(model.model)
 
