@@ -153,7 +153,9 @@ if __name__ == "__main__":
         min_images_per_tracking=10,
         width_range=(None, None),
         height_range=(None, None),
-        split_path="/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl",
+        split_path=Path(
+            "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+        ),
     )
     contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
     print(len(contrastive_sampler))
