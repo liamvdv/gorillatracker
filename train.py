@@ -1,5 +1,4 @@
 import warnings
-from typing import Union
 
 import torch
 from lightning import seed_everything

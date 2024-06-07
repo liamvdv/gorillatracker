@@ -1,21 +1,19 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 from urllib.parse import urlparse
 
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
 import wandb
-from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from gorillatracker.model import BaseModule, get_model_cls
-from gorillatracker.data.nlet import NletDataset, build_onelet
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.builder import dataset_registry
+from gorillatracker.data.nlet import NletDataset, build_onelet
+from gorillatracker.model import BaseModule, get_model_cls
 
-DataTransforms = Union[Callable[..., Any]]
 BBox = Tuple[float, float, float, float]  # x, y, w, h
 BBoxFrame = Tuple[int, BBox]  # frame_idx, x, y, w, h
 IdFrameDict = Dict[int, List[BBoxFrame]]  # id -> list of frames

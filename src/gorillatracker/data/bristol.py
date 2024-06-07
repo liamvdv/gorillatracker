@@ -1,11 +1,7 @@
 from collections import defaultdict
 from pathlib import Path
 
-from gorillatracker.data.contrastive_sampler import (
-    ContrastiveClassSampler,
-    ContrastiveImage,
-    group_contrastive_images,
-)
+from gorillatracker.data.contrastive_sampler import ContrastiveClassSampler, ContrastiveImage, group_contrastive_images
 from gorillatracker.data.nlet import NletDataset
 from gorillatracker.type_helper import Label
 from gorillatracker.utils.labelencoder import LabelEncoder

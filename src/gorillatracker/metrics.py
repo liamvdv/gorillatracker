@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 import PIL
 import seaborn as sns

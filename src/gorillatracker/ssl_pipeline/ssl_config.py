@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
+    CliqueGraphSampler,
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
-    CliqueGraphSampler,
 )
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
