@@ -26,46 +26,26 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
     sweep_config = {
         "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": project_name,
-        "method": "grid",  # Specify the search method (random search in this case)
-        "metric": {"goal": "maximize", "name": "val/embeddings/knn/accuracy"},  # Specify the metric to optimize
+        "method": "bayes",  # Specify the search method (random search in this case)
+        "metric": {"goal": "maximize", "name": "val/embeddings/knn5/auroc"},  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
     }
     sweep_id = sweep(sweep=sweep_config, project=project_name, entity=entity)
     # Print the sweep ID directly
     print(f"SWEEP_PATH={entity}/{project_name}/{sweep_id}")
-    agent(sweep_id)  # type: ignore
+    agent(sweep_id)
 
 
 sweeps = [
     {
-        "project_name": "Embedding-Efficientnet-CXL-OpenSet",
+        "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
         "entity": "gorillas",
-        "config_path": "./cfgs/efficientnet_cxl.yml",
+        "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
         "parameters": {
-            "loss_mode": {"values": ["offline/native", "online/soft"]},
-            "embedding_size": {"values": [128, 256]},
-            "weight_decay": {"values": [0.2, 0.5]},
-        },
-    },
-    {
-        "project_name": "Embedding-ConvNeXtV2-CXL-Open",
-        "entity": "gorillas",
-        "config_path": "./cfgs/convnextv2_cxl.yml",
-        "parameters": {
-            "loss_mode": {"values": ["offline/native", "online/soft"]},
-            "embedding_size": {"values": [128, 256]},
-            "weight_decay": {"values": [0.2, 0.5]},
-        },
-    },
-    {
-        "project_name": "Embedding-ViT-CXL-OpenSet",
-        "entity": "gorillas",
-        "config_path": "./cfgs/visiontransformer_cxl.yml",
-        "parameters": {
-            "loss_mode": {"values": ["offline/native", "online/soft"]},
-            "embedding_size": {"values": [128, 256]},
-            "weight_decay": {"values": [0.2, 0.5]},
+            "weight_decay": {"values": [0.5, 0.1, 0.01]},
+            "initial_lr": {"values": [1e-3, 1e-4, 1e-5]},
+            "dropout_p": {"values": [0.5, 0.3, 0.1]},
         },
     },
 ]

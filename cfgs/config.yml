@@ -32,11 +32,17 @@ early_stopping_patience: 3      # Early stopping patience (number of epochs)
 min_delta: 0.01                     # Early stopping delta
 embedding_size: 128
 dropout_p: 0.32
+use_quantization_aware_training: False
 
 weight_decay: 0.2               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
+
+# L2SP Arguments
+l2_alpha: 0.1                       # Alpha for the l2sp loss
+l2_beta: 0.01                       # Beta for the l2sp loss
+path_to_pretrained_weights: ""    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                   # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
@@ -52,16 +58,20 @@ warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is per
 initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
 start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+stepwise_schedule: False        # Use stepwise schedule with lr change after each validation
 
 batch_size: 512                 # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 5                   # Training goal (large number)
+val_check_interval: 1.0         # Validation check interval as a fraction of total steps or as an fixed number of steps
 val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
+kfold: False                     # Perform kfold cross validation
 
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
+save_model_to_wandb: False      # Save the model to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
@@ -69,3 +79,7 @@ embedding_save_interval: 2      # Embedding save interval
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: ""
 data_resize_transform: Null
+use_ssl: False
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

@@ -21,9 +21,9 @@ FROM --platform=$TARGETPLATFORM mambaorg/micromamba:1.4.2 as micromamba
 # -----------------
 # base image for amd64
 # -----------------
-FROM --platform=linux/amd64 nvidia/cuda:11.8.0-cudnn8-runtime-ubi8 as amd64ubi8
+FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as amd64ubi8
 # Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
-RUN yum install -y git gcc gcc-c++ nano && yum clean all
+RUN yum install -y git gcc gcc-c++ nano wget && yum clean all
 # Copy lockfile to container
 COPY environment.yml /locks/environment.yml
 
@@ -33,16 +33,16 @@ COPY environment.yml /locks/environment.yml
 # But Ubuntu works better for devcontainers than ubi8
 # So we use Ubuntu for devcontainers and ubi8 for actual deployment on the cluster
 # -----------------
-FROM --platform=linux/amd64 nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 as amd64ubuntu
+FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04 as amd64ubuntu
 # Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
-RUN apt-get update && apt-get install -y git gcc g++ nano openssh-client && apt-get clean
+RUN apt-get update && apt-get install -y git gcc wget g++ nano openssh-client && apt-get clean
 # Copy lockfile to container
 COPY environment.yml /locks/environment.yml
 
 # -----------------
 # base image for ppc64le
 # -----------------
-FROM --platform=linux/ppc64le nvidia/cuda:11.8.0-cudnn8-runtime-ubi8 as ppc64leubi8
+FROM --platform=linux/ppc64le nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as ppc64leubi8
 # Install compiler for .compile() with PyTorch 2.0
 RUN yum install -y gcc gcc-c++ && yum clean all
 # Copy ppc64le specififc lockfile to container
@@ -57,7 +57,7 @@ COPY ppc64le.cenvironment.yml /locks/environment.yml
 # -----------------
 # Final build image - we choose the correct base image based on the target architecture and OS
 # -----------------
-ARG TARGETARCH
+ARG TARGETARCH=amd64
 FROM ${TARGETARCH}${OS_SELECTOR} as final
 # From https://github.com/mamba-org/micromamba-docker#adding-micromamba-to-an-existing-docker-image
 # The commands below add micromamba to an existing image to give the capability to ad-hoc install new dependencies
@@ -95,6 +95,9 @@ RUN apt-get update && apt-get install -y make
 RUN apt-get update && apt-get install bash-completion -y
 RUN echo "source /usr/share/bash-completion/bash_completion" >> /root/.bashrc
 
+# Install postgresql-client for database access
+RUN apt update && apt-get install -y postgresql-client libpython3.10
+
 USER $MAMBA_USER
 
 SHELL ["/usr/local/bin/_dockerfile_shell.sh"]
@@ -130,8 +133,9 @@ ARG TARGETPLATFORM
 # Use line below to debug if cache is correctly mounted
 # RUN --mount=type=cache,target=$MAMBA_ROOT_PREFIX/pkgs,id=conda-$TARGETPLATFORM,uid=$MAMBA_USER_ID,gid=$MAMBA_USER_GID ls -al /opt/conda/pkgs
 # Install dependencies from lockfile into environment, cache packages in /opt/conda/pkgs
+
 RUN --mount=type=cache,target=$MAMBA_ROOT_PREFIX/pkgs,id=conda-$TARGETPLATFORM,uid=$MAMBA_USER_ID,gid=$MAMBA_USER_GID \
-    micromamba create --name research --yes --file /locks/environment.yml
+micromamba create --name research --yes --file /locks/environment.yml
 
 # Set conda-forge as default channel (otherwise no default channel is set)
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
@@ -141,6 +145,9 @@ RUN micromamba config set show_banner false --env
 
 # Install optional tricky pip dependencies that do not work with conda-lock
 # RUN micromamba run -n research pip install example-dependency --no-deps --no-cache-dir
+
+# Fix opencv problems
+RUN micromamba run -n research pip install opencv-python-headless --force --no-deps --no-cache-dir
 
 # Use our environment `research` as default
 ENV ENV_NAME=research

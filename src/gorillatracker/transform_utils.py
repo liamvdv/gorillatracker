@@ -16,8 +16,5 @@ class SquarePad:
             padding_right = height - width - padding_left
             padding = (padding_left, 0, padding_right, 0)
 
-        # image = transforms.ToPILImage()(image)
-        # image.save("img_before_pad.png")
-        image = pad(image, padding, (0.485 * 255, 0.456 * 255, 0.406 * 255), "constant")
-        # image = transforms.ToTensor()(image)
+        image = pad(image, padding, (0, 0, 0), "constant")
         return image

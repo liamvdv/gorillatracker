@@ -1,22 +1,37 @@
-from pathlib import Path
+import warnings
+from typing import Union
 
 import torch
-import wandb
-from lightning import Trainer, seed_everything
+from lightning import seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
-from print_on_steroids import graceful_exceptions, logger
+from lightning.pytorch.plugins import BitsandbytesPrecision
+from print_on_steroids import logger
 from simple_parsing import parse
 from torchvision.transforms import Compose, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
+from gorillatracker.data_modules import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
+from gorillatracker.ssl_pipeline.data_module import SSLDataModule
+from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.train_utils import get_data_module
+from gorillatracker.utils.train import (
+    ModelConstructor,
+    train_and_validate_model,
+    train_and_validate_using_kfold,
+    train_using_quantization_aware_training,
+)
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
+warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
+warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
+warnings.filterwarnings("ignore", ".* does not have many workers.*")
+warnings.filterwarnings("ignore", ".*site-packages/torchmetrics/utilities/prints.py:43.*")
 
-def main(args: TrainingArgs) -> None:  # noqa: C901
+
+def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -39,77 +54,60 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     wandb_logging_module = WandbLoggingModule(args)
     wandb_logger = wandb_logging_module.construct_logger()
 
-    #################### Construct dataloaders #################
+    ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
+
+    #################### Construct dataloaders #################
     model_transforms = model_cls.get_tensor_transforms()
     if args.data_resize_transform is not None:
         model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        model_transforms,
-        model_cls.get_training_transforms(),  # type: ignore
-    )
+
+    # TODO(memben): Unify SSLDatamodule and NletDataModule
+    dm: Union[SSLDataModule, NletDataModule]
+    if args.use_ssl:
+        assert args.split_path is not None, "Split path must be provided for SSL training."
+        ssl_config = SSLConfig(
+            tff_selection=args.tff_selection,
+            negative_mining=args.negative_mining,
+            n_samples=args.n_samples,
+            feature_types=args.feature_types,
+            min_confidence=args.min_confidence,
+            min_images_per_tracking=args.min_images_per_tracking,
+            width_range=args.width_range,
+            height_range=args.height_range,
+            split_path=args.split_path,
+        )
+        dm = SSLDataModule(
+            ssl_config=ssl_config,
+            batch_size=args.batch_size,
+            transforms=model_transforms,
+            training_transforms=model_cls.get_training_transforms(),
+            data_dir=str(args.data_dir),
+            additional_dataset_class_ids=args.additional_val_dataset_classes,
+            additional_data_dirs=args.additional_val_data_dirs,
+        )
+    else:
+        dm = get_data_module(
+            args.dataset_class,
+            str(args.data_dir),
+            args.batch_size,
+            args.loss_mode,
+            args.workers,
+            model_transforms,
+            model_cls.get_training_transforms(),
+            args.additional_val_dataset_classes,
+            args.additional_val_data_dirs,
+        )
 
     ################# Construct model ##############
 
-    # Resume from checkpoint if specified
-    model_args = dict(
-        model_name_or_path=args.model_name_or_path,
-        from_scratch=args.from_scratch,
-        weight_decay=args.weight_decay,
-        beta1=args.beta1,
-        beta2=args.beta2,
-        epsilon=args.epsilon,
-        lr_schedule=args.lr_schedule,
-        warmup_mode=args.warmup_mode,
-        warmup_epochs=args.warmup_epochs,
-        max_epochs=args.max_epochs,
-        initial_lr=args.initial_lr,
-        start_lr=args.start_lr,
-        end_lr=args.end_lr,
-        margin=args.margin,
-        loss_mode=args.loss_mode,
-        embedding_size=args.embedding_size,
-        batch_size=args.batch_size,
-        s=args.s,
-        delta_t=args.delta_t,
-        mem_bank_start_epoch=args.mem_bank_start_epoch,
-        lambda_membank=args.lambda_membank,
-        num_classes=(dm.get_num_classes("train"), dm.get_num_classes("val"), dm.get_num_classes("test")),
-        dropout_p=args.dropout_p,
-        accelerator=args.accelerator,
-    )
+    model_constructor = ModelConstructor(args, model_cls, dm)
+    model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
-    if args.saved_checkpoint_path is not None:
-        args.saved_checkpoint_path = wandb_logging_module.check_for_wandb_checkpoint_and_download_if_necessary(
-            args.saved_checkpoint_path, wandb_logger.experiment
-        )
-
-        if args.resume:  # load weights, optimizer states, scheduler state, ...\
-            model = model_cls.load_from_checkpoint(args.saved_checkpoint_path, save_hyperparameters=False)
-            # we will resume via trainer.fit(ckpt_path=...)
-        else:  # load only weights
-            model = model_cls(**model_args)  # type: ignore
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device(args.accelerator))
-            model.load_state_dict(torch_load["state_dict"], strict=False)
-    else:
-        model = model_cls(**model_args)  # type: ignore
-
-    # https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
-    torch.set_float32_matmul_precision("high")
-
-    if args.compile:
-        if not hasattr(torch, "compile"):
-            raise RuntimeError(
-                f"The current torch version ({torch.__version__}) does not have support for compile."
-                "Please install torch >= 2.0 or disable compile."
-            )
-        model = torch.compile(model)
-
-    #################### Construct trainer #################
+    #################### Construct dataloaders & trainer #################
+    model_transforms = model.get_tensor_transforms()
+    if args.data_resize_transform is not None:
+        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
@@ -118,6 +116,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
+        use_quantization_aware_training=args.use_quantization_aware_training,
+        use_ssl=args.use_ssl,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -125,46 +125,43 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor="val/loss",
+        monitor="val/loss/dataloader_0",
         mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss",
+        monitor="val/loss/dataloader_0",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
 
-    callbacks = [
-        checkpoint_callback,
-        wandb_disk_cleanup_callback,
-        lr_monitor,
-        early_stopping,
-        embeddings_logger_callback,
-    ]
+    callbacks = (
+        [
+            checkpoint_callback,  # keep this at the top
+            wandb_disk_cleanup_callback,
+            lr_monitor,
+            early_stopping,
+            embeddings_logger_callback,
+        ]
+        if not args.kfold
+        else [
+            wandb_disk_cleanup_callback,
+            lr_monitor,
+            embeddings_logger_callback,
+        ]
+    )
+
     if args.accelerator == "cuda":
         callbacks.append(CUDAMetricsCallback())
 
     # Initialize trainer
-    trainer = Trainer(
-        max_epochs=args.max_epochs,
-        devices=args.num_devices,
-        accelerator=args.accelerator,
-        strategy=str(args.distributed_strategy),
-        logger=wandb_logger,
-        deterministic=args.force_deterministic,
-        callbacks=callbacks,
-        precision=args.precision,
-        gradient_clip_val=args.grad_clip,
-        # accumulate_grad_batches=args.gradient_accumulation_steps,
-        fast_dev_run=args.fast_dev_run,
-        profiler=args.profiler,
-        inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-        # reload_dataloaders_every_n_epochs=1,
-    )
+    supported_quantizations = ["nf4", "nf4-dq", "fp4", "fp4-dq", "int8", "int8-training"]
+    if args.precision in supported_quantizations:
+        args.plugins = BitsandbytesPrecision(mode=args.precision)  # type: ignore
+        args.precision = "16-true"
 
     if current_process_rank == 0:
         logger.info(
@@ -173,47 +170,37 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Effective batch size: {args.batch_size} | "
         )
 
-    ########### Start val & train loop ###########
-    if args.val_before_training and not args.resume:
-        # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
-        logger.info(f"Rank {current_process_rank} | Validation before training...")
-        val_result = trainer.validate(model, dm)
-        print(val_result)
-        if args.only_val:
-            exit(0)
-
+    ################# Start training #################
     logger.info(f"Rank {current_process_rank} | Starting training...")
-    trainer.fit(model, dm, ckpt_path=args.saved_checkpoint_path if args.resume else None)
-
-    if trainer.interrupted:
-        logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")
+    if args.kfold:
+        train_and_validate_using_kfold(
+            args=args,
+            dm=dm,
+            model_cls=model_cls,
+            callbacks=callbacks,
+            wandb_logger=wandb_logger,
+            wandb_logging_module=wandb_logging_module,
+            embeddings_logger_callback=embeddings_logger_callback,
+        )
+    elif args.use_quantization_aware_training:
+        model, trainer = train_using_quantization_aware_training(
+            args=args,
+            dm=dm,
+            model=model,
+            callbacks=callbacks,
+            wandb_logger=wandb_logger,
+            checkpoint_callback=checkpoint_callback,
+        )
     else:
-        logger.success("Fit complete")
-
-    if current_process_rank == 0:
-        logger.info("Trying to save checkpoint....")
-        assert checkpoint_callback.dirpath is not None
-        save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
-        trainer.save_checkpoint(save_path)
-
-        logger.info("Collecting PL checkpoint for wandb...")
-        artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
-        artifact.add_file(save_path, name="model.ckpt")
-
-        logger.info("Pushing to wandb...")
-        aliases = ["train_end", "latest"]
-        wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
-
-        logger.success("Saving finished!")
+        train_and_validate_model(args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger)
 
 
 if __name__ == "__main__":
     print("Starting training script...")
-    config_path = "./cfgs/efficientnet_cxl.yml"
+    config_path = "./cfgs/config.yml"
     parsed_arg_groups = parse(TrainingArgs, config_path=config_path)
 
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()
-    with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+    main(parsed_arg_groups)

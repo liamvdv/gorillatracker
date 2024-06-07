@@ -1,35 +1,18 @@
-from typing import Any, Callable, Literal
+import logging
+from typing import Callable, Literal
 
 import torch
 import torch.nn.functional as F
-from sklearn.preprocessing import LabelEncoder
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
-
-def convert_labels_to_tensor(labels: gtypes.MergedLabels) -> torch.Tensor:
-    """Convert labels to tensor
-
-    Args:
-        labels: labels in array-like, e.g., list or numpy array. shape: (batch_size,)
-
-    Returns:
-        Tensor of labels. shape: (batch_size,). That contains labels from 0 to num_classes - 1.
-    """
-    if isinstance(labels, torch.Tensor):
-        return labels
-
-    le = LabelEncoder()
-    labels = le.fit_transform(labels)
-
-    return torch.tensor(labels)
+logger = logging.getLogger(__name__)
 
 
-def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
+def get_triplet_mask(labels: torch.Tensor) -> torch.Tensor:
     """Compute a mask for valid triplets
 
     Args:
@@ -44,7 +27,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     # step 1 - get a mask for distinct indices
 
     # shape: (batch_size, batch_size)
-    labels = convert_labels_to_tensor(labels)
+
     batch_size = labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool)
     indices_not_equal = torch.logical_not(indices_equal)
@@ -80,7 +63,7 @@ def get_triplet_mask(labels: gtypes.MergedLabels) -> torch.Tensor:
     return mask
 
 
-def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
+def get_distance_mask(labels: torch.Tensor, valid: Literal["pos", "neg"] = "neg") -> torch.Tensor:
     """Compute mask for the calculation of the hardest positive and negative distance
 
     Args:
@@ -94,7 +77,7 @@ def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] 
         A negative distance is valid if:
         `labels[i] != labels[j] and i != j`
     """
-    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = labels.detach().clone()
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=tensor_labels.device)
     indices_not_equal = torch.logical_not(indices_equal)
@@ -110,7 +93,7 @@ def get_distance_mask(labels: gtypes.MergedLabels, valid: Literal["pos", "neg"] 
 
 
 def get_semi_hard_mask(
-    labels: gtypes.MergedLabels,
+    labels: torch.Tensor,
     distance_matrix: torch.Tensor,
     margin: float = 1.0,
 ) -> torch.Tensor:
@@ -127,7 +110,7 @@ def get_semi_hard_mask(
     """
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
-    tensor_labels = convert_labels_to_tensor(labels)
+    tensor_labels = labels.detach().clone()
     tensor_labels = tensor_labels.to(device)
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=device)
@@ -208,7 +191,13 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        images: torch.Tensor = torch.Tensor(),
+        dist_calc: Callable[[torch.Tensor], torch.Tensor] = euclidean_distance_matrix,
+    ) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -221,7 +210,7 @@ class TripletLossOnline(nn.Module):
 
         # step 1 - get distance matrix
         # shape: (batch_size, batch_size)
-        distance_matrix = euclidean_distance_matrix(embeddings)
+        distance_matrix = dist_calc(embeddings)
 
         # step 2 - compute loss values for all triplets by applying broadcasting to distance matrix
 
@@ -261,12 +250,10 @@ class TripletLossOnline(nn.Module):
         distance_matrix: torch.Tensor,
         anchor_positive_dists: torch.Tensor,
         anchor_negative_dists: torch.Tensor,
-        labels: gtypes.MergedLabels,
+        labels: torch.Tensor,
     ) -> torch.Tensor:
-        labels = convert_labels_to_tensor(labels)
 
         mask = get_triplet_mask(labels)
-
         if self.mode == "hard":  # take only the hardest negative as a negative per anchor
             neg_mask = get_distance_mask(labels, valid="neg")  # get all valid negatives
 
@@ -275,9 +262,17 @@ class TripletLossOnline(nn.Module):
                 neg_mask == 0, float("inf")
             )  # fill all invalid negatives with inf so they are not considered in the min
             _, neg_min_indices = torch.min(masked_anchor_negative_dists, dim=1)
+            # print(neg_min_indices)
+
+            pos_mask = get_distance_mask(labels, valid="pos")  # get all valid positives
+            masked_anchor_positive_dists = anchor_positive_dists.squeeze(2).masked_fill(
+                pos_mask == 0, float("-inf")
+            )  # fill all invalid positives with inf so they are not considered in the min
+            _, pos_max_indices = torch.max(masked_anchor_positive_dists, dim=1)
+            # print(pos_max_indices)
 
             hard_mask = torch.zeros(len(labels), len(labels), len(labels))
-            hard_mask[torch.arange(len(labels)), :, neg_min_indices] = 1
+            hard_mask[torch.arange(len(labels)), pos_max_indices, neg_min_indices] = 1
             hard_mask = hard_mask.to(mask.device)
             # combine with base mask
             mask = torch.logical_and(mask, hard_mask)
@@ -302,7 +297,9 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         """
         Compute loss.
 
@@ -336,40 +333,14 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
+    ) -> gtypes.LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
-        NO_VALUE = torch.tensor([-1], dtype=torch.float32)
+        NO_VALUE = torch.tensor([-1])
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
-
-
-def get_loss(loss_mode: str, **kw_args: Any) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
-    loss_modes = {
-        "online/hard": TripletLossOnline(mode="hard", margin=kw_args["margin"]),
-        "online/semi-hard": TripletLossOnline(mode="semi-hard", margin=kw_args["margin"]),
-        "online/soft": TripletLossOnline(mode="soft", margin=kw_args["margin"]),
-        "offline": TripletLossOffline(margin=kw_args["margin"]),
-        "offline/native": TripletLossOfflineNative(margin=kw_args["margin"]),
-        "softmax/arcface": ArcFaceLoss(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            accelerator=kw_args["accelerator"],
-        ),  # TODO
-        "softmax/vpl": VariationalPrototypeLearning(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-            accelerator=kw_args["accelerator"],
-        ),  # TODO
-    }
-    return loss_modes[loss_mode]
 
 
 if __name__ == "__main__":

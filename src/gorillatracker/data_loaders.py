@@ -1,5 +1,7 @@
 import itertools
+import json
 from collections import defaultdict
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -20,18 +22,44 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 
 import gorillatracker.type_helper as gtypes
 
+G = TypeVar("G")
 T = TypeVar("T")
 R = TypeVar("R")
 
-LabelSection = DefaultDict[Union[int, str], Tuple[int, int]]
+LabelSection = DefaultDict[gtypes.Label, Tuple[int, int]]
 
 
-def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, str]]]) -> LabelSection:
+def generate_labelsection(sorted_value_labels: Sequence[Tuple[gtypes.Id, Any, gtypes.Label]]) -> LabelSection:
     n = len(sorted_value_labels)
     labelsection: LabelSection = defaultdict(lambda: (-1, -1))
     prev_label = None
     prev_start = None
-    for i, (_, label) in enumerate(sorted_value_labels):
+    for i, (_, __, label) in enumerate(sorted_value_labels):
+        assert prev_label is None or prev_label <= label, "dataset passed to TripletSampler must be label-sorted."
+        if prev_label is None:
+            prev_label = label
+            prev_start = i
+        elif prev_label != label:
+            labelsection[prev_label] = (prev_start, i - prev_start)
+            prev_label = label
+            prev_start = i
+        # print(i)
+    assert prev_label is not None and prev_start is not None  # make typing happy
+    if prev_label:
+        labelsection[prev_label] = (prev_start, n - prev_start)
+    return labelsection
+
+
+def generate_labelsection_video_data(data_dir: Path) -> LabelSection:
+    image_paths = sorted(data_dir.glob("*.png"))
+    n = len(image_paths)
+    labelsection: LabelSection = defaultdict(lambda: (-1, -1))
+    prev_label = None
+    prev_start = None
+    for i, image_path in enumerate(image_paths):
+        label = (
+            image_path.name.split("-")[0] + "-" + image_path.name.split("-")[1]
+        )  # expects image_path as video-id-frame
         assert prev_label is None or prev_label <= label, "dataset passed to TripletSampler must be label-sorted."
         if prev_label is None:
             prev_label = label
@@ -46,6 +74,7 @@ def generate_labelsection(sorted_value_labels: Sequence[Tuple[Any, Union[int, st
     return labelsection
 
 
+# NOTE(memben): Unused?
 def iter_index_permutations_generator(n: int) -> Iterator[Tuple[int, ...]]:
     """
     returns all possibel index permutations in a systematic order.
@@ -87,32 +116,35 @@ def randint_except(start: int, end: int, excluded: int) -> int:
             return idx
 
 
-class ToNthDataset(Dataset[Tuple[Tuple[T, ...], Tuple[R, ...]]], Generic[T, R]):
+class ToNthDataset(Dataset[Tuple[Tuple[T, ...], Tuple[R, ...], Tuple[G, ...]]], Generic[T, R, G]):
     """
     ToNthDataset allows N index accesses at once on a single index access Dataset.
     """
 
-    def __init__(self, dataset: Dataset[Tuple[T, R]], transform: gtypes.Transform = lambda x: x) -> None:
+    def __init__(self, dataset: Dataset[Tuple[T, R, G]], transform: gtypes.Transform = lambda x: x) -> None:
         self.dataset = dataset
         self.transform = transform
 
     def __len__(self) -> int:
         return len(self.dataset)  # type: ignore
 
-    def __getitem__(self, idxs: Union[int, List[int], torch.Tensor]) -> Tuple[Tuple[T, ...], Tuple[R, ...]]:
+    def __getitem__(
+        self, idxs: Union[int, List[int], torch.Tensor]
+    ) -> Tuple[Tuple[T, ...], Tuple[R, ...], Tuple[G, ...]]:
         if torch.is_tensor(idxs):  # type: ignore
             idxs = idxs.tolist()  # type: ignore
         if isinstance(idxs, int):
             idxs = [idxs]
 
-        xs, ys = [], []
+        ids, xs, ys = [], [], []
         for idx in idxs:
-            x, y = self.dataset[idx]
+            id, x, y = self.dataset[idx]
             x = self.transform(x)
+            ids.append(id)
             xs.append(x)
             ys.append(y)
 
-        return tuple(xs), tuple(ys)
+        return tuple(ids), tuple(xs), tuple(ys)
 
 
 class TripletSampler(Sampler[Tuple[int, int, int]]):
@@ -120,7 +152,7 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
 
     def __init__(
         self,
-        sorted_dataset: Sequence[Tuple[Any, gtypes.Label]],
+        sorted_dataset: Sequence[Tuple[gtypes.Id, Any, gtypes.Label]],
         shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
     ):
         self.dataset = sorted_dataset
@@ -142,11 +174,37 @@ class TripletSampler(Sampler[Tuple[int, int, int]]):
     def __iter__(self) -> Iterator[Tuple[int, int, int]]:
         anchor_shuffle = next(self.shuffled_indices_generator)
         for anchor in anchor_shuffle:
-            anchor_label = self.dataset[anchor][1]
+            anchor_label = self.dataset[anchor][2]
             astart, alength = self.labelsection[anchor_label]
             positive = randint_except(astart, astart + alength, anchor)
             negative = self.any_sample_not(anchor_label)
             yield anchor, positive, negative
+
+
+class VideoTripletSampler(TripletSampler):
+    """TripletSampler that only samples negatives specified in json file."""
+
+    def __init__(
+        self,
+        dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]],
+        data_dir: str,
+        shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
+    ):
+        self.dataset = dataset  # type: ignore
+        self.n = len(self.dataset)
+        self.data_dir = data_dir
+        with open(data_dir + "/negatives.json") as f:
+            self.negatives = json.load(f)
+        self.labelsection = generate_labelsection_video_data(Path(data_dir))
+        self.shuffled_indices_generator = shuffled_indices_generator(self.n)
+
+    def any_sample_not(self, label: gtypes.Label) -> int:
+        possible_negative_labels = self.negatives[label]
+        negative_label = possible_negative_labels[torch.randint(len(possible_negative_labels), (1,)).item()]
+
+        negative_start, negative_length = self.labelsection[negative_label]
+        i = torch.randint(negative_start, negative_start + negative_length, (1,)).item()
+        return i  # type: ignore
 
 
 class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
@@ -154,7 +212,7 @@ class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
 
     def __init__(
         self,
-        sorted_dataset: Sequence[Tuple[Any, gtypes.Label]],
+        sorted_dataset: Sequence[Tuple[gtypes.Id, Any, gtypes.Label]],
         shuffled_indices_generator: Callable[[int], Generator[List[int], None, None]] = index_permuation_generator,
     ):
         self.dataset = sorted_dataset
@@ -176,12 +234,12 @@ class QuadletSampler(Sampler[Tuple[int, int, int, int]]):
     def __iter__(self) -> Iterator[Tuple[int, int, int, int]]:
         anchor_shuffle = next(self.shuffled_indices_generator)
         for anchor_positive in anchor_shuffle:
-            anchor_p_label = self.dataset[anchor_positive][1]
+            anchor_p_label = self.dataset[anchor_positive][2]
             pstart, plength = self.labelsection[anchor_p_label]
             positive = randint_except(pstart, pstart + plength, anchor_positive)
 
             anchor_negative = self.any_sample_not(anchor_p_label)
-            negative_label = self.dataset[anchor_negative][1]
+            negative_label = self.dataset[anchor_negative][2]
             nstart, nlength = self.labelsection[negative_label]
             negative = randint_except(nstart, nstart + nlength, anchor_negative)
             yield anchor_positive, positive, anchor_negative, negative
@@ -208,7 +266,7 @@ class FreezeSampler(Sampler[T]):
 
 
 def TripletDataLoader(
-    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True, num_workers: int = 0
 ) -> gtypes.BatchTripletDataLoader:
     """
     TripletDataLoader will take any Dataset that returns a single sample in the form of
@@ -216,16 +274,16 @@ def TripletDataLoader(
     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
     dataset will be shuffled once at the start and not after that.
     """
-    label_sorted_dataset = sorted(dataset, key=lambda t: t[1])  # type: ignore
+    label_sorted_dataset = sorted(dataset, key=lambda t: t[2])  # type: ignore
     sampler = TripletSampler(label_sorted_dataset)
     if not shuffle:
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
-    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size, num_workers=num_workers)
 
 
 def QuadletDataLoader(
-    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True, num_workers: int = 0
 ) -> gtypes.BatchQuadletDataLoader:
     """
     QuadletDataLoader will take any Dataset that returns a single sample in the form of
@@ -233,16 +291,16 @@ def QuadletDataLoader(
     If shuffle=True, the dataset will be shuffled on every epoch. If shuffle=False, the
     dataset will be shuffled once at the start and not after that.
     """
-    label_sorted_dataset = sorted(dataset, key=lambda t: t[1])  # type: ignore
+    label_sorted_dataset = sorted(dataset, key=lambda t: t[2])  # type: ignore
     sampler = QuadletSampler(label_sorted_dataset)
     if not shuffle:
         sampler = FreezeSampler(sampler)  # type: ignore
     final_dataset = ToNthDataset(label_sorted_dataset)
-    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size)
+    return DataLoader(final_dataset, sampler=sampler, shuffle=False, batch_size=batch_size, num_workers=num_workers)
 
 
 def SimpleDataLoader(
-    dataset: Dataset[Tuple[Any, gtypes.Label]], batch_size: int, shuffle: bool = True
+    dataset: Dataset[Tuple[gtypes.Id, Any, gtypes.Label]], batch_size: int, shuffle: bool = True, num_workers: int = 0
 ) -> gtypes.BatchSimpleDataLoader:
     final_dataset = ToNthDataset(dataset)
-    return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size)
+    return DataLoader(dataset=final_dataset, shuffle=shuffle, batch_size=batch_size, num_workers=num_workers)

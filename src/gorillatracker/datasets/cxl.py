@@ -1,17 +1,16 @@
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple
 
-import torch
 import torchvision.transforms.v2 as transforms_v2
 from PIL import Image
-from sklearn.preprocessing import LabelEncoder
+from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.transform_utils import SquarePad
-
-Label = Union[int, str]
+from gorillatracker.type_helper import Id, Label
+from gorillatracker.utils.labelencoder import LabelEncoder
 
 
 def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
@@ -30,12 +29,10 @@ def get_samples(dirpath: Path) -> List[Tuple[Path, str]]:
 
 
 def cast_label_to_int(labels: List[str]) -> List[int]:
-    le = LabelEncoder()
-    le.fit(labels)
-    return le.transform(labels)
+    return LabelEncoder.encode_list(labels)
 
 
-class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
+class CXLDataset(Dataset[Tuple[Id, Tensor, Label]]):
     def __init__(
         self, data_dir: str, partition: Literal["train", "val", "test"], transform: Optional[gtypes.Transform] = None
     ):
@@ -65,31 +62,32 @@ class CXLDataset(Dataset[Tuple[Image.Image, Label]]):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[Id, Tensor, Label]:
         img_path, label = self.samples[idx]
         img = Image.open(img_path)
         if self.transform:
             img = self.transform(img)
-
-        # save img
-        # img2 = transforms.ToPILImage()(img)
-        # img2.save(f"img_{self.partition}.png")
-
-        return img, label
+        return str(img_path), img, label
 
     @classmethod
     def get_transforms(cls) -> gtypes.Transform:
         return transforms.Compose(
             [
-                # Uniform input, you may choose higher/lower sizes.
                 SquarePad(),
-                # transforms.ToTensor(),
+                # Uniform input, you may choose higher/lower sizes.
+                transforms.Resize(224),
+                transforms.ToTensor(),
             ]
         )
 
     def get_num_classes(self) -> int:
         labels = [label for _, label in self.samples]
         return len(set(labels))
+
+    def get_class_distribution(self) -> Dict[int, int]:
+        labels = [label for _, label in self.samples]
+        class_distribution = {label: labels.count(label) for label in set(labels)}
+        return class_distribution
 
 
 if __name__ == "__main__":
@@ -101,6 +99,7 @@ if __name__ == "__main__":
     image = cxl[0][0]
     transformations = transforms.Compose(
         [
+            transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             transforms_v2.RandomHorizontalFlip(p=0.5),
             transforms.RandomErasing(p=1, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
         ]
