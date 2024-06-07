@@ -271,12 +271,13 @@ class BaseModule(L.LightningModule):
             logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels = batch
-        # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-        flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-        # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-        vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
-        embeddings = self.forward(vec)
+        _, images, labels = batch
+        # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
+        flat_labels = torch.flatten(torch.tensor(labels))
+        # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
+        flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
+
+        embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
 
@@ -284,9 +285,9 @@ class BaseModule(L.LightningModule):
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
-        self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log("train/positive_distance", pos_dist, on_step=True)
-        self.log("train/negative_distance", neg_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
+        self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         return loss
 
     def add_validation_embeddings(
@@ -315,17 +316,15 @@ class BaseModule(L.LightningModule):
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         dataloader_name = self.dataset_names[dataloader_idx]
-        ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
-        batch_size = len(images)
+        ids, images, labels = batch
+        batch_size = len(ids[0])
+        anchor_ids = list(ids[0])
+        # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
+        flat_labels = torch.flatten(torch.tensor(labels))
+        # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
+        flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
 
-        # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-        flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-        # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-        vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
-
-        anchor_ids = [nlet[0] for nlet in ids]
-
-        embeddings = self.forward(vec)
+        embeddings = self.forward(flat_images)
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:

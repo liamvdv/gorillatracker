@@ -58,15 +58,15 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_labels = torch.tensor([])
         for batch in self.dm.train_dataloader():
             ids, images, labels = batch
-            batch_size = len(images)
-            # TODO(memben)
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            anchor_images = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)[:batch_size].to(
-                trainer.model.device
-            )
+            batch_size = len(ids[0])
+            # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
+            flat_labels = torch.flatten(torch.tensor(labels))
+            # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
+            flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
+            anchor_labels = flat_labels[:batch_size]
+            anchor_images = flat_images[:batch_size].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
-            anchor_labels = flat_labels[:batch_size]
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
