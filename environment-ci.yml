@@ -4,7 +4,7 @@ channels:
   - conda-forge
   - nodefaults
   - pyviz/label/dev
-  - pytorch-nightly
+  # - pytorch-nightly
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
