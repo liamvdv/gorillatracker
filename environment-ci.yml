@@ -4,6 +4,7 @@ channels:
   - conda-forge
   - nodefaults
   - pyviz/label/dev
+  - pytorch-nightly
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
@@ -13,9 +14,6 @@ dependencies:
   # CUDA only on linux and windows
   - wandb
   - lightning
-  - datasets
-  - evaluate
-  - accelerate
   - torchvision
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
@@ -29,12 +27,9 @@ dependencies:
   - matplotlib
 
   # Misc
-  - pydantic
   - jsonlines
   - zstandard
-  - debugpy
   - tqdm
-  - ipykernel
   - bokeh
   - colorcet
   - shapely
@@ -46,7 +41,6 @@ dependencies:
   - mypy=1.10.0
   - pytest
   - typer
-  - ipywidgets
 
   # pip dependencies
   - pip
