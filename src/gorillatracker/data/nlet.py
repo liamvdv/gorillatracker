@@ -129,9 +129,9 @@ class NletDataModule(L.LightningDataModule):
         ids = tuple(nlet[0] for nlet in batch)
         values = tuple(nlet[1] for nlet in batch)
         labels = tuple(nlet[2] for nlet in batch)
-        batched_ids = tuple(zip(*ids, strict=True))
-        batched_values = tuple(zip(*values, strict=True))
-        batched_labels = tuple(zip(*labels, strict=True))
+        batched_ids = tuple(zip(*ids))
+        batched_values = tuple(zip(*values))
+        batched_labels = tuple(zip(*labels))
         return batched_ids, batched_values, batched_labels
 
     def get_dataset_class_names(self) -> list[str]:
