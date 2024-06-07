@@ -102,7 +102,7 @@ class CliqueGraphSampler(ContrastiveSampler):
 
     def __len__(self) -> int:
         return len(self.graph)
-    
+
     @property
     def class_labels(self) -> list[gtypes.Label]:
         raise NotImplementedError("No logic yet implemented")
