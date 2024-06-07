@@ -7,7 +7,7 @@ from gorillatracker.type_helper import Label
 from gorillatracker.utils.labelencoder import LabelEncoder
 
 
-def get_groups(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
+def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
     """
     Assumed directory structure:
         dirpath/
@@ -43,7 +43,7 @@ class CXLDataset(NletDataset):
                     ...
         """
         dirpath = base_dir / Path(self.partition)
-        self.groups = get_groups(dirpath)
+        self.groups = group_images_by_label(dirpath)
         return ContrastiveClassSampler(self.groups)
 
 
@@ -73,16 +73,16 @@ class KFoldCXLDataset(KFoldNletDataset):
                 if i == self.val_i:
                     continue
                 dirpath = base_dir / Path(f"fold-{i}")
-                new_groups = get_groups(dirpath)
+                new_groups = group_images_by_label(dirpath)
                 for label, samples in new_groups.items():
                     # NOTE(memben): NO deduplication here (feel free to add it)
                     self.groups[label].extend(samples)
         elif self.partition == "test":
             dirpath = base_dir / Path(self.partition)
-            self.groups = get_groups(dirpath)
+            self.groups = group_images_by_label(dirpath)
         elif self.partition == "val":
             dirpath = base_dir / Path(f"fold-{self.val_i}")
-            self.groups = get_groups(dirpath)
+            self.groups = group_images_by_label(dirpath)
         else:
             raise ValueError(f"Invalid partition: {self.partition}")
         return ContrastiveClassSampler(self.groups)

@@ -1,19 +1,17 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Literal
 
 from gorillatracker.data.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
-    ContrastiveSampler,
     group_contrastive_images,
 )
-from gorillatracker.data.nlet import FlatNlet, NletDataset
-from gorillatracker.type_helper import Label, TensorTransform
+from gorillatracker.data.nlet import NletDataset
+from gorillatracker.type_helper import Label
 from gorillatracker.utils.labelencoder import LabelEncoder
 
 
-def get_groups(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
+def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
     """
     Assumed directory structure:
         dirpath/
@@ -54,5 +52,5 @@ class BristolDataset(NletDataset):
                     ...
         """
         dirpath = base_dir / Path(self.partition)
-        self.groups = get_groups(dirpath)
+        self.groups = group_images_by_label(dirpath)
         return ContrastiveClassSampler(self.groups)

@@ -150,6 +150,9 @@ def main(args: TrainingArgs) -> None:
 
     ################# Start training #################
     logger.info(f"Rank {current_process_rank} | Starting training...")
+    assert not (
+        args.use_quantization_aware_training and args.kfold
+    ), "Quantization aware training not supported with kfold"
     if args.kfold:
         train_and_validate_using_kfold(
             args=args,
