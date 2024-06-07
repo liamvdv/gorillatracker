@@ -60,12 +60,12 @@ save_model_to_wandb: True       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
-kfold: True                     # Enable kfold cross-validation
-# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
+kfold: False                     # Enable kfold cross-validation
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
-dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
