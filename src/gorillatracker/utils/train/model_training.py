@@ -154,7 +154,7 @@ def train_using_quantization_aware_training(
     checkpoint_callback: ModelCheckpoint,
 ) -> Tuple[BaseModule, Trainer]:
     logger.info("Preperation for quantization aware training...")
-    example_inputs, _ = get_model_input(dm.dataset_class, str(args.data_dir), amount_of_tensors=100)  # type: ignore
+    example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=100)  # type: ignore
     example_inputs = (example_inputs,)  # type: ignore
     model.model = capture_pre_autograd_graph(model.model, example_inputs)
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore

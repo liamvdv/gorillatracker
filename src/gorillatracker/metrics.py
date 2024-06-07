@@ -51,6 +51,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.run = wandb_run
         self.dm = dm
         self.use_quantization_aware_training = use_quantization_aware_training
+        self.kfold_k: Optional[int] = None
 
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."

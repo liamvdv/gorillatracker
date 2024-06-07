@@ -36,7 +36,7 @@ l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 0.5                   # Margin for the contrastive loss (triplet loss)
-loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "softmax/arcface"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
@@ -47,13 +47,13 @@ end_lr: 1e-6                    # End learning rate (for the learning rate sched
 
 max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
-batch_size: 16                  # Training batch size
+batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-check_val_every_n_epoch: 2     # Perform validation every n epochs
+check_val_every_n_epoch: 4     # Perform validation every n epochs
 save_interval: 10              # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 10      # Embedding save interval
 save_model_to_wandb: True       # Save the model checkpoint to wandb
@@ -68,5 +68,5 @@ dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
+# additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+# additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
