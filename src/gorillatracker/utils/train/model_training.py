@@ -1,3 +1,4 @@
+# mypy: warn_unused_ignores=False
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Tuple, Type
