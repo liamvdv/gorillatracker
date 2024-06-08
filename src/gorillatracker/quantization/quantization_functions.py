@@ -1,4 +1,3 @@
-# mypy: warn_unused_ignores=False
 from typing import Tuple
 
 import torch
