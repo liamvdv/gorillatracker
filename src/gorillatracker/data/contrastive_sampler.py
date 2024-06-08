@@ -1,3 +1,4 @@
+import logging
 import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -8,6 +9,8 @@ from PIL import Image
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, order=True, slots=True)  # type: ignore
@@ -64,6 +67,10 @@ class ContrastiveClassSampler(ContrastiveSampler):
         self.sample_to_class = {sample: label for label, samples in classes.items() for sample in samples}
 
         # assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples" # TODO(memben)
+        for label, samples in classes.items():
+            if len(samples) < 2:
+                logger.warning(f"Class {label} has less than two samples (samples: {len(samples)}).")
+        
         assert len(self.samples) == len(set(self.samples)), "Samples must be unique"
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
@@ -78,8 +85,10 @@ class ContrastiveClassSampler(ContrastiveSampler):
 
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         positive_class = self.sample_to_class[sample]
-        # positives = [s for s in self.classes[positive_class] if s != sample] # TODO(memben)
-        positives = [s for s in self.classes[positive_class]]
+        if len(self.classes[positive_class]) == 1:
+            # logger.warning(f"Only one sample in class {positive_class}. Returning same sample as positive.")
+            return sample
+        positives = [s for s in self.classes[positive_class] if s != sample]
         return random.choice(positives)
 
     # NOTE(memben): First samples a negative class to ensure a more balanced distribution of negatives,

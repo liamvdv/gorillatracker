@@ -15,6 +15,7 @@ dependencies:
   - wandb
   - lightning
   - torchvision
+  - transformers
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
 

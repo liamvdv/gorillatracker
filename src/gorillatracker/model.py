@@ -1,5 +1,4 @@
 import importlib
-from itertools import chain
 from typing import Any, Callable, Dict, Literal, Optional, Type
 
 import lightning as L
@@ -26,6 +25,7 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
@@ -271,11 +271,8 @@ class BaseModule(L.LightningModule):
             logger.info("Using memory bank")
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        _, images, labels = batch
-        # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
-        flat_labels = torch.flatten(torch.tensor(labels))
-        # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
-        flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
+        _, images, _ = batch
+        _, flat_images, flat_labels = flatten_batch(batch)
 
         embeddings = self.forward(flat_images)
 
@@ -316,13 +313,11 @@ class BaseModule(L.LightningModule):
 
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         dataloader_name = self.dataset_names[dataloader_idx]
-        ids, images, labels = batch
-        batch_size = len(ids[0])
-        anchor_ids = list(ids[0])
-        # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
-        flat_labels = torch.flatten(torch.tensor(labels))
-        # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
-        flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
+
+        batch_size = lazy_batch_size(batch)
+        _, images, _ = batch
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        anchor_ids = list(flat_ids[:batch_size])
 
         embeddings = self.forward(flat_images)
 

@@ -202,9 +202,9 @@ class NletDataset(Dataset[Nlet], ABC):
 
     def _get_item(self, idx: int) -> Nlet:
         flat_nlet = self.nlet_builder(idx, self.contrastive_sampler)
-        return self.stack_flat_nlet(flat_nlet)
+        return self._stack_flat_nlet(flat_nlet)
 
-    def stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
+    def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
         ids = tuple(str(img.image_path) for img in flat_nlet)
         labels = tuple(img.class_label for img in flat_nlet)
         values = tuple(self.transform(img.image) for img in flat_nlet)

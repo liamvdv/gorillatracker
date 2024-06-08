@@ -34,7 +34,7 @@ class BristolDataset(NletDataset):
 
     @property
     def class_distribution(self) -> dict[Label, int]:
-        return {label: len(samples) for label, samples in self.groups.items()}
+        return {label: len(samples) for label, samples in self.classes.items()}
 
     def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
         """
@@ -48,5 +48,5 @@ class BristolDataset(NletDataset):
                     ...
         """
         dirpath = base_dir / Path(self.partition)
-        self.groups = group_images_by_label(dirpath)
-        return ContrastiveClassSampler(self.groups)
+        self.classes = group_images_by_label(dirpath)
+        return ContrastiveClassSampler(self.classes)

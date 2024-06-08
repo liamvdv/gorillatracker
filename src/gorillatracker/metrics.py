@@ -1,5 +1,5 @@
 from functools import partial
-from itertools import chain, islice
+from itertools import islice
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import lightning as L
@@ -20,6 +20,7 @@ from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -57,12 +58,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         train_embedding_batches = []
         train_labels = torch.tensor([])
         for batch in self.dm.train_dataloader():
-            ids, images, labels = batch
-            batch_size = len(ids[0])
-            # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
-            flat_labels = torch.flatten(torch.tensor(labels))
-            # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
-            flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
+            batch_size = lazy_batch_size(batch)
+            _, flat_images, flat_labels = flatten_batch(batch)
             anchor_labels = flat_labels[:batch_size]
             anchor_images = flat_images[:batch_size].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
@@ -90,12 +87,9 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             self.run.log_artifact(artifact)
             self.embedding_artifacts.append(artifact.name)
 
-            train_embeddings: Optional[torch.Tensor] = None
-            train_labels: Optional[gtypes.MergedLabels] = None
-            if self.knn_with_train:
-                train_embeddings, train_labels = (
-                    self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-                )
+            train_embeddings, train_labels = (
+                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+            )
 
             metrics = {
                 "knn5": partial(knn, k=5),
@@ -156,6 +150,7 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
     return ToPILImage()(tensor.cpu()).convert("RGB")
 
 
+# TODO(memben)
 def get_n_samples_from_dataloader(
     dataloader: gtypes.BatchNletDataLoader, n_samples: int = 1
 ) -> List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]]:

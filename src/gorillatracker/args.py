@@ -40,7 +40,7 @@ class TrainingArgs:
     use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
-    fast_dev_run: bool = field(default=False)
+    fast_dev_run: bool = field(default=True)
     profiler: Union[Literal["simple", "advanced", "pytorch"], None] = field(default=None)
     offline: bool = field(default=True)
     data_preprocessing_only: bool = field(default=False)
