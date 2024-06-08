@@ -70,7 +70,7 @@ class ContrastiveClassSampler(ContrastiveSampler):
         for label, samples in classes.items():
             if len(samples) < 2:
                 logger.warning(f"Class {label} has less than two samples (samples: {len(samples)}).")
-        
+
         assert len(self.samples) == len(set(self.samples)), "Samples must be unique"
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
