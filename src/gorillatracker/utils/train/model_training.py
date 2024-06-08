@@ -11,6 +11,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
 from torch._export import capture_pre_autograd_graph
+from torch.ao.quantization import allow_exported_model_train_eval
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
@@ -160,7 +161,7 @@ def train_using_quantization_aware_training(
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
     model.model = prepare_qat_pt2e(autograd_graph, quantizer)
 
-    torch.ao.quantization.allow_exported_model_train_eval(model.model)
+    allow_exported_model_train_eval(model.model)
 
     torch.use_deterministic_algorithms(True, warn_only=True)
     model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)

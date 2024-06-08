@@ -6,6 +6,7 @@ import torch.ao.quantization.quantize_fx as quantize_fx
 import torch.nn as nn
 from ai_edge_torch.quantize.pt2e_quantizer import PT2EQuantizer
 from torch._export import capture_pre_autograd_graph
+from torch.ao.quantization import allow_exported_model_train_eval
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import get_symmetric_quantization_config
 from torch.fx import GraphModule
@@ -73,9 +74,9 @@ def pt2e_quantization(model: BaseModule, calibration_input: torch.Tensor) -> Tup
 
     quantizer = PT2EQuantizer().set_global(get_symmetric_quantization_config(is_per_channel=True, is_dynamic=True))
     prepared_model = prepare_pt2e(prepared_model_autograd, quantizer)
-    torch.ao.quantization.allow_exported_model_train_eval(prepared_model)
+    allow_exported_model_train_eval(prepared_model)
     calibrate(prepared_model, calibration_input)
 
     quantized_model = convert_pt2e(prepared_model, fold_quantize=False)
-    torch.ao.quantization.allow_exported_model_train_eval(quantized_model)
+    allow_exported_model_train_eval(quantized_model)
     return quantized_model, quantizer
