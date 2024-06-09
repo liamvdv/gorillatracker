@@ -4,6 +4,7 @@ from typing import Optional, Type
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.bristol import BristolDataset
 from gorillatracker.data.cxl import CXLDataset, KFoldCXLDataset
+from gorillatracker.data.chimp import CZooDataset, CTaiDataset, KFoldCZooDataset, KFoldCTaiDataset
 from gorillatracker.data.nlet import (
     FlatNletBuilder,
     NletDataModule,
@@ -17,6 +18,10 @@ from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 
 BristolDatasetId = "gorillatracker.datasets.bristol.BristolDataset"
 CXLDatasetId = "gorillatracker.datasets.cxl.CXLDataset"
+CZooDatasetId = "gorillatracker.datasets.chimp.CZooDataset"
+CTaiDatasetId = "gorillatracker.datasets.chimp.CTaiDataset"
+KFoldCZooDatasetId = "gorillatracker.datasets.chimp.KFoldCZooDataset"
+KFoldCTaiDatasetId = "gorillatracker.datasets.chimp.KFoldCTaiDataset"
 KFoldCXLDatasetId = "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"  # TODO change this cxl.KFoldCXLDataset
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 
@@ -25,6 +30,10 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     CXLDatasetId: CXLDataset,
     KFoldCXLDatasetId: KFoldCXLDataset,
     SSLDatasetId: SSLDataset,
+    CZooDatasetId: CZooDataset,
+    CTaiDatasetId: CTaiDataset,
+    KFoldCZooDatasetId: KFoldCZooDataset,
+    KFoldCTaiDatasetId: KFoldCTaiDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {

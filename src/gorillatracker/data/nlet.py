@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import lru_cache
@@ -296,8 +297,42 @@ class BasicDataset(NletDataset):
                 test/
                     ...
         """
-        dirpath = base_dir / Path(self.partition)
+        dirpath = base_dir / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else base_dir
+        assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
         self.classes = group_images_by_label(dirpath)
+        return ContrastiveClassSampler(self.classes)
+
+
+class BasicKFoldDataset(KFoldNletDataset):
+    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+        """
+        Assumes directory structure:
+            data_dir/
+                fold-0/
+                    ...
+                fold-(k-1)/
+                    ...
+                test/
+                    ...
+        """
+        if self.partition == "train":
+            self.classes: defaultdict[Label, list[ContrastiveImage]] = defaultdict(list)
+            for i in range(self.k):
+                if i == self.val_i:
+                    continue
+                dirpath = base_dir / Path(f"fold-{i}")
+                new_classes = group_images_by_label(dirpath)
+                for label, samples in new_classes.items():
+                    # NOTE(memben): NO deduplication here (feel free to add it)
+                    self.classes[label].extend(samples)
+        elif self.partition == "test":
+            dirpath = base_dir / Path(self.partition)
+            self.classes = group_images_by_label(dirpath)
+        elif self.partition == "val":
+            dirpath = base_dir / Path(f"fold-{self.val_i}")
+            self.classes = group_images_by_label(dirpath)
+        else:
+            raise ValueError(f"Invalid partition: {self.partition}")
         return ContrastiveClassSampler(self.classes)
 
 
