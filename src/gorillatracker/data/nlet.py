@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Literal, Protocol, Type
@@ -13,9 +14,15 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler
+from gorillatracker.data.contrastive_sampler import (
+    ContrastiveClassSampler,
+    ContrastiveImage,
+    ContrastiveSampler,
+    group_contrastive_images,
+)
 from gorillatracker.transform_utils import SquarePad
-from gorillatracker.type_helper import Nlet
+from gorillatracker.type_helper import Label, Nlet
+from gorillatracker.utils.labelencoder import LabelEncoder
 
 FlatNlet = tuple[ContrastiveImage, ...]
 
@@ -235,6 +242,63 @@ class KFoldNletDataset(NletDataset):
         self.k = k
         self.val_i = val_i
         super().__init__(data_dir, nlet_builder, partition, transform)
+
+
+def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
+    """
+    Assumed directory structure:
+        dirpath/
+            <label>_<...>.png
+            or
+            <label>_<...>.jpg
+    """
+    samples = []
+    image_paths = list(dirpath.glob("*.jpg"))
+    image_paths = image_paths + list(dirpath.glob("*.png"))
+    for image_path in image_paths:
+        if "_" in image_path.name:
+            label = image_path.name.split("_")[0]
+        else:
+            label = image_path.name.split("-")[0]
+        samples.append(ContrastiveImage(str(image_path), image_path, LabelEncoder.encode(label)))
+    return group_contrastive_images(samples)
+
+
+class BasicDataset(NletDataset):
+    """
+    A dataset that assumes the following directory structure:
+        data_dir/
+            train/
+                ...
+            val/
+                ...
+            test/
+                ...
+    Each file is prefixed with the class label, e.g. "label1_1.jpg"
+    """
+
+    @property
+    def num_classes(self) -> int:
+        return len(self.contrastive_sampler.class_labels)
+
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.classes.items()}
+
+    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+        """
+        Assumes directory structure:
+            data_dir/
+                train/
+                    ...
+                val/
+                    ...
+                test/
+                    ...
+        """
+        dirpath = base_dir / Path(self.partition)
+        self.classes = group_images_by_label(dirpath)
+        return ContrastiveClassSampler(self.classes)
 
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:
