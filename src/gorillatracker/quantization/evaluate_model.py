@@ -9,7 +9,7 @@ from print_on_steroids import print_on_steroids
 from torch.fx import GraphModule
 
 import gorillatracker.quantization.quantization_functions as quantization_functions
-from gorillatracker.datasets.cxl import CXLDataset
+from gorillatracker.data.cxl import CXLDataset
 from gorillatracker.model import BaseModule
 from gorillatracker.quantization.export_model import convert_model_to_tflite
 from gorillatracker.quantization.performance_evaluation import evaluate_model

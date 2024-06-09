@@ -16,6 +16,7 @@ dependencies:
   - lightning
   - accelerate
   - torchvision
+  - transformers
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
 

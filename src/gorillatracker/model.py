@@ -1,6 +1,5 @@
 import importlib
-from itertools import chain
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Literal, Optional, Type
 
 import lightning as L
 import numpy as np
@@ -26,6 +25,7 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
@@ -128,9 +128,11 @@ class BaseModule(L.LightningModule):
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         embedding_size: int = 256,
+        batch_size: int = 32,
+        dataset_names: list[str] = [],
+        accelerator: str = "cpu",
         dropout_p: float = 0.0,
         use_dist_term: bool = False,
-        num_val_dataloaders: int = 1,
         kfold_k: Optional[int] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
@@ -173,36 +175,35 @@ class BaseModule(L.LightningModule):
             "embedding",
             "id",
         ]  # note that the dataloader usually returns the order (id, embedding, label)
-        self.num_val_dataloaders = num_val_dataloaders
+        self.dataset_names = dataset_names
         self.embeddings_table_list = [
-            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]
 
     def set_losses(
         self,
         model: nn.Module,
         loss_mode: str,
-        margin: float = 0.5,
-        s: float = 64.0,
-        delta_t: int = 200,
-        mem_bank_start_epoch: int = 2,
-        lambda_membank: float = 0.5,
-        embedding_size: int = 256,
-        batch_size: int = 32,
-        num_classes: Tuple[int, int, int] = (0, 0, 0),
-        class_distribution: Dict[int, int] = {},
-        use_focal_loss: bool = False,
-        k_subcenters: int = 2,
-        accelerator: str = "cpu",
-        label_smoothing: float = 0.0,
-        l2_alpha: float = 0.1,
-        l2_beta: float = 0.01,
-        path_to_pretrained_weights: str = "",
-        use_class_weights: Union[List[float], None] = None,
-        use_dist_term: bool = False,
-        **kwargs: Dict[str, Any],
+        margin: float,
+        s: float,
+        delta_t: int,
+        mem_bank_start_epoch: int,
+        lambda_membank: float,
+        embedding_size: int,
+        batch_size: int,
+        num_classes: Optional[tuple[int, int, int]],
+        class_distribution: Optional[dict[int, int]],
+        use_focal_loss: bool,
+        k_subcenters: int,
+        accelerator: str,
+        label_smoothing: float,
+        l2_alpha: float,
+        l2_beta: float,
+        path_to_pretrained_weights: str,
+        use_class_weights: bool,
+        use_dist_term: bool,
+        **kwargs: Any,
     ) -> None:
-
         kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.loss_module_train = get_loss(
             loss_mode,
@@ -211,8 +212,8 @@ class BaseModule(L.LightningModule):
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
-            num_classes=num_classes[0],
-            class_distribution=class_distribution[0],
+            num_classes=num_classes[0] if num_classes is not None else None,  # TODO(memben)
+            class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -236,8 +237,8 @@ class BaseModule(L.LightningModule):
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
-            num_classes=num_classes[1],
-            class_distribution=class_distribution[1],
+            num_classes=num_classes[1] if num_classes is not None else None,  # TODO(memben)
+            class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -269,22 +270,11 @@ class BaseModule(L.LightningModule):
             self.loss_module_train.loss.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
 
-    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels = batch
+        _, images, _ = batch
+        _, flat_images, flat_labels = flatten_batch(batch)
 
-        # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):  # type: ignore
-            flat_labels = torch.cat(labels, dim=0)  # type: ignore
-            vec = torch.cat(images, dim=0)  # type: ignore
-        else:
-            # NOTE(memben): this is the expected shape
-            # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
-
-        embeddings = self.forward(vec)
+        embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
 
@@ -292,14 +282,14 @@ class BaseModule(L.LightningModule):
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
-        self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log("train/positive_distance", pos_dist, on_step=True)
-        self.log("train/negative_distance", neg_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
+        self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         return loss
 
     def add_validation_embeddings(
         self,
-        anchor_ids: List[str],
+        anchor_ids: list[str],
         anchor_embeddings: torch.Tensor,
         anchor_labels: gtypes.MergedLabels,
         dataloader_idx: int,
@@ -321,31 +311,22 @@ class BaseModule(L.LightningModule):
         )
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
-    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
-        ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
-        n_anchors = len(images[0])
+        dataloader_name = self.dataset_names[dataloader_idx]
 
-        # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):  # type: ignore
-            flat_labels = torch.cat(labels, dim=0)  # type: ignore
-            vec = torch.cat(images, dim=0)  # type: ignore
-        else:
-            # NOTE(memben): this is the expected shape
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+        batch_size = lazy_batch_size(batch)
+        _, images, _ = batch
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        anchor_ids = list(flat_ids[:batch_size])
 
-        flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
-        embeddings = self.forward(vec)
+        embeddings = self.forward(flat_images)
 
-        self.add_validation_embeddings(
-            flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors], dataloader_idx
-        )
+        self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)
-            log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
+            kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
-                f"{log_str_prefix}val/loss/dataloader_{dataloader_idx}",
+                f"{dataloader_name}/{kfold_prefix}val/loss",
                 loss,
                 on_step=True,
                 sync_dist=True,
@@ -353,22 +334,24 @@ class BaseModule(L.LightningModule):
                 add_dataloader_idx=False,
             )
             self.log(
-                f"{log_str_prefix}val/positive_distance/dataloader_{dataloader_idx}",
+                f"{dataloader_name}/{kfold_prefix}val/positive_distance",
                 pos_dist,
                 on_step=True,
-                add_dataloader_idx=False,  # TODO: BAD
+                add_dataloader_idx=False,
             )
             self.log(
-                f"{log_str_prefix}val/negative_distance/dataloader_{dataloader_idx}",
+                f"{dataloader_name}/{kfold_prefix}val/negative_distance",
                 neg_dist,
                 on_step=True,
                 add_dataloader_idx=False,
             )
             return loss
         else:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0)  # TODO(memben): ???
 
-    def on_validation_epoch_end(self) -> None:
+    def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
+        dataloader_name = self.dataset_names[dataloader_idx]
+        kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         # calculate loss after all embeddings have been processed
         if "softmax" in self.loss_mode:
             for i, table in enumerate(self.embeddings_table_list):
@@ -381,7 +364,7 @@ class BaseModule(L.LightningModule):
                 if self.use_dist_term:
                     loss_module_val = loss_module_val.arcface
 
-                num_classes = loss_module_val.num_classes
+                num_classes = loss_module_val.num_classes  # TODO(memben)
                 assert len(table) > 0, f"Empty table for dataloader {i}"
 
                 # get weights for all classes by averaging over all embeddings
@@ -411,13 +394,10 @@ class BaseModule(L.LightningModule):
                     losses.append(loss)
                 loss = torch.tensor(losses).mean()
                 assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-                if self.kfold_k is not None:
-                    self.log(f"fold-{self.kfold_k}/val/loss/dataloader_{i}", loss, sync_dist=True)
-                else:
-                    self.log(f"val/loss/dataloader_{i}", loss, sync_dist=True)
+                self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss, sync_dist=True)
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
-            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(self.num_val_dataloaders)
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]  # reset embeddings table
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
@@ -583,7 +563,7 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
                 # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
-                transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
+                # transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
             ]
         )
 

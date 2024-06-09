@@ -7,7 +7,7 @@ from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.contrastive_sampler import (
+from gorillatracker.data.contrastive_sampler import (
     CliqueGraphSampler,
     ContrastiveClassSampler,
     ContrastiveImage,
@@ -38,11 +38,15 @@ class SSLConfig:
     feature_types: list[str]
     min_confidence: float
     min_images_per_tracking: int
+    split_path: Path
     width_range: tuple[Optional[int], Optional[int]]
     height_range: tuple[Optional[int], Optional[int]]
-    split_path: str
 
-    def get_contrastive_sampler(self, partition: Literal["train", "val", "test"], base_path: str) -> ContrastiveSampler:
+    def get_contrastive_sampler(
+        self,
+        base_path: Path,
+        partition: Literal["train", "val", "test"],
+    ) -> ContrastiveSampler:
         engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
         with Session(engine) as session:
@@ -54,7 +58,7 @@ class SSLConfig:
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
-        split = SplitArgs.load_pickle(self.split_path)
+        split = SplitArgs.load_pickle(str(self.split_path))
         if partition == "train":
             return split.train_video_ids()
         elif partition == "val":
@@ -113,10 +117,10 @@ class SSLConfig:
         return list(sampler.sample(session))
 
     def _create_contrastive_images(
-        self, tracked_features: List[TrackingFrameFeature], base_path: str
+        self, tracked_features: List[TrackingFrameFeature], base_path: Path
     ) -> List[ContrastiveImage]:
         return [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
+            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id)  # type: ignore
             for f in tracked_features
         ]
 
@@ -149,9 +153,11 @@ if __name__ == "__main__":
         min_images_per_tracking=10,
         width_range=(None, None),
         height_range=(None, None),
-        split_path="/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl",
+        split_path=Path(
+            "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+        ),
     )
-    contrastive_sampler = ssl_config.get_contrastive_sampler("train", "cropped-images/2024-04-18")
+    contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
     print(len(contrastive_sampler))
     for i in range(10):
         contrastive_image = contrastive_sampler[i * 10]

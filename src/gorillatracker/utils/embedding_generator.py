@@ -1,20 +1,19 @@
 # from gorillatracker.args import TrainingArgs
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 from urllib.parse import urlparse
 
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
 import wandb
-from torch.utils.data import Dataset
 from tqdm import tqdm
 
+import gorillatracker.type_helper as gtypes
+from gorillatracker.data.builder import dataset_registry
+from gorillatracker.data.nlet import NletDataset, build_onelet
 from gorillatracker.model import BaseModule, get_model_cls
-from gorillatracker.train_utils import get_dataset_class
-from gorillatracker.type_helper import Label
 
-DataTransforms = Union[Callable[..., Any]]
 BBox = Tuple[float, float, float, float]  # x, y, w, h
 BBoxFrame = Tuple[int, BBox]  # frame_idx, x, y, w, h
 IdFrameDict = Dict[int, List[BBoxFrame]]  # id -> list of frames
@@ -140,6 +139,8 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
     with torch.no_grad():
         print("Generating embeddings...")
         for ids, imgs, labels in tqdm(dataset):
+            # NOTE(memben): blame me if this fails
+            ids, imgs, labels = ids[0], imgs[0], labels[0]
             if isinstance(imgs, torch.Tensor):
                 imgs = [imgs]
                 labels = [labels]
@@ -185,21 +186,15 @@ def get_dataset(
     partition: Literal["train", "val", "test"],
     data_dir: str,
     dataset_class: str,
-    transform: Union[Callable[..., Any], None] = None,
-) -> Dataset[Tuple[Any, Label]]:
-    cls = get_dataset_class(dataset_class)
-    if transform is None:
-        transform = transforms.Compose(
-            [
-                cls.get_transforms(),  # type: ignore
-                model.get_tensor_transforms(),
-            ]
-        )
+    transform: Optional[gtypes.TensorTransform] = None,
+) -> NletDataset:
+    cls = dataset_registry[dataset_class]
 
-    return cls(  # type: ignore
-        data_dir=data_dir,
+    return cls(
+        base_dir=Path(data_dir),
+        nlet_builder=build_onelet,
         partition=partition,
-        transform=transform,
+        transform=model.get_tensor_transforms() if transform is None else transform,
     )
 
 
@@ -231,6 +226,9 @@ def generate_embeddings_from_run(
 
     if dataset_cls is None:
         dataset_cls = args["dataset_class"]
+
+    assert data_dir is not None, "data_dir must be provided"
+    assert dataset_cls is not None, "dataset_cls must be provided"
 
     train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
     val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)

@@ -1,19 +1,16 @@
-from typing import Any, Type, Union
+from typing import Any, Type
 
 import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.model import BaseModule
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 class ModelConstructor:
-    def __init__(
-        self, args: TrainingArgs, model_cls: Type[BaseModule], dm: Union[SSLDataModule, NletDataModule]
-    ) -> None:
+    def __init__(self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule) -> None:
         self.args = args
         self.model_cls = model_cls
         self.dm = dm
@@ -22,16 +19,26 @@ class ModelConstructor:
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
 
-        assert not args.use_ssl or isinstance(self.dm, SSLDataModule), "SSLDataModule must be used for SSL training"
-        assert "softmax" not in args.loss_mode or not args.use_ssl, "softmax loss not supported for SSL training"
+        num_classes = None
+        class_distribution = None
+        # TODO(memben): this is not logical for multiple datasets
+        if "softmax" in args.loss_mode:
+            # HACK(memben): To force load the datasets
+            self.dm.setup("fit")
+            self.dm.setup("test")
 
-        num_classes_dist = (
-            (self.dm.get_ds_stats("train"), self.dm.get_ds_stats("val"), self.dm.get_ds_stats("test"))  # type: ignore
-            if not args.use_ssl
-            else ((-1, {}), (-1, {}), (-1, {}))
-        )
-        num_classes = (num_classes_dist[0][0], num_classes_dist[1][0], num_classes_dist[2][0])
-        class_distribution = (num_classes_dist[0][1], num_classes_dist[1][1], num_classes_dist[2][1])
+            num_classes = (
+                self.dm.get_num_classes("train"),
+                self.dm.get_num_classes("val"),
+                self.dm.get_num_classes("test"),
+            )
+            class_distribution = (
+                self.dm.get_class_distribution("train"),
+                self.dm.get_class_distribution("val"),
+                self.dm.get_class_distribution("test"),
+            )
+
+        dataset_names = self.dm.get_dataset_class_names()
 
         return dict(
             model_name_or_path=args.model_name_or_path,
@@ -59,9 +66,7 @@ class ModelConstructor:
             lambda_membank=args.lambda_membank,
             num_classes=num_classes,
             class_distribution=class_distribution,
-            num_val_dataloaders=(
-                1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1
-            ),
+            dataset_names=dataset_names,
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,

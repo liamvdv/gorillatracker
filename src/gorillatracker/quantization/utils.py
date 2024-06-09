@@ -1,16 +1,17 @@
+from pathlib import Path
 from typing import Literal, Type
 
 import torch
 import torch.nn as nn
 from torchvision import transforms
 
-from gorillatracker.datasets.cxl import CXLDataset
-from gorillatracker.transform_utils import SquarePad
+from gorillatracker.data.cxl import CXLDataset
+from gorillatracker.data.nlet import build_onelet
 
 
 def get_model_input(
     dataset_cls: Type[CXLDataset],
-    dataset_path: str,
+    dataset_path: Path,
     partion: Literal["train", "val", "test"] = "train",
     amount_of_tensors: int = 100,
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -22,17 +23,18 @@ def get_model_input(
         amount_of_tensors: The amount of tensors to get from the dataset. If -1, get all tensors.
     """
 
+    transform = transforms.Compose(
+        [
+            transforms.Resize(224),
+            transforms.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+
     dataset = dataset_cls(
-        dataset_path,
-        partion,
-        transforms.Compose(
-            [
-                SquarePad(),
-                transforms.Resize(224),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        ),
+        base_dir=dataset_path,
+        nlet_builder=build_onelet,
+        partition=partion,
+        transform=transform,
     )
 
     if amount_of_tensors == -1:
@@ -42,8 +44,8 @@ def get_model_input(
     labels = []
     for i in range(amount_of_tensors):
         _, image, label = dataset[i]
-        images.append(image)
-        labels.append(label)
+        images.append(image[0])
+        labels.append(label[0])
 
     return torch.stack(images), torch.tensor(labels)
 

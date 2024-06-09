@@ -73,7 +73,7 @@ class ArcFaceLoss(torch.nn.Module):
         tmp_rng = torch.Generator(device=accelerator)
         torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
         self.ce: Union[FocalLoss, torch.nn.CrossEntropyLoss]
-        if not use_focal_loss:
+        if use_focal_loss:
             self.ce = FocalLoss(num_classes=num_classes, label_smoothing=label_smoothing, *args, **kwargs)  # type: ignore
         else:
             self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=label_smoothing)
@@ -91,7 +91,7 @@ class ArcFaceLoss(torch.nn.Module):
         # NOTE(rob2u): necessary for range 0:n-1
         # get class frequencies
         class_freqs = torch.ones_like(labels)
-        if self.class_distribution is not None:
+        if self.use_class_weights:
             class_freqs = torch.tensor([self.class_distribution[label.item()] for label in labels]).to(
                 embeddings.device
             )
@@ -101,7 +101,11 @@ class ArcFaceLoss(torch.nn.Module):
         labels_transformed: List[int] = self.le.encode_list(labels.tolist())
         labels = torch.tensor(labels_transformed).to(embeddings.device)
 
-        cos_theta = torch.einsum("bj,knj->bnk", embeddings, self.prototypes)  # batch x num_classes x k_subcenters
+        cos_theta = torch.einsum(
+            "bj,knj->bnk",
+            torch.nn.functional.normalize(embeddings, dim=-1),
+            torch.nn.functional.normalize(self.prototypes, dim=-1),
+        )  # batch x num_classes x k_subcenters
 
         sine_theta = torch.sqrt(
             torch.maximum(

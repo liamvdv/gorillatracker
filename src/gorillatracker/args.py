@@ -104,7 +104,7 @@ class TrainingArgs:
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
     label_smoothing: float = field(default=0.0)
-    use_class_weights: Union[List[float], None] = field(default=None)
+    use_class_weights: bool = field(default=False)
     use_dist_term: bool = field(default=False)
 
     batch_size: int = field(default=8)
@@ -123,15 +123,15 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
-    additional_val_dataset_classes: Union[List[str], None] = field(default=None)
-    additional_val_data_dirs: Union[List[str], None] = field(default=None)
+    additional_val_dataset_classes: list[str] = field(default_factory=lambda: [])
+    additional_val_data_dirs: list[Path] = field(default_factory=lambda: [])
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
     negative_mining: Literal["random", "overlapping"] = field(default="random")
-    split_path: Union[str, None] = field(default=None)
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)

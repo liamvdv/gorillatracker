@@ -23,10 +23,10 @@ debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
 early_stopping_patience: 3      # Early stopping patience (number of epochs)
 embedding_size: 256
-dropout_p: 0.32
+dropout_p: 0.3
 use_quantization_aware_training: True
 
-weight_decay: 0.5               # Weight decay
+weight_decay: 1e-1              # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
@@ -36,37 +36,37 @@ l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 0.5                   # Margin for the contrastive loss (triplet loss)
-loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "softmax/arcface"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 1e-4                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+initial_lr: 1e-3                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-3                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
 max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
-batch_size: 16                  # Training batch size
+batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-check_val_every_n_epoch: 2     # Perform validation every n epochs
+check_val_every_n_epoch: 4     # Perform validation every n epochs
 save_interval: 10              # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 10      # Embedding save interval
 save_model_to_wandb: True       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
-kfold: True                     # Enable kfold cross-validation
-# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
+kfold: False                     # Enable kfold cross-validation
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
-dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
+# additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+# additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
