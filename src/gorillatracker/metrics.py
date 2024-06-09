@@ -113,7 +113,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 else {}
             )
             metrics = metrics if not self.fast_dev_run else {}
-            
+
             # log to wandb
             evaluate_embeddings(
                 data=embeddings_table,

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from gorillatracker.data.contrastive_sampler import ContrastiveClassSampler
-from gorillatracker.data.nlet import BasicKFoldDataset, BasicDataset
+from gorillatracker.data.nlet import BasicDataset, BasicKFoldDataset
 
 
 class CXLDataset(BasicDataset):

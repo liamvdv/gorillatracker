@@ -3,8 +3,8 @@ from typing import Optional, Type
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.bristol import BristolDataset
+from gorillatracker.data.chimp import CTaiDataset, CZooDataset, KFoldCTaiDataset, KFoldCZooDataset
 from gorillatracker.data.cxl import CXLDataset, KFoldCXLDataset
-from gorillatracker.data.chimp import CZooDataset, CTaiDataset, KFoldCZooDataset, KFoldCTaiDataset
 from gorillatracker.data.nlet import (
     FlatNletBuilder,
     NletDataModule,
