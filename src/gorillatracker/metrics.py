@@ -447,11 +447,11 @@ def knn_naive(
 
 
 def pca(
-    embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
+    embeddings_in: torch.Tensor, labels_in: torch.Tensor, **kwargs: Any
 ) -> wandb.Image:  # generate a 2D plot of the embeddings
-    num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()
-    labels = labels.numpy()
+    num_classes = len(torch.unique(labels_in))
+    embeddings = embeddings_in.numpy()
+    labels = labels_in.numpy()
 
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
@@ -476,11 +476,11 @@ def pca(
 
 
 def tsne(
-    embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
+    embeddings_in: torch.Tensor, labels_in: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
-    num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()
-    labels = labels.numpy()
+    num_classes = len(torch.unique(labels_in))
+    embeddings = embeddings_in.numpy()
+    labels = labels_in.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
