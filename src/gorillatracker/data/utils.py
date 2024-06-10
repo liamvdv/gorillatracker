@@ -15,7 +15,7 @@ def flatten_batch(batch: NletBatch) -> FlatNletBatch:
     # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
     flat_ids = tuple(chain.from_iterable(ids))
     # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
-    flat_labels = torch.flatten(torch.tensor(labels))
+    flat_labels = torch.cat(labels)
     # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
-    flat_images = torch.stack(list(chain.from_iterable(images)), dim=0)
+    flat_images = torch.cat(images)
     return flat_ids, flat_images, flat_labels
