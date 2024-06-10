@@ -9,15 +9,16 @@ from PIL import Image
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
+from gorillatracker.type_helper import Id, Label
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, order=True, slots=True)  # type: ignore
 class ContrastiveImage:
-    id: str
+    id: Id
     image_path: Path
-    class_label: int
+    class_label: Label
 
     @property
     def image(self) -> Image.Image:
@@ -55,6 +56,11 @@ class ContrastiveSampler(ABC):
     @abstractmethod
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
         """Return a negative sample from a different class."""
+        pass
+
+    @abstractmethod
+    def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
+        """Return all possible negative labels for a sample"""
         pass
 
 
@@ -95,11 +101,14 @@ class ContrastiveClassSampler(ContrastiveSampler):
     # independent of the number of samples per class
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
         """Different class is sampled uniformly at random and a random sample from that class is returned"""
-        positive_class = self.sample_to_class[sample]
-        negative_classes = [c for c in self.class_labels if c != positive_class]
-        negative_class = random.choice(negative_classes)
+        negative_class = random.choice(self.negative_classes(sample))
         negatives = self.classes[negative_class]
         return random.choice(negatives)
+
+    def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
+        positive_class = self.sample_to_class[sample]
+        negative_classes = [c for c in self.class_labels if c != positive_class]
+        return negative_classes
 
 
 class CliqueGraphSampler(ContrastiveSampler):
@@ -122,3 +131,8 @@ class CliqueGraphSampler(ContrastiveSampler):
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
         random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
         return self.graph.get_random_clique_member(random_adjacent_clique)
+
+    # TODO(memben): if this becomes a bottleneck, consider only retrieving the roots
+    def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
+        adjacent_cliques = self.graph.get_adjacent_cliques(sample)
+        return [root.class_label for root in adjacent_cliques.keys()]
