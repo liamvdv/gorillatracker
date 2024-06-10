@@ -102,7 +102,7 @@ def read_dataset_partition(dirpath: Path, labeler: Labeler) -> List[Entry]:
 def read_ground_truth(full_images_dirpath: str, file_types: List[str], re_label: str, label_pos: int) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
-        if filename.endswith(file_types):
+        if filename.endswith(tuple(file_types)):
             label = re.split(re_label, filename, maxsplit=1)[label_pos]
             entry = Entry(Path(full_images_dirpath, filename), label, {})
             entries.append(entry)
@@ -118,7 +118,7 @@ def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
 
 
 def read_ground_truth_cows2021(full_images_dirpath: str) -> List[Entry]:
-    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_]", 0)
+    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_\s]", 0)
 
 
 # Business Logic
@@ -414,7 +414,7 @@ def generate_kfold_split(
     elif "bristol" in dataset:
         images = read_ground_truth_bristol(f"data/{dataset}")
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    elif "ctai" or "czoo" in dataset:
+    elif "ctai" in dataset or "czoo" in dataset:
         images = read_ground_truth_cxl(dataset)
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     elif "cows2021" in dataset:
