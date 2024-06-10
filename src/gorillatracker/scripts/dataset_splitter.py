@@ -413,6 +413,9 @@ def generate_kfold_split(
     elif "bristol" in dataset:
         images = read_ground_truth_bristol(f"data/{dataset}")
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "ctai" or "czoo" in dataset:
+        images = read_ground_truth_cxl(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     else:
         raise ValueError(f"unknown dataset {dataset}")
     fold_buckets, test_bucket = kfold_splitter(

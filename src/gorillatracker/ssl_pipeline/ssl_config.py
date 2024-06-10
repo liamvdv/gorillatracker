@@ -51,10 +51,8 @@ class SSLConfig:
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
-            query = self._build_query(video_ids)
-            sampler = self._create_tff_sampler(query)
-            tracked_features = self._sample_tracked_features(sampler, session)
-            contrastive_images = self._create_contrastive_images(tracked_features, base_path)
+            tracking_frame_features = self._sample_tracking_frame_features(video_ids, session)
+            contrastive_images = self._create_contrastive_images(tracking_frame_features, base_path)
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
@@ -112,9 +110,16 @@ class SSLConfig:
         query = min_count_filter(query, self.min_images_per_tracking)
         return query
 
-    def _sample_tracked_features(self, sampler: Sampler, session: Session) -> List[TrackingFrameFeature]:
+    def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
-        return list(sampler.sample(session))
+        BATCH_SIZE = 200
+        num_batches = len(video_ids) // BATCH_SIZE
+        tffs = []
+        for i in range(num_batches + 1):
+            batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+            sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
+            tffs.extend(list(sampler.sample(session)))
+        return tffs
 
     def _create_contrastive_images(
         self, tracked_features: List[TrackingFrameFeature], base_path: Path
@@ -146,7 +151,7 @@ class SSLConfig:
 if __name__ == "__main__":
     ssl_config = SSLConfig(
         tff_selection="equidistant",
-        negative_mining="overlapping",
+        negative_mining="random",
         n_samples=15,
         feature_types=["body"],
         min_confidence=0.5,

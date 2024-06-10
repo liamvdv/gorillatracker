@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Literal, Protocol, Type
@@ -13,9 +15,15 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler
+from gorillatracker.data.contrastive_sampler import (
+    ContrastiveClassSampler,
+    ContrastiveImage,
+    ContrastiveSampler,
+    group_contrastive_images,
+)
 from gorillatracker.transform_utils import SquarePad
-from gorillatracker.type_helper import Nlet
+from gorillatracker.type_helper import Label, Nlet
+from gorillatracker.utils.labelencoder import LabelEncoder
 
 FlatNlet = tuple[ContrastiveImage, ...]
 
@@ -40,6 +48,7 @@ class NletDataModule(L.LightningDataModule):
         training_transforms: gtypes.TensorTransform,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[Path] = [],
+        dataset_names: list[str] = [],
         **kwargs: Any,  # SSLConfig, etc.
     ) -> None:
         """
@@ -47,6 +56,9 @@ class NletDataModule(L.LightningDataModule):
         """
         super().__init__()
         assert len(eval_datasets) == len(eval_data_dirs), "eval_datasets and eval_data_dirs must have the same length"
+        assert (
+            len(eval_datasets) == len(dataset_names) - 1
+        ), "eval_datasets and eval_dataset_names must have the same length"
         assert (
             dataset_class not in eval_datasets
         ), "dataset_class should not be in eval_datasets, as it will be added automatically"
@@ -60,6 +72,7 @@ class NletDataModule(L.LightningDataModule):
         self.training_transforms = training_transforms
         self.eval_datasets = [dataset_class] + eval_datasets
         self.eval_data_dirs = [data_dir] + eval_data_dirs
+        self.dataset_names = dataset_names
         self.kwargs = kwargs
 
     def setup(self, stage: str) -> None:
@@ -135,7 +148,7 @@ class NletDataModule(L.LightningDataModule):
         return batched_ids, batched_values, batched_labels
 
     def get_dataset_class_names(self) -> list[str]:
-        return [dataset_class.__name__ for dataset_class in self.eval_datasets]
+        return self.dataset_names
 
     # TODO(memben): we probably want tuple[int, list[int], list[int]]
     def get_num_classes(self, partition: Literal["train", "val", "test"]) -> int:
@@ -235,6 +248,105 @@ class KFoldNletDataset(NletDataset):
         self.k = k
         self.val_i = val_i
         super().__init__(data_dir, nlet_builder, partition, transform)
+
+
+def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
+    """
+    Assumed directory structure:
+        dirpath/
+            <label>_<...>.png
+            or
+            <label>_<...>.jpg
+    """
+    samples = []
+    image_paths = list(dirpath.glob("*.jpg"))
+    image_paths = image_paths + list(dirpath.glob("*.png"))
+    for image_path in image_paths:
+        if "_" in image_path.name:
+            label = image_path.name.split("_")[0]
+        else:
+            label = image_path.name.split("-")[0]
+        samples.append(ContrastiveImage(str(image_path), image_path, LabelEncoder.encode(label)))
+    return group_contrastive_images(samples)
+
+
+class SupervisedDataset(NletDataset):
+    """
+    A dataset that assumes the following directory structure:
+        data_dir/
+            train/
+                ...
+            val/
+                ...
+            test/
+                ...
+    Each file is prefixed with the class label, e.g. "label1_1.jpg"
+    """
+
+    @property
+    def num_classes(self) -> int:
+        return len(self.contrastive_sampler.class_labels)
+
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.classes.items()}
+
+    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+        """
+        Assumes directory structure:
+            data_dir/
+                train/
+                    ...
+                val/
+                    ...
+                test/
+                    ...
+        """
+        dirpath = base_dir / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else base_dir
+        assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
+        self.classes = group_images_by_label(dirpath)
+        return ContrastiveClassSampler(self.classes)
+
+
+class SupervisedKFoldDataset(KFoldNletDataset):
+    @property
+    def num_classes(self) -> int:
+        return len(self.contrastive_sampler.class_labels)
+
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.classes.items()}
+
+    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+        """
+        Assumes directory structure:
+            data_dir/
+                fold-0/
+                    ...
+                fold-(k-1)/
+                    ...
+                test/
+                    ...
+        """
+        if self.partition == "train":
+            self.classes: defaultdict[Label, list[ContrastiveImage]] = defaultdict(list)
+            for i in range(self.k):
+                if i == self.val_i:
+                    continue
+                dirpath = base_dir / Path(f"fold-{i}")
+                new_classes = group_images_by_label(dirpath)
+                for label, samples in new_classes.items():
+                    # NOTE(memben): NO deduplication here (feel free to add it)
+                    self.classes[label].extend(samples)
+        elif self.partition == "test":
+            dirpath = base_dir / Path(self.partition)
+            self.classes = group_images_by_label(dirpath)
+        elif self.partition == "val":
+            dirpath = base_dir / Path(f"fold-{self.val_i}")
+            self.classes = group_images_by_label(dirpath)
+        else:
+            raise ValueError(f"Invalid partition: {self.partition}")
+        return ContrastiveClassSampler(self.classes)
 
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:

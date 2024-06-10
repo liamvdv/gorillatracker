@@ -8,9 +8,9 @@ compile: False                  # Compile the model for faster execution
 workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
-project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
-run_name: "326-train-using-quantization-aware-training"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep-2"]            # WandB tags for experiment tracking
+project_name: "Embedding-EfficientNetRWM-CTAI-OpenSet" # WandB project name
+run_name: "405-chimpanzee_training_128_singlesubcenter"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -21,10 +21,11 @@ data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 3      # Early stopping patience (number of epochs)
-embedding_size: 256
+early_stopping_patience: 20      # Early stopping patience (number of epochs)
+embedding_size: 128
 dropout_p: 0.3
-use_quantization_aware_training: True
+use_quantization_aware_training: False
+use_dist_term: False
 
 weight_decay: 1e-1              # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
@@ -45,7 +46,7 @@ initial_lr: 1e-3                # Initial learning rate before warmup(must be > 
 start_lr: 1e-3                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
@@ -60,13 +61,18 @@ save_model_to_wandb: True       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
-kfold: False                     # Enable kfold cross-validation
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
-# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
-# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
+kfold: True                     # Enable kfold cross-validation
+
+# data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+
+# data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
+# data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
+data_dir: "/workspaces/gorillatracker/datasets/splits/chimpanzee/ctai-workspaces-gorillatracker-data_vast-external-datasets-chimp_ctai_czoo-ctai_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
+dataset_class: "gorillatracker.datasets.chimp.KFoldCTaiDataset"
+
 data_resize_transform: 224
-# additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-# additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
+additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset", "gorillatracker.datasets.chimp.CZooDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/bristol", "/workspaces/gorillatracker/datasets/vast/external-datasets/chimp_ctai_czoo/czoo_format_adapted"]
