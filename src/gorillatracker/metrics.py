@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -15,6 +15,7 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
+from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
@@ -22,7 +23,6 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
-from torch.utils.data import DataLoader as Dataloader
 
 # TODO: What is the wandb run type?
 Runner = Any
@@ -151,8 +151,7 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
     return ToPILImage()(tensor.cpu()).convert("RGB")
 
 
-# TODO(memben)
-def get_n_samples_from_dataloader(dataloader: Dataloader, n_samples: int = 1) -> list[gtypes.Nlet]:
+def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
     samples: list[gtypes.Nlet] = []
     for batch in dataloader:
         ids, images, labels = batch
