@@ -74,7 +74,7 @@ class TrainingArgs:
 
     save_model_to_wandb: bool = field(default=False)
 
-    k_subcenters: int = field(default=2)
+    k_subcenters: int = field(default=1)
     margin: float = field(default=0.5)
     s: float = field(default=64.0)
     delta_t: int = field(default=100)

@@ -48,6 +48,7 @@ class NletDataModule(L.LightningDataModule):
         training_transforms: gtypes.TensorTransform,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[Path] = [],
+        dataset_names: list[str] = [],
         **kwargs: Any,  # SSLConfig, etc.
     ) -> None:
         """
@@ -55,6 +56,9 @@ class NletDataModule(L.LightningDataModule):
         """
         super().__init__()
         assert len(eval_datasets) == len(eval_data_dirs), "eval_datasets and eval_data_dirs must have the same length"
+        assert (
+            len(eval_datasets) == len(dataset_names) - 1
+        ), "eval_datasets and eval_dataset_names must have the same length"
         assert (
             dataset_class not in eval_datasets
         ), "dataset_class should not be in eval_datasets, as it will be added automatically"
@@ -68,6 +72,7 @@ class NletDataModule(L.LightningDataModule):
         self.training_transforms = training_transforms
         self.eval_datasets = [dataset_class] + eval_datasets
         self.eval_data_dirs = [data_dir] + eval_data_dirs
+        self.dataset_names = dataset_names
         self.kwargs = kwargs
 
     def setup(self, stage: str) -> None:
@@ -143,7 +148,7 @@ class NletDataModule(L.LightningDataModule):
         return batched_ids, batched_values, batched_labels
 
     def get_dataset_class_names(self) -> list[str]:
-        return [dataset_class.__name__ for dataset_class in self.eval_datasets]
+        return self.dataset_names
 
     # TODO(memben): we probably want tuple[int, list[int], list[int]]
     def get_num_classes(self, partition: Literal["train", "val", "test"]) -> int:
@@ -179,6 +184,7 @@ class NletDataset(Dataset[Nlet], ABC):
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
         self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(), transform])
+        self.name = self.__class__.__name__
 
     def __len__(self) -> int:
         return len(self.contrastive_sampler)
@@ -265,7 +271,7 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
     return group_contrastive_images(samples)
 
 
-class BasicDataset(NletDataset):
+class SupervisedDataset(NletDataset):
     """
     A dataset that assumes the following directory structure:
         data_dir/
@@ -303,7 +309,15 @@ class BasicDataset(NletDataset):
         return ContrastiveClassSampler(self.classes)
 
 
-class BasicKFoldDataset(KFoldNletDataset):
+class SupervisedKFoldDataset(KFoldNletDataset):
+    @property
+    def num_classes(self) -> int:
+        return len(self.contrastive_sampler.class_labels)
+
+    @property
+    def class_distribution(self) -> dict[Label, int]:
+        return {label: len(samples) for label, samples in self.classes.items()}
+
     def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
         """
         Assumes directory structure:

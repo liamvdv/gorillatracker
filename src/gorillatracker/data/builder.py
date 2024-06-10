@@ -2,13 +2,12 @@ from pathlib import Path
 from typing import Optional, Type
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.bristol import BristolDataset
-from gorillatracker.data.chimp import CTaiDataset, CZooDataset, KFoldCTaiDataset, KFoldCZooDataset
-from gorillatracker.data.cxl import CXLDataset, KFoldCXLDataset
 from gorillatracker.data.nlet import (
     FlatNletBuilder,
     NletDataModule,
     NletDataset,
+    SupervisedDataset,
+    SupervisedKFoldDataset,
     build_onelet,
     build_quadlet,
     build_triplet,
@@ -26,14 +25,14 @@ KFoldCXLDatasetId = "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"  # TODO 
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 
 dataset_registry: dict[str, Type[NletDataset]] = {
-    BristolDatasetId: BristolDataset,
-    CXLDatasetId: CXLDataset,
-    KFoldCXLDatasetId: KFoldCXLDataset,
+    BristolDatasetId: SupervisedDataset,
+    CXLDatasetId: SupervisedDataset,
+    KFoldCXLDatasetId: SupervisedKFoldDataset,
     SSLDatasetId: SSLDataset,
-    CZooDatasetId: CZooDataset,
-    CTaiDatasetId: CTaiDataset,
-    KFoldCZooDatasetId: KFoldCZooDataset,
-    KFoldCTaiDatasetId: KFoldCTaiDataset,
+    CZooDatasetId: SupervisedDataset,
+    CTaiDatasetId: SupervisedDataset,
+    KFoldCZooDatasetId: SupervisedKFoldDataset,
+    KFoldCTaiDatasetId: SupervisedKFoldDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
@@ -68,6 +67,8 @@ def build_data_module(
 
     dataset_class = dataset_registry[dataset_class_id]
     eval_datasets = [dataset_registry[cls_id] for cls_id in additional_eval_datasets_ids]
+    dataset_names = [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
+    print(f"Dataset names: {dataset_names}")
 
     nlet_builder = next((builder for mode, builder in nlet_requirements.items() if loss_mode.startswith(mode)), None)
     assert nlet_builder is not None, f"Invalid loss mode: {loss_mode}"
@@ -81,6 +82,7 @@ def build_data_module(
         model_transforms=model_transforms,
         training_transforms=training_transforms,
         eval_datasets=eval_datasets,
+        dataset_names=dataset_names,
         eval_data_dirs=additional_eval_data_dirs,
         ssl_config=ssl_config,
     )
