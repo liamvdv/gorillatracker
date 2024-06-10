@@ -98,26 +98,24 @@ def read_files(dirpath: str) -> List[Entry]:
 def read_dataset_partition(dirpath: Path, labeler: Labeler) -> List[Entry]:
     return [Entry(value, labeler(value), {}) for value in dirpath.glob("*")]
 
-
-def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
+def read_ground_truth(full_images_dirpath: str, file_types: List[str], re_label: str, label_pos:int) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
-        if not filename.endswith(".png"):
-            continue
-        label, rest = re.split(r"[_\s]", filename, maxsplit=1)
-        entry = Entry(Path(full_images_dirpath, filename), label, {})
-        entries.append(entry)
-    return entries
-
-
-def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
-    entries = []
-    for filename in os.listdir(full_images_dirpath):
-        if filename.endswith(".jpg"):
-            label = re.split(r"[_\s-]", filename, maxsplit=1)[0]
+        if filename.endswith(file_types):
+            label = re.split(re_label, filename, maxsplit=1)[label_pos]
             entry = Entry(Path(full_images_dirpath, filename), label, {})
             entries.append(entry)
     return entries
+
+def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
+    return read_ground_truth(full_images_dirpath, [".png"], r"[_\s]", 0)
+
+def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
+    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_\s-]", 0)
+
+def read_ground_truth_cows2021(full_images_dirpath: str) -> List[Entry]:
+    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_]", 0)
+
 
 
 # Business Logic
@@ -415,6 +413,9 @@ def generate_kfold_split(
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     elif "ctai" or "czoo" in dataset:
         images = read_ground_truth_cxl(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})    
+    elif "cows2021" in dataset:
+        images = read_ground_truth_cows2021(dataset)
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     else:
         raise ValueError(f"unknown dataset {dataset}")
