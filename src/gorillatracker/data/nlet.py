@@ -184,7 +184,6 @@ class NletDataset(Dataset[Nlet], ABC):
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
         self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(), transform])
-        self.name = self.__class__.__name__
 
     def __len__(self) -> int:
         return len(self.contrastive_sampler)
