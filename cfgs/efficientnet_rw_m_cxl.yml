@@ -5,11 +5,11 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 4                      # Number of workers for data loading
+workers: 16                      # Number of workers for data loading
 
 # Model and Training Arguments
-project_name: "Embedding-EfficientNetRWM-CTAI-OpenSet" # WandB project name
-run_name: "405-chimpanzee_training_128_singlesubcenter"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-EfficientNetRWM-Cows2021-OpenSet" # WandB project name
+run_name: "407-cows2021-dataset-kfold"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
@@ -21,7 +21,7 @@ data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 20      # Early stopping patience (number of epochs)
+early_stopping_patience: 4      # Early stopping patience (number of epochs)
 embedding_size: 128
 dropout_p: 0.3
 use_quantization_aware_training: False
@@ -48,7 +48,7 @@ end_lr: 1e-6                    # End learning rate (for the learning rate sched
 
 max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
 
-batch_size: 32                  # Training batch size
+batch_size: 128                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
@@ -57,7 +57,7 @@ only_val: False                 # Perform only validation
 check_val_every_n_epoch: 4     # Perform validation every n epochs
 save_interval: 10              # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 10      # Embedding save interval
-save_model_to_wandb: True       # Save the model checkpoint to wandb
+save_model_to_wandb: False       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
@@ -70,9 +70,9 @@ kfold: True                     # Enable kfold cross-validation
 # data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-data_dir: "/workspaces/gorillatracker/datasets/splits/chimpanzee/ctai-workspaces-gorillatracker-data_vast-external-datasets-chimp_ctai_czoo-ctai_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
-dataset_class: "gorillatracker.datasets.chimp.KFoldCTaiDataset"
+data_dir: "/workspaces/gorillatracker/data/splits/cows2021-labeled-data-kfold-openset-seed-42-trainval-80-test-20-k-5"
+dataset_class: "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
 
 data_resize_transform: 224
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset", "gorillatracker.datasets.chimp.CZooDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/bristol", "/workspaces/gorillatracker/datasets/vast/external-datasets/chimp_ctai_czoo/czoo_format_adapted"]
+additional_val_dataset_classes: []
+additional_val_data_dirs: []
