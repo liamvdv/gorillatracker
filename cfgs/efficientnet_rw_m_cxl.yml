@@ -8,9 +8,9 @@ compile: False                  # Compile the model for faster execution
 workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
-project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
-run_name: "326-train-using-quantization-aware-training"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep-2"]            # WandB tags for experiment tracking
+project_name: "Embedding-EfficientNetRWM-CTAI-OpenSet" # WandB project name
+run_name: "405-chimpanzee_training"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -46,7 +46,7 @@ initial_lr: 1e-3                # Initial learning rate before warmup(must be > 
 start_lr: 1e-3                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 32                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
@@ -67,11 +67,11 @@ kfold: True                     # Enable kfold cross-validation
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
-dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-# data_dir: "/workspaces/gorillatracker/data/splits/chimpanzee/ctai-workspaces-gorillatracker-data_vast-external-datasets-chimp_ctai_czoo-ctai_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
-# dataset_class: "gorillatracker.datasets.chimp.KFoldCTaiDataset"
+data_dir: "/workspaces/gorillatracker/data/splits/chimpanzee/ctai-workspaces-gorillatracker-data_vast-external-datasets-chimp_ctai_czoo-ctai_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
+dataset_class: "gorillatracker.datasets.chimp.KFoldCTaiDataset"
 
 data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset", "gorillatracker.datasets.chimp.CZooDataset"]

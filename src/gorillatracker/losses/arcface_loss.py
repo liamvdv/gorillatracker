@@ -106,6 +106,8 @@ class ArcFaceLoss(torch.nn.Module):
             torch.nn.functional.normalize(embeddings, dim=-1),
             torch.nn.functional.normalize(self.prototypes, dim=-1),
         )  # batch x num_classes x k_subcenters
+        
+        assert not any(torch.flatten(torch.isnan(cos_theta))), "NaNs in cos_theta"
 
         sine_theta = torch.sqrt(
             torch.maximum(
@@ -113,21 +115,34 @@ class ArcFaceLoss(torch.nn.Module):
                 torch.tensor([eps], device=cos_theta.device),
             )
         ).clamp(eps, 1.0 - eps)
+        
+        assert not any(torch.flatten(torch.isnan(sine_theta))), "NaNs in sine_theta"
+        
         phi = (
             self.cos_m.unsqueeze(1) * cos_theta - self.sin_m.unsqueeze(1) * sine_theta
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
         phi = phi - self.additive_margin.unsqueeze(1)
+        
+        assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
 
         mask = torch.zeros(
             (cos_theta.shape[0], self.num_classes, self.k_subcenters), device=cos_theta.device
         )  # batch x num_classes x k_subcenters
+        
+        assert labels.max() < self.num_classes, "Labels out of range"
+        
         mask.scatter_(1, labels.view(1, -1, 1).long(), 1)
+        
+        assert not any(torch.flatten(torch.isnan(mask))), "NaNs in mask"
 
         output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: the margin is only added to the correct class
         output *= self.s
+        
+        assert not any(torch.flatten(torch.isnan(output))), "NaNs in output before mean"
+        
         output = torch.mean(output, dim=2)  # batch x num_classes
 
-        assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
+        assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
         loss = self.ce(output, labels)
         if self.use_class_weights:
             loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
@@ -139,7 +154,6 @@ class ArcFaceLoss(torch.nn.Module):
     def set_weights(self, weights: torch.Tensor) -> None:
         """Sets the weights of the prototypes"""
         weights = weights.unsqueeze(0)
-        assert weights.shape == self.prototypes.shape
 
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
             weights = weights.cuda()
