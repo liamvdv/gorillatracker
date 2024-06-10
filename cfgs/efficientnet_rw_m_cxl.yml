@@ -21,7 +21,7 @@ data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 3      # Early stopping patience (number of epochs)
+early_stopping_patience: 20      # Early stopping patience (number of epochs)
 embedding_size: 256
 dropout_p: 0.3
 use_quantization_aware_training: False
