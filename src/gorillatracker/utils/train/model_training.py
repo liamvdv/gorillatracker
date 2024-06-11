@@ -97,7 +97,6 @@ def train_and_validate_using_kfold(
     dataloader_name = dm.get_dataset_class_names()[0]
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
-    kfold_k = 3
 
     # Inject kfold_k into the datamodule TODO(memben): is there a better way?
     dm.kwargs["k"] = kfold_k
