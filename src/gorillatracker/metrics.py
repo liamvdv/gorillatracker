@@ -252,9 +252,9 @@ def evaluate_embeddings(
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value})
+                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value}, commit=True)
         else:
-            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result})
+            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
 
     return results
 
