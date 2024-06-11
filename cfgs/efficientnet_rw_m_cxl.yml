@@ -8,9 +8,9 @@ compile: False                  # Compile the model for faster execution
 workers: 16                      # Number of workers for data loading
 
 # Model and Training Arguments
-project_name: "Embedding-EfficientNetRWM-Cows2021-OpenSet" # WandB project name
-run_name: "407-cows2021-dataset-kfold"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: []            # WandB tags for experiment tracking
+project_name: "Embedding-EfficientNetRWM-ATRW-OpenSet" # WandB project name
+run_name: "419-atrw-dataset-kfold"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["baseline"]            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -46,7 +46,7 @@ initial_lr: 1e-3                # Initial learning rate before warmup(must be > 
 start_lr: 1e-3                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
+max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
 batch_size: 128                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
@@ -70,8 +70,8 @@ kfold: True                     # Enable kfold cross-validation
 # data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-data_dir: "/workspaces/gorillatracker/data/splits/cows2021-labeled-data-kfold-openset-seed-42-trainval-80-test-20-k-5"
-dataset_class: "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
+data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillatracker-video_data-external-datasets-ATRW-atrw_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
+dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
 
 data_resize_transform: 224
 additional_val_dataset_classes: []

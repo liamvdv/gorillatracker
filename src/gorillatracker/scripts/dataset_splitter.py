@@ -420,6 +420,9 @@ def generate_kfold_split(
     elif "cows2021" in dataset:
         images = read_ground_truth_cows2021(dataset)
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "atrw" in dataset:
+        images = read_ground_truth_cows2021(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     else:
         raise ValueError(f"unknown dataset {dataset}")
     fold_buckets, test_bucket = kfold_splitter(
