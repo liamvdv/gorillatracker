@@ -11,9 +11,9 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
 from torch._export import capture_pre_autograd_graph
-# from torch.ao.quantization import allow_exported_model_train_eval  # type: ignore
-# from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
-# from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
+from torch.ao.quantization import allow_exported_model_train_eval  # type: ignore
+from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
+from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
 from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
@@ -195,18 +195,17 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
             base_keys = key.split("/")
             base_key: str
             if "fold" in base_keys[1]:
-                base_key = f"{base_keys[0]}/{'/'.join(base_keys[2:])}" # remove fold from key 
+                base_key = f"{base_keys[0]}/{'/'.join(base_keys[2:])}"  # remove fold from key
             else:
-                continue # skip metrics that do not fit the pattern 
+                continue  # skip metrics that do not fit the pattern
             aggregated_metrics[f"aggregated/{base_key}"].append(value)
 
     # Step 2: Compute averages
     average_metrics = {}
     for key, values in aggregated_metrics.items():
-        if "pca" in key or "tsne" in key: # skip pca and tsne metrics as we cannot average them
+        if "pca" in key or "tsne" in key:  # skip pca and tsne metrics as we cannot average them
             continue
         average_metrics[key] = np.mean(values)
-        
 
     wandb.log(average_metrics, commit=True)
 
