@@ -258,6 +258,8 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
             or
             <label>_<...>.jpg
     """
+    assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
+
     samples = []
     image_paths = list(dirpath.glob("*.jpg"))
     image_paths = image_paths + list(dirpath.glob("*.png"))
