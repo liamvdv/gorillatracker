@@ -1,6 +1,6 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -15,6 +15,7 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
+from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
@@ -154,14 +155,11 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
     return ToPILImage()(tensor.cpu()).convert("RGB")
 
 
-# TODO(memben)
-def get_n_samples_from_dataloader(
-    dataloader: gtypes.BatchNletDataLoader, n_samples: int = 1
-) -> List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]]:
-    samples: List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]] = []
+def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
+    samples: list[gtypes.Nlet] = []
     for batch in dataloader:
         ids, images, labels = batch
-        row_batch = zip(zip(*images), zip(*labels))
+        row_batch = zip(zip(*ids), zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))
         if len(samples) == n_samples:
@@ -179,7 +177,7 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
     for i, sample in enumerate(samples):
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
         row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
-        row_images, row_labels = sample
+        _, row_images, row_labels = sample
         img_label_meaning = zip(row_images, row_labels, row_meaning)
         artifacts = [
             wandb.Image(tensor_to_image(img), caption=f"{meaning} label={label}")
@@ -203,7 +201,7 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
     wandb_images: List[wandb.Image] = []
     for sample in samples:
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
-        row_images, row_labels = sample
+        _, row_images, row_labels = sample
         anchor, *rest = row_images
         grayscale_cam = cam(input_tensor=anchor.unsqueeze(0), targets=None)
 
