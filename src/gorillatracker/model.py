@@ -381,9 +381,7 @@ class BaseModule(L.LightningModule):
                         class_weights[label] = 0.0
 
                 # calculate loss for all embeddings
-                loss_module_val.set_weights(class_weights)
-                loss_module_val.le = lse
-                loss_module_val.num_classes = num_classes
+                loss_module_val.update(class_weights, num_classes, lse)
 
                 losses = []
                 for _, row in table.iterrows():
