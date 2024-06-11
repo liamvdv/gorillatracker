@@ -29,13 +29,20 @@ def crop_image(image: cv2.Mat, bbox: list) -> cv2.Mat:
     x, y, width, height = bbox
     return image[int(y) : int(y + height), int(x) : int(x + width)]
 
+def filter_duplicate_annotations(annotations: list) -> list:
+    image_ids = [ann["image_id"] for ann in annotations]
+    duplicate_image_ids = [image_id for image_id in image_ids if image_ids.count(image_id) > 1]
+
+    return [ann for ann in annotations if ann["image_id"] not in duplicate_image_ids]
+
 def crop_images_from_coco(annotation_path: str, image_dir: str, output_dir: str) -> None:
     os.makedirs(output_dir, exist_ok=True)
     annotation_file = load_json(annotation_path)
     annotations = annotation_file.get("annotations", [])
+    # There are images with multiple annotations and different names which need to be filtered out
+    annotations = filter_duplicate_annotations(annotations)
     images = annotation_file.get("images", [])
     image_file_names = extract_image_file_names(images)
-
     for ann in tqdm(annotations, desc="Cropping images", total=len(annotations), unit="image"):
         image_id = ann["image_id"]
         leopard_name = ann["name"]
@@ -59,9 +66,8 @@ def crop_images_from_coco(annotation_path: str, image_dir: str, output_dir: str)
 
 
 if __name__ == "__main__":
-    data_dir = "video_data/external-datasets/LeopardID2022/leopard.coco"
+    data_dir = "/workspaces/gorillatracker/datasets/vast/external-datasets/LeopardID2022/leopard.coco"
     annotation_file = os.path.join(data_dir, "annotations/instances_train2022.json")
     image_dir = os.path.join(data_dir, "images/train2022")
-    output_dir = "compressed/test"
-    # output_dir = "video_data/external-datasets/LeopardID2022/cropped-images/train"
+    output_dir = "/workspaces/gorillatracker/datasets/vast/external-datasets/LeopardID2022/cropped_images/train"
     crop_images_from_coco(annotation_file, image_dir, output_dir)
