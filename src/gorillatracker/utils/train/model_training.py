@@ -97,6 +97,7 @@ def train_and_validate_using_kfold(
     dataloader_name = dm.get_dataset_class_names()[0]
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
+    kfold_k = 3
 
     # Inject kfold_k into the datamodule TODO(memben): is there a better way?
     dm.kwargs["k"] = kfold_k
@@ -192,16 +193,23 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
     # Step 1: Extract metrics by fold and group them
     for key, value in metrics:
         if isinstance(value, (int, float)):
-            base_key = "/".join(key.split("/")[1:])
-            aggregated_metrics[base_key].append(value)
+            base_keys = key.split("/")
+            base_key: str
+            if "fold" in base_keys[1]:
+                base_key = f"{base_keys[0]}/{'/'.join(base_keys[2:])}" # remove fold from key 
+            else:
+                continue # skip metrics that do not fit the pattern 
+            aggregated_metrics[f"aggregated/{base_key}"].append(value)
 
     # Step 2: Compute averages
     average_metrics = {}
     for key, values in aggregated_metrics.items():
+        if "pca" in key or "tsne" in key: # skip pca and tsne metrics as we cannot average them
+            continue
         average_metrics[key] = np.mean(values)
+        
 
-    wandb.log(average_metrics)
-    print(average_metrics)
+    wandb.log(average_metrics, commit=True)
 
 
 def save_model(
