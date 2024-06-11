@@ -127,7 +127,7 @@ class ArcFaceLoss(torch.nn.Module):
         output *= self.s
         output = torch.mean(output, dim=2)  # batch x num_classes
 
-        assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
+        assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
         loss = self.ce(output, labels)
         if self.use_class_weights:
             loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
@@ -139,7 +139,6 @@ class ArcFaceLoss(torch.nn.Module):
     def set_weights(self, weights: torch.Tensor) -> None:
         """Sets the weights of the prototypes"""
         weights = weights.unsqueeze(0)
-        assert weights.shape == self.prototypes.shape
 
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
             weights = weights.cuda()

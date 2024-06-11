@@ -43,6 +43,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         wandb_run: Runner,
         dm: NletDataModule,
         use_quantization_aware_training: bool = False,
+        fast_dev_run: bool = False,
     ) -> None:
         super().__init__()
         self.embedding_artifacts: List[str] = []
@@ -52,6 +53,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.dm = dm
         self.use_quantization_aware_training = use_quantization_aware_training
         self.kfold_k: Optional[int] = None
+        self.fast_dev_run = fast_dev_run
 
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
@@ -110,6 +112,8 @@ class LogEmbeddingsToWandbCallback(L.Callback):
                 if self.knn_with_train
                 else {}
             )
+            metrics = metrics if not self.fast_dev_run else {}
+
             # log to wandb
             evaluate_embeddings(
                 data=embeddings_table,

@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 
 import torch
 from lightning import seed_everything
@@ -78,7 +79,7 @@ def main(args: TrainingArgs) -> None:
         model_transforms=model_transforms,
         training_transforms=model_cls.get_training_transforms(),
         additional_eval_datasets_ids=args.additional_val_dataset_classes,
-        additional_eval_data_dirs=args.additional_val_data_dirs,
+        additional_eval_data_dirs=[Path(d) for d in args.additional_val_data_dirs],
         ssl_config=ssl_config,
     )
 
@@ -97,6 +98,7 @@ def main(args: TrainingArgs) -> None:
         wandb_run=wandb_logger.experiment,
         dm=dm,
         use_quantization_aware_training=args.use_quantization_aware_training,
+        fast_dev_run=args.fast_dev_run,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(

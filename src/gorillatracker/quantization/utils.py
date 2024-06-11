@@ -5,12 +5,11 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 
-from gorillatracker.data.cxl import CXLDataset
-from gorillatracker.data.nlet import build_onelet
+from gorillatracker.data.nlet import SupervisedDataset, build_onelet
 
 
 def get_model_input(
-    dataset_cls: Type[CXLDataset],
+    dataset_cls: Type[SupervisedDataset],
     dataset_path: Path,
     partion: Literal["train", "val", "test"] = "train",
     amount_of_tensors: int = 100,

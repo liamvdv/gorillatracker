@@ -61,10 +61,7 @@ def train_and_validate_model(
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
-        val_result = trainer.validate(model, dm)
-        for elem in val_result:
-            wandb.log(elem)
-        print(val_result)
+        trainer.validate(model, dm)
         if args.only_val:
             return model, trainer
     logger.info("Starting training...")

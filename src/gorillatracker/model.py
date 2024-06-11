@@ -277,7 +277,6 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
@@ -364,7 +363,7 @@ class BaseModule(L.LightningModule):
                 if self.use_dist_term:
                     loss_module_val = loss_module_val.arcface
 
-                num_classes = loss_module_val.num_classes  # TODO(memben)
+                num_classes = table["label"].nunique()  # TODO(memben + rob2u)
                 assert len(table) > 0, f"Empty table for dataloader {i}"
 
                 # get weights for all classes by averaging over all embeddings
@@ -384,6 +383,7 @@ class BaseModule(L.LightningModule):
                 # calculate loss for all embeddings
                 loss_module_val.set_weights(class_weights)
                 loss_module_val.le = lse
+                loss_module_val.num_classes = num_classes
 
                 losses = []
                 for _, row in table.iterrows():
