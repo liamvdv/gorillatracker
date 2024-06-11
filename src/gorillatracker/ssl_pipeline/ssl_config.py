@@ -47,7 +47,7 @@ class SSLConfig:
         base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
-        engine = create_engine(GorillaDatasetKISZ.DB_URI)
+        engine = create_engine(GorillaDatasetKISZ.DB_URI, echo=True)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
@@ -112,14 +112,15 @@ class SSLConfig:
 
     def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
-        BATCH_SIZE = 200
-        num_batches = len(video_ids) // BATCH_SIZE
-        tffs = []
-        for i in range(num_batches + 1):
-            batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
-            sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
-            tffs.extend(list(sampler.sample(session)))
-        return tffs
+        return list(self._create_tff_sampler(self._build_query(video_ids)).sample(session))
+        # BATCH_SIZE = 200
+        # num_batches = len(video_ids) // BATCH_SIZE
+        # tffs = []
+        # for i in range(num_batches + 1):
+        #     batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+        #     sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
+        #     tffs.extend(list(sampler.sample(session)))
+        # return tffs
 
     def _create_contrastive_images(
         self, tracked_features: List[TrackingFrameFeature], base_path: Path
@@ -162,10 +163,15 @@ if __name__ == "__main__":
             "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
         ),
     )
+    import time
+
+    before = time.time()
     contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
-    print(len(contrastive_sampler))
-    for i in range(10):
-        contrastive_image = contrastive_sampler[i * 10]
-        print(contrastive_image)
-        print(contrastive_sampler.positive(contrastive_image))
-        print(contrastive_sampler.negative(contrastive_image))
+    after = time.time()
+    print(f"Time: {after - before}")
+    # print(len(contrastive_sampler))
+    # for i in range(10):
+    #     contrastive_image = contrastive_sampler[i * 10]
+    #     print(contrastive_image)
+    #     print(contrastive_sampler.positive(contrastive_image))
+    #     print(contrastive_sampler.negative(contrastive_image))
