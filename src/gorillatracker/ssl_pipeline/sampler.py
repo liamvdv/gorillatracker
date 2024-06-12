@@ -1,5 +1,5 @@
-from collections import defaultdict
 import random
+from collections import defaultdict
 from typing import Iterator, List
 
 from sqlalchemy import Select
