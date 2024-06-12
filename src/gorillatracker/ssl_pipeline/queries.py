@@ -53,14 +53,8 @@ def multiple_videos_filter(video_ids: list[int]) -> Select[tuple[TrackingFrameFe
         return filter(lambda x: x.tracking.video_id in video_ids, frame_features)
     ```
     """
-    # Create a CTE with the list of video IDs
-    # Create a list of select statements
-    selects = [select(literal_column(str(video_id)).label("video_id")) for video_id in video_ids]
-
-    # Combine the selects using union_all
-    temp_table = union_all(*selects).cte("temp_table")
-
-    return select(TrackingFrameFeature).join(temp_table, TrackingFrameFeature.video_id == temp_table.c.video_id)
+    # NOTE(memben): Alternative of using a intermediate Video result and joining it, turned out to be not a difference
+    return select(TrackingFrameFeature).where(TrackingFrameFeature.video_id.in_(video_ids))
 
 
 def associated_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[TrackingFrameFeature]]:

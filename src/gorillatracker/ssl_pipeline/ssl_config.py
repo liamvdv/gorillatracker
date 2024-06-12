@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from sqlalchemy import Select, create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
@@ -108,19 +108,28 @@ class SSLConfig:
         query = confidence_filter(query, self.min_confidence)
         query = bbox_filter(query, self.width_range[0], self.width_range[1], self.height_range[0], self.height_range[1])
         query = min_count_filter(query, self.min_images_per_tracking)
+        # NOTE(memben): Use with care, as it might lead to performance issues if using other columns
+        query = query.options(
+            load_only(
+                TrackingFrameFeature.tracking_frame_feature_id,
+                TrackingFrameFeature.tracking_id,
+                TrackingFrameFeature.frame_nr,
+            )
+        )
         return query
 
     def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
-        return list(self._create_tff_sampler(self._build_query(video_ids)).sample(session))
-        # BATCH_SIZE = 200
-        # num_batches = len(video_ids) // BATCH_SIZE
-        # tffs = []
-        # for i in range(num_batches + 1):
-        #     batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
-        #     sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
-        #     tffs.extend(list(sampler.sample(session)))
-        # return tffs
+        # return list(self._create_tff_sampler(self._build_query(video_ids)).sample(session))
+
+        BATCH_SIZE = 200
+        num_batches = len(video_ids) // BATCH_SIZE
+        tffs = []
+        for i in range(num_batches + 1):
+            batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+            sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
+            tffs.extend(list(sampler.sample(session)))
+        return tffs
 
     def _create_contrastive_images(
         self, tracked_features: List[TrackingFrameFeature], base_path: Path
