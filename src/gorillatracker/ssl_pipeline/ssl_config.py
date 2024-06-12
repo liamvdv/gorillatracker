@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from sqlalchemy import Select, create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
@@ -108,6 +108,14 @@ class SSLConfig:
         query = confidence_filter(query, self.min_confidence)
         query = bbox_filter(query, self.width_range[0], self.width_range[1], self.height_range[0], self.height_range[1])
         query = min_count_filter(query, self.min_images_per_tracking)
+        # NOTE(memben): Use with care, as it might lead to performance issues if using other columns
+        query = query.options(
+            load_only(
+                TrackingFrameFeature.tracking_frame_feature_id,
+                TrackingFrameFeature.tracking_id,
+                TrackingFrameFeature.frame_nr,
+            )
+        )
         return query
 
     def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
@@ -162,10 +170,15 @@ if __name__ == "__main__":
             "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
         ),
     )
+    import time
+
+    before = time.time()
     contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
-    print(len(contrastive_sampler))
-    for i in range(10):
-        contrastive_image = contrastive_sampler[i * 10]
-        print(contrastive_image)
-        print(contrastive_sampler.positive(contrastive_image))
-        print(contrastive_sampler.negative(contrastive_image))
+    after = time.time()
+    print(f"Time: {after - before}")
+    # print(len(contrastive_sampler))
+    # for i in range(10):
+    #     contrastive_image = contrastive_sampler[i * 10]
+    #     print(contrastive_image)
+    #     print(contrastive_sampler.positive(contrastive_image))
+    #     print(contrastive_sampler.negative(contrastive_image))

@@ -136,8 +136,11 @@ class ArcFaceLoss(torch.nn.Module):
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
 
-    def set_weights(self, weights: torch.Tensor) -> None:
+    def update(self, weights: torch.Tensor, num_classes: int, le: LinearSequenceEncoder) -> None:
         """Sets the weights of the prototypes"""
+        self.num_classes = num_classes
+        self.le = le
+
         weights = weights.unsqueeze(0)
 
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
@@ -258,6 +261,8 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
     def set_weights(self, weights: torch.Tensor) -> None:
         """Sets the weights of the prototypes"""
+        raise NotImplementedError("This method is not implemented for VariationalPrototypeLearning ask @rob2u for help")
+
         assert weights.shape == self.prototypes.shape
 
         if torch.cuda.is_available() and self.prototypes.device != weights.device:

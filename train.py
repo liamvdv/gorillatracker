@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import logger
 from simple_parsing import parse
-from torchvision.transforms import Compose, Resize
+from torchvision.transforms import Compose, Normalize, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
@@ -54,10 +54,19 @@ def main(args: TrainingArgs) -> None:
 
     ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
+
     #################### Construct Data Module #################
-    model_transforms = model_cls.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    def resize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    def normalize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    if args.data_resize_transform:
+        resize_transform = Resize((args.data_resize_transform, args.data_resize_transform))
+    if args.use_normalization:
+        normalize_transform = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    model_transforms = Compose([resize_transform, normalize_transform])
 
     ssl_config = SSLConfig(
         tff_selection=args.tff_selection,

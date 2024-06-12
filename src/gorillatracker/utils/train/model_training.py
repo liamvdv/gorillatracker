@@ -61,6 +61,7 @@ def train_and_validate_model(
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
+        wandb.log({"trainer/global_step": 0})  # HACK: to make sure the global_step is logged before the validation
         trainer.validate(model, dm)
         if args.only_val:
             return model, trainer
@@ -192,16 +193,22 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
     # Step 1: Extract metrics by fold and group them
     for key, value in metrics:
         if isinstance(value, (int, float)):
-            base_key = "/".join(key.split("/")[1:])
-            aggregated_metrics[base_key].append(value)
+            base_keys = key.split("/")
+            base_key: str
+            if "fold" in base_keys[1]:
+                base_key = f"{base_keys[0]}/{'/'.join(base_keys[2:])}"  # remove fold from key
+            else:
+                continue  # skip metrics that do not fit the pattern
+            aggregated_metrics[f"aggregated/{base_key}"].append(value)
 
     # Step 2: Compute averages
     average_metrics = {}
     for key, values in aggregated_metrics.items():
+        if "pca" in key or "tsne" in key:  # skip pca and tsne metrics as we cannot average them
+            continue
         average_metrics[key] = np.mean(values)
 
-    wandb.log(average_metrics)
-    print(average_metrics)
+    wandb.log(average_metrics, commit=True)
 
 
 def save_model(

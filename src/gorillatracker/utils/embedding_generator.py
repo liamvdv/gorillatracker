@@ -182,7 +182,6 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
 
 
 def get_dataset(
-    model: BaseModule,
     partition: Literal["train", "val", "test"],
     data_dir: str,
     dataset_class: str,
@@ -194,7 +193,13 @@ def get_dataset(
         base_dir=Path(data_dir),
         nlet_builder=build_onelet,
         partition=partition,
-        transform=model.get_tensor_transforms() if transform is None else transform,
+        transform=(
+            transforms.Compose(
+                [cls.get_transforms(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]
+            )
+            if transform is None
+            else transform
+        ),
     )
 
 
@@ -230,8 +235,8 @@ def generate_embeddings_from_run(
     assert data_dir is not None, "data_dir must be provided"
     assert dataset_cls is not None, "dataset_cls must be provided"
 
-    train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
-    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)
+    train_dataset = get_dataset(partition="train", data_dir=data_dir, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"
