@@ -464,23 +464,15 @@ class BaseModule(L.LightningModule):
             return {"optimizer": optimizer, "lr_scheduler": plateau_scheduler}
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        """
-        Please implement this method in your subclass for non-square resizes,
-        normalizations, etc. To apply nothing, return the identity function
-            `lambda x: x`.
-        Note that for square resizes we have the `data_resize_transform` argument
-        in the `TrainingArgs` class. This is a special case worth supporting
-        because it allows easily switching between little image MNIST and large
-        image non-MNIST Datasets. Setting it to `Null` / `None` will give you
-        full control here.
-        """
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        """Add your data augmentations here. Function will be called after in the training loop"""
         return lambda x: x
 
     @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        """Add your data augmentations here. Function will be called after get_tensor_transforms in the training loop"""
-        return lambda x: x
+    def get_tensor_transforms(cls) -> None:
+        raise NotImplementedError(
+            "This method was deprecated! Use arg.use_normalization and args.data_resize_transform instead!"
+        )
 
 
 class EfficientNetV2Wrapper(BaseModule):
@@ -510,10 +502,6 @@ class EfficientNetV2Wrapper(BaseModule):
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv
         return self.model.features[-1][0]  # TODO(liamvdv)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -547,10 +535,6 @@ class EfficientNetRW_M(BaseModule):
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         return self.model.conv_head
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -587,10 +571,6 @@ class ConvNeXtV2BaseWrapper(BaseModule):
         return self.model.stages[-1].blocks[-1].conv_dw
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -615,10 +595,6 @@ class ConvNeXtV2HugeWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Resize((224), antialias=True)
 
 
 class VisionTransformerWrapper(BaseModule):
@@ -652,15 +628,6 @@ class VisionTransformerWrapper(BaseModule):
         return reshape_transform
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms.Resize((224), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -685,15 +652,6 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms.Resize((518), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -721,15 +679,6 @@ class VisionTransformerClipWrapper(BaseModule):
         )
 
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms.Resize((224), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -762,15 +711,6 @@ class ConvNextClipWrapper(BaseModule):
         self.set_losses(self.model, **kwargs)
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -795,15 +735,6 @@ class ConvNextWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -859,15 +790,6 @@ class SwinV2BaseWrapper(BaseModule):
         return reshape_transform
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -901,15 +823,6 @@ class SwinV2LargeWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -946,10 +859,6 @@ class ResNet18Wrapper(BaseModule):
         return self.model.layer4[-1].conv2
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -982,10 +891,6 @@ class ResNet152Wrapper(BaseModule):
         return self.model.layer4[-1].conv3
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -1012,10 +917,6 @@ class ResNet50Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1052,10 +953,6 @@ class ResNet50DinoV2Wrapper(BaseModule):
         return feature_vector
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -1087,10 +984,6 @@ class InceptionV3Wrapper(BaseModule):
         return self.model.Mixed_7c.branch_pool
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -1117,15 +1010,6 @@ class FaceNetWrapper(BaseModule):
         )
         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1189,11 +1073,6 @@ class MiewIdNetWrapper(BaseModule):
         x = self.model(x)
         x = self.classifier(x)
         return x
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        # return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # TODO (rob2u): might be necessary to remove this for wildme model finetuning
-        return lambda x: x
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
