@@ -291,13 +291,18 @@ class BaseModule(L.LightningModule):
         num_classes: int
         if "l2sp" in self.loss_mode and not self.use_dist_term:
             num_classes = self.loss_module_train.loss.num_classes  # type: ignore
+            flat_labels = self.loss_module_train.loss.le.encode_list(flat_labels.tolist())  # type: ignore
         elif "l2sp" in self.loss_mode and self.use_dist_term:
             num_classes = self.loss_module_train.loss.arcface.num_classes  # type: ignore
+            flat_labels = self.loss_module_train.loss.arcface.le.encode_list(flat_labels.tolist())  # type: ignore
         elif "l2sp" not in self.loss_mode and self.use_dist_term:
             num_classes = self.loss_module_train.arcface.num_classes  # type: ignore
+            flat_labels = self.loss_module_train.arcface.le.encode_list(flat_labels.tolist())  # type: ignore
         else:
             num_classes = self.loss_module_train.num_classes  # type: ignore
+            flat_labels = self.loss_module_train.le.encode_list(flat_labels.tolist())  # type: ignore
 
+        flat_labels = torch.tensor(flat_labels).to(flat_images.device)
         flat_labels_onehot = torch.nn.functional.one_hot(flat_labels, num_classes).float()
         flat_images, flat_labels_onehot = in_batch_mixup(flat_images, flat_labels_onehot, 0.5)
 

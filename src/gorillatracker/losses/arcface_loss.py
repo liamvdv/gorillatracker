@@ -20,7 +20,6 @@ class FocalLoss(torch.nn.Module):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         # assert len(alphas) == len(target), "Alphas must be the same length as the target"
-
         logpt = -self.ce(input, target)
         pt = torch.exp(logpt)
         loss = -((1 - pt) ** self.gamma) * logpt
@@ -132,7 +131,7 @@ class ArcFaceLoss(torch.nn.Module):
         output = torch.mean(output, dim=2)  # batch x num_classes
 
         assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
-        loss = self.ce(output, labels)
+        loss = self.ce(output, labels) if len(labels_onehot) == 0 else self.ce(output, labels_onehot)
         if self.use_class_weights:
             loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
