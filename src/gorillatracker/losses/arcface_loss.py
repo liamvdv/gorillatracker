@@ -81,7 +81,11 @@ class ArcFaceLoss(torch.nn.Module):
         self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: torch.Tensor = torch.Tensor(),
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
         embeddings = embeddings.to(self.accelerator)
@@ -156,7 +160,11 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         self.is_eval = False
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: torch.Tensor = torch.Tensor(),
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         angle_margin = torch.Tensor([self.angle_margin]).to(embeddings.device)
         if not self.is_eval:
@@ -169,6 +177,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         return super().forward(
             embeddings,
             labels,
+            labels_onehot=labels_onehot,
         )
 
     def eval(self) -> Any:
@@ -186,7 +195,11 @@ class AdaFaceLoss(ArcFaceLoss):
         self.norm = torch.nn.BatchNorm1d(1, affine=False, momentum=momentum).to(kwargs.get("accelerator", "cpu"))
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: torch.Tensor = torch.Tensor(),
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         if self.norm.running_mean.device != embeddings.device:  # type: ignore
             self.norm = self.norm.to(embeddings.device)
@@ -201,7 +214,7 @@ class AdaFaceLoss(ArcFaceLoss):
             self.cos_m = torch.cos(g_angle)
             self.sin_m = torch.sin(g_angle)
             self.additive_margin = g_additive
-        return super().forward(embeddings, labels, images)
+        return super().forward(embeddings, labels, labels_onehot=labels_onehot, **kwargs)
 
     def eval(self) -> Any:
         self.is_eval = True

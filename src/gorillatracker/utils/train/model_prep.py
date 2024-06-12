@@ -78,6 +78,7 @@ class ModelConstructor:
             label_smoothing=args.label_smoothing,
             use_class_weights=args.use_class_weights,
             use_dist_term=args.use_dist_term,
+            use_inbatch_mixup=args.use_inbatch_mixup,
             teacher_model_wandb_link=args.teacher_model_wandb_link,
         )
 

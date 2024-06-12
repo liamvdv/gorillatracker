@@ -104,6 +104,19 @@ def combine_schedulers(
         )
 
 
+def in_batch_mixup(data: torch.Tensor, targets: torch.Tensor, alpha: float) -> tuple[torch.Tensor, torch.Tensor]:
+    """Mixes the data and targets in a batch randomly. Targets need to be one-hot encoded."""
+    indices = torch.randperm(data.size(0))
+    data2 = data[indices]
+    targets2 = targets[indices]
+
+    lam = torch.FloatTensor([np.random.beta(alpha, alpha)]).to(data.device)  # f(x; a,b) = const * x^(a-1) * (1-x)^(b-1)
+    data = data * lam + data2 * (1 - lam)
+    targets = targets * lam + targets2 * (1 - lam)
+
+    return data, targets
+
+
 class BaseModule(L.LightningModule):
     """
     must be subclassed and set self.model = ...
@@ -133,6 +146,7 @@ class BaseModule(L.LightningModule):
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
         use_dist_term: bool = False,
+        use_inbatch_mixup: bool = False,
         kfold_k: Optional[int] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
@@ -162,8 +176,11 @@ class BaseModule(L.LightningModule):
         self.dropout_p = dropout_p
 
         ####### Losses
+        assert "softmax" in loss_mode or not use_inbatch_mixup, "In-batch mixup is only supported for softmax losses."
+
         self.loss_mode = loss_mode
         self.use_dist_term = use_dist_term
+        self.use_inbatch_mixup = use_inbatch_mixup
 
         ####### Other
         self.quant = torch.quantization.QuantStub()  # type: ignore
@@ -270,14 +287,33 @@ class BaseModule(L.LightningModule):
             self.loss_module_train.loss.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
 
+    def perform_mixup(self, flat_images: torch.Tensor, flat_labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        num_classes: int
+        if "l2sp" in self.loss_mode and not self.use_dist_term:
+            num_classes = self.loss_module_train.loss.num_classes  # type: ignore
+        elif "l2sp" in self.loss_mode and self.use_dist_term:
+            num_classes = self.loss_module_train.loss.arcface.num_classes  # type: ignore
+        elif "l2sp" not in self.loss_mode and self.use_dist_term:
+            num_classes = self.loss_module_train.arcface.num_classes  # type: ignore
+        else:
+            num_classes = self.loss_module_train.num_classes  # type: ignore
+
+        flat_labels_onehot = torch.nn.functional.one_hot(flat_labels, num_classes).float()
+        flat_images, flat_labels_onehot = in_batch_mixup(flat_images, flat_labels_onehot, 0.5)
+
+        return flat_images, flat_labels_onehot
+
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         _, images, _ = batch
         _, flat_images, flat_labels = flatten_batch(batch)
 
+        flat_labels_onehot = None
+        if self.use_inbatch_mixup:
+            flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=images, labels_onehot=flat_labels_onehot)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
