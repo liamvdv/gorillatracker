@@ -104,7 +104,7 @@ def combine_schedulers(
         )
 
 
-def in_batch_mixup(data: torch.Tensor, targets: torch.Tensor, alpha: float) -> tuple[torch.Tensor, torch.Tensor]:
+def in_batch_mixup(data: torch.Tensor, targets: torch.Tensor, alpha: float = 0.2) -> tuple[torch.Tensor, torch.Tensor]:
     """Mixes the data and targets in a batch randomly. Targets need to be one-hot encoded."""
     indices = torch.randperm(data.size(0))
     data2 = data[indices]
@@ -304,7 +304,7 @@ class BaseModule(L.LightningModule):
 
         flat_labels = torch.tensor(flat_labels).to(flat_images.device)
         flat_labels_onehot = torch.nn.functional.one_hot(flat_labels, num_classes).float()
-        flat_images, flat_labels_onehot = in_batch_mixup(flat_images, flat_labels_onehot, 0.5)
+        flat_images, flat_labels_onehot = in_batch_mixup(flat_images, flat_labels_onehot)
 
         return flat_images, flat_labels_onehot
 
