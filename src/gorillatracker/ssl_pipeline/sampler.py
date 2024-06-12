@@ -1,9 +1,5 @@
 from collections import defaultdict
 import random
-<<<<<<< HEAD
-from collections import defaultdict
-=======
->>>>>>> 1512a1df28a4baf20a9c76bb627a0b120e55f8c2
 from typing import Iterator, List
 
 from sqlalchemy import Select
@@ -35,15 +31,13 @@ class Sampler:
 class RandomSampler(Sampler):
     """Randomly sample a subset of TrackingFrameFeature instances per tracking."""
 
-    def __init__(self, query: Select[tuple[TrackingFrameFeature]], n_samples: int, seed: int = 42) -> None:
+    def __init__(self, query: Select[tuple[TrackingFrameFeature]], n_samples: int) -> None:
         super().__init__(query)
-        self.seed = seed
         self.n_samples = n_samples
 
     def sample(self, session: Session) -> Iterator[TrackingFrameFeature]:
         tracking_frame_features = list(session.execute(self.query).scalars().all())
         tracking_id_grouped = self.group_by_tracking_id(tracking_frame_features)
-        random.seed(self.seed)
         for features in tracking_id_grouped.values():
             num_samples = min(len(features), self.n_samples)
             yield from random.sample(features, num_samples)
