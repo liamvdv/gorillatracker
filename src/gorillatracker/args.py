@@ -74,6 +74,7 @@ class TrainingArgs:
 
     save_model_to_wandb: bool = field(default=False)
 
+    k_subcenters: int = field(default=1)
     margin: float = field(default=0.5)
     s: float = field(default=64.0)
     delta_t: int = field(default=100)
@@ -86,6 +87,8 @@ class TrainingArgs:
         "online/hard",
         "online/semi-hard",
         "softmax/arcface",
+        "softmax/adaface",
+        "softmax/elasticface",
         "softmax/vpl",
         "offline/native/l2sp",
         "online/soft/l2sp",
@@ -93,8 +96,17 @@ class TrainingArgs:
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
         "softmax/vpl/l2sp",
+        "softmax/adaface/l2sp",
+        "softmax/elasticface/l2sp",
+        "distillation/offline/response-based",
     ] = field(default="offline")
+    teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
+    use_focal_loss: bool = field(default=False)
+    label_smoothing: float = field(default=0.0)
+    use_class_weights: bool = field(default=False)
+    use_dist_term: bool = field(default=False)
+    use_normalization: bool = field(default=True)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)
@@ -112,18 +124,34 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
+    additional_val_dataset_classes: list[str] = field(default_factory=lambda: [])
+    additional_val_data_dirs: list[str] = field(default_factory=lambda: [])
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config
     use_ssl: bool = field(default=False)
-
-    pretrained_weights_file: Union[str, None] = field(default=None)
-    # Add any additional fields as needed.
+    tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
+    negative_mining: Literal["random", "overlapping"] = field(default="random")
+    n_samples: int = field(default=15)
+    feature_types: list[str] = field(default_factory=lambda: ["body"])
+    min_confidence: float = field(default=0.5)
+    min_images_per_tracking: int = field(default=3)
+    width_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
+    height_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0
         assert self.batch_size > 0
         assert self.gradient_accumulation_steps > 0
         assert isinstance(self.grad_clip, float), "automatically set to None if < 0"
+        if not (
+            self.width_range[0] is None or self.width_range[1] is None or self.width_range[0] <= self.width_range[1]
+        ):
+            raise ValueError("min_width should be <= max_width")
+        if not (
+            self.height_range[0] is None or self.height_range[1] is None or self.height_range[0] <= self.height_range[1]
+        ):
+            raise ValueError("min_height should be <= max_height")
         if self.grad_clip <= 0:
             self.grad_clip = None

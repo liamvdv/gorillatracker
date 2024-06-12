@@ -1,53 +1,57 @@
-from typing import Any, Callable, Tuple, Union
+from typing import Callable, Tuple, Union
 
 import cv2.typing as cvt
 import torch
+from PIL.Image import Image as PILImage
 from torch.utils.data import DataLoader
 
 # Position top left, bottom right
 BoundingBox = Tuple[Tuple[int, int], Tuple[int, int]]
+
 Image = cvt.MatLike
 
 Id = str
-Label = Union[str, int]
+Label = int
 
-NletId = Tuple[Id, ...]
-NletLabel = Tuple[Label, ...]
-NletValue = Tuple[torch.Tensor, ...]
+NletId = Tuple[Id, ...]  # e.g (anchor_id, positive_id, negative_id)
+NletLabel = Tuple[Label, ...]  # e.g (anchor_label, positive_label, negative_label)
+NletValue = Tuple[torch.Tensor, ...]  # e.g (anchor_image, positive_image, negative_image)
 Nlet = Tuple[NletId, NletValue, NletLabel]
 
 
+# NOTE(memben): Concrete type hints are all wrong
 BatchId = Tuple[Id, ...]
 BatchLabel = Tuple[Label, ...]
-BatchTripletIds = Tuple[BatchId, BatchId, BatchId]
-BatchTripletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel]
-# stacked tensors
-BatchTripletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
 LossPosNegDist = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
-BatchQuadletIds = Tuple[BatchId, BatchId, BatchId, BatchId]
-BatchQuadletLabel = Tuple[BatchLabel, BatchLabel, BatchLabel, BatchLabel]
-BatchQuadletValue = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+# WRONG ensd here
 
-TripletBatch = Tuple[BatchTripletIds, BatchTripletValue, BatchTripletLabel]
-QuadletBatch = Tuple[BatchQuadletIds, BatchQuadletValue, BatchQuadletLabel]
-
-NletBatchIds = Tuple[BatchId, ...]
-NletBatchLabels = Tuple[BatchLabel, ...]
-NletBatchValues = Tuple[torch.Tensor, ...]
+NletBatchIds = Tuple[
+    Tuple[Id, ...], ...
+]  # e.g. ((anchor_id_1, anchor_id2, ...), (positive_id_1, ...), (negative_id_1, ...), ...)
+NletBatchValues = Tuple[
+    Tuple[torch.Tensor, ...], ...
+]  # e.g. ((anchor_image_1, anchor_image_2, ...), (positive_image_1, ...), (negative_image_1, ...), ...)
+NletBatchLabels = Tuple[
+    Tuple[Label, ...], ...
+]  # e.g. ((anchor_label_1, anchor_label_2, ...), (positive_label_1, ...), (negative_label_1, ...), ...)
 
 NletBatch = Tuple[NletBatchIds, NletBatchValues, NletBatchLabels]
 
-BatchTripletDataLoader = DataLoader[TripletBatch]
-BatchQuadletDataLoader = DataLoader[QuadletBatch]
-# BatchSimpleDataLoader = torch.utils.data.DataLoader[Tuple[torch.Tensor]], Tuple[BatchLabel]
-BatchSimpleDataLoader = Any
+FlatNletBatchIds = tuple[Id, ...]  # e.g. (anchor_id_1, ..., positive_id_1, ..., negative_id_1, ...)
+FlatNletBatchValues = torch.Tensor  # e.g. (anchor_image_1, ..., positive_image_1, ..., negative_image_1, ...)
+FlatNletBatchLabels = torch.Tensor  # e.g. (anchor_label_1, ..., positive_label_1, ..., negative_label_1, ...)
 
+FlatNletBatch = Tuple[FlatNletBatchIds, FlatNletBatchValues, FlatNletBatchLabels]
+
+
+# TODO(memben)
 BatchNletDataLoader = DataLoader[NletBatch]
 
 
 MergedLabels = Union[BatchLabel, torch.Tensor]
 
 
-Transform = Callable[[Any], Any]
+Transform = Callable[[PILImage], torch.Tensor]
+TensorTransform = Callable[[torch.Tensor], torch.Tensor]

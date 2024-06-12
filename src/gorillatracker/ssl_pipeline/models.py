@@ -242,7 +242,7 @@ class TrackingFrameFeature(Base):
     __tablename__ = "tracking_frame_feature"
 
     tracking_frame_feature_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"))  # NOTE(memben): Denormalized
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.video_id"), index=True)  # NOTE(memben): Denormalized
     tracking_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tracking.tracking_id"), nullable=True)
     frame_nr: Mapped[int]
     bbox_x_center_n: Mapped[float]
@@ -257,8 +257,6 @@ class TrackingFrameFeature(Base):
 
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
-
-    Index("idx_frame_feature", "tracking_id", "frame_nr", "feature_type", unique=True)
 
     @validates("bbox_x_center_n", "bbox_y_center_n", "bbox_width_n", "bbox_height_n", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
@@ -279,6 +277,10 @@ class TrackingFrameFeature(Base):
             str(self.tracking_frame_feature_id % 2**16),
             f"{self.tracking_frame_feature_id}.png",
         )
+
+    __table_args__ = (
+        Index("idx_tracking_id_frame_nr_feature_type", "tracking_id", "frame_nr", "feature_type", unique=True),
+    )
 
     def __lt__(self, other: TrackingFrameFeature) -> bool:
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id

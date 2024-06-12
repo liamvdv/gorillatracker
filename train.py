@@ -1,32 +1,35 @@
 import warnings
 from pathlib import Path
-from typing import Union
 
 import torch
-import wandb
 from lightning import seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.plugins import BitsandbytesPrecision
-from print_on_steroids import graceful_exceptions, logger
+from print_on_steroids import logger
 from simple_parsing import parse
-from torchvision.transforms import Compose, Resize
+from torchvision.transforms import Compose, Normalize, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.builder import build_data_module
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
-from gorillatracker.train_utils import get_data_module
-from gorillatracker.utils.train import ModelConstructor, train_and_validate_model, train_and_validate_using_kfold
+from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
+from gorillatracker.utils.train import (
+    ModelConstructor,
+    train_and_validate_model,
+    train_and_validate_using_kfold,
+    train_using_quantization_aware_training,
+)
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
-warnings.filterwarnings("ignore", ".*does not have many workers.*")
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
+warnings.filterwarnings("ignore", ".* does not have many workers.*")
+warnings.filterwarnings("ignore", ".*site-packages/torchmetrics/utilities/prints.py:43.*")
 
 
-def main(args: TrainingArgs) -> None:  # noqa: C901
+def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
@@ -52,49 +55,50 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
 
-    #################### Construct dataloaders #################
-    model_transforms = model_cls.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    #################### Construct Data Module #################
+    def resize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
 
-    # TODO(memben): Unify SSLDatamodule and NletDataModule
-    dm: Union[SSLDataModule, NletDataModule]
-    if args.use_ssl:
-        dm = SSLDataModule(
-            batch_size=args.batch_size,
-            transforms=model_transforms,
-            training_transforms=model_cls.get_training_transforms(),
-            data_dir=str(args.data_dir),
-        )
-    else:
-        dm = get_data_module(
-            args.dataset_class,
-            str(args.data_dir),
-            args.batch_size,
-            args.loss_mode,
-            model_transforms,
-            model_cls.get_training_transforms(),
-        )
+    def normalize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    if args.data_resize_transform:
+        resize_transform = Resize((args.data_resize_transform, args.data_resize_transform))
+    if args.use_normalization:
+        normalize_transform = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    model_transforms = Compose([resize_transform, normalize_transform])
+
+    ssl_config = SSLConfig(
+        tff_selection=args.tff_selection,
+        negative_mining=args.negative_mining,
+        n_samples=args.n_samples,
+        feature_types=args.feature_types,
+        min_confidence=args.min_confidence,
+        min_images_per_tracking=args.min_images_per_tracking,
+        width_range=args.width_range,
+        height_range=args.height_range,
+        split_path=args.split_path,
+    )
+    dm = build_data_module(
+        dataset_class_id=args.dataset_class,
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        loss_mode=args.loss_mode,
+        workers=args.workers,
+        model_transforms=model_transforms,
+        training_transforms=model_cls.get_training_transforms(),
+        additional_eval_datasets_ids=args.additional_val_dataset_classes,
+        additional_eval_data_dirs=[Path(d) for d in args.additional_val_data_dirs],
+        ssl_config=ssl_config,
+    )
 
     ################# Construct model ##############
 
-    model_constructor = ModelConstructor(args, model_cls, dm)
-    model = model_constructor.construct(wandb_logging_module, wandb_logger)
+    if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
+        model_constructor = ModelConstructor(args, model_cls, dm)
+        model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
-    #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-    dm = get_data_module(
-        args.dataset_class,
-        str(args.data_dir),
-        args.batch_size,
-        args.loss_mode,
-        # args.video_data,
-        model_transforms,
-        model.get_training_transforms(),
-    )
-
+    #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -102,6 +106,8 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
         knn_with_train=args.knn_with_train,
         wandb_run=wandb_logger.experiment,
         dm=dm,
+        use_quantization_aware_training=args.use_quantization_aware_training,
+        fast_dev_run=args.fast_dev_run,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -109,26 +115,35 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
     )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor="val/loss",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
         mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
 
-    callbacks = [
-        checkpoint_callback,
-        wandb_disk_cleanup_callback,
-        lr_monitor,
-        early_stopping,
-        embeddings_logger_callback,
-    ]
+    callbacks = (
+        [
+            checkpoint_callback,  # keep this at the top
+            wandb_disk_cleanup_callback,
+            lr_monitor,
+            early_stopping,
+            embeddings_logger_callback,
+        ]
+        if not args.kfold
+        else [
+            wandb_disk_cleanup_callback,
+            lr_monitor,
+            embeddings_logger_callback,
+        ]
+    )
+
     if args.accelerator == "cuda":
         callbacks.append(CUDAMetricsCallback())
 
@@ -145,70 +160,32 @@ def main(args: TrainingArgs) -> None:  # noqa: C901
             f"Effective batch size: {args.batch_size} | "
         )
 
-    if args.pretrained_weights_file is not None:
-        # delete everything in model except model.model
-        for k in list(model.__dict__.keys()):
-            if k != "model" and not k.startswith("_"):
-                del model.__dict__[k]
-        # trainer.save_checkpoint(str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt"))
-        torch.save(model.state_dict(), args.pretrained_weights_file)
-        logger.info("Model saved")
-        exit(0)
-
-    ### Preperation for quantization aware training ###
-    if args.use_quantization_aware_training:
-        logger.info("Preperation for quantization aware training...")
-        from torch._export import capture_pre_autograd_graph
-        from torch.ao.quantization.quantize_pt2e import prepare_qat_pt2e
-        from torch.ao.quantization.quantizer.xnnpack_quantizer import (
-            XNNPACKQuantizer,
-            get_symmetric_quantization_config,
-        )
-
-        from gorillatracker.quantization.utils import get_model_input
-
-        example_inputs, _ = get_model_input(dm.dataset_class, str(args.data_dir), amount_of_tensors=100)  # type: ignore
-        model.model = capture_pre_autograd_graph(model.model, example_inputs)
-        quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
-        model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
-
     ################# Start training #################
     logger.info(f"Rank {current_process_rank} | Starting training...")
+    assert not (
+        args.use_quantization_aware_training and args.kfold
+    ), "Quantization aware training not supported with kfold"
     if args.kfold:
-        model, trainer = train_and_validate_using_kfold(
+        train_and_validate_using_kfold(
+            args=args,
+            dm=dm,
+            model_cls=model_cls,
+            callbacks=callbacks,
+            wandb_logger=wandb_logger,
+            wandb_logging_module=wandb_logging_module,
+            embeddings_logger_callback=embeddings_logger_callback,
+        )
+    elif args.use_quantization_aware_training:
+        model, trainer = train_using_quantization_aware_training(
             args=args,
             dm=dm,
             model=model,
             callbacks=callbacks,
             wandb_logger=wandb_logger,
-            embeddings_logger_callback=embeddings_logger_callback,
+            checkpoint_callback=checkpoint_callback,
         )
     else:
-        model, trainer = train_and_validate_model(
-            args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger
-        )
-
-    ########### Save checkpoint ###########
-    if current_process_rank == 0:
-        logger.info("Trying to save checkpoint....")
-
-        assert checkpoint_callback.dirpath is not None
-        save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
-        trainer.save_checkpoint(save_path)
-        logger.info(f"Checkpoint saved to {save_path}")
-
-        if args.save_model_to_wandb:
-            logger.info("Collecting PL checkpoint for wandb...")
-            artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
-            artifact.add_file(save_path, name="model.ckpt")
-
-            logger.info("Pushing to wandb...")
-            aliases = ["train_end", "latest"]
-            wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
-
-            logger.success("Saving finished!")
-    else:
-        logger.info("Rank is not 0, skipping checkpoint saving...")
+        train_and_validate_model(args=args, dm=dm, model=model, callbacks=callbacks, wandb_logger=wandb_logger)
 
 
 if __name__ == "__main__":
@@ -219,5 +196,4 @@ if __name__ == "__main__":
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
     current_process_rank = get_rank()
-    with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+    main(parsed_arg_groups)

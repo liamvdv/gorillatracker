@@ -4,18 +4,17 @@ import logging
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
-from functools import partial
 from pathlib import Path
 
 import cv2
-from sqlalchemy import Engine, Select, select, update
+from sqlalchemy import Engine, update
 from sqlalchemy.orm import Session, sessionmaker
 from tqdm import tqdm
 
+from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.helpers import BoundingBox, crop_frame, video_reader
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature, Video
-from gorillatracker.ssl_pipeline.queries import load_video
-from gorillatracker.ssl_pipeline.sampler import Sampler
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+from gorillatracker.ssl_pipeline.queries import associated_filter, load_preprocessed_videos, load_video, video_filter
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ def create_crop_tasks(
     video_path: Path,
     version: str,
     session_cls: sessionmaker[Session],
-    sampler: Sampler,
     dest_base_path: Path,
 ) -> list[CropTask]:
     with session_cls() as session:
@@ -40,7 +38,9 @@ def create_crop_tasks(
         # NOTE(memben): When multiple videos have the same name, their TFF will be in the same folder, which is fine.
         # If we want to avoid this, we can add the video_id to the path.
         dest_path = dest_base_path / version
-        frame_features = sampler.sample(video.video_id, session)
+        query = video_filter(video.video_id)
+        query = associated_filter(query)
+        frame_features = session.execute(query).scalars().all()
         crop_tasks = [
             CropTask(
                 feature.frame_nr,
@@ -79,28 +79,28 @@ def update_cached_tff(crop_tasks: list[CropTask], session_cls: sessionmaker[Sess
         session.commit()
 
 
-def crop(
-    video_path: Path, version: str, session_cls: sessionmaker[Session], sampler: Sampler, dest_base_path: Path
-) -> None:
-    crop_tasks = create_crop_tasks(video_path, version, session_cls, sampler, dest_base_path)
+def crop(video_path: Path, version: str, session_cls: sessionmaker[Session], dest_base_path: Path) -> None:
+    crop_tasks = create_crop_tasks(video_path, version, session_cls, dest_base_path)
 
     if not crop_tasks:
         log.warning(f"No frames to crop for video: {video_path}")
         return
 
-    crop_from_video(video_path, crop_tasks)
-    update_cached_tff(crop_tasks, session_cls)
+    try:
+        crop_from_video(video_path, crop_tasks)
+        update_cached_tff(crop_tasks, session_cls)
+    except cv2.error as e:
+        log.error(f"Error cropping video: {video_path}")
+        log.error(e)
 
 
 _version = None
 _session_cls = None
-_sampler = None
 
 
-def _init_cropper(engine: Engine, version: str, sampler: Sampler) -> None:
-    global _version, _session_cls, _sampler
+def _init_cropper(engine: Engine, version: str) -> None:
+    global _version, _session_cls
     _version = version
-    _sampler = sampler
     engine.dispose(close=False)
     _session_cls = sessionmaker(bind=engine)
 
@@ -109,18 +109,17 @@ def _multiprocess_crop(
     video_path: Path,
     dest_base_path: Path,
 ) -> None:
-    global _version, _session_cls, _sampler
+    global _version, _session_cls
     assert _session_cls is not None, "Engine not initialized, call _init_cropper first"
     assert _version is not None, "Version not initialized, call _init_cropper instead"
-    assert _sampler is not None, "Sampler not initialized, call _init_cropper instead"
-    crop(video_path, _version, _session_cls, _sampler, dest_base_path)
+    crop(video_path, _version, _session_cls, dest_base_path)
 
 
 def multiprocess_crop_from_video(
-    video_paths: list[Path], version: str, engine: Engine, sampler: Sampler, dest_base_path: Path, max_workers: int
+    video_paths: list[Path], version: str, engine: Engine, dest_base_path: Path, max_workers: int
 ) -> None:
     with ProcessPoolExecutor(
-        initializer=_init_cropper, initargs=(engine, version, sampler), max_workers=max_workers
+        initializer=_init_cropper, initargs=(engine, version), max_workers=max_workers
     ) as executor:
         list(
             tqdm(
@@ -133,37 +132,16 @@ def multiprocess_crop_from_video(
 
 
 if __name__ == "__main__":
-    import shutil
-
     from sqlalchemy import create_engine
 
-    from gorillatracker.ssl_pipeline.queries import associated_filter, video_filter
-
-    # engine = create_engine("postgresql+psycopg2://postgres:DEV_PWD_139u02riowenfgiw4y589wthfn@postgres:5432/postgres")
-    engine = create_engine("sqlite:///test.db")
-
-    def sampling_strategy(video_id: int, min_n_images_per_tracking: int) -> Select[tuple[TrackingFrameFeature]]:
-        query = video_filter(video_id)
-        query = associated_filter(query)
-        return query
-
-    abs_path = "/workspaces/gorillatracker/cropped_images"
-    shutil.rmtree(abs_path)
-    Path(abs_path).mkdir(parents=True, exist_ok=True)
+    engine = create_engine(GorillaDatasetKISZ.DB_URI)
+    abs_path = "/workspaces/gorillatracker/video_data/cropped-images"
 
     session_cls = sessionmaker(bind=engine)
-    version = "2024-04-09"  # TODO(memben)
+    version = "2024-04-18"  # TODO(memben)
 
     with session_cls() as session:
-        videos = session.execute(select(Video)).scalars().all()
+        videos = load_preprocessed_videos(session, version)
         video_paths = [video.path for video in videos]
 
-    query = partial(sampling_strategy, min_n_images_per_tracking=10)
-    sampler = Sampler(query_builder=query)
-
-    multiprocess_crop_from_video(video_paths[:20], version, engine, sampler, Path(abs_path), max_workers=10)
-
-    with session_cls() as session:
-        tracking_frame_features = session.execute(select(TrackingFrameFeature)).scalars().all()
-        for feature in tracking_frame_features[:50]:
-            print(feature.cached)
+    multiprocess_crop_from_video(video_paths, version, engine, Path(abs_path), max_workers=80)

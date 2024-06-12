@@ -10,6 +10,7 @@ ignored/
 results/
 **/checkpoints/*.ckpt
 **/*.pth
+**/*.tflite
 **/*.onnx
 
 # Byte-compiled / optimized / DLL files
@@ -161,5 +162,8 @@ mnist/
 *.pt
 *.ckpt
 *.db
-*visualized.mp4
-cropped_images/*
+*mp4
+*MP4
+*AVI
+cropped-images/*
+/pretrained_weights/

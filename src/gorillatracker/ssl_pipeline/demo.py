@@ -30,6 +30,16 @@ from gorillatracker.ssl_pipeline.visualizer import multiprocess_visualize
 log = logging.getLogger(__name__)
 
 
+def visualize_video(video_id: int, dataset: SSLDataset, dest_dir: Path) -> None:
+    with Session(dataset.engine) as session:
+        video = session.get(Video, video_id)
+        assert video is not None
+        video.tasks.append(Task(task_type=TaskType.VISUALIZE))
+        session.commit()
+
+    multiprocess_visualize(dest_dir, dataset.engine, 1)
+
+
 def visualize_pipeline(
     dataset: SSLDataset,
     version: str,
@@ -121,9 +131,9 @@ def gpu2_demo() -> None:
 
 
 def kisz_demo() -> None:
-    version = "2024-04-09"
+    version = "2024-04-18"
     logging.basicConfig(level=logging.INFO)
-    dataset = GorillaDatasetKISZ()
+    dataset = GorillaDatasetKISZ("sqlite:///test.db")
     visualize_pipeline(
         dataset,
         version,
@@ -133,6 +143,12 @@ def kisz_demo() -> None:
         gpu_ids=[0],
     )
     dataset.post_setup()
+
+
+def kisz_visualize_video(video_id: int) -> None:
+    logging.basicConfig(level=logging.INFO)
+    dataset = GorillaDatasetKISZ()
+    visualize_video(video_id, dataset, Path("/workspaces/gorillatracker/video_output"))
 
 
 if __name__ == "__main__":
