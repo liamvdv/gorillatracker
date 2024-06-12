@@ -15,7 +15,7 @@ wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "EfficientNetV2_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: True             # Enable fast development run
+fast_dev_run: False             # Enable fast development run
 profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
@@ -25,7 +25,6 @@ from_scratch: False             # Train the model from scratch
 early_stopping_patience: 10      # Early stopping patience (number of epochs)
 embedding_size: 256
 dropout_p: 0.32
-use_mixup: True
 
 weight_decay: 0.5               # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
