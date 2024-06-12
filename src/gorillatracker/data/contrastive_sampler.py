@@ -1,30 +1,37 @@
-# NOTE(memben): let's worry about how we parse configs from the yaml file later
-
+import logging
 import random
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
-from itertools import groupby
 from pathlib import Path
-from typing import Any
 
 from PIL import Image
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
 
+import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
-from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
+from gorillatracker.type_helper import Id, Label
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, order=True, slots=True)  # type: ignore
 class ContrastiveImage:
-    id: str
+    id: Id
     image_path: Path
-    class_label: int
+    class_label: Label
 
     @property
     def image(self) -> Image.Image:
         return Image.open(self.image_path)
+
+
+def group_contrastive_images(
+    contrastive_images: list[ContrastiveImage],
+) -> defaultdict[gtypes.Label, list[ContrastiveImage]]:
+    classes: defaultdict[gtypes.Label, list[ContrastiveImage]] = defaultdict(list)
+    for image in contrastive_images:
+        classes[image.class_label].append(image)
+    return classes
 
 
 class ContrastiveSampler(ABC):
@@ -34,6 +41,11 @@ class ContrastiveSampler(ABC):
 
     @abstractmethod
     def __len__(self) -> int:
+        pass
+
+    @property
+    @abstractmethod
+    def class_labels(self) -> list[gtypes.Label]:
         pass
 
     @abstractmethod
@@ -46,17 +58,25 @@ class ContrastiveSampler(ABC):
         """Return a negative sample from a different class."""
         pass
 
+    @abstractmethod
+    def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
+        """Return all possible negative labels for a sample"""
+        pass
+
 
 class ContrastiveClassSampler(ContrastiveSampler):
     """ContrastiveSampler that samples from a set of classes. Negatives are drawn from a uniformly sampled negative class"""
 
-    def __init__(self, classes: dict[Any, list[ContrastiveImage]]) -> None:
+    def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]]) -> None:
         self.classes = classes
-        self.class_labels = list(classes.keys())
         self.samples = [sample for samples in classes.values() for sample in samples]
         self.sample_to_class = {sample: label for label, samples in classes.items() for sample in samples}
 
-        assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples"
+        # assert all([len(samples) > 1 for samples in classes.values()]), "Classes must have at least two samples" # TODO(memben)
+        for label, samples in classes.items():
+            if len(samples) < 2:
+                logger.warning(f"Class {label} has less than two samples (samples: {len(samples)}).")
+
         assert len(self.samples) == len(set(self.samples)), "Samples must be unique"
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
@@ -65,8 +85,15 @@ class ContrastiveClassSampler(ContrastiveSampler):
     def __len__(self) -> int:
         return len(self.samples)
 
+    @property
+    def class_labels(self) -> list[gtypes.Label]:
+        return list(self.classes.keys())
+
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         positive_class = self.sample_to_class[sample]
+        if len(self.classes[positive_class]) == 1:
+            # logger.warning(f"Only one sample in class {positive_class}. Returning same sample as positive.")
+            return sample
         positives = [s for s in self.classes[positive_class] if s != sample]
         return random.choice(positives)
 
@@ -74,11 +101,14 @@ class ContrastiveClassSampler(ContrastiveSampler):
     # independent of the number of samples per class
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
         """Different class is sampled uniformly at random and a random sample from that class is returned"""
-        positive_class = self.sample_to_class[sample]
-        negative_classes = [c for c in self.class_labels if c != positive_class]
-        negative_class = random.choice(negative_classes)
+        negative_class = random.choice(self.negative_classes(sample))
         negatives = self.classes[negative_class]
         return random.choice(negatives)
+
+    def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
+        positive_class = self.sample_to_class[sample]
+        negative_classes = [c for c in self.class_labels if c != positive_class]
+        return negative_classes
 
 
 class CliqueGraphSampler(ContrastiveSampler):
@@ -91,6 +121,10 @@ class CliqueGraphSampler(ContrastiveSampler):
     def __len__(self) -> int:
         return len(self.graph)
 
+    @property
+    def class_labels(self) -> list[gtypes.Label]:
+        raise NotImplementedError("No logic yet implemented")
+
     def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
         return self.graph.get_random_clique_member(sample, exclude=[sample])
 
@@ -98,36 +132,7 @@ class CliqueGraphSampler(ContrastiveSampler):
         random_adjacent_clique = self.graph.get_random_adjacent_clique(sample)
         return self.graph.get_random_clique_member(random_adjacent_clique)
 
-
-# TODO(memben): This is only for demonstration purposes. We will need to replace this with a more general solution
-def get_random_ssl_sampler(base_path: str) -> ContrastiveClassSampler:
-    engine = create_engine(GorillaDatasetKISZ.DB_URI)
-    with Session(engine) as session:
-        tracked_features = list(
-            session.execute(
-                select(TrackingFrameFeature)
-                .where(
-                    TrackingFrameFeature.tracking_frame_feature_id < 1000000,
-                    TrackingFrameFeature.cached,
-                    TrackingFrameFeature.tracking_id.isnot(None),
-                    TrackingFrameFeature.feature_type == "body",
-                    TrackingFrameFeature.bbox_width > 100,
-                    TrackingFrameFeature.bbox_height > 100,
-                )
-                .order_by(TrackingFrameFeature.tracking_id)
-            )
-            .scalars()
-            .all()
-        )
-        contrastive_images = [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
-            for f in tracked_features
-        ]
-        groups = groupby(contrastive_images, lambda x: x.class_label)
-        classes: dict[Any, list[ContrastiveImage]] = {}
-        for group in groups:
-            class_label, sample_iter = group
-            samples = list(sample_iter)
-            if len(samples) > 1:
-                classes[class_label] = samples
-        return ContrastiveClassSampler(classes)
+    # TODO(memben): if this becomes a bottleneck, consider only retrieving the roots
+    def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
+        adjacent_cliques = self.graph.get_adjacent_cliques(sample)
+        return [root.class_label for root in adjacent_cliques.keys()]

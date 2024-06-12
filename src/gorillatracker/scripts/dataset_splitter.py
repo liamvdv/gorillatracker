@@ -99,25 +99,26 @@ def read_dataset_partition(dirpath: Path, labeler: Labeler) -> List[Entry]:
     return [Entry(value, labeler(value), {}) for value in dirpath.glob("*")]
 
 
-def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
+def read_ground_truth(full_images_dirpath: str, file_types: List[str], re_label: str, label_pos: int) -> List[Entry]:
     entries = []
     for filename in os.listdir(full_images_dirpath):
-        if not filename.endswith(".png"):
-            continue
-        label, rest = re.split(r"[_\s]", filename, maxsplit=1)
-        entry = Entry(Path(full_images_dirpath, filename), label, {})
-        entries.append(entry)
-    return entries
-
-
-def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
-    entries = []
-    for filename in os.listdir(full_images_dirpath):
-        if filename.endswith(".jpg"):
-            label = re.split(r"[_\s-]", filename, maxsplit=1)[0]
+        if filename.endswith(tuple(file_types)):
+            label = re.split(re_label, filename, maxsplit=1)[label_pos]
             entry = Entry(Path(full_images_dirpath, filename), label, {})
             entries.append(entry)
     return entries
+
+
+def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
+    return read_ground_truth(full_images_dirpath, [".png"], r"[_\s]", 0)
+
+
+def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
+    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_\s-]", 0)
+
+
+def read_ground_truth_cows2021(full_images_dirpath: str) -> List[Entry]:
+    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_\s]", 0)
 
 
 # Business Logic
@@ -168,7 +169,6 @@ def compute_split(samples: int, train: int, val: int, test: int, kfold: bool) ->
     val_count = int(val_count)
     test_count = int(test_count)
     train_count = samples - (val_count + test_count)
-    assert train_count >= 1
     return train_count, val_count, test_count
 
 
@@ -227,9 +227,7 @@ def splitter(
         # need to shuffle again because we ungroup() will return images of individuals sequentially
         rest = consistent_random_permutation(ungroup(individums), lambda x: x.value, seed + 1)
         val_bucket, rest = rest[:val_count], rest[val_count:]
-        assert len(val_bucket) == val_count, "Dataset too small: Not enough images left to fill validation."
         test_bucket, rest = rest[:test_count], rest[test_count:]
-        assert len(test_bucket) == test_count, "Dataset too small: Not enough images left to fill test."
         train_bucket.extend(rest)
     elif mode == "openset":
         # At least one unseen individum in test and eval.
@@ -416,6 +414,15 @@ def generate_kfold_split(
     elif "bristol" in dataset:
         images = read_ground_truth_bristol(f"data/{dataset}")
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "ctai" in dataset or "czoo" in dataset:
+        images = read_ground_truth_cxl(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "cows2021" in dataset:
+        images = read_ground_truth_cows2021(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "atrw" in dataset:
+        images = read_ground_truth_cows2021(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     else:
         raise ValueError(f"unknown dataset {dataset}")
     fold_buckets, test_bucket = kfold_splitter(
@@ -535,15 +542,16 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 
 if __name__ == "__main__":
-    generate_kfold_split(mode="openset")
-
     # dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
     # copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
 
     # dir = generate_split(
     #     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
     # )
-    # dir = generate_split(dataset="ground_truth/cxl/full_images", mode="closedset", seed=42)
+
+    dir = generate_split(
+        dataset="ground_truth/bristol/cropped_images_face", mode="closedset", seed=42, train=0, val=100, test=0
+    )
 
     # merge_dataset_splits(
     #     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",

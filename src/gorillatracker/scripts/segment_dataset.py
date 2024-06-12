@@ -32,9 +32,9 @@ def _predict_mask(
 
 def _remove_background(image: gtyping.Image, mask: npt.NDArray[np.bool_]) -> gtyping.Image:
     mask = mask.squeeze()
-    assert image.shape[:2] == mask.shape
+    assert image.shape[:2] == mask.shape  # type: ignore
     background_color = (255, 255, 255)
-    image[~mask] = background_color
+    image[~mask] = background_color  # type: ignore
     return image
 
 

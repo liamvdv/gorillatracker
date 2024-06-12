@@ -1,6 +1,5 @@
 import importlib
-from itertools import chain
-from typing import Any, Callable, Dict, List, Literal, Tuple, Type
+from typing import Any, Callable, Dict, Literal, Optional, Type
 
 import lightning as L
 import numpy as np
@@ -11,7 +10,7 @@ import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
-from torch.optim import AdamW
+from torch.optim.adamw import AdamW
 from torchvision import transforms
 from torchvision.models import (
     EfficientNet_V2_L_Weights,
@@ -26,8 +25,8 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import VariationalPrototypeLearning
-from gorillatracker.losses.triplet_loss import L2SPRegularization_Wrapper, get_loss
+from gorillatracker.data.utils import flatten_batch, lazy_batch_size
+from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -112,8 +111,6 @@ class BaseModule(L.LightningModule):
 
     def __init__(
         self,
-        model_name_or_path: str,
-        # model_kwargs: dict,
         from_scratch: bool,
         loss_mode: str,
         weight_decay: float,
@@ -130,16 +127,13 @@ class BaseModule(L.LightningModule):
         beta2: float,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
-        margin: float = 0.5,
-        s: float = 64.0,
-        delta_t: int = 200,
-        mem_bank_start_epoch: int = 2,
-        lambda_membank: float = 0.5,
         embedding_size: int = 256,
         batch_size: int = 32,
-        num_classes: Tuple[int, int, int] = (0, 0, 0),
+        dataset_names: list[str] = [],
         accelerator: str = "cpu",
         dropout_p: float = 0.0,
+        use_dist_term: bool = False,
+        kfold_k: Optional[int] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
@@ -147,8 +141,8 @@ class BaseModule(L.LightningModule):
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
 
+        ####### Optimizer and Scheduler
         self.weight_decay = weight_decay
-
         self.lr_schedule = lr_schedule
         self.warmup_mode = warmup_mode
         self.warmup_epochs = warmup_epochs
@@ -158,118 +152,146 @@ class BaseModule(L.LightningModule):
         self.end_lr = end_lr
         self.stepwise_schedule = stepwise_schedule
         self.lr_interval = lr_interval
-
         self.beta1 = beta1
         self.beta2 = beta2
         self.epsilon = epsilon
-        self.margin = margin
 
+        ####### Embedding Layers
         self.from_scratch = from_scratch
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
+
+        ####### Losses
         self.loss_mode = loss_mode
+        self.use_dist_term = use_dist_term
 
+        ####### Other
         self.quant = torch.quantization.QuantStub()  # type: ignore
+        self.kfold_k = kfold_k
 
-        ##### Create Table embeddings_table
+        ##### Create List of embeddings_tables
         self.embeddings_table_columns = [
             "label",
             "embedding",
             "id",
         ]  # note that the dataloader usually returns the order (id, embedding, label)
-        self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)
+        self.dataset_names = dataset_names
+        self.embeddings_table_list = [
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
+        ]
 
     def set_losses(
         self,
         model: nn.Module,
         loss_mode: str,
-        s: float = 64.0,
-        delta_t: int = 200,
-        mem_bank_start_epoch: int = 2,
-        lambda_membank: float = 0.5,
-        embedding_size: int = 256,
-        batch_size: int = 32,
-        num_classes: Tuple[int, int, int] = (0, 0, 0),
-        accelerator: str = "cpu",
-        **kwargs: Dict[str, Any],
+        margin: float,
+        s: float,
+        delta_t: int,
+        mem_bank_start_epoch: int,
+        lambda_membank: float,
+        embedding_size: int,
+        batch_size: int,
+        num_classes: Optional[tuple[int, int, int]],
+        class_distribution: Optional[dict[int, int]],
+        use_focal_loss: bool,
+        k_subcenters: int,
+        accelerator: str,
+        label_smoothing: float,
+        l2_alpha: float,
+        l2_beta: float,
+        path_to_pretrained_weights: str,
+        use_class_weights: bool,
+        use_dist_term: bool,
+        **kwargs: Any,
     ) -> None:
+        kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.loss_module_train = get_loss(
             loss_mode,
-            margin=self.margin,
-            embedding_size=self.embedding_size,
+            margin=margin,
+            embedding_size=embedding_size,
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
-            num_classes=num_classes[0],
+            num_classes=num_classes[0] if num_classes is not None else None,  # TODO(memben)
+            class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
-            l2_alpha=kwargs["l2_alpha"],
-            l2_beta=kwargs["l2_beta"],
-            path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
+            l2_alpha=l2_alpha,
+            l2_beta=l2_beta,
+            path_to_pretrained_weights=path_to_pretrained_weights,
+            use_focal_loss=use_focal_loss,
+            label_smoothing=label_smoothing,
             model=model,
-            log_func=self.log,
+            k_subcenters=k_subcenters,
+            use_class_weights=use_class_weights,
+            use_dist_term=use_dist_term,
+            # log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
+            log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
+            teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
         )
         self.loss_module_val = get_loss(
             loss_mode,
-            margin=self.margin,
-            embedding_size=self.embedding_size,
+            margin=margin,
+            embedding_size=embedding_size,
             batch_size=batch_size,
             delta_t=delta_t,
             s=s,
-            num_classes=num_classes[1],
+            num_classes=num_classes[1] if num_classes is not None else None,  # TODO(memben)
+            class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
-            l2_alpha=kwargs["l2_alpha"],
-            l2_beta=kwargs["l2_beta"],
-            path_to_pretrained_weights=kwargs["path_to_pretrained_weights"],
+            l2_alpha=l2_alpha,
+            l2_beta=l2_beta,
+            path_to_pretrained_weights=path_to_pretrained_weights,
+            use_focal_loss=use_focal_loss,
+            label_smoothing=label_smoothing,
             model=model,
+            log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
+            k_subcenters=1,
+            use_class_weights=use_class_weights,
+            use_dist_term=use_dist_term,
+            teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
         )
+        self.loss_module_val.eval()  # type: ignore
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.quant(x)
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
-        if (
-            isinstance(self.loss_module_train, VariationalPrototypeLearning)
-            and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch
-        ):
-            self.loss_module_train.set_using_memory_bank(True)
+        if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:  # type: ignore
+            self.loss_module_train.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
         elif (
-            isinstance(self.loss_module_train, L2SPRegularization_Wrapper)
-            and isinstance(self.loss_module_train.loss, VariationalPrototypeLearning)
-            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch
+            self.loss_mode.endswith("vpl/l2sp")
+            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch  # type: ignore
         ):  # is wrapped in l2sp regularization
-            self.loss_module_train.loss.set_using_memory_bank(True)
+            self.loss_module_train.loss.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
 
-    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels = batch
+        _, images, _ = batch
+        _, flat_images, flat_labels = flatten_batch(batch)
 
-        # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):  # type: ignore
-            flat_labels = torch.cat(labels, dim=0)  # type: ignore
-            vec = torch.cat(images, dim=0)  # type: ignore
-        else:
-            # NOTE(memben): this is the expected shape
-            # transform ((a1, p1, n1), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            # transform ((a1: Tensor, p1: Tensor, n1: Tensor), (a2, p2, n2)) to (a1, a2, p1, p2, n1, n2)
-            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
-        embeddings = self.forward(vec)
+        embeddings = self.forward(flat_images)
 
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels)  # type: ignore
-        self.log("train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log("train/positive_distance", pos_dist, on_step=True)
-        self.log("train/negative_distance", neg_dist, on_step=True)
+        assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings, flat_labels, images)
+
+        log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
+        self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         return loss
 
     def add_validation_embeddings(
-        self, anchor_ids: List[str], anchor_embeddings: torch.Tensor, anchor_labels: gtypes.MergedLabels
+        self,
+        anchor_ids: list[str],
+        anchor_embeddings: torch.Tensor,
+        anchor_labels: gtypes.MergedLabels,
+        dataloader_idx: int,
     ) -> None:
         # save anchor embeddings of validation step for later analysis in W&B
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
@@ -283,82 +305,98 @@ class BaseModule(L.LightningModule):
         }
 
         df = pd.DataFrame(data)
-        self.embeddings_table = pd.concat([df, self.embeddings_table], ignore_index=True)
+        self.embeddings_table_list[dataloader_idx] = pd.concat(
+            [df, self.embeddings_table_list[dataloader_idx]], ignore_index=True
+        )
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
-    # TODO(memben): ATTENTION: type hints NOT correct, only for SSL
-    def validation_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        ids, images, labels = batch  # embeddings either (ap, a, an, n) or (a, p, n)
-        n_anchors = len(images[0])
+    def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
+        dataloader_name = self.dataset_names[dataloader_idx]
 
-        # HACK(memben): We'll allow this for now, but we should correct it later
-        if torch.is_tensor(labels[0]):  # type: ignore
-            flat_labels = torch.cat(labels, dim=0)  # type: ignore
-            vec = torch.cat(images, dim=0)  # type: ignore
-        else:
-            # NOTE(memben): this is the expected shape
-            flat_labels = torch.cat([torch.Tensor(d) for d in zip(*labels)], dim=0)
-            vec = torch.stack(list(chain.from_iterable(zip(*images))), dim=0)
+        batch_size = lazy_batch_size(batch)
+        _, images, _ = batch
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        anchor_ids = list(flat_ids[:batch_size])
 
-        flat_ids = [id for nlet in ids for id in nlet]  # TODO(memben): This seems to be wrong for SSL
-        embeddings = self.forward(vec)
-        self.add_validation_embeddings(flat_ids[:n_anchors], embeddings[:n_anchors], flat_labels[:n_anchors])
-        if "softmax" not in self.loss_mode:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels)  # type: ignore
-            self.log("val/loss", loss, on_step=True, sync_dist=True, prog_bar=True)
-            self.log("val/positive_distance", pos_dist, on_step=True)
-            self.log("val/negative_distance", neg_dist, on_step=True)
+        embeddings = self.forward(flat_images)
+
+        self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
+        if "softmax" not in self.loss_mode and not self.use_dist_term:
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)
+            kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
+            self.log(
+                f"{dataloader_name}/{kfold_prefix}val/loss",
+                loss,
+                on_step=True,
+                sync_dist=True,
+                prog_bar=True,
+                add_dataloader_idx=False,
+            )
+            self.log(
+                f"{dataloader_name}/{kfold_prefix}val/positive_distance",
+                pos_dist,
+                on_step=True,
+                add_dataloader_idx=False,
+            )
+            self.log(
+                f"{dataloader_name}/{kfold_prefix}val/negative_distance",
+                neg_dist,
+                on_step=True,
+                add_dataloader_idx=False,
+            )
             return loss
         else:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0)  # TODO(memben): ???
 
-    def on_validation_epoch_end(self) -> None:
+    def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
+        dataloader_name = self.dataset_names[dataloader_idx]
+        kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         # calculate loss after all embeddings have been processed
         if "softmax" in self.loss_mode:
-            logger.info("Calculating loss for all embeddings (%d)", len(self.embeddings_table))
+            for i, table in enumerate(self.embeddings_table_list):
+                logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
-            # get weights for all classes by averaging over all embeddings
-            loss_module_val = (
-                self.loss_module_val
-                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss  # type: ignore
-            )
-            num_classes = (
-                self.loss_module_val.num_classes  # type: ignore
-                if not isinstance(self.loss_module_val, L2SPRegularization_Wrapper)
-                else self.loss_module_val.loss.num_classes  # type: ignore
-            )
-
-            class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
-            lse = LinearSequenceEncoder()
-            self.embeddings_table["label"] = self.embeddings_table["label"].apply(lse.encode)
-
-            for label in range(num_classes):
-                class_embeddings = self.embeddings_table[self.embeddings_table["label"] == label]["embedding"].tolist()
-                class_embeddings = (
-                    np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                # get weights for all classes by averaging over all embeddings
+                loss_module_val = (
+                    self.loss_module_val if not self.loss_mode.endswith("l2sp") else self.loss_module_val.loss  # type: ignore
                 )
-                class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
-                if torch.isnan(class_weights[label]).any():
-                    class_weights[label] = 0.0
+                if self.use_dist_term:
+                    loss_module_val = loss_module_val.arcface
 
-            # calculate loss for all embeddings
-            loss_module_val.set_weights(class_weights)  # type: ignore
-            loss_module_val.le = lse  # type: ignore
+                num_classes = table["label"].nunique()  # TODO(memben + rob2u)
+                assert len(table) > 0, f"Empty table for dataloader {i}"
 
-            losses = []
-            for _, row in self.embeddings_table.iterrows():
-                loss, _, _ = loss_module_val(
-                    torch.tensor(row["embedding"]).unsqueeze(0),
-                    torch.tensor(lse.decode(row["label"])).unsqueeze(0),  # type: ignore
-                )
-                losses.append(loss)
-            loss = torch.tensor(losses).mean()
-            assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            self.log("val/loss", loss, sync_dist=True)
+                # get weights for all classes by averaging over all embeddings
+                class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+                lse = LinearSequenceEncoder()
+                table["label"] = table["label"].apply(lse.encode)
 
+                for label in range(num_classes):
+                    class_embeddings = table[table["label"] == label]["embedding"].tolist()
+                    class_embeddings = (
+                        np.stack(class_embeddings) if len(class_embeddings) > 0 else np.zeros((0, self.embedding_size))
+                    )
+                    class_weights[label] = torch.tensor(class_embeddings).mean(dim=0)
+                    if torch.isnan(class_weights[label]).any():
+                        class_weights[label] = 0.0
+
+                # calculate loss for all embeddings
+                loss_module_val.update(class_weights, num_classes, lse)
+
+                losses = []
+                for _, row in table.iterrows():
+                    loss, _, _ = loss_module_val(
+                        torch.tensor(row["embedding"]).unsqueeze(0),
+                        torch.tensor(lse.decode(row["label"])).unsqueeze(0),
+                    )
+                    losses.append(loss)
+                loss = torch.tensor(losses).mean()
+                assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
+                self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss, sync_dist=True)
         # clear the table where the embeddings are stored
-        self.embeddings_table = pd.DataFrame(columns=self.embeddings_table_columns)  # reset embeddings table
+        self.embeddings_table_list = [
+            pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
+        ]  # reset embeddings table
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         if self.global_rank == 0:
@@ -378,12 +416,6 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
-
-        # optimizer = torch.optim.RMSprop(
-        #     self.model.parameters(),
-        #     lr=self.initial_lr,
-        #     weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
-        # )
 
         def lambda_schedule(epoch: int) -> float:
             return combine_schedulers(
@@ -432,23 +464,15 @@ class BaseModule(L.LightningModule):
             return {"optimizer": optimizer, "lr_scheduler": plateau_scheduler}
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        """
-        Please implement this method in your subclass for non-square resizes,
-        normalizations, etc. To apply nothing, return the identity function
-            `lambda x: x`.
-        Note that for square resizes we have the `data_resize_transform` argument
-        in the `TrainingArgs` class. This is a special case worth supporting
-        because it allows easily switching between little image MNIST and large
-        image non-MNIST Datasets. Setting it to `Null` / `None` will give you
-        full control here.
-        """
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        """Add your data augmentations here. Function will be called after in the training loop"""
         return lambda x: x
 
     @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        """Add your data augmentations here. Function will be called after get_tensor_transforms in the training loop"""
-        return lambda x: x
+    def get_tensor_transforms(cls) -> None:
+        raise NotImplementedError(
+            "This method was deprecated! Use arg.use_normalization and args.data_resize_transform instead!"
+        )
 
 
 class EfficientNetV2Wrapper(BaseModule):
@@ -478,10 +502,6 @@ class EfficientNetV2Wrapper(BaseModule):
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv
         return self.model.features[-1][0]  # TODO(liamvdv)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -517,10 +537,6 @@ class EfficientNetRW_M(BaseModule):
         return self.model.conv_head
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -528,6 +544,8 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
+                # transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
             ]
         )
 
@@ -551,10 +569,6 @@ class ConvNeXtV2BaseWrapper(BaseModule):
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         return self.model.stages[-1].blocks[-1].conv_dw
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -581,10 +595,6 @@ class ConvNeXtV2HugeWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Resize((224), antialias=True)
 
 
 class VisionTransformerWrapper(BaseModule):
@@ -618,15 +628,6 @@ class VisionTransformerWrapper(BaseModule):
         return reshape_transform
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms.Resize((224), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -651,15 +652,6 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms.Resize((518), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -687,15 +679,6 @@ class VisionTransformerClipWrapper(BaseModule):
         )
 
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Compose(
-            [
-                transforms.Resize((224), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -728,15 +711,6 @@ class ConvNextClipWrapper(BaseModule):
         self.set_losses(self.model, **kwargs)
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -761,15 +735,6 @@ class ConvNextWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -825,15 +790,6 @@ class SwinV2BaseWrapper(BaseModule):
         return reshape_transform
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -869,20 +825,13 @@ class SwinV2LargeWrapper(BaseModule):
         self.set_losses(self.model, **kwargs)
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
 
@@ -908,10 +857,6 @@ class ResNet18Wrapper(BaseModule):
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.layer4[-1]
         return self.model.layer4[-1].conv2
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -946,10 +891,6 @@ class ResNet152Wrapper(BaseModule):
         return self.model.layer4[-1].conv3
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -976,10 +917,6 @@ class ResNet50Wrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1016,10 +953,6 @@ class ResNet50DinoV2Wrapper(BaseModule):
         return feature_vector
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -1051,10 +984,6 @@ class InceptionV3Wrapper(BaseModule):
         return self.model.Mixed_7c.branch_pool
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
@@ -1081,15 +1010,6 @@ class FaceNetWrapper(BaseModule):
         )
         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
         self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1153,11 +1073,6 @@ class MiewIdNetWrapper(BaseModule):
         x = self.model(x)
         x = self.classifier(x)
         return x
-
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        # return transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # TODO (rob2u): might be necessary to remove this for wildme model finetuning
-        return lambda x: x
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:

@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import datetime as dt
 import os
-import pickle
 import sys
 from dataclasses import dataclass
 from typing import Literal, Union
 
+import dill as pickle
 from simple_parsing import field
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import sessionmaker
@@ -47,6 +49,15 @@ class SplitArgs:
     _val_video_ids: list[int] = field(init=False, default_factory=lambda: [])
     _test_video_ids: list[int] = field(init=False, default_factory=lambda: [])
 
+    def _set_name(self) -> None:
+        if self.split_by in ["percentage", "camera", "time"]:
+            self.name = f"{self.name}_{self.version}_{self.split_by}-{self.train_split}-{self.val_split}-{self.test_split}_split"
+        else:
+            self.name = f"{self.name}_{self.version}_{self.split_by}_split"
+
+        current_time = dt.datetime.now().strftime("%Y%m%d_%H%M")
+        self.name = f"{self.name}_{current_time}"
+
     def train_video_ids(self) -> list[int]:
         return self._train_video_ids
 
@@ -57,11 +68,7 @@ class SplitArgs:
         return self._test_video_ids
 
     def create_split(self) -> None:
-        if self.split_by in ["percentage", "camera", "time"]:
-            self.name = f"{self.name}_{self.version}_{self.split_by}-{self.train_split}-{self.val_split}-{self.test_split}_split"
-        else:
-            self.name = f"{self.name}_{self.version}_{self.split_by}_split"
-
+        self._set_name()
         if self.split_by == "percentage":
             self.split_by_percentage()
         elif self.split_by == "time":
@@ -164,20 +171,23 @@ class SplitArgs:
             pickle.dump(self, file)
 
     @classmethod
-    def load_pickle(cls, path: str) -> None:
+    def load_pickle(cls, path: str) -> SplitArgs:
         """Load the class instance from a pickle file."""
         with open(path, "rb") as file:
             return pickle.load(file)
 
 
 if __name__ == "__main__":
+    DB_URI = os.environ.get("POSTGRESQL_URI")
+    if DB_URI is None:
+        raise ValueError("Please set the DB_URI environment variable in devcontainer.json")
     args = SplitArgs(
-        db_uri="db-uri",
+        db_uri=DB_URI,
         version="2024-04-18",
         save_path="/workspaces/gorillatracker/data/splits/SSL/",
-        split_by="camera",
-        train_split=10,
-        val_split=80,
+        split_by="percentage",
+        train_split=80,
+        val_split=10,
         test_split=10,
         train_starttime=dt.datetime(2010, 1, 1),
         train_endtime=dt.datetime(2030, 1, 1),
@@ -187,12 +197,17 @@ if __name__ == "__main__":
         test_endtime=dt.datetime(2030, 1, 1),
         hours=list(range(0, 24)),  # only videos from certain hours of the day
         video_length=(0, 1000000),  # min, max video length in seconds
-        max_train_videos=1000000,  # max videos in train bucket
-        max_val_videos=1000000,  # max videos in val bucket
-        max_test_videos=1000000,  # max videos in test bucket
+        max_train_videos=1000,  # max videos in train bucket
+        max_val_videos=10,  # max videos in val bucket
+        max_test_videos=10,  # max videos in test bucket
     )
-    args.create_split()
-    args.save_to_pickle()
-    print("Split created and saved")
-    # args = SplitArgs.load_pickle("path.pkl")
+    if True:
+        args.create_split()
+        args.save_to_pickle()
+        print("Split created and saved")
+    else:
+        split_path = (
+            "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+        )
+        args = SplitArgs.load_pickle(split_path)
     print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))

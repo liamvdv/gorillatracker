@@ -1,11 +1,10 @@
 from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 import PIL
 import seaborn as sns
@@ -16,10 +15,13 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
+from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -40,87 +42,97 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         every_n_val_epochs: int,
         knn_with_train: bool,
         wandb_run: Runner,
-        dm: L.LightningDataModule,
-        kfold_k: Optional[int] = None,
+        dm: NletDataModule,
+        use_quantization_aware_training: bool = False,
+        fast_dev_run: bool = False,
     ) -> None:
         super().__init__()
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
         self.run = wandb_run
-        self.kfold_k = kfold_k if kfold_k is not None else None
-        if knn_with_train:
-            dm.setup("fit")
-            self.train_dataloader = dm.train_dataloader()
+        self.dm = dm
+        self.use_quantization_aware_training = use_quantization_aware_training
+        self.kfold_k: Optional[int] = None
+        self.fast_dev_run = fast_dev_run
 
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
         train_labels = torch.tensor([])
-        for batch in self.train_dataloader:
-            ids, images, labels = batch
-            anchor_images = images[0].to(trainer.model.device)
+        for batch in self.dm.train_dataloader():
+            batch_size = lazy_batch_size(batch)
+            _, flat_images, flat_labels = flatten_batch(batch)
+            anchor_labels = flat_labels[:batch_size]
+            anchor_images = flat_images[:batch_size].to(trainer.model.device)
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
-            anchor_labels = labels[0]
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
         return train_embeddings.cpu(), train_labels.cpu()
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        embeddings_table = pl_module.embeddings_table
+        embeddings_table_list = pl_module.embeddings_table_list
         current_step = trainer.global_step
 
         assert trainer.max_epochs is not None
+        for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
+            dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
+            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
+            artifact = wandb.Artifact(
+                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_name),
+                type="embeddings",
+                metadata={"step": current_step},
+                description="Embeddings from step {}".format(current_step),
+            )
+            artifact.add(table, "embeddings_table_step_{}".format(current_step))
+            self.run.log_artifact(artifact)
+            self.embedding_artifacts.append(artifact.name)
 
-        table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
-        artifact = wandb.Artifact(
-            name="run_{0}_step_{1}".format(self.run.name, current_step),
-            type="embeddings",
-            metadata={"step": current_step},
-            description="Embeddings from step {}".format(current_step),
-        )
-        artifact.add(table, "embeddings_table_step_{}".format(current_step))
-        self.run.log_artifact(artifact)
-        self.embedding_artifacts.append(artifact.name)
+            train_embeddings, train_labels = (
+                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
+            )
 
-        train_embeddings, train_labels = (
-            self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-        )
-
-        metrics = {
-            "knn5": partial(knn, k=5),
-            "knn": partial(knn, k=1),
-            "pca": pca,
-            "tsne": tsne,
-            # "fc_layer": fc_layer,
-        }
-        metrics |= (
-            {
-                "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+            metrics = {
+                "knn5": partial(knn, k=5),
+                "knn": partial(knn, k=1),
+                "knn5_macro": partial(knn, k=5, average="macro"),
+                "knn_macro": partial(knn, k=1, average="macro"),
+                "pca": pca,
+                "tsne": tsne,
+                # "fc_layer": fc_layer,
             }
-            if self.knn_with_train
-            else {}
-        )
-        # log to wandb
-        evaluate_embeddings(
-            data=embeddings_table,
-            embedding_name="val/embeddings",
-            metrics=metrics,
-            train_embeddings=train_embeddings,  # type: ignore
-            train_labels=train_labels,
-            kfold_k=self.kfold_k,
-        )
-        # clear the table where the embeddings are stored
-        # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # rese t embeddings table
+            metrics |= (
+                {
+                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                    "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
+                    "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
+                }
+                if self.knn_with_train
+                else {}
+            )
+            metrics = metrics if not self.fast_dev_run else {}
+
+            # log to wandb
+            evaluate_embeddings(
+                data=embeddings_table,
+                embedding_name="val/embeddings",
+                metrics=metrics,
+                train_embeddings=train_embeddings,
+                train_labels=train_labels,
+                kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
+                dataloader_name=dataloader_name,
+            )
+            # clear the table where the embeddings are stored
+            # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
 
     def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
         log_train_images_to_wandb(self.run, trainer, n_samples=1)
 
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        if trainer.model.dtype == torch.float32:  # type: ignore
+        if trainer.model.dtype == torch.float32 and not self.use_quantization_aware_training:  # type: ignore
             log_grad_cam_images_to_wandb(self.run, trainer)
 
 
@@ -143,13 +155,11 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
     return ToPILImage()(tensor.cpu()).convert("RGB")
 
 
-def get_n_samples_from_dataloader(
-    dataloader: gtypes.BatchNletDataLoader, n_samples: int = 1
-) -> List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]]:
-    samples: List[Tuple[Tuple[torch.Tensor, ...], Tuple[Union[str, int], ...]]] = []
+def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
+    samples: list[gtypes.Nlet] = []
     for batch in dataloader:
         ids, images, labels = batch
-        row_batch = zip(zip(*images), zip(*labels))
+        row_batch = zip(zip(*ids), zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))
         if len(samples) == n_samples:
@@ -167,7 +177,7 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
     for i, sample in enumerate(samples):
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
         row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
-        row_images, row_labels = sample
+        _, row_images, row_labels = sample
         img_label_meaning = zip(row_images, row_labels, row_meaning)
         artifacts = [
             wandb.Image(tensor_to_image(img), caption=f"{meaning} label={label}")
@@ -191,7 +201,7 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
     wandb_images: List[wandb.Image] = []
     for sample in samples:
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
-        row_images, row_labels = sample
+        _, row_images, row_labels = sample
         anchor, *rest = row_images
         grayscale_cam = cam(input_tensor=anchor.unsqueeze(0), targets=None)
 
@@ -207,9 +217,10 @@ def evaluate_embeddings(
     data: pd.DataFrame,
     embedding_name: str,
     metrics: Dict[str, Any],
-    train_embeddings: Optional[npt.NDArray[np.float_]] = None,
+    train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[gtypes.MergedLabels] = None,
     kfold_k: Optional[int] = None,
+    dataloader_name: str = "Unkonwn",
 ) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
     assert (train_embeddings is not None and train_labels is not None) or (
         train_embeddings is None and train_labels is None
@@ -235,14 +246,13 @@ def evaluate_embeddings(
         for metric_name, metric in metrics.items()
     }
 
-    kfold_str = f"/fold-{kfold_k}/" if kfold_k is not None else "/"
+    kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{embedding_name}{kfold_str}{metric_name}/{key}": value})
+                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value})
         else:
-            wandb.log({f"{embedding_name}{kfold_str}{metric_name}": result})
-
+            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
     return results
 
 
@@ -253,6 +263,7 @@ def knn(
     use_train_embeddings: bool = False,
     train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[torch.Tensor] = None,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
 ) -> Dict[str, Any]:
     if use_train_embeddings and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
@@ -270,9 +281,10 @@ def knn(
             k=k,
             train_embeddings=train_embeddings,  # type: ignore
             train_labels=train_labels_encoded,
+            average=average,
         )
     else:
-        return knn_naive(val_embeddings, val_labels_encoded, k=k)
+        return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
 
 
 def knn_with_train(
@@ -280,6 +292,7 @@ def knn_with_train(
     val_labels: torch.Tensor,
     train_embeddings: torch.Tensor,
     train_labels: torch.Tensor,
+    average: Literal["micro", "macro", "weighted", "none"],
     k: int = 5,
 ) -> Dict[str, Any]:
     """
@@ -331,21 +344,25 @@ def knn_with_train(
     assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, top_k=5
+        val_classification_matrix,
+        val_labels,
+        task="multiclass",
+        num_classes=num_classes,
+        top_k=5 if num_classes >= 5 else num_classes,
     )
     assert accuracy_top5 is not None
     auroc = tm.functional.auroc(val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
     assert auroc is not None
     f1 = tm.functional.f1_score(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert precision is not None
 
@@ -358,7 +375,12 @@ def knn_with_train(
     }
 
 
-def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5) -> Dict[str, Any]:
+def knn_naive(
+    val_embeddings: torch.Tensor,
+    val_labels: torch.Tensor,
+    average: Literal["micro", "macro", "weighted", "none"],
+    k: int = 5,
+) -> Dict[str, Any]:
     num_classes = len(torch.unique(val_labels))
     if num_classes < k:
         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
@@ -388,21 +410,25 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
     assert classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert accuracy is not None
     accuracy_top5 = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, top_k=5
+        classification_matrix,
+        val_labels,
+        task="multiclass",
+        num_classes=num_classes,
+        top_k=5 if num_classes >= 5 else num_classes,
     )
     assert accuracy_top5 is not None
     auroc = tm.functional.auroc(classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
     assert auroc is not None
     f1 = tm.functional.f1_score(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert f1 is not None
     precision = tm.functional.precision(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average="weighted"
+        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
     assert precision is not None
 
@@ -416,11 +442,11 @@ def knn_naive(val_embeddings: torch.Tensor, val_labels: torch.Tensor, k: int = 5
 
 
 def pca(
-    embeddings: torch.Tensor, labels: torch.Tensor, **kwargs: Any
+    embeddings_in: torch.Tensor, labels_in: torch.Tensor, **kwargs: Any
 ) -> wandb.Image:  # generate a 2D plot of the embeddings
-    num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()
-    labels = labels.numpy()
+    num_classes = len(torch.unique(labels_in))
+    embeddings = embeddings_in.numpy()
+    labels = labels_in.numpy()
 
     pca = sklearn.decomposition.PCA(n_components=2)
     pca.fit(embeddings)
@@ -440,15 +466,16 @@ def pca(
     # plot.figure.savefig("pca.png")
     plot = wandb.Image(plot.figure)
     # print("pca done")
+    plt.close("all")
     return plot
 
 
 def tsne(
-    embeddings: torch.Tensor, labels: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
+    embeddings_in: torch.Tensor, labels_in: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
-    num_classes = len(torch.unique(labels))
-    embeddings = embeddings.numpy()
-    labels = labels.numpy()
+    num_classes = len(torch.unique(labels_in))
+    embeddings = embeddings_in.numpy()
+    labels = labels_in.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
@@ -479,6 +506,7 @@ def tsne(
     # plot.figure.savefig("tnse.png")
     plot = wandb.Image(plot.figure)
     # print("tsne done")
+    plt.close("all")
     return plot
 
 

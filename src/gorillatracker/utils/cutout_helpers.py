@@ -18,7 +18,7 @@ def get_cutout_bbox(full_image: gtyping.Image, cutout: gtyping.Image, threshold:
     res = cv2.matchTemplate(full_image, cutout, cv2.TM_CCOEFF_NORMED)
     _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
     assert maxVal > threshold, "Cutout not found in full image"
-    cutout_height, cutout_width, _ = cutout.shape
+    cutout_height, cutout_width, _ = cutout.shape  # type: ignore
     top_left_x, top_left_y = maxLoc[:2]
     top_left = (top_left_x, top_left_y)
     bottom_right = (top_left[0] + cutout_width, top_left[1] + cutout_height)
@@ -36,5 +36,5 @@ def cutout_image(full_image: gtyping.Image, bbox: gtyping.BoundingBox, target_pa
 
     """
     top_left, bottom_right = bbox
-    cutout = full_image[top_left[1] : bottom_right[1], top_left[0] : bottom_right[0]]
+    cutout = full_image[top_left[1] : bottom_right[1], top_left[0] : bottom_right[0]]  # type: ignore
     cv2.imwrite(target_path, cutout)
