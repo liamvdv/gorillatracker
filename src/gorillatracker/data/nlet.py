@@ -77,13 +77,12 @@ class NletDataModule(L.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         assert stage in {"fit", "validate", "test", "predict"}
-
         if stage == "fit":
             self.train = self.dataset_class(
                 self.data_dir,
                 nlet_builder=self.nlet_builder,
                 partition="train",
-                transform=transforms.Compose([self.model_transforms, self.training_transforms]),
+                transform=transforms.Compose([self.training_transforms, self.model_transforms]),
                 **self.kwargs,
             )
 
