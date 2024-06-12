@@ -423,6 +423,9 @@ def generate_kfold_split(
     elif "atrw" in dataset:
         images = read_ground_truth_cows2021(dataset)
         logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
+    elif "Leopard" in dataset:
+        images = read_ground_truth_cxl(dataset)
+        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
     else:
         raise ValueError(f"unknown dataset {dataset}")
     fold_buckets, test_bucket = kfold_splitter(
@@ -549,8 +552,8 @@ if __name__ == "__main__":
     #     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
     # )
 
-    dir = generate_split(
-        dataset="ground_truth/bristol/cropped_images_face", mode="closedset", seed=42, train=0, val=100, test=0
+    dir = generate_kfold_split(
+        dataset="/workspaces/gorillatracker/datasets/vast/external-datasets/LeopardID2022/cropped_images/filtered", mode="openset", seed=42, trainval=80, test=20, k=5
     )
 
     # merge_dataset_splits(
