@@ -47,7 +47,7 @@ class SSLConfig:
         base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
-        engine = create_engine(GorillaDatasetKISZ.DB_URI, echo=True)
+        engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
