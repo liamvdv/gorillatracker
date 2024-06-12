@@ -1,5 +1,9 @@
-import random
 from collections import defaultdict
+import random
+<<<<<<< HEAD
+from collections import defaultdict
+=======
+>>>>>>> 1512a1df28a4baf20a9c76bb627a0b120e55f8c2
 from typing import Iterator, List
 
 from sqlalchemy import Select

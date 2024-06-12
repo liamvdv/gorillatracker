@@ -113,38 +113,25 @@ class NletDataModule(L.LightningDataModule):
         if stage == "predict":
             raise NotImplementedError("Predict not implemented")
 
+    # NOTE(memben): The dataloader batches like:
+    # batched_ids = ((ap1, ap2, ap3), (p1, p2, p3), ...)
+    # batched_values = torch.Tensor((ap1, ap2, ap3), (p1, p2, p3), ...)
+    # batched_labels = torch.Tensor((ap1, ap2, ap3), (p1, p2, p3), ...)
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
-        return DataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=self.workers
-        )
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(
-                val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=self.workers
-            )
-            for val in self.val
+            DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(
-                test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=self.workers
-            )
-            for test in self.test
+            DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for test in self.test
         ]
 
     def predict_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:  # TODO(memben)
         raise NotImplementedError
-
-    def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
-        ids = tuple(nlet[0] for nlet in batch)
-        values = tuple(nlet[1] for nlet in batch)
-        labels = tuple(nlet[2] for nlet in batch)
-        batched_ids = tuple(zip(*ids))
-        batched_values = tuple(zip(*values))
-        batched_labels = tuple(zip(*labels))
-        return batched_ids, batched_values, batched_labels
 
     def get_dataset_class_names(self) -> list[str]:
         return self.dataset_names

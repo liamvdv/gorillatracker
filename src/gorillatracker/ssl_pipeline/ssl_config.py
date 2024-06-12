@@ -47,7 +47,7 @@ class SSLConfig:
         base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
-        engine = create_engine(GorillaDatasetKISZ.DB_URI)
+        engine = create_engine(GorillaDatasetKISZ.DB_URI, echo=True)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
@@ -120,6 +120,8 @@ class SSLConfig:
 
     def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
+        # return list(self._create_tff_sampler(self._build_query(video_ids)).sample(session))
+
         BATCH_SIZE = 200
         num_batches = len(video_ids) // BATCH_SIZE
         tffs = []
