@@ -45,7 +45,6 @@ closedset/
 import logging
 import os
 import random
-import re
 import shutil
 import sys
 from collections import defaultdict
@@ -86,11 +85,11 @@ Labeler = Callable[[Path], Label]
 # Importers of images, Path is unique identifier.
 
 
-def read_files(dirpath: str) -> List[Entry]:
+def read_files(dirpath: Path) -> List[Entry]:
     entries = []
     for filename in os.listdir(dirpath):
-        filepath = Path(dirpath, filename)
-        entry = Entry(filepath, filename, {})
+        filepath = dirpath / filename
+        entry = Entry(filepath, str(filename), {})
         entries.append(entry)
     return entries
 
@@ -99,26 +98,25 @@ def read_dataset_partition(dirpath: Path, labeler: Labeler) -> List[Entry]:
     return [Entry(value, labeler(value), {}) for value in dirpath.glob("*")]
 
 
-def read_ground_truth(full_images_dirpath: str, file_types: List[str], re_label: str, label_pos: int) -> List[Entry]:
+def read_ground_truth(full_images_dirpath: Path) -> List[Entry]:
+    """
+    Assumed directory structure:
+    dirpath/
+        <label>_<...>.png
+        or
+        <label>_<...>.jpg
+    """
     entries = []
-    for filename in os.listdir(full_images_dirpath):
-        if filename.endswith(tuple(file_types)):
-            label = re.split(re_label, filename, maxsplit=1)[label_pos]
-            entry = Entry(Path(full_images_dirpath, filename), label, {})
-            entries.append(entry)
+    image_paths = list(full_images_dirpath.glob("*.jpg"))
+    image_paths = image_paths + list(full_images_dirpath.glob("*.png"))
+    for image_path in image_paths:
+        if "_" in image_path.name:
+            label = image_path.name.split("_")[0]
+        else:
+            label = image_path.name.split("-")[0]
+        entry = Entry(image_path, label, {})
+        entries.append(entry)
     return entries
-
-
-def read_ground_truth_cxl(full_images_dirpath: str) -> List[Entry]:
-    return read_ground_truth(full_images_dirpath, [".png"], r"[_\s]", 0)
-
-
-def read_ground_truth_bristol(full_images_dirpath: str) -> List[Entry]:
-    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_\s-]", 0)
-
-
-def read_ground_truth_cows2021(full_images_dirpath: str) -> List[Entry]:
-    return read_ground_truth(full_images_dirpath, [".jpg"], r"[_\s]", 0)
 
 
 # Business Logic
@@ -339,7 +337,8 @@ def stats_and_confirm(name: str, full: List[Entry], train: List[Entry], val: Lis
 
 
 def generate_split(
-    dataset: str = "ground_truth/cxl/full_images",
+    dataset_dir: Path = Path("data/ground_truth/cxl/full_images"),
+    output_dir: Path = Path("data/splits"),
     mode: Literal["openset", "closedset"] = "closedset",
     seed: int = 42,
     train: int = 70,
@@ -347,18 +346,11 @@ def generate_split(
     test: int = 15,
     min_train_count: int = 3,
 ) -> Path:
-    name = f"splits/{dataset.replace('/', '-')}-{mode}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
-    outdir = Path(f"data/{name}")
+    name = f"{str(dataset_dir).replace('/', '-')}-{mode}-mintraincount-{min_train_count}-seed-{seed}-train-{train}-val-{val}-test-{test}"
+    output_dir = output_dir / name
 
-    # NOTE hacky workaround
-    if "cxl" in dataset:
-        images = read_ground_truth_cxl(f"data/{dataset}")
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    elif "bristol" in dataset:
-        images = read_ground_truth_bristol(f"data/{dataset}")
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    else:
-        raise ValueError(f"unknown dataset {dataset}")
+    images = read_ground_truth(dataset_dir)
+
     train_bucket, val_bucket, test_bucket = splitter(
         images,
         mode=mode,
@@ -369,62 +361,49 @@ def generate_split(
         min_train_count=min_train_count,
     )
     stats_and_confirm(name, images, train_bucket, val_bucket, test_bucket)
-    write_entries(train_bucket, outdir / "train")
-    write_entries(val_bucket, outdir / "val")
-    write_entries(test_bucket, outdir / "test")
-    return outdir
+    write_entries(train_bucket, output_dir / "train")
+    write_entries(val_bucket, output_dir / "val")
+    write_entries(test_bucket, output_dir / "test")
+    return output_dir
 
 
 def generate_simple_split(
-    dataset: str = "ground_truth/cxl/full_images",
+    dataset_dir: Path = Path("data/ground_truth/cxl/full_images"),
+    output_dir: Path = Path("data/splits"),
     seed: int = 42,
     train: int = 70,
     val: int = 15,
     test: int = 15,
-) -> None:
-    name = f"splits/{dataset.replace('/', '-')}-seed-{seed}-train-{train}-val-{val}-test-{test}"
-    files = read_files(f"data/{dataset}")
+) -> Path:
+    name = f"{str(dataset_dir).replace('/', '-')}-seed-{seed}-train-{train}-val-{val}-test-{test}"
+    files = read_files(dataset_dir)
     files = consistent_random_permutation(files, lambda x: x.value, seed)
-    outdir = Path(f"data/{name}")
+    output_dir = output_dir / name
     train_count, val_count, test_count = compute_split(len(files), train, val, test, False)
     train_set = files[:train_count]
     val_set = files[train_count : train_count + val_count]
     test_set = files[train_count + val_count :]
     stats_and_confirm(name, files, train_set, val_set, test_set)
-    write_entries(train_set, outdir / "train")
-    write_entries(val_set, outdir / "val")
-    write_entries(test_set, outdir / "test")
+    write_entries(train_set, output_dir / "train")
+    write_entries(val_set, output_dir / "val")
+    write_entries(test_set, output_dir / "test")
+    return output_dir
 
 
 def generate_kfold_split(
-    dataset: str = "ground_truth/cxl/face_images",
+    dataset_dir: Path = Path("data/ground_truth/cxl/face_images"),
+    output_dir: Path = Path("data/splits"),
     mode: Literal["openset", "closedset"] = "closedset",
     seed: int = 42,
     trainval: int = 80,
     test: int = 20,
     k: int = 5,
 ) -> Path:
-    name = f"splits/{dataset.replace('/', '-')}-kfold-{mode}-seed-{seed}-trainval-{trainval}-test-{test}-k-{k}"
-    outdir = Path(f"data/{name}")
+    name = f"{str(dataset_dir).replace('/', '-')}-kfold-{mode}-seed-{seed}-trainval-{trainval}-test-{test}-k-{k}"
+    output_dir = output_dir / name
 
-    # NOTE hacky workaround
-    if "cxl" in dataset:
-        images = read_ground_truth_cxl(f"data/{dataset}")
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    elif "bristol" in dataset:
-        images = read_ground_truth_bristol(f"data/{dataset}")
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    elif "ctai" in dataset or "czoo" in dataset:
-        images = read_ground_truth_cxl(dataset)
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    elif "cows2021" in dataset:
-        images = read_ground_truth_cows2021(dataset)
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    elif "atrw" in dataset:
-        images = read_ground_truth_cows2021(dataset)
-        logger.info("read %(count)d images from %(dataset)s", {"count": len(images), "dataset": dataset})
-    else:
-        raise ValueError(f"unknown dataset {dataset}")
+    images = read_ground_truth(dataset_dir)
+
     fold_buckets, test_bucket = kfold_splitter(
         images,
         mode=mode,
@@ -435,9 +414,9 @@ def generate_kfold_split(
     )
     # stats_and_confirm(name, images, fold_buckets, [], test_bucket)
     for i, fold_bucket in enumerate(fold_buckets):
-        write_entries(fold_bucket, outdir / f"fold-{i}")
-    write_entries(test_bucket, outdir / "test")
-    return outdir
+        write_entries(fold_bucket, output_dir / f"fold-{i}")
+    write_entries(test_bucket, output_dir / "test")
+    return output_dir
 
 
 def copy_corresponding_images(data_dir: str, img_dir: str = "ground_truth/cxl/full_images") -> None:
@@ -542,23 +521,17 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 
 if __name__ == "__main__":
-    # dir = generate_simple_split(dataset="ground_truth/cxl/full_images_body_bbox", seed=42)
-    # copy_corresponding_images("splits/ground_truth-cxl-full_images_body_bbox-seed-42-train-70-val-15-test-15/train")
-
-    # dir = generate_split(
-    #     dataset="ground_truth/cxl/full_images", mode="openset", seed=43, reid_factor_test=10, reid_factor_val=10
-    # )
-
-    dir = generate_split(
-        dataset="ground_truth/bristol/cropped_images_face", mode="closedset", seed=42, train=0, val=100, test=0
+    dir = generate_kfold_split(
+        dataset_dir=Path("/workspaces/gorillatracker/data/ground_truth/bristol/full_images"),
+        output_dir=Path("compressed/test"),
+        mode="openset",
+        seed=42,
+        trainval=80,
+        test=20,
+        k=5,
     )
-
-    # merge_dataset_splits(
-    #     "splits/ground_truth-bristol-full_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-    #     "splits/ground_truth-rohan-cxl-face_images-closedset--mintraincount-3-seed-42-train-70-val-15-test-15",
-    # )
 
 # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
 # dir = generate_split(
-#     dataset="ground_truth/cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
+#     dataset_dir="data/ground_truth/cxl/face_images", mode="openset", seed=42, reid_factor_test=0, reid_factor_val=0, train=50, val=25, test=25
 # )
