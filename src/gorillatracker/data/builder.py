@@ -21,11 +21,13 @@ CZooDatasetId = "gorillatracker.datasets.chimp.CZooDataset"
 CTaiDatasetId = "gorillatracker.datasets.chimp.CTaiDataset"
 Cows2021DatasetId = "gorillatracker.datasets.cows2021.Cows2021Dataset"
 ATRWDatasetId = "gorillatracker.datasets.atrw.ATRWDataset"
+LeopardDatasetId = "gorillatracker.datasets.leopard.LeopardDataset"
 KFoldCZooDatasetId = "gorillatracker.datasets.chimp.KFoldCZooDataset"
 KFoldCTaiDatasetId = "gorillatracker.datasets.chimp.KFoldCTaiDataset"
 KFoldCXLDatasetId = "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"  # TODO change this cxl.KFoldCXLDataset
 KFoldCows2021DatasetId = "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
 KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
+KFoldLeopardDatasetId = "gorillatracker.datasets.leopard.KFoldLeopardDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 
 dataset_registry: dict[str, Type[NletDataset]] = {
@@ -37,10 +39,12 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     CTaiDatasetId: SupervisedDataset,
     Cows2021DatasetId: SupervisedDataset,
     ATRWDatasetId: SupervisedDataset,
+    LeopardDatasetId: SupervisedDataset,
     KFoldCZooDatasetId: SupervisedKFoldDataset,
     KFoldCTaiDatasetId: SupervisedKFoldDataset,
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
+    KFoldLeopardDatasetId: SupervisedKFoldDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
