@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Sequence
+from typing import Callable, Sequence
 
 from sqlalchemy import ColumnElement, Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
@@ -43,11 +43,8 @@ def build_overlapping_trackings_query(video_ids: Sequence[int]) -> Select[tuple[
 
 
 def find_overlapping_trackings(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
-    stmt = build_overlapping_trackings_query(video_ids)
-    print("Sampling negatives...")
-    overlapping_trackings = session.execute(stmt).fetchall()
-    result = [(row[0], row[1]) for row in overlapping_trackings]
-    return result
+    negative_tuples = fetch_negative_tuples(session, video_ids, build_overlapping_trackings_query)
+    return negative_tuples
 
 
 def tracking_ids_from_videos(video_ids: Sequence[int]) -> Select[tuple[int]]:
@@ -125,15 +122,9 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
     return negative_tuples
 
 
-def social_group_negatives(video_ids: Sequence[int], version: str) -> Select[tuple[int, int]]:
+def social_group_negatives(video_ids: Sequence[int]) -> Select[tuple[int, int]]:
     relevant_videos_cte = (
-        select(Video.video_id)
-        .where(
-            # Video.video_id.in_(video_ids),
-            Video.version
-            == version
-        )
-        .cte("relevant_videos")
+        select(Video.video_id).where(Video.video_id.in_(video_ids)).cte("relevant_videos")
     )
 
     video_social_groups_cte = (
@@ -154,10 +145,22 @@ def social_group_negatives(video_ids: Sequence[int], version: str) -> Select[tup
     return stmt
 
 
-def find_social_group_negatives(session: Session, version: str, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
-    stmt = social_group_negatives(video_ids, version)
-    result = session.execute(stmt).all()
-    negative_tuples = [(row[0], row[1]) for row in result]
+def find_social_group_negatives(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
+    negative_tuples = fetch_negative_tuples(session, video_ids, social_group_negatives)
+    return negative_tuples
+
+
+def fetch_negative_tuples(
+    session: Session, video_ids: Sequence[int], query_builder: Callable[[Sequence[int]], Select[tuple[int, int]]]
+) -> Sequence[tuple[int, int]]:
+    BATCH_SIZE = 200
+    num_batches = len(video_ids) // BATCH_SIZE
+    negative_tuples = []
+    for i in range(num_batches + 1):
+        batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+        stmt = query_builder(batch_video_ids)
+        result = session.execute(stmt).all()
+        negative_tuples.extend([(row[0], row[1]) for row in result])
     return negative_tuples
 
 
@@ -170,9 +173,8 @@ if __name__ == "__main__":
 
     engine = create_engine(GorillaDatasetKISZ.DB_URI)
     video_ids = list(range(1, 10000))
-    version = "2024-04-18"
     with Session(engine) as session:
         start = time.time()
-        video_negatives = find_social_group_negatives(session, version, video_ids)
+        video_negatives = find_social_group_negatives(session, video_ids)
         end = time.time()
         print(f"Found {len(video_negatives)} video negatives in {end - start:.2f} seconds")
