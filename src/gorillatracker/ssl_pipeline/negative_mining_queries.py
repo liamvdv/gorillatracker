@@ -123,9 +123,7 @@ def travel_distance_negatives(session: Session, version: str, travel_speed: floa
 
 
 def social_group_negatives(video_ids: Sequence[int]) -> Select[tuple[int, int]]:
-    relevant_videos_cte = (
-        select(Video.video_id).where(Video.video_id.in_(video_ids)).cte("relevant_videos")
-    )
+    relevant_videos_cte = select(Video.video_id).where(Video.video_id.in_(video_ids)).cte("relevant_videos")
 
     video_social_groups_cte = (
         select(relevant_videos_cte.c.video_id, VideoFeature.value)
