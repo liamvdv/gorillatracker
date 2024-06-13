@@ -318,7 +318,7 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=vec, labels_onehot=flat_labels_onehot)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=images, labels_onehot=flat_labels_onehot)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
@@ -363,7 +363,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, vec)
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -866,7 +866,7 @@ class SwinV2LargeWrapper(BaseModule):
         self.set_losses(self.model, **kwargs)
 
     @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+    def get_tensor_transforms(cls):
         return transforms.Compose(
             [
                 transforms.Resize((224), antialias=True),
