@@ -28,7 +28,11 @@ def run_experiment(
     # Construct the command with parameter overrides
     params_str = " ".join([f"--{key} {value}" for key, value in parameters.items()])
 
+    print(f"Running experiment '{project_name}' with overridden parameters: {parameters}")
+    print(f"Sweep parameters: {sweep_parameters}")
+
     if sweep_parameters:
+        params_array = params_str.split(" ")
         sweep_config = {
             "program": "./train.py",  # Note: not the sweep file, but the training script
             "name": project_name,
@@ -38,12 +42,12 @@ def run_experiment(
                 "name": "val/embeddings/knn/dataloader_0/accuracy",
             },  # Specify the metric to optimize
             "parameters": sweep_parameters,
-            "command": ["${interpreter}", "${program}", params_str, "${args}", "--config_path", config_path],
+            "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path, *params_array],
         }
         sweep_id = sweep(sweep=sweep_config, project=project_name, entity="gorillas")
 
         print(f"SWEEP_PATH=gorillas/{project_name}/{sweep_id}")
-        agent(sweep_id)
+        agent(sweep_id, count=12)
     else:
         command = f"python train.py {params_str} --config_path {config_path}"
         os.system(command)
@@ -51,7 +55,7 @@ def run_experiment(
 
 
 if __name__ == "__main__":
-    with open("scripts/multi_configs/kn.json", "r") as file:
+    with open("scripts/multi_configs/baseline_sweep.json", "r") as file:
         json_file = json.load(file)
         experiments = json_file["experiments"]
         global_parameters = json_file["global"]
