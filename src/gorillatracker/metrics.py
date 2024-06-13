@@ -260,19 +260,20 @@ def knn(
     val_embeddings: torch.Tensor,
     val_labels: torch.Tensor,
     k: int = 5,
-    use_train_embeddings: bool = False,
+    type:Literal["naive", "with_train", "ssl"] = "naive",
+    dm: Optional[NletDataModule] = None,
     train_embeddings: Optional[torch.Tensor] = None,
     train_labels: Optional[torch.Tensor] = None,
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
 ) -> Dict[str, Any]:
-    if use_train_embeddings and (train_embeddings is None or train_labels is None):
+    if type == "with_train" and (train_embeddings is None or train_labels is None):
         raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
 
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
     le = LinearSequenceEncoder()
     val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
 
-    if use_train_embeddings:
+    if type == "with_train":
         train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))  # type: ignore
         # print("Using train embeddings for knn")
         return knn_with_train(
@@ -283,8 +284,13 @@ def knn(
             train_labels=train_labels_encoded,
             average=average,
         )
-    else:
+    elif type == "naive":
         return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
+    elif type == "ssl":
+        #TODO:knn_ssl(val_embeddings, val_labels, k=k, average=average, dm=dm)
+        pass
+    else:
+        raise ValueError(f"Unknown type {type}")
 
 
 def knn_with_train(
