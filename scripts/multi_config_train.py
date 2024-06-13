@@ -1,7 +1,9 @@
+import json
 import os
 from typing import Any, Dict
+
 import yaml
-import json
+from wandb import agent, sweep
 
 
 def check_experiment_configs(configs: list[dict[str, Any]]) -> None:
@@ -20,11 +22,31 @@ def get_config(config_path: str) -> Dict[str, Any]:
     return config_dict
 
 
-def run_experiment(project_name: str, config_path: str, parameters: Dict[str, Any]) -> None:
+def run_experiment(
+    project_name: str, config_path: str, parameters: Dict[str, Any], sweep_parameters: Dict[str, Any]
+) -> None:
     # Construct the command with parameter overrides
     params_str = " ".join([f"--{key} {value}" for key, value in parameters.items()])
-    command = f"python train.py {params_str} --config_path {config_path}"
-    os.system(command)
+
+    if sweep_parameters:
+        sweep_config = {
+            "program": "./train.py",  # Note: not the sweep file, but the training script
+            "name": project_name,
+            "method": "bayes",  # Specify the search method (random search in this case)
+            "metric": {
+                "goal": "maximize",
+                "name": "val/embeddings/knn/dataloader_0/accuracy",
+            },  # Specify the metric to optimize
+            "parameters": sweep_parameters,
+            "command": ["${interpreter}", "${program}", params_str, "${args}", "--config_path", config_path],
+        }
+        sweep_id = sweep(sweep=sweep_config, project=project_name, entity="gorillas")
+
+        print(f"SWEEP_PATH=gorillas/{project_name}/{sweep_id}")
+        agent(sweep_id)
+    else:
+        command = f"python train.py {params_str} --config_path {config_path}"
+        os.system(command)
     print(f"Experiment '{project_name}' has been executed with overridden parameters: {parameters}")
 
 
@@ -33,12 +55,17 @@ if __name__ == "__main__":
         json_file = json.load(file)
         experiments = json_file["experiments"]
         global_parameters = json_file["global"]
+        global_sweep_parameters = json_file.get("global_sweep_parameters", {})
 
     check_experiment_configs(experiments)
 
     for current_experiment in experiments:
         print(f"Running experiment: {current_experiment['project_name']}")
         current_experiment["parameters"] = {**current_experiment["parameters"], **global_parameters}
+        current_experiment["sweep_parameters"] = {
+            **current_experiment.get("sweep_parameters", {}),
+            **global_sweep_parameters,
+        }
         try:
             run_experiment(**current_experiment)
         except Exception as e:
