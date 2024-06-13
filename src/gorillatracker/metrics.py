@@ -27,6 +27,7 @@ from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 # TODO: What is the wandb run type?
 Runner = Any
 
+
 def load_embeddings_from_wandb(embedding_name: str, run: Runner) -> pd.DataFrame:
     """Load embeddings from wandb Artifact."""
     # Data is a pandas Dataframe with columns: label, embedding_0, embedding_1, ... loaded from wandb from the
@@ -52,13 +53,15 @@ def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples
     return samples
 
 
-def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> None:
+def log_train_images_to_wandb(
+    run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1
+) -> None:
     """
     Log nlet images from the train dataloader to wandb.
     Visual sanity check to see if the dataloader works as expected.
     """
     # get first n_samples triplets from the train dataloader
-    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=n_samples)  # type: ignore
+    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=n_samples)
     for i, sample in enumerate(samples):
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
         row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
@@ -70,18 +73,21 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataloader:
         ]
         run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
 
+
+@torch.enable_grad()  # type: ignore
 def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet]) -> None:
     # NOTE(liamvdv): inverse grad cam support to model since we might not be using
     #                a model which grad cam does not support.
     # NOTE(liamvdv): Transform models may have different interpretations.
     assert trainer.model is not None, "Must only call log_grad_cam_images... after model was initialized."
+
     if not hasattr(trainer.model, "get_grad_cam_layer"):
         return
     target_layer = trainer.model.get_grad_cam_layer()
     get_reshape_transform = getattr(trainer.model, "get_grad_cam_reshape_transform", lambda: None)
     cam = GradCAM(model=trainer.model, target_layers=[target_layer], reshape_transform=get_reshape_transform())
 
-    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=1)  # type: ignore
+    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=1)
     wandb_images: List[wandb.Image] = []
     for sample in samples:
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)

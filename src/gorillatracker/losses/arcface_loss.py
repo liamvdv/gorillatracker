@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict, List, Literal, Tuple, Union, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 
@@ -162,7 +162,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        labels_onehot: torch.Tensor = torch.Tensor(),
+        labels_onehot: Optional[torch.Tensor] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         angle_margin = torch.Tensor([self.angle_margin]).to(embeddings.device)
@@ -197,7 +197,7 @@ class AdaFaceLoss(ArcFaceLoss):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        labels_onehot: torch.Tensor = torch.Tensor(),
+        labels_onehot: Optional[torch.Tensor] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         if self.norm.running_mean.device != embeddings.device:  # type: ignore

@@ -1,5 +1,6 @@
 import importlib
-from typing import Any, Callable, Dict, Literal, Optional, Type, Tuple
+from functools import partial
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
 import lightning as L
 import numpy as np
@@ -9,7 +10,6 @@ import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
-from functools import partial
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
@@ -26,12 +26,20 @@ from torchvision.models import (
 from transformers import ResNetModel
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
+from gorillatracker.metrics import (
+    evaluate_embeddings,
+    knn,
+    log_grad_cam_images_to_wandb,
+    log_train_images_to_wandb,
+    pca,
+    tsne,
+)
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
-from gorillatracker.metrics import evaluate_embeddings, log_grad_cam_images_to_wandb, log_train_images_to_wandb, knn, pca, tsne
 
 def warmup_lr(
     warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
@@ -118,7 +126,10 @@ def in_batch_mixup(data: torch.Tensor, targets: torch.Tensor, alpha: float = 0.2
 
     return data, targets
 
+
 Runner = Any
+
+
 class BaseModule(L.LightningModule):
     """
     must be subclassed and set self.model = ...
@@ -126,7 +137,7 @@ class BaseModule(L.LightningModule):
 
     def __init__(
         self,
-        data_module: L.LightningDataModule,
+        data_module: NletDataModule,
         from_scratch: bool,
         wandb_run: Runner,
         loss_mode: str,
@@ -292,7 +303,7 @@ class BaseModule(L.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         log_train_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader(), n_samples=1)
-        
+
         if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:  # type: ignore
             self.loss_module_train.set_using_memory_bank(True)  # type: ignore
             logger.info("Using memory bank")
@@ -406,44 +417,43 @@ class BaseModule(L.LightningModule):
             return torch.tensor(0.0)  # TODO(memben): ???
 
     def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
+        # TODO(rob2u): this fails, IDK why gradient calc is activated, params are not frozen
         # if self.trainer.model.dtype == torch.float32 and not self.use_quantization_aware_training:  # type: ignore
         #     log_grad_cam_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader())
-        
+
         dataloader_name = self.dataset_names[dataloader_idx]
         kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
-        
+
         if "softmax" in self.loss_mode:
             self.validation_loss_softmax(dataloader_name, kfold_prefix)
-       
+
         embeddings_table_list = self.embeddings_table_list
 
         assert self.trainer.max_epochs is not None
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
             self.eval_embeddings_table(embeddings_table, dataloader_idx)
-        
+
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]  # reset embeddings table
-    
+
     def lambda_schedule(self, epoch: int) -> float:
-            return combine_schedulers(
-                self.warmup_mode,
-                self.lr_schedule,  # type: ignore
-                epoch,
-                self.initial_lr,
-                self.start_lr,
-                self.end_lr,
-                self.max_epochs,
-                self.warmup_epochs,
-            )
+        return combine_schedulers(
+            self.warmup_mode,
+            self.lr_schedule,  # type: ignore
+            epoch,
+            self.initial_lr,
+            self.start_lr,
+            self.end_lr,
+            self.max_epochs,
+            self.warmup_epochs,
+        )
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
-        if self.global_rank == 0:
-            logger.info(
-                f"Using {self.lr_schedule} learning rate schedule with {self.warmup_mode} warmup for {self.max_epochs} epochs."
-            )
-
+        logger.info(
+            f"Using {self.lr_schedule} learning rate schedule with {self.warmup_mode} warmup for {self.max_epochs} epochs."
+        )
         if "l2sp" in self.loss_mode and self.weight_decay != 0.0:
             logger.warning(
                 "Using L2SP regularization, weight decay will be set to 0.0. Please use the l2_alpha and l2_beta arguments to set the L2SP parameters."
@@ -456,9 +466,6 @@ class BaseModule(L.LightningModule):
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
         )
-
-    
-
         if self.lr_schedule != "reduce_on_plateau":
             lambda_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer=optimizer,
@@ -477,7 +484,6 @@ class BaseModule(L.LightningModule):
                 "optimizer": optimizer,
                 "lr_scheduler": lr_scheduler,
             }
-
         else:
             plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer=optimizer,
@@ -493,17 +499,6 @@ class BaseModule(L.LightningModule):
             )
             return {"optimizer": optimizer, "lr_scheduler": plateau_scheduler}
 
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        """Add your data augmentations here. Function will be called after in the training loop"""
-        return lambda x: x
-
-    @classmethod
-    def get_tensor_transforms(cls) -> None:
-        raise NotImplementedError(
-            "This method was deprecated! Use arg.use_normalization and args.data_resize_transform instead!"
-        )
-
     def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
@@ -518,9 +513,9 @@ class BaseModule(L.LightningModule):
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
-        return train_embeddings.cpu(), train_labels.cpu()        
-    
-    def eval_embeddings_table(self, embeddings_table, dataloader_idx):
+        return train_embeddings.cpu(), train_labels.cpu()
+
+    def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> None:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
         train_embeddings, train_labels = (
             self._get_train_embeddings_for_knn(self.trainer) if self.knn_with_train else (None, None)
@@ -557,7 +552,7 @@ class BaseModule(L.LightningModule):
             kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
             dataloader_name=dataloader_name,
         )
-    
+
     def validation_loss_softmax(self, dataloader_name: str, kfold_prefix: str) -> None:
         for i, table in enumerate(self.embeddings_table_list):
             logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
@@ -599,7 +594,18 @@ class BaseModule(L.LightningModule):
             loss = torch.tensor(losses).mean()
             assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
             self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss, sync_dist=True)
-    
+
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        """Add your data augmentations here. Function will be called after in the training loop"""
+        return lambda x: x
+
+    @classmethod
+    def get_tensor_transforms(cls) -> None:
+        raise NotImplementedError(
+            "This method was deprecated! Use arg.use_normalization and args.data_resize_transform instead!"
+        )
+
 
 class EfficientNetV2Wrapper(BaseModule):
     def __init__(  # type: ignore

@@ -10,7 +10,9 @@ from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 class ModelConstructor:
-    def __init__(self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule, wandb_logger: WandbLogger) -> None:
+    def __init__(
+        self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule, wandb_logger: WandbLogger
+    ) -> None:
         self.args = args
         self.model_cls = model_cls
         self.dm = dm
@@ -85,7 +87,7 @@ class ModelConstructor:
             knn_with_train=args.knn_with_train,
             use_quantization_aware_training=args.use_quantization_aware_training,
             fast_dev_run=args.fast_dev_run,
-            every_n_val_epochs=args.embedding_save_interval, # TODO(rob2u): rename
+            every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
             wandb_run=self.wandb_logger.experiment,
         )
 
