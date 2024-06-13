@@ -1,5 +1,5 @@
 import warnings
-from typing import Union
+from pathlib import Path
 
 import torch
 from lightning import seed_everything
@@ -7,16 +7,14 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import logger
 from simple_parsing import parse
-from torchvision.transforms import Compose, Resize
+from torchvision.transforms import Compose, Normalize, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.builder import build_data_module
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
-from gorillatracker.train_utils import get_data_module
 from gorillatracker.utils.train import (
     ModelConstructor,
     train_and_validate_model,
@@ -57,58 +55,50 @@ def main(args: TrainingArgs) -> None:
     ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
 
-    #################### Construct dataloaders #################
-    model_transforms = model_cls.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    #################### Construct Data Module #################
+    def resize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
 
-    # TODO(memben): Unify SSLDatamodule and NletDataModule
-    dm: Union[SSLDataModule, NletDataModule]
-    if args.use_ssl:
-        assert args.split_path is not None, "Split path must be provided for SSL training."
-        ssl_config = SSLConfig(
-            tff_selection=args.tff_selection,
-            negative_mining=args.negative_mining,
-            n_samples=args.n_samples,
-            feature_types=args.feature_types,
-            min_confidence=args.min_confidence,
-            min_images_per_tracking=args.min_images_per_tracking,
-            width_range=args.width_range,
-            height_range=args.height_range,
-            split_path=args.split_path,
-        )
-        dm = SSLDataModule(
-            ssl_config=ssl_config,
-            batch_size=args.batch_size,
-            transforms=model_transforms,
-            training_transforms=model_cls.get_training_transforms(),
-            data_dir=str(args.data_dir),
-            additional_dataset_class_ids=args.additional_val_dataset_classes,
-            additional_data_dirs=args.additional_val_data_dirs,
-        )
-    else:
-        dm = get_data_module(
-            args.dataset_class,
-            str(args.data_dir),
-            args.batch_size,
-            args.loss_mode,
-            args.workers,
-            model_transforms,
-            model_cls.get_training_transforms(),
-            args.additional_val_dataset_classes,
-            args.additional_val_data_dirs,
-        )
+    def normalize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    if args.data_resize_transform:
+        resize_transform = Resize((args.data_resize_transform, args.data_resize_transform))
+    if args.use_normalization:
+        normalize_transform = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    model_transforms = Compose([resize_transform, normalize_transform])
+
+    ssl_config = SSLConfig(
+        tff_selection=args.tff_selection,
+        negative_mining=args.negative_mining,
+        n_samples=args.n_samples,
+        feature_types=args.feature_types,
+        min_confidence=args.min_confidence,
+        min_images_per_tracking=args.min_images_per_tracking,
+        width_range=args.width_range,
+        height_range=args.height_range,
+        split_path=args.split_path,
+    )
+    dm = build_data_module(
+        dataset_class_id=args.dataset_class,
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        loss_mode=args.loss_mode,
+        workers=args.workers,
+        model_transforms=model_transforms,
+        training_transforms=model_cls.get_training_transforms(),
+        additional_eval_datasets_ids=args.additional_val_dataset_classes,
+        additional_eval_data_dirs=[Path(d) for d in args.additional_val_data_dirs],
+        ssl_config=ssl_config,
+    )
 
     ################# Construct model ##############
 
-    model_constructor = ModelConstructor(args, model_cls, dm)
-    model = model_constructor.construct(wandb_logging_module, wandb_logger)
+    if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
+        model_constructor = ModelConstructor(args, model_cls, dm)
+        model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
-    #################### Construct dataloaders & trainer #################
-    model_transforms = model.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
-
+    #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     embeddings_logger_callback = LogEmbeddingsToWandbCallback(
@@ -117,7 +107,7 @@ def main(args: TrainingArgs) -> None:
         wandb_run=wandb_logger.experiment,
         dm=dm,
         use_quantization_aware_training=args.use_quantization_aware_training,
-        use_ssl=args.use_ssl,
+        fast_dev_run=args.fast_dev_run,
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
@@ -125,14 +115,14 @@ def main(args: TrainingArgs) -> None:
     )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor="val/loss/dataloader_0",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
         mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor="val/loss/dataloader_0",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
         mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
@@ -172,6 +162,9 @@ def main(args: TrainingArgs) -> None:
 
     ################# Start training #################
     logger.info(f"Rank {current_process_rank} | Starting training...")
+    assert not (
+        args.use_quantization_aware_training and args.kfold
+    ), "Quantization aware training not supported with kfold"
     if args.kfold:
         train_and_validate_using_kfold(
             args=args,

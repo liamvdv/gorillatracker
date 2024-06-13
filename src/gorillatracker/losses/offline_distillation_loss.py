@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -13,7 +15,9 @@ class OfflineResponseBasedLoss(nn.Module):
         self.teacher_model.eval()
         self.loss = nn.MSELoss()
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(
+        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor, **kwargs: Any
+    ) -> gtypes.LossPosNegDist:
         teacher_embeddings = self.teacher_model(images)
         return (
             self.loss(embeddings, teacher_embeddings),
