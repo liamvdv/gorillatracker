@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from sqlalchemy import Select, create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.ssl_pipeline.contrastive_sampler import (
+from gorillatracker.data.contrastive_sampler import (
     CliqueGraphSampler,
     ContrastiveClassSampler,
     ContrastiveImage,
@@ -38,23 +38,25 @@ class SSLConfig:
     feature_types: list[str]
     min_confidence: float
     min_images_per_tracking: int
+    split_path: Path
     width_range: tuple[Optional[int], Optional[int]]
     height_range: tuple[Optional[int], Optional[int]]
-    split_path: str
 
-    def get_contrastive_sampler(self, partition: Literal["train", "val", "test"], base_path: str) -> ContrastiveSampler:
+    def get_contrastive_sampler(
+        self,
+        base_path: Path,
+        partition: Literal["train", "val", "test"],
+    ) -> ContrastiveSampler:
         engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
-            query = self._build_query(video_ids)
-            sampler = self._create_tff_sampler(query)
-            tracked_features = self._sample_tracked_features(sampler, session)
-            contrastive_images = self._create_contrastive_images(tracked_features, base_path)
+            tracking_frame_features = self._sample_tracking_frame_features(video_ids, session)
+            contrastive_images = self._create_contrastive_images(tracking_frame_features, base_path)
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
-        split = SplitArgs.load_pickle(self.split_path)
+        split = SplitArgs.load_pickle(str(self.split_path))
         if partition == "train":
             return split.train_video_ids()
         elif partition == "val":
@@ -106,17 +108,32 @@ class SSLConfig:
         query = confidence_filter(query, self.min_confidence)
         query = bbox_filter(query, self.width_range[0], self.width_range[1], self.height_range[0], self.height_range[1])
         query = min_count_filter(query, self.min_images_per_tracking)
+        # NOTE(memben): Use with care, as it might lead to performance issues if using other columns
+        query = query.options(
+            load_only(
+                TrackingFrameFeature.tracking_frame_feature_id,
+                TrackingFrameFeature.tracking_id,
+                TrackingFrameFeature.frame_nr,
+            )
+        )
         return query
 
-    def _sample_tracked_features(self, sampler: Sampler, session: Session) -> List[TrackingFrameFeature]:
+    def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
         print("Sampling TrackingFrameFeatures...")
-        return list(sampler.sample(session))
+        BATCH_SIZE = 200
+        num_batches = len(video_ids) // BATCH_SIZE
+        tffs = []
+        for i in range(num_batches + 1):
+            batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+            sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
+            tffs.extend(list(sampler.sample(session)))
+        return tffs
 
     def _create_contrastive_images(
-        self, tracked_features: List[TrackingFrameFeature], base_path: str
+        self, tracked_features: List[TrackingFrameFeature], base_path: Path
     ) -> List[ContrastiveImage]:
         return [
-            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(Path(base_path)), f.tracking_id)  # type: ignore
+            ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id)  # type: ignore
             for f in tracked_features
         ]
 
@@ -142,19 +159,26 @@ class SSLConfig:
 if __name__ == "__main__":
     ssl_config = SSLConfig(
         tff_selection="equidistant",
-        negative_mining="overlapping",
+        negative_mining="random",
         n_samples=15,
         feature_types=["body"],
         min_confidence=0.5,
         min_images_per_tracking=10,
         width_range=(None, None),
         height_range=(None, None),
-        split_path="/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl",
+        split_path=Path(
+            "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+        ),
     )
-    contrastive_sampler = ssl_config.get_contrastive_sampler("train", "cropped-images/2024-04-18")
-    print(len(contrastive_sampler))
-    for i in range(10):
-        contrastive_image = contrastive_sampler[i * 10]
-        print(contrastive_image)
-        print(contrastive_sampler.positive(contrastive_image))
-        print(contrastive_sampler.negative(contrastive_image))
+    import time
+
+    before = time.time()
+    contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
+    after = time.time()
+    print(f"Time: {after - before}")
+    # print(len(contrastive_sampler))
+    # for i in range(10):
+    #     contrastive_image = contrastive_sampler[i * 10]
+    #     print(contrastive_image)
+    #     print(contrastive_sampler.positive(contrastive_image))
+    #     print(contrastive_sampler.negative(contrastive_image))

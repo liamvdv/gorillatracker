@@ -78,5 +78,5 @@ data_resize_transform: 192
 
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
 additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
-
+dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"

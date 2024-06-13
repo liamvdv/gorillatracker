@@ -166,4 +166,4 @@ mnist/
 *MP4
 *AVI
 cropped-images/*
-
+/pretrained_weights/

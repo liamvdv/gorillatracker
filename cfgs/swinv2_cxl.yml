@@ -17,7 +17,7 @@ wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2LargeWrapper"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: True               # Enable fast development run
+fast_dev_run: False               # Enable fast development run
 profiler: Null                    # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                    # Enable offline mode for WandB
 data_preprocessing_only: False    # Run only data preprocessing
@@ -45,11 +45,11 @@ s: 64.0                             # Scale for the softmax losses
 delta_t: 50                         # Delta t for the vpl loss
 mem_bank_start_epoch: 10            # Epoch to start using the memory bank
 lambda_membank: 0.5                 # Lambda for the memory bank loss
-use_focal_loss: True                # Use focal loss
+use_focal_loss: False                # Use focal loss
 label_smoothing: 0.05                # Label smoothing value
 loss_mode: "softmax/arcface/l2sp"          # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
-use_class_weights: True                # Use class weights for the loss
+use_class_weights: False                # Use class weights for the loss
 use_dist_term: True                     # Use the distance term for the loss
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
@@ -60,13 +60,14 @@ start_lr: 1e-5                  # Learning Rate after warmup at the beginning of
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
 
-batch_size: 8                 # Training batch size
+batch_size: 64                 # Training batch size
 grad_clip: 1.0                 # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 200                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: True                     # Perform kfold cross validation
+knn_with_train: False 
 
 save_interval: 50                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 50      # Embedding save interval

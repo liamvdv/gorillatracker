@@ -14,10 +14,6 @@ dependencies:
   - torchvision=0.19.0.dev20240605
   - wandb
   - lightning
-  - transformers
-  - tokenizers
-  - datasets
-  - evaluate
   - accelerate
   - sentencepiece
   - faiss-cpu
@@ -47,7 +43,7 @@ dependencies:
   - black
   - ruff
   - isort
-  - mypy=1.10.0
+  - mypy
   - pytest
   - typer
   - ipywidgets

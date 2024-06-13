@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Type
 
 import numpy as np
 import torch.ao.quantization
@@ -11,23 +11,23 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
 from torch._export import capture_pre_autograd_graph
+from torch.ao.quantization import allow_exported_model_train_eval  # type: ignore
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
 from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
 from gorillatracker.quantization.utils import get_model_input
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.utils.train import ModelConstructor
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 def train_and_validate_model(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
+    dm: NletDataModule,
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
@@ -61,10 +61,8 @@ def train_and_validate_model(
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
         logger.info("Validation before training...")
-        val_result = trainer.validate(model, dm)
-        for elem in val_result:
-            wandb.log(elem)
-        print(val_result)
+        wandb.log({"trainer/global_step": 0})  # HACK: to make sure the global_step is logged before the validation
+        trainer.validate(model, dm)
         if args.only_val:
             return model, trainer
     logger.info("Starting training...")
@@ -88,28 +86,37 @@ def train_and_validate_model(
 
 def train_and_validate_using_kfold(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],  # TODO: incorrect type hint
-    model_cls: type,
+    dm: NletDataModule,
+    model_cls: Type[BaseModule],
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     wandb_logging_module: WandbLoggingModule,
     embeddings_logger_callback: LogEmbeddingsToWandbCallback,
 ) -> Trainer:
+    # TODO(memben):!!! Fix kfold_k
 
+    dataloader_name = dm.get_dataset_class_names()[0]
     current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
-    dm.k = kfold_k  # type: ignore
 
-    for i in range(kfold_k):
-        logger.info(f"Rank {current_process_rank} | k-fold iteration {i+1} / {kfold_k}")
-        dm.val_fold = i  # type: ignore
-        embeddings_logger_callback.kfold_k = i
+    # Inject kfold_k into the datamodule TODO(memben): is there a better way?
+    dm.kwargs["k"] = kfold_k
+
+    for val_i in range(kfold_k):
+        logger.info(f"Rank {current_process_rank} | k-fold iteration {val_i+1} / {kfold_k}")
+
+        # Inject val_i into the datamodule  TODO(memben): is there a better way?
+        dm.kwargs["val_i"] = val_i
+
+        kfold_prefix = f"fold-{val_i}"
+
+        embeddings_logger_callback.kfold_k = val_i
         model_constructor = ModelConstructor(args, model_cls, dm)
         model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
-        model_kfold.kfold_k = i
+        model_kfold.kfold_k = val_i
 
         early_stopping_callback = EarlyStopping(
-            monitor=f"fold-{i}/val/loss/dataloader_0",
+            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
             mode="min",
             min_delta=args.min_delta,
             patience=args.early_stopping_patience,
@@ -117,7 +124,7 @@ def train_and_validate_using_kfold(
 
         checkpoint_callback = ModelCheckpoint(
             filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-            monitor=f"fold-{i}/val/loss/dataloader_0",
+            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
             mode="min",
             auto_insert_metric_name=False,
             every_n_epochs=int(args.save_interval),
@@ -129,7 +136,6 @@ def train_and_validate_using_kfold(
             model_kfold,
             [checkpoint_callback, *callbacks, early_stopping_callback],
             wandb_logger,
-            f"_fold_{i}",
         )
 
     if args.kfold and not args.fast_dev_run:
@@ -140,20 +146,20 @@ def train_and_validate_using_kfold(
 
 def train_using_quantization_aware_training(
     args: TrainingArgs,
-    dm: Union[SSLDataModule, NletDataModule],
+    dm: NletDataModule,
     model: BaseModule,
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     checkpoint_callback: ModelCheckpoint,
 ) -> Tuple[BaseModule, Trainer]:
     logger.info("Preperation for quantization aware training...")
-    example_inputs, _ = get_model_input(dm.dataset_class, str(args.data_dir), amount_of_tensors=100)  # type: ignore
+    example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=100)  # type: ignore
     example_inputs = (example_inputs,)  # type: ignore
-    model.model = capture_pre_autograd_graph(model.model, example_inputs)
+    autograd_graph = capture_pre_autograd_graph(model.model, example_inputs)
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
-    model.model = prepare_qat_pt2e(model.model, quantizer)  # type: ignore
+    model.model = prepare_qat_pt2e(autograd_graph, quantizer)
 
-    torch.ao.quantization.allow_exported_model_train_eval(model.model)  # type: ignore
+    allow_exported_model_train_eval(model.model)
 
     torch.use_deterministic_algorithms(True, warn_only=True)
     model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
@@ -187,16 +193,22 @@ def kfold_averaging(wandb_logger: WandbLogger) -> None:
     # Step 1: Extract metrics by fold and group them
     for key, value in metrics:
         if isinstance(value, (int, float)):
-            base_key = "/".join(key.split("/")[1:])
-            aggregated_metrics[base_key].append(value)
+            base_keys = key.split("/")
+            base_key: str
+            if "fold" in base_keys[1]:
+                base_key = f"{base_keys[0]}/{'/'.join(base_keys[2:])}"  # remove fold from key
+            else:
+                continue  # skip metrics that do not fit the pattern
+            aggregated_metrics[f"aggregated/{base_key}"].append(value)
 
     # Step 2: Compute averages
     average_metrics = {}
     for key, values in aggregated_metrics.items():
+        if "pca" in key or "tsne" in key:  # skip pca and tsne metrics as we cannot average them
+            continue
         average_metrics[key] = np.mean(values)
 
-    wandb.log(average_metrics)
-    print(average_metrics)
+    wandb.log(average_metrics, commit=True)
 
 
 def save_model(
