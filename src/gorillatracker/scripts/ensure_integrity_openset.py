@@ -7,6 +7,7 @@ The exact same applies to the val set.
 import logging
 import os
 import shutil
+from pathlib import Path
 from typing import List, Literal, Set, Tuple
 
 import regex as re
@@ -166,7 +167,7 @@ def ensure_integrity_openset(
 if __name__ == "__main__":
     bristol_split_dir = str(
         generate_split(
-            dataset="ground_truth/bristol/full_images",
+            dataset_dir=Path("data/ground_truth/bristol/full_images"),
             mode="openset",
             seed=69,
         )

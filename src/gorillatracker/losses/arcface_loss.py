@@ -20,7 +20,6 @@ class FocalLoss(torch.nn.Module):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         # assert len(alphas) == len(target), "Alphas must be the same length as the target"
-
         logpt = -self.ce(input, target)
         pt = torch.exp(logpt)
         loss = -((1 - pt) ** self.gamma) * logpt
@@ -73,7 +72,7 @@ class ArcFaceLoss(torch.nn.Module):
         tmp_rng = torch.Generator(device=accelerator)
         torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
         self.ce: Union[FocalLoss, torch.nn.CrossEntropyLoss]
-        if not use_focal_loss:
+        if use_focal_loss:
             self.ce = FocalLoss(num_classes=num_classes, label_smoothing=label_smoothing, *args, **kwargs)  # type: ignore
         else:
             self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=label_smoothing)
@@ -81,7 +80,11 @@ class ArcFaceLoss(torch.nn.Module):
         self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: torch.Tensor = torch.Tensor(),
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
         embeddings = embeddings.to(self.accelerator)
@@ -91,7 +94,7 @@ class ArcFaceLoss(torch.nn.Module):
         # NOTE(rob2u): necessary for range 0:n-1
         # get class frequencies
         class_freqs = torch.ones_like(labels)
-        if self.class_distribution is not None:
+        if self.use_class_weights:
             class_freqs = torch.tensor([self.class_distribution[label.item()] for label in labels]).to(
                 embeddings.device
             )
@@ -101,7 +104,11 @@ class ArcFaceLoss(torch.nn.Module):
         labels_transformed: List[int] = self.le.encode_list(labels.tolist())
         labels = torch.tensor(labels_transformed).to(embeddings.device)
 
-        cos_theta = torch.einsum("bj,knj->bnk", embeddings, self.prototypes)  # batch x num_classes x k_subcenters
+        cos_theta = torch.einsum(
+            "bj,knj->bnk",
+            torch.nn.functional.normalize(embeddings, dim=-1),
+            torch.nn.functional.normalize(self.prototypes, dim=-1),
+        )  # batch x num_classes x k_subcenters
 
         sine_theta = torch.sqrt(
             torch.maximum(
@@ -123,8 +130,8 @@ class ArcFaceLoss(torch.nn.Module):
         output *= self.s
         output = torch.mean(output, dim=2)  # batch x num_classes
 
-        assert not any(torch.flatten(torch.isnan(phi))), "NaNs in phi"
-        loss = self.ce(output, labels)
+        assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
+        loss = self.ce(output, labels) if len(labels_onehot) == 0 else self.ce(output, labels_onehot)
         if self.use_class_weights:
             loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
@@ -132,10 +139,12 @@ class ArcFaceLoss(torch.nn.Module):
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
         return loss, torch.Tensor([-1.0]), torch.Tensor([-1.0])  # dummy values for pos/neg distances
 
-    def set_weights(self, weights: torch.Tensor) -> None:
+    def update(self, weights: torch.Tensor, num_classes: int, le: LinearSequenceEncoder) -> None:
         """Sets the weights of the prototypes"""
+        self.num_classes = num_classes
+        self.le = le
+
         weights = weights.unsqueeze(0)
-        assert weights.shape == self.prototypes.shape
 
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
             weights = weights.cuda()
@@ -150,7 +159,11 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         self.is_eval = False
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: torch.Tensor = torch.Tensor(),
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         angle_margin = torch.Tensor([self.angle_margin]).to(embeddings.device)
         if not self.is_eval:
@@ -163,6 +176,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         return super().forward(
             embeddings,
             labels,
+            labels_onehot=labels_onehot,
         )
 
     def eval(self) -> Any:
@@ -180,7 +194,11 @@ class AdaFaceLoss(ArcFaceLoss):
         self.norm = torch.nn.BatchNorm1d(1, affine=False, momentum=momentum).to(kwargs.get("accelerator", "cpu"))
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: torch.Tensor = torch.Tensor(),
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         if self.norm.running_mean.device != embeddings.device:  # type: ignore
             self.norm = self.norm.to(embeddings.device)
@@ -195,7 +213,7 @@ class AdaFaceLoss(ArcFaceLoss):
             self.cos_m = torch.cos(g_angle)
             self.sin_m = torch.sin(g_angle)
             self.additive_margin = g_additive
-        return super().forward(embeddings, labels, images)
+        return super().forward(embeddings, labels, labels_onehot=labels_onehot, **kwargs)
 
     def eval(self) -> Any:
         self.is_eval = True
@@ -255,6 +273,8 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
 
     def set_weights(self, weights: torch.Tensor) -> None:
         """Sets the weights of the prototypes"""
+        raise NotImplementedError("This method is not implemented for VariationalPrototypeLearning ask @rob2u for help")
+
         assert weights.shape == self.prototypes.shape
 
         if torch.cuda.is_available() and self.prototypes.device != weights.device:

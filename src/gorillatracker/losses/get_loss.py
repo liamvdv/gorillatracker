@@ -23,11 +23,11 @@ def get_loss(
 
     loss_module: Union[torch.nn.Module, None] = None
 
-    assert not kw_args.get("use_dist_term", False) or "softmax" in loss_mode, "distance term only for softmax loss"
-    assert kw_args["num_classes"] != -1 or "softmax" not in loss_mode, "num_classes must be set for softmax loss"
-    assert (
-        len(kw_args["class_distribution"]) > 0 or not kw_args["use_class_weights"]
-    ), "class_distribution must be set for class weights"
+    if "softmax" in loss_mode:
+        assert kw_args["num_classes"], "num_classes must be set for softmax loss"
+        assert (
+            len(kw_args["class_distribution"]) > 0 or not kw_args["use_class_weights"]
+        ), "class_distribution must be set for class weights"
 
     if loss_mode == "online/hard":
         loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])

@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 import torch
 import torch.nn.functional as F
@@ -195,8 +195,8 @@ class TripletLossOnline(nn.Module):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        images: torch.Tensor = torch.Tensor(),
         dist_calc: Callable[[torch.Tensor], torch.Tensor] = euclidean_distance_matrix,
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.
 
@@ -297,9 +297,7 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(
-        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
-    ) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, **kwargs: Any) -> gtypes.LossPosNegDist:
         """
         Compute loss.
 
@@ -333,9 +331,7 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(
-        self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, images: torch.Tensor = torch.Tensor()
-    ) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, **kwargs: Any) -> gtypes.LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]

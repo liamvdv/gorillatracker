@@ -1,5 +1,5 @@
 import random
-from itertools import groupby
+from collections import defaultdict
 from typing import Iterator, List
 
 from sqlalchemy import Select
@@ -18,12 +18,14 @@ class Sampler:
         """Sample a subset of TrackingFrameFeature instances from the database. Defined by query and sampling strategy."""
         return iter(session.execute(self.query).scalars().all())
 
-    def group_by_tracking_id(self, frame_features: list[TrackingFrameFeature]) -> dict[int, list[TrackingFrameFeature]]:
-        frame_features.sort(key=lambda x: x.tracking.tracking_id)
-        return {
-            tracking_id: list(features)
-            for tracking_id, features in groupby(frame_features, key=lambda x: x.tracking.tracking_id)
-        }
+    def group_by_tracking_id(
+        self, frame_features: list[TrackingFrameFeature]
+    ) -> defaultdict[int, list[TrackingFrameFeature]]:
+        grouped = defaultdict(list)
+        for feature in frame_features:
+            assert feature.tracking_id is not None
+            grouped[feature.tracking_id].append(feature)
+        return grouped
 
 
 class RandomSampler(Sampler):
