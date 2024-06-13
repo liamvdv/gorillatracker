@@ -206,8 +206,6 @@ if __name__ == "__main__":
         args.save_to_pickle()
         print("Split created and saved")
     else:
-        split_path = (
-            "/workspaces/gorillatracker/data/splits/SSL/SSL-dev10vid_2024-04-18_percentage-100-0-0_split_20240606_1452.pkl"
-        )
+        split_path = "/workspaces/gorillatracker/data/splits/SSL/SSL-dev10vid_2024-04-18_percentage-100-0-0_split_20240606_1452.pkl"
         args = SplitArgs.load_pickle(split_path)
     print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))
