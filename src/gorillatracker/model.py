@@ -866,15 +866,6 @@ class SwinV2LargeWrapper(BaseModule):
         self.set_losses(self.model, **kwargs)
 
     @classmethod
-    def get_tensor_transforms(cls):
-        return transforms.Compose(
-            [
-                transforms.Resize((224), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
