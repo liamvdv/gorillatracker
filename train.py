@@ -12,7 +12,6 @@ from torchvision.transforms import Compose, Normalize, Resize
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.builder import build_data_module
-from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.utils.train import (
@@ -95,20 +94,11 @@ def main(args: TrainingArgs) -> None:
     ################# Construct model ##############
 
     if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
-        model_constructor = ModelConstructor(args, model_cls, dm)
+        model_constructor = ModelConstructor(args, model_cls, dm, wandb_logger)
         model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
-
-    embeddings_logger_callback = LogEmbeddingsToWandbCallback(
-        every_n_val_epochs=args.embedding_save_interval,
-        knn_with_train=args.knn_with_train,
-        wandb_run=wandb_logger.experiment,
-        dm=dm,
-        use_quantization_aware_training=args.use_quantization_aware_training,
-        fast_dev_run=args.fast_dev_run,
-    )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
         cleanup_local=True, cleanup_online=False, size_limit=20
@@ -134,13 +124,11 @@ def main(args: TrainingArgs) -> None:
             wandb_disk_cleanup_callback,
             lr_monitor,
             early_stopping,
-            embeddings_logger_callback,
         ]
         if not args.kfold
         else [
             wandb_disk_cleanup_callback,
             lr_monitor,
-            embeddings_logger_callback,
         ]
     )
 
@@ -173,7 +161,6 @@ def main(args: TrainingArgs) -> None:
             callbacks=callbacks,
             wandb_logger=wandb_logger,
             wandb_logging_module=wandb_logging_module,
-            embeddings_logger_callback=embeddings_logger_callback,
         )
     elif args.use_quantization_aware_training:
         model, trainer = train_using_quantization_aware_training(

@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict, List, Literal, Tuple, Union
+from typing import Any, Dict, List, Literal, Tuple, Union, Optional
 
 import torch
 
@@ -83,7 +83,7 @@ class ArcFaceLoss(torch.nn.Module):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        labels_onehot: torch.Tensor = torch.Tensor(),
+        labels_onehot: Optional[torch.Tensor] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
@@ -131,7 +131,7 @@ class ArcFaceLoss(torch.nn.Module):
         output = torch.mean(output, dim=2)  # batch x num_classes
 
         assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
-        loss = self.ce(output, labels) if len(labels_onehot) == 0 else self.ce(output, labels_onehot)
+        loss = self.ce(output, labels) if labels_onehot is None else self.ce(output, labels_onehot)
         if self.use_class_weights:
             loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
