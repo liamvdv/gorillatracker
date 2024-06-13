@@ -71,5 +71,5 @@ data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-k
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 192
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
+additional_val_dataset_classes: []
+additional_val_data_dirs: []

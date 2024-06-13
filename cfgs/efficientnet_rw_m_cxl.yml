@@ -78,5 +78,6 @@ data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillat
 dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
 
 data_resize_transform: 224
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
+
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null
