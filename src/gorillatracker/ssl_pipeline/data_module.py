@@ -52,6 +52,7 @@ class SSLDataModule(L.LightningDataModule):
                 transform=transforms.Compose([self.transforms, self.training_transforms]),
                 ssl_config=self.ssl_config,
             )
+            print(len(self.train))
             self.setup_val()
         elif stage == "test":
             raise NotImplementedError("test not yet supported by data module.")
