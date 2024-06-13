@@ -104,7 +104,7 @@ class TrainingArgs:
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
     label_smoothing: float = field(default=0.0)
-    use_class_weights: Union[List[float], None] = field(default=None)
+    use_class_weights: bool = field(default=False)
     use_dist_term: bool = field(default=False)
 
     batch_size: int = field(default=8)

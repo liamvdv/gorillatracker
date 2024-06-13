@@ -212,7 +212,7 @@ class BaseModule(L.LightningModule):
             delta_t=delta_t,
             s=s,
             num_classes=num_classes[0],
-            class_distribution=class_distribution[0],
+            class_distribution=class_distribution[0] if len(class_distribution) > 0 else {},
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -237,7 +237,7 @@ class BaseModule(L.LightningModule):
             delta_t=delta_t,
             s=s,
             num_classes=num_classes[1],
-            class_distribution=class_distribution[1],
+            class_distribution=class_distribution[1] if len(class_distribution) > 1 else {},
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
             accelerator=accelerator,
@@ -907,7 +907,7 @@ class SwinV2LargeWrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        swin_model = "swinv2_large_window12_192.ms_in22k"
+        swin_model = "swinv2_large_window12to16_192to256.ms_in22k_ft_in1k"
         self.model = (
             timm.create_model(swin_model, pretrained=False)
             if kwargs.get("from_scratch", False)
@@ -928,7 +928,7 @@ class SwinV2LargeWrapper(BaseModule):
     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.Resize((192), antialias=True),
+                transforms.Resize((224), antialias=True),
                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
@@ -940,7 +940,7 @@ class SwinV2LargeWrapper(BaseModule):
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
