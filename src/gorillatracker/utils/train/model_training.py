@@ -18,7 +18,6 @@ from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, 
 from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import BaseModule
 from gorillatracker.quantization.utils import get_model_input
 from gorillatracker.utils.train import ModelConstructor
@@ -91,7 +90,6 @@ def train_and_validate_using_kfold(
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     wandb_logging_module: WandbLoggingModule,
-    embeddings_logger_callback: LogEmbeddingsToWandbCallback,
 ) -> Trainer:
     # TODO(memben):!!! Fix kfold_k
 
@@ -110,8 +108,7 @@ def train_and_validate_using_kfold(
 
         kfold_prefix = f"fold-{val_i}"
 
-        embeddings_logger_callback.kfold_k = val_i
-        model_constructor = ModelConstructor(args, model_cls, dm)
+        model_constructor = ModelConstructor(args, model_cls, dm, wandb_logger)
         model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
         model_kfold.kfold_k = val_i
 

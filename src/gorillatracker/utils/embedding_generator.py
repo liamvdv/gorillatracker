@@ -68,6 +68,9 @@ def load_model_from_wandb(
     checkpoint = torch.load(model, map_location=torch.device("cpu"))
     model_state_dict = checkpoint["state_dict"]
 
+    model_config["num_classes"] = [0] * 3  # HACK
+    model_config["class_distribution"] = [{}] * 3  # HACK
+
     model = model_cls(**model_config)
 
     if (
@@ -123,6 +126,24 @@ def get_model_for_run_url(run_url: str, eval_mode: bool = True) -> BaseModule:
             "l2_alpha",
             "l2_beta",
             "path_to_pretrained_weights",
+            "num_classes",
+            "class_distribution",
+            "num_val_dataloaders",
+            "dropout_p",
+            "accelerator",
+            "use_wildme_model",
+            "k_subcenters",
+            "use_focal_loss",
+            "label_smoothing",
+            "use_class_weights",
+            "margin",
+            "s",
+            "delta_t",
+            "mem_bank_start_epoch",
+            "lambda_membank",
+            "teacher_model_wandb_link",
+            "use_dist_term",
+            "batch_size",
             # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }

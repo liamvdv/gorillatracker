@@ -1,6 +1,5 @@
-from functools import partial
 from itertools import islice
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -20,128 +19,12 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
 Runner = Any
 
 
-class LogEmbeddingsToWandbCallback(L.Callback):
-    """
-    A pytorch lightning callback that saves embeddings to wandb and logs them.
-
-    Args:
-        every_n_val_epochs: Save embeddings every n epochs as a wandb artifact (of validation set).
-        log_share: Log embeddings to wandb every n epochs.
-    """
-
-    def __init__(
-        self,
-        every_n_val_epochs: int,
-        knn_with_train: bool,
-        wandb_run: Runner,
-        dm: NletDataModule,
-        use_quantization_aware_training: bool = False,
-        fast_dev_run: bool = False,
-    ) -> None:
-        super().__init__()
-        self.embedding_artifacts: List[str] = []
-        self.every_n_val_epochs = every_n_val_epochs
-        self.knn_with_train = knn_with_train
-        self.run = wandb_run
-        self.dm = dm
-        self.use_quantization_aware_training = use_quantization_aware_training
-        self.kfold_k: Optional[int] = None
-        self.fast_dev_run = fast_dev_run
-
-    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
-        assert trainer.model is not None, "Model must be initalized before validation phase."
-        train_embedding_batches = []
-        train_labels = torch.tensor([])
-        for batch in self.dm.train_dataloader():
-            batch_size = lazy_batch_size(batch)
-            _, flat_images, flat_labels = flatten_batch(batch)
-            anchor_labels = flat_labels[:batch_size]
-            anchor_images = flat_images[:batch_size].to(trainer.model.device)
-            embeddings = trainer.model(anchor_images)
-            train_embedding_batches.append(embeddings)
-            train_labels = torch.cat([train_labels, anchor_labels], dim=0)
-        train_embeddings = torch.cat(train_embedding_batches, dim=0)
-        assert len(train_embeddings) == len(train_labels)
-        return train_embeddings.cpu(), train_labels.cpu()
-
-    def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        embeddings_table_list = pl_module.embeddings_table_list
-        current_step = trainer.global_step
-
-        assert trainer.max_epochs is not None
-        for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
-            dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
-            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
-            artifact = wandb.Artifact(
-                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_name),
-                type="embeddings",
-                metadata={"step": current_step},
-                description="Embeddings from step {}".format(current_step),
-            )
-            artifact.add(table, "embeddings_table_step_{}".format(current_step))
-            self.run.log_artifact(artifact)
-            self.embedding_artifacts.append(artifact.name)
-
-            train_embeddings, train_labels = (
-                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-            )
-
-            metrics = {
-                "knn5": partial(knn, k=5),
-                "knn": partial(knn, k=1),
-                "knn5_macro": partial(knn, k=5, average="macro"),
-                "knn_macro": partial(knn, k=1, average="macro"),
-                "pca": pca,
-                "tsne": tsne,
-                # "fc_layer": fc_layer,
-            }
-            metrics |= (
-                {
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                    "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
-                    "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
-                }
-                if self.knn_with_train
-                else {}
-            )
-            metrics = metrics if not self.fast_dev_run else {}
-
-            # log to wandb
-            evaluate_embeddings(
-                data=embeddings_table,
-                embedding_name="val/embeddings",
-                metrics=metrics,
-                train_embeddings=train_embeddings,
-                train_labels=train_labels,
-                kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
-                dataloader_name=dataloader_name,
-            )
-            # clear the table where the embeddings are stored
-            # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
-
-    def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        log_train_images_to_wandb(self.run, trainer, n_samples=1)
-
-    def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        if trainer.model.dtype == torch.float32 and not self.use_quantization_aware_training:  # type: ignore
-            log_grad_cam_images_to_wandb(self.run, trainer)
-
-
-# now add stuff to evaluate the embeddings / the model that created the embeddings
-# 1. add a fully connected layer to the model that takes the embeddings as input and outputs the labels -> then train this model -> evaluate false positive, false negative, accuracy, ...)
-# 2. use different kinds of clustering algorithms to cluster the embeddings -> evaluate (false positive, false negative, accuracy, ...)
-# 3. use some kind of FLDA ({(m_1 - m_2)^2/(s_1^2 + s_2^2)} like metric to evaluate the quality of the embeddings
-# 4. try kNN with different k values to evaluate the quality of the embeddings
-# 5. enjoy
 def load_embeddings_from_wandb(embedding_name: str, run: Runner) -> pd.DataFrame:
     """Load embeddings from wandb Artifact."""
     # Data is a pandas Dataframe with columns: label, embedding_0, embedding_1, ... loaded from wandb from the
@@ -167,13 +50,15 @@ def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples
     return samples
 
 
-def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 1) -> None:
+def log_train_images_to_wandb(
+    run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1
+) -> None:
     """
     Log nlet images from the train dataloader to wandb.
     Visual sanity check to see if the dataloader works as expected.
     """
     # get first n_samples triplets from the train dataloader
-    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=n_samples)  # type: ignore
+    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=n_samples)
     for i, sample in enumerate(samples):
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
         row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
@@ -186,18 +71,20 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
         run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
 
 
-def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
+@torch.enable_grad()  # type: ignore
+def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet]) -> None:
     # NOTE(liamvdv): inverse grad cam support to model since we might not be using
     #                a model which grad cam does not support.
     # NOTE(liamvdv): Transform models may have different interpretations.
     assert trainer.model is not None, "Must only call log_grad_cam_images... after model was initialized."
+
     if not hasattr(trainer.model, "get_grad_cam_layer"):
         return
     target_layer = trainer.model.get_grad_cam_layer()
     get_reshape_transform = getattr(trainer.model, "get_grad_cam_reshape_transform", lambda: None)
     cam = GradCAM(model=trainer.model, target_layers=[target_layer], reshape_transform=get_reshape_transform())
 
-    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=1)  # type: ignore
+    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=1)
     wandb_images: List[wandb.Image] = []
     for sample in samples:
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
