@@ -151,19 +151,21 @@ def _get_crossvideo_masks(
     classification_mask = torch.zeros(len(labels))
 
     individual_video_ids_per_individual = defaultdict(set)
+    transformed_ids = [Path(id).name for id in ids]
+    transformed_ids = ["".join(id.split("_")[:3]).upper() for id in transformed_ids]
     for i, id in enumerate(ids):
         id = Path(id).name
-        individual_video_id = "".join(id.split("_")[:3])  # individual + camera + date
+        individual_video_id = "".join(id.split("_")[:3]).upper()  # individual + camera + date
         distance_mask[i] = torch.tensor(
-            [individual_video_id != "".join(str(Path(id_x).name).split("_")[:3]) for id_x in ids]
+            [individual_video_id != vi_id for vi_id in transformed_ids]
         )  # 1 if not same video, 0 if same video
 
-        individual_video_ids_per_individual[id.split("_")[0]].add(individual_video_id)
+        individual_video_ids_per_individual[id.split("_")[0].upper()].add(individual_video_id)
 
     for i, id in enumerate(ids):
         id = Path(id).name
-        individual_video_id = "".join(id.split("_")[:3])
-        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0]]) > 1
+        individual_video_id = "".join(id.split("_")[:3]).upper()
+        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0].upper()]) > 1
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
 
@@ -186,8 +188,8 @@ def knn(
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
 
-    assert (
-        all(["CXL" in row["dataset"] for _, row in data.iterrows()]) or not use_crossvideo_positives
+    assert not use_crossvideo_positives or all(
+        ["CXL" in row["dataset"] for _, row in data.iterrows()]
     ), "Crossvideo positives can only be used with CXL datasets"
 
     # convert embeddings and labels to tensors
@@ -232,7 +234,7 @@ def knn(
     # Select only the validation part of the classification matrix
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
 
-    if use_crossvideo_positives:  # remove all with only one indivdual_video_id
+    if use_crossvideo_positives:  # remove all with only one individual_video_id
         val_classification_matrix = val_classification_matrix[classification_mask]
         val_labels = val_labels[classification_mask]
 
