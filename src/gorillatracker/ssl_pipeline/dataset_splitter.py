@@ -8,7 +8,7 @@ from typing import Literal, Union
 
 import dill as pickle
 from simple_parsing import field
-from sqlalchemy import Select, create_engine, func
+from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import gorillatracker.ssl_pipeline.video_filter_queries as vq
