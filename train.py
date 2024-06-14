@@ -108,6 +108,7 @@ def main(args: TrainingArgs) -> None:
         dm=dm,
         use_quantization_aware_training=args.use_quantization_aware_training,
         fast_dev_run=args.fast_dev_run,
+        knn_ssl=args.use_ssl
     )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(

@@ -11,8 +11,8 @@ workers: 40                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-SwinV2-SSL-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "379-use-ssl-split-face_45_90" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-SwinV2-SSL-VAL-TEST" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "376-ssl-val-first-test" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["baseline"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2Base"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -59,7 +59,7 @@ end_lr: 1e-7                    # End learning rate (for the learning rate sched
 batch_size: 128                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 10                  # Training goal (large number)
+max_epochs: 2                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -71,12 +71,12 @@ knn_with_train: False
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
-split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-100-0-0_split.pkl"
+split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-dev10-10-10_2024-04-18_percentage-80-10-10_split_20240614_0931.pkl"
 feature_types: ["face_45", "face_90"]
 
 data_resize_transform: 192
 
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+additional_val_dataset_classes: []
+additional_val_data_dirs: []
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"

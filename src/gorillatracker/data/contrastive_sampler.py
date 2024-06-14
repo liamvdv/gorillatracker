@@ -62,6 +62,13 @@ class ContrastiveSampler(ABC):
     def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
         """Return all possible negative labels for a sample"""
         pass
+    
+    # HACK(memben): ...
+    def find_any_image(self, label: Label) -> ContrastiveImage:
+        for image in self:
+            if image.class_label == label:
+                return image
+        raise ValueError(f"No image found for label {label}")
 
 
 class ContrastiveClassSampler(ContrastiveSampler):

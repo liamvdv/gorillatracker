@@ -12,6 +12,8 @@ import sklearn
 import torch
 import torchmetrics as tm
 import wandb
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import accuracy_score, f1_score, precision_score
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
@@ -43,6 +45,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         knn_with_train: bool,
         wandb_run: Runner,
         dm: NletDataModule,
+        knn_ssl: bool = False,
         use_quantization_aware_training: bool = False,
         fast_dev_run: bool = False,
     ) -> None:
@@ -50,6 +53,7 @@ class LogEmbeddingsToWandbCallback(L.Callback):
         self.embedding_artifacts: List[str] = []
         self.every_n_val_epochs = every_n_val_epochs
         self.knn_with_train = knn_with_train
+        self.knn_ssl = knn_ssl
         self.run = wandb_run
         self.dm = dm
         self.use_quantization_aware_training = use_quantization_aware_training
@@ -105,14 +109,25 @@ class LogEmbeddingsToWandbCallback(L.Callback):
             }
             metrics |= (
                 {
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                    "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
-                    "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
+                    "knn5-with-train": partial(knn, k=5, type = "with_train"),
+                    "knn-with-train": partial(knn, k=1, type = "with_train"),
+                    "knn5-with-train_macro": partial(knn, k=5, type = "with_train", average="macro"),
+                    "knn-with-train_macro": partial(knn, k=1, type = "with_train", average="macro"),
                 }
                 if self.knn_with_train
                 else {}
             )
+            if(self.knn_ssl):
+                metrics = (
+                    {
+                        "knn5-ssl": partial(knn, k=5, type = "ssl", dm=self.dm),
+                        "knn-ssl": partial(knn, k=1, type = "ssl", dm=self.dm),
+                        "knn5-ssl_macro": partial(knn, k=5, type = "ssl", average="macro", dm=self.dm),
+                        "knn-ssl_macro": partial(knn, k=1, type = "ssl", average="macro", dm=self.dm),
+                        "pca": pca,
+                        "tsne": tsne,
+                    }
+                )
             metrics = metrics if not self.fast_dev_run else {}
 
             # log to wandb
@@ -273,7 +288,9 @@ def knn(
     le = LinearSequenceEncoder()
     val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
 
-    if type == "with_train":
+    if type == "naive":
+        return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
+    elif type == "with_train":
         train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))  # type: ignore
         # print("Using train embeddings for knn")
         return knn_with_train(
@@ -284,11 +301,9 @@ def knn(
             train_labels=train_labels_encoded,
             average=average,
         )
-    elif type == "naive":
-        return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
     elif type == "ssl":
-        #TODO:knn_ssl(val_embeddings, val_labels, k=k, average=average, dm=dm)
-        pass
+        assert dm is not None, "DataModule must be provided for ssl knn"
+        return knn_ssl(val_embeddings, val_labels, k=k, average=average, dm=dm)
     else:
         raise ValueError(f"Unknown type {type}")
 
@@ -445,6 +460,62 @@ def knn_naive(
         "f1": f1.item(),
         "precision": precision.item(),
     }
+    
+    
+def knn_ssl(embeddings: torch.Tensor, labels: torch.Tensor, k:int, average: Literal["micro", "macro", "weighted", "none"], dm: NletDataModule) -> Dict[str, Any]:
+    print (dm.dataset_class)
+    print(dm.val)
+    negatives = {}
+    true_labels = []
+    pred_labels = []
+    pred_labels_top5 = []
+    
+    en = LinearSequenceEncoder()
+    labels = torch.tensor(en.encode_list(labels.tolist()))
+    current_val_index = 0
+    for label in labels.unique():
+        decoded_label = en.decode(label.item())
+        image = dm.val[current_val_index].contrastive_sampler.find_any_image(decoded_label)
+        negative_labels = dm.val[current_val_index].contrastive_sampler.negative_classes(image)
+        negatives[label.item()] = en.encode_list(negative_labels)
+    
+    for label in labels.unique():
+        subset_labels = negatives[label.item()] + [label.item()]
+        if(len(subset_labels) < 2):
+            continue
+        subset_mask = torch.isin(labels,torch.tensor(subset_labels))
+        subset_embeddings = embeddings[subset_mask]
+        subset_label_values = labels[subset_mask]
+        knn = NearestNeighbors(n_neighbors=max(5,k)+1,algorithm='auto').fit(subset_embeddings.numpy())
+        current_label_mask = (subset_label_values == label.item())
+        current_label_embeddings = subset_embeddings[current_label_mask]
+        distances, indices = knn.kneighbors(current_label_embeddings.numpy())
+        distances = distances[:, 1:]
+        indices = indices[:, 1:]
+        for idx_list in indices:
+            neighbor_labels = subset_label_values[idx_list]
+            most_common = torch.mode(neighbor_labels[:k]).values.item()
+            true_labels.append(label.item())
+            pred_labels.append(most_common)
+            pred_labels_top5.append(neighbor_labels[:5].numpy())
+                    
+    true_labels = torch.tensor(true_labels)
+    pred_labels = torch.tensor(pred_labels)
+    
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
+    top5_correct = []
+    for i, true_label in enumerate(true_labels):
+        if true_label in pred_labels_top5_tensor[i]:
+            top5_correct.append(1)
+        else:
+            top5_correct.append(0)
+    top5_accuracy = sum(top5_correct) / len(top5_correct)
+
+    accuracy = accuracy_score(true_labels, pred_labels)
+    f1 = f1_score(true_labels, pred_labels, average=average)
+    precision = precision_score(true_labels, pred_labels, average=average,zero_division=0)
+    
+    return {'accuracy': accuracy, 'accuracy_top5': top5_accuracy, 'f1': f1, 'precision': precision}
 
 
 def pca(
