@@ -1,0 +1,28 @@
+{
+    "global": {
+        "run_name": "332-use-student-teacher-distillation-and-efficient-net",
+        "use_quantization_aware_training": false,
+        "max_epochs": 40,
+        "early_stopping_patience": 6,
+        "embedding_size": 256,
+        "data_resize_transform": 192
+    },
+    "experiments": [
+        {
+            "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
+            "parameters": {
+                "wandb_tags": [
+                    "non-kfold",
+                    "distillation/offline/response-based"
+                ],
+                "loss_mode": "distillation/offline/response-based",
+                "teacher_model_wandb_link": "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/y94y8uu7?nw=nwuserkajohpi",
+                "from_scratch": true,
+                "initial_lr": 1e-4,
+                "start_lr": 1e-4,
+                "end_lr": 1e-4
+            }
+        }
+    ]
+}

@@ -289,7 +289,7 @@ class BaseModule(L.LightningModule):
             k_subcenters=1,
             use_class_weights=use_class_weights,
             use_dist_term=use_dist_term,
-            teacher_model_wand_link=kwargs.get("teacher_model_wandb_link", ""),
+            teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -699,7 +699,7 @@ class EfficientNetRW_M(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
                 # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
                 # transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
             ]
@@ -963,7 +963,7 @@ class SwinV2LargeWrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        swin_model = "swinv2_large_window12_192.ms_in22k"
+        swin_model = "swinv2_large_window12to16_192to256.ms_in22k_ft_in1k"
         self.model = (
             timm.create_model(swin_model, pretrained=False)
             if kwargs.get("from_scratch", False)
@@ -987,7 +987,7 @@ class SwinV2LargeWrapper(BaseModule):
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
