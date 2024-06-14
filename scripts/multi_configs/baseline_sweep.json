@@ -73,6 +73,11 @@
             "project_name": "Embedding-SwinV2Large-CXL-Open",
             "config_path": "./cfgs/swinv2_cxl.yml",
             "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ViT-CXL-OpenSet",
+            "config_path": "./cfgs/visiontransformer_cxl.yml",
+            "parameters": {}
         }
     ]
 }

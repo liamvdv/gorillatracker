@@ -39,7 +39,7 @@ def run_experiment(
             "method": "bayes",  # Specify the search method (random search in this case)
             "metric": {
                 "goal": "maximize",
-                "name": "val/embeddings/knn/dataloader_0/accuracy",
+                "name": "CXLDataset/val/embeddings/knn/accuracy",
             },  # Specify the metric to optimize
             "parameters": sweep_parameters,
             "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path, *params_array],
