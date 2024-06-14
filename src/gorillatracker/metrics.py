@@ -100,7 +100,7 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataload
     run.log({"Grad-CAM": wandb_images})
 
 
-def get_partition_from_dataframe(data: pd.DataFrame, partition: Literal["val", "train"] = "val") -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, List[gtypes.Id]]:
+def get_partition_from_dataframe(data: pd.DataFrame, partition: Literal["val", "train"] = "val") -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id]]:
     partition_df = data.where(data["partition"] == partition).dropna()
     partition_labels = torch.tensor(partition_df["label"].tolist()).long()
     partition_embeddings = np.stack(partition_df["embedding"].apply(np.array)).astype(np.float32)
@@ -140,11 +140,17 @@ def evaluate_embeddings(
     return results
 
 
+def _get_crossvideo_mask(labels: torch.Tensor, ids: list[gtypes.Id]) -> torch.Tensor: # TODO: Add type hints
+    mask = torch.ones((len(labels), len(labels)))
+    return mask
+
+
 def knn(
     data: pd.DataFrame,
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
     use_train_embeddings: bool = False,
+    use_crossvideo_positives: bool = False,
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -157,7 +163,7 @@ def knn(
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
     # convert embeddings and labels to tensors
-    _, val_labels, val_embeddings, _ = get_partition_from_dataframe(data, partition="val")
+    _, val_labels, val_embeddings, val_ids = get_partition_from_dataframe(data, partition="val")
     train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])
     if use_train_embeddings:
         _, train_labels, train_embeddings, _ = get_partition_from_dataframe(data, partition="train")
@@ -171,8 +177,11 @@ def knn(
         k = num_classes
 
     distance_matrix = pairwise_euclidean_distance(combined_embeddings)
-
     distance_matrix.fill_diagonal_(float("inf"))
+    
+    if use_crossvideo_positives:
+        mask = _get_crossvideo_mask(combined_labels, val_ids)
+        distance_matrix = distance_matrix * mask
 
     _, closest_indices = torch.topk(
         distance_matrix,
@@ -224,73 +233,6 @@ def knn(
         "f1": f1.item(),
         "precision": precision.item(),
     }
-
-
-# def knn_naive(
-#     data: pd.DataFrame,
-#     average: Literal["micro", "macro", "weighted", "none"],
-#     k: int = 5,
-# ) -> Dict[str, Any]:
-#     _, val_labels, val_embeddings, _ = get_partition_from_dataframe(data, partition="val")
-    
-#     num_classes = len(torch.unique(val_labels))
-#     if num_classes < k:
-#         print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
-#         k = num_classes
-
-#     # convert embeddings and labels to tensors
-#     val_embeddings = val_embeddings.clone().detach()
-#     val_labels = torch.tensor(val_labels.tolist())
-
-#     distance_matrix = pairwise_euclidean_distance(val_embeddings)
-
-#     # Ensure distances on the diagonal are set to a large value so they are ignored
-#     distance_matrix.fill_diagonal_(float("inf"))
-
-#     # Find the indices of the closest embeddings for each embedding
-#     classification_matrix = torch.zeros((len(val_embeddings), k))
-
-#     _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True)
-#     assert closest_indices.shape == (len(val_embeddings), k)
-
-#     closest_labels = val_labels[closest_indices]
-#     assert closest_labels.shape == closest_indices.shape
-
-#     classification_matrix = torch.zeros((len(val_embeddings), num_classes))
-#     for i in range(num_classes):
-#         classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
-#     assert classification_matrix.shape == (len(val_embeddings), num_classes)
-
-#     accuracy = tm.functional.accuracy(
-#         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
-#     )
-#     assert accuracy is not None
-#     accuracy_top5 = tm.functional.accuracy(
-#         classification_matrix,
-#         val_labels,
-#         task="multiclass",
-#         num_classes=num_classes,
-#         top_k=5 if num_classes >= 5 else num_classes,
-#     )
-#     assert accuracy_top5 is not None
-#     auroc = tm.functional.auroc(classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
-#     assert auroc is not None
-#     f1 = tm.functional.f1_score(
-#         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
-#     )
-#     assert f1 is not None
-#     precision = tm.functional.precision(
-#         classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
-#     )
-#     assert precision is not None
-
-#     return {
-#         "accuracy": accuracy.item(),
-#         "accuracy_top5": accuracy_top5.item(),
-#         "auroc": auroc.item(),
-#         "f1": f1.item(),
-#         "precision": precision.item(),
-#     }
 
 
 def pca(
