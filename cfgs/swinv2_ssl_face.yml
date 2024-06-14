@@ -76,7 +76,7 @@ feature_types: ["face_45", "face_90"]
 
 data_resize_transform: 192
 
-additional_val_dataset_classes: []
-additional_val_data_dirs: []
+additional_val_dataset_classes: [gorillatracker.datasets.bristol.BristolDataset]
+additional_val_data_dirs: [/workspaces/gorillatracker/data/splits/bristol]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
