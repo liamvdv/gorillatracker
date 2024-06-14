@@ -1,4 +1,6 @@
+from collections import defaultdict
 from itertools import islice
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import lightning as L
@@ -100,35 +102,37 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataload
     run.log({"Grad-CAM": wandb_images})
 
 
-def get_partition_from_dataframe(data: pd.DataFrame, partition: Literal["val", "train"] = "val") -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id]]:
+def get_partition_from_dataframe(
+    data: pd.DataFrame, partition: Literal["val", "train"] = "val"
+) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id]]:
     partition_df = data.where(data["partition"] == partition).dropna()
     partition_labels = torch.tensor(partition_df["label"].tolist()).long()
     partition_embeddings = np.stack(partition_df["embedding"].apply(np.array)).astype(np.float32)
     partition_embeddings = torch.tensor(partition_embeddings)
     partition_ids = partition_df["id"].tolist()
-    
+
     return partition_df, partition_labels, partition_embeddings, partition_ids
 
-    
+
 def evaluate_embeddings(
-    data: pd.DataFrame, # columns: label, embedding, id, partition
+    data: pd.DataFrame,  # columns: label, embedding, id, partition
     embedding_name: str,
     metrics: Dict[str, Any],
     kfold_k: Optional[int] = None,
     dataloader_name: str = "Unknown",
 ) -> Dict[str, Any]:
-    
-    assert all([column in data.columns for column in ["label", "embedding", "id", "partition"]]) and len(data.columns) == 4, "Dataframe must have columns: label, embedding, id, partition. More are not allowed!"
-    
+
+    assert (
+        all([column in data.columns for column in ["label", "embedding", "id", "partition", "dataset"]])
+        and len(data.columns) == 5
+    ), "Dataframe must have columns: label, embedding, id, partition. More are not allowed!"
+
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
     le = LinearSequenceEncoder()
     data["label"] = data["label"].astype(int)
     data["label"] = le.encode_list(data["label"].tolist())
 
-    results = {
-        metric_name: metric(data)
-        for metric_name, metric in metrics.items()
-    }
+    results = {metric_name: metric(data) for metric_name, metric in metrics.items()}
 
     kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
     for metric_name, result in results.items():
@@ -140,9 +144,28 @@ def evaluate_embeddings(
     return results
 
 
-def _get_crossvideo_mask(labels: torch.Tensor, ids: list[gtypes.Id]) -> torch.Tensor: # TODO: Add type hints
-    mask = torch.ones((len(labels), len(labels)))
-    return mask
+def _get_crossvideo_masks(
+    labels: torch.Tensor, ids: list[gtypes.Id]
+) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
+    distance_mask = torch.zeros((len(labels), len(labels)))
+    classification_mask = torch.zeros(len(labels))
+
+    individual_video_ids_per_individual = defaultdict(set)
+    for i, id in enumerate(ids):
+        id = Path(id).name
+        individual_video_id = "".join(id.split("_")[:3])  # individual + camera + date
+        distance_mask[i] = torch.tensor(
+            [individual_video_id != "".join(str(Path(id_x).name).split("_")[:3]) for id_x in ids]
+        )  # 1 if not same video, 0 if same video
+
+        individual_video_ids_per_individual[id.split("_")[0]].add(individual_video_id)
+
+    for i, id in enumerate(ids):
+        id = Path(id).name
+        individual_video_id = "".join(id.split("_")[:3])
+        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0]]) > 1
+
+    return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
 
 
 def knn(
@@ -162,6 +185,11 @@ def knn(
     4. Select only the validation part of the classification matrix (len(val_embeddings) x num_classes)
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
+
+    assert (
+        all(["CXL" in row["dataset"] for _, row in data.iterrows()]) or not use_crossvideo_positives
+    ), "Crossvideo positives can only be used with CXL datasets"
+
     # convert embeddings and labels to tensors
     _, val_labels, val_embeddings, val_ids = get_partition_from_dataframe(data, partition="val")
     train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])
@@ -178,10 +206,12 @@ def knn(
 
     distance_matrix = pairwise_euclidean_distance(combined_embeddings)
     distance_matrix.fill_diagonal_(float("inf"))
-    
+
+    distance_mask: torch.Tensor
+    classification_mask: torch.Tensor
     if use_crossvideo_positives:
-        mask = _get_crossvideo_mask(combined_labels, val_ids)
-        distance_matrix = distance_matrix * mask
+        distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
         distance_matrix,
@@ -201,7 +231,12 @@ def knn(
 
     # Select only the validation part of the classification matrix
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
-    assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
+
+    if use_crossvideo_positives:  # remove all with only one indivdual_video_id
+        val_classification_matrix = val_classification_matrix[classification_mask]
+        val_labels = val_labels[classification_mask]
+
+    # assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
@@ -235,11 +270,9 @@ def knn(
     }
 
 
-def pca(
-    data: pd.DataFrame, **kwargs: Any
-) -> wandb.Image:  # generate a 2D plot of the embeddings
+def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
     _, labels_in, embeddings_in, _ = get_partition_from_dataframe(data, partition="val")
-    
+
     num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()
@@ -270,7 +303,7 @@ def tsne(
     data: pd.DataFrame, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     _, labels_in, embeddings_in, _ = get_partition_from_dataframe(data, partition="val")
-    
+
     num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()

@@ -48,7 +48,7 @@ end_lr: 1e-6                    # End learning rate (for the learning rate sched
 
 max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
-batch_size: 128                  # Training batch size
+batch_size: 16                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
@@ -67,12 +67,13 @@ kfold: True                     # Enable kfold cross-validation
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 # data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
-# data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
-# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+# data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillatracker-video_data-external-datasets-ATRW-atrw_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
+# dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
 
-data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillatracker-video_data-external-datasets-ATRW-atrw_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
-dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
+data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
+dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+
 
 data_resize_transform: 224
-additional_val_dataset_classes: []
-additional_val_data_dirs: []
+additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
