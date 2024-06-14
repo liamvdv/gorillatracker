@@ -103,7 +103,7 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataload
 
 
 def get_partition_from_dataframe(
-    data: pd.DataFrame, partition: Literal["val", "train"] = "val"
+    data: pd.DataFrame, partition: Literal["val", "train", "test"] = "val"
 ) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id]]:
     partition_df = data.where(data["partition"] == partition).dropna()
     partition_labels = torch.tensor(partition_df["label"].tolist()).long()
