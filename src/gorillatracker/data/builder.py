@@ -20,11 +20,13 @@ CXLDatasetId = "gorillatracker.datasets.cxl.CXLDataset"
 CZooDatasetId = "gorillatracker.datasets.chimp.CZooDataset"
 CTaiDatasetId = "gorillatracker.datasets.chimp.CTaiDataset"
 Cows2021DatasetId = "gorillatracker.datasets.cows2021.Cows2021Dataset"
+SeaturtleDatasetId = "gorillatracker.datasets.seaturtle.SeaturtleDataset"
 ATRWDatasetId = "gorillatracker.datasets.atrw.ATRWDataset"
 KFoldCZooDatasetId = "gorillatracker.datasets.chimp.KFoldCZooDataset"
 KFoldCTaiDatasetId = "gorillatracker.datasets.chimp.KFoldCTaiDataset"
 KFoldCXLDatasetId = "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"  # TODO change this cxl.KFoldCXLDataset
 KFoldCows2021DatasetId = "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
+KFoldSeaturtleDatasetId = "gorillatracker.datasets.seaturtle.KFoldSeaturtleDataset"
 KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 
@@ -36,10 +38,12 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     CZooDatasetId: SupervisedDataset,
     CTaiDatasetId: SupervisedDataset,
     Cows2021DatasetId: SupervisedDataset,
+    SeaturtleDatasetId: SupervisedDataset,
     ATRWDatasetId: SupervisedDataset,
     KFoldCZooDatasetId: SupervisedKFoldDataset,
     KFoldCTaiDatasetId: SupervisedKFoldDataset,
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
+    KFoldSeaturtleDatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
 }
 
