@@ -209,7 +209,8 @@ class BaseModule(L.LightningModule):
             "label",
             "embedding",
             "id",
-        ]  # note that the dataloader usually returns the order (id, embedding, label)
+            "partition", # val for validation, train for training
+         ]  # note that the dataloader usually returns the order (id, embedding, label)
         self.dataset_names = dataset_names
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
@@ -358,11 +359,13 @@ class BaseModule(L.LightningModule):
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
         embeddings = embeddings.cpu()
 
-        assert len(self.embeddings_table_columns) == 3
+        assert len(self.embeddings_table_columns) == 4, "Embeddings table columns are not set correctly."
+        anchor_labels_list = anchor_labels.tolist()
         data = {
-            self.embeddings_table_columns[0]: (anchor_labels.tolist()),  # type: ignore
+            self.embeddings_table_columns[0]: [int(x) for x in anchor_labels_list],  # type: ignore
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
             self.embeddings_table_columns[2]: anchor_ids,
+            self.embeddings_table_columns[3]: ["val"] * len(anchor_ids),
         }
 
         df = pd.DataFrame(data)
@@ -492,26 +495,45 @@ class BaseModule(L.LightningModule):
             )
             return {"optimizer": optimizer, "lr_scheduler": plateau_scheduler}
 
-    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
+    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels, list[gtypes.Id]]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
         train_labels = torch.tensor([])
+        train_ids = []
         for batch in self.dm.train_dataloader():
             batch_size = lazy_batch_size(batch)
-            _, flat_images, flat_labels = flatten_batch(batch)
+            flat_ids, flat_images, flat_labels = flatten_batch(batch)
             anchor_labels = flat_labels[:batch_size]
             anchor_images = flat_images[:batch_size].to(trainer.model.device)
+            anchor_ids = flat_ids[:batch_size]
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
+            train_ids.extend(anchor_ids)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
-        return train_embeddings.cpu(), train_labels.cpu()
+        return train_embeddings.cpu(), train_labels.cpu(), train_ids
 
     def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> None:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
-        train_embeddings, train_labels = (
+        train_embeddings, train_labels, train_ids = (
             self._get_train_embeddings_for_knn(self.trainer) if self.knn_with_train else (None, None)
+        )
+        
+        # add train embeddings to the embeddings table
+        embeddings_table = pd.concat(
+            [
+                embeddings_table,
+                pd.DataFrame(
+                    {
+                        "label": [int(x) for x in train_labels.tolist()],
+                        "embedding": train_embeddings.tolist(),
+                        "id": train_ids,
+                        "partition": "train",
+                    }
+                ),
+            ],
+            ignore_index=True,
         )
 
         metrics = {
@@ -540,8 +562,8 @@ class BaseModule(L.LightningModule):
             data=embeddings_table,
             embedding_name="val/embeddings",
             metrics=metrics,
-            train_embeddings=train_embeddings,
-            train_labels=train_labels,
+            # train_embeddings=train_embeddings,
+            # train_labels=train_labels,
             kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
             dataloader_name=dataloader_name,
         )
@@ -587,6 +609,7 @@ class BaseModule(L.LightningModule):
             loss = torch.tensor(losses).mean()
             assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
             self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss, sync_dist=True)
+
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
