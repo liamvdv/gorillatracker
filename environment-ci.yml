@@ -11,7 +11,7 @@ dependencies:
   # ML libraries
     # https://anaconda.org/pytorch-nightly/pytorch/
   - pytorch=2.3.0=*cpu*
-  - torchvision=0.15.0
+  - torchvision
   # CUDA only on linux and windows
   - wandb
   - lightning
