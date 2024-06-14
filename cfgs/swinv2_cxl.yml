@@ -81,7 +81,7 @@ check_val_every_n_epoch: 10      # Perform validation every n epochs
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
-data_resize_transform: 192
+data_resize_transform: 224
 
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/bristol"]
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null

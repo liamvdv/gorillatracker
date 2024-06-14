@@ -70,6 +70,6 @@ data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-k
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-data_resize_transform: 192
-additional_val_dataset_classes: []
-additional_val_data_dirs: []
+data_resize_transform: 224
+additional_val_dataset_classes: None
+additional_val_data_dirs: None

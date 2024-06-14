@@ -47,7 +47,7 @@ def run_experiment(
         sweep_id = sweep(sweep=sweep_config, project=project_name, entity="gorillas")
 
         print(f"SWEEP_PATH=gorillas/{project_name}/{sweep_id}")
-        agent(sweep_id, count=12)
+        agent(sweep_id, count=20)
     else:
         command = f"python train.py {params_str} --config_path {config_path}"
         os.system(command)
@@ -55,7 +55,7 @@ def run_experiment(
 
 
 if __name__ == "__main__":
-    with open("scripts/multi_configs/baseline_sweep.json", "r") as file:
+    with open("scripts/multi_configs/baseline_sweep_temp.json", "r") as file:
         json_file = json.load(file)
         experiments = json_file["experiments"]
         global_parameters = json_file["global"]

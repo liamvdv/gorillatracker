@@ -25,7 +25,7 @@ seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
 early_stopping_patience: 3      # Early stopping patience (number of epochs)
-embedding_size: 128
+embedding_size: 256
 dropout_p: 0.32
 
 weight_decay: 0.2              # Weight decay

@@ -47,6 +47,7 @@ nlet_requirements: dict[str, FlatNletBuilder] = {
     "softmax": build_onelet,
     "offline": build_triplet,
     "online": build_quadlet,
+    "distillation": build_triplet,
 }
 
 
