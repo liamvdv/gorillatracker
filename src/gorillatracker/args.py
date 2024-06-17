@@ -107,6 +107,7 @@ class TrainingArgs:
     use_class_weights: bool = field(default=False)
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
+    use_inbatch_mixup: bool = field(default=False)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

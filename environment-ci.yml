@@ -4,13 +4,14 @@ channels:
   - conda-forge
   - nodefaults
   - pyviz/label/dev
-  - pytorch-nightly
+  # - pytorch-nightly
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
   # ML libraries
-  - pytorch=2.4.0.*=py3.10_cpu_0
-  - torchvision=0.19.0
+    # https://anaconda.org/pytorch-nightly/pytorch/
+  - pytorch=2.3.0=*cpu*
+  - torchvision
   # CUDA only on linux and windows
   - wandb
   - lightning
