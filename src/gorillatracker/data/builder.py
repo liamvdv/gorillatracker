@@ -19,8 +19,8 @@ from gorillatracker.data.nlet import (
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 
-HardCrossEncounterSupervisedKFoldDatasetId = "gorillatracker.datasets.kfold.HardKFoldSupervisedDataset"
-HardCrossEncounterSupervisedDatasetId = "gorillatracker.datasets.hard.HardSupervisedDataset"
+HardCrossEncounterSupervisedKFoldDatasetId = "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
+HardCrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"
 CrossEncounterKFoldSupervisedDatasetId = "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
 CrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.CrossEncounterSupervisedDataset"
 BristolDatasetId = "gorillatracker.datasets.bristol.BristolDataset"

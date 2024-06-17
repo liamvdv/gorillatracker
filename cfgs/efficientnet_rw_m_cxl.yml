@@ -10,7 +10,7 @@ workers: 16                      # Number of workers for data loading
 
 # Model and Training Arguments
 project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
-run_name: "421-test-crossencounterknn"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "421-crossencounter_normalmining_arcloss"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
 
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
@@ -74,6 +74,7 @@ kfold: True                     # Enable kfold cross-validation
 # dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
 
 data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 
