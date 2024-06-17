@@ -55,7 +55,7 @@ def run_experiment(
 
 
 if __name__ == "__main__":
-    with open("scripts/multi_configs/baseline_sweep_quantization_aware_train.json", "r") as file:
+    with open("scripts/multi_configs/baseline_sweep_temp.json", "r") as file:
         json_file = json.load(file)
         experiments = json_file["experiments"]
         global_parameters = json_file["global"]
