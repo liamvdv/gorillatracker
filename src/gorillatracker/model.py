@@ -3,7 +3,6 @@ from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
 import lightning as L
-from lightning.pytorch.utilities.types import LRSchedulerConfigType
 import numpy as np
 import pandas as pd
 import timm
@@ -11,6 +10,7 @@ import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from facenet_pytorch import InceptionResnetV1
+from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
