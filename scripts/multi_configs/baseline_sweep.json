@@ -75,8 +75,8 @@
             "parameters": {}
         },
         {
-            "project_name": "Embedding-ViT-CXL-OpenSet",
-            "config_path": "./cfgs/visiontransformer_cxl.yml",
+            "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
+            "config_path": "./cfgs/convnextv2huge_cxl.yml",
             "parameters": {}
         }
     ]
