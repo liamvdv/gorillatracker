@@ -51,7 +51,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Tuple, TypeVar, Union
-from functools import reduce
 
 import numpy as np
 import torch
@@ -289,7 +288,7 @@ def kfold_splitter(
         fold_bucket_size = trainval_count // k
 
         sorted_individums = sorted(individums, key=lambda x: len(x.value), reverse=True)  # type: ignore
-        
+
         sizes = [0 for _ in range(k)]
         num_images_fold = [0 for _ in range(k)]
 
@@ -413,7 +412,7 @@ def generate_kfold_split(
         seed=seed,
         k=k,
     )
-    
+
     unique_individuals = group(images)
     unique_labels = dict([(individual.label, 0) for individual in unique_individuals])
     for i, fold_bucket in enumerate((fold_buckets + [test_bucket])):
@@ -422,7 +421,7 @@ def generate_kfold_split(
             unique_labels[individual.label] += 1
             if unique_labels[individual.label] > 1:
                 print(f"Individual {individual.label} appears in multiple folds ({i}).")
-        
+
     # stats_and_confirm(name, images, fold_buckets, [], test_bucket)
     for i, fold_bucket in enumerate(fold_buckets):
         write_entries(fold_bucket, output_dir / f"fold-{i}")
