@@ -9,7 +9,6 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
