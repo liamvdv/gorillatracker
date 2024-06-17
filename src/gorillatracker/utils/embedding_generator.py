@@ -154,51 +154,41 @@ def get_model_for_run_url(run_url: str, eval_mode: bool = True) -> BaseModule:
     return load_model_from_wandb(model_path, model_cls=model_cls, model_config=args, eval_mode=eval_mode)
 
 
-def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", norm_input: bool = False) -> pd.DataFrame:
-    embeddings = []
-    df = pd.DataFrame(columns=["embedding", "label", "input", "label_string"])
+def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cuda", batch_size: int = 256, worker: int = 1) -> pd.DataFrame:
+    model = model.to(device)
+    all_ids = []
+    all_embeddings = []
+    all_labels = []
+    all_inputs = []
+    all_label_strings = []
+    
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=worker, shuffle=False)
+    
     with torch.no_grad():
         print("Generating embeddings...")
-        for ids, imgs, labels in tqdm(dataset):
-            # NOTE(memben): blame me if this fails
-            ids, imgs, labels = ids[0], imgs[0], labels[0]
-            if isinstance(imgs, torch.Tensor):
-                imgs = [imgs]
-                labels = [labels]
+        for batch in tqdm(data_loader):
+            ids, imgs, labels = batch
+            batch_inputs = imgs.to(device)
 
-            batch_inputs = torch.stack(imgs)
-            if batch_inputs.shape[0] != 1:
-                batch_inputs = batch_inputs.unsqueeze(1)
-            batch_inputs = batch_inputs.to(device)
-
-            model_inputs = batch_inputs
-            if norm_input:
-                model_inputs_list = [
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(img) for img in imgs
-                ]
-                model_inputs = torch.stack(model_inputs_list)
-                model_inputs = model_inputs.to(device)
-                if model_inputs.shape[0] != 1:
-                    model_inputs = model_inputs.unsqueeze(1)
-            embeddings = model(model_inputs)
-
-            for i in range(len(imgs)):
+            embeddings = model(batch_inputs).cpu()
+            for i in range(batch_inputs.size(0)):
                 input_img = transforms.ToPILImage()(batch_inputs[i].cpu())
-                df = pd.concat(
-                    [
-                        df,
-                        pd.DataFrame(
-                            {
-                                "id": [ids],
-                                "embedding": [embeddings[i]],
-                                "label": [labels[i]],
-                                "input": [input_img],
-                                "label_string": [dataset.mapping[labels[i]]] if dataset.mapping else None,
-                            }
-                        ),
-                    ]
-                )
-    df.reset_index(drop=False, inplace=True)
+                label_string = dataset.mapping[labels[i].item()] if hasattr(dataset, "mapping") else None
+                
+                all_ids.append(ids[i].item())
+                all_embeddings.append(embeddings[i].numpy())
+                all_labels.append(labels[i].item())
+                all_inputs.append(input_img)
+                all_label_strings.append(label_string)
+                
+    df = pd.DataFrame({
+        "id": all_ids,
+        "embedding": all_embeddings,
+        "label": all_labels,
+        "input": all_inputs,
+        "label_string": all_label_strings
+    })
+    
     return df
 
 

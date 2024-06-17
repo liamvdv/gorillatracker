@@ -8,7 +8,6 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
@@ -1042,7 +1041,7 @@ class FaceNetWrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = InceptionResnetV1(pretrained="vggface2")
+        #self.model = InceptionResnetV1(pretrained="vggface2")
 
         self.model.last_linear = torch.nn.Sequential(
             torch.nn.BatchNorm1d(1792),

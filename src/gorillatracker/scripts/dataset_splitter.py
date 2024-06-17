@@ -51,6 +51,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Tuple, TypeVar, Union
+from functools import reduce
 
 import numpy as np
 import torch
@@ -288,7 +289,7 @@ def kfold_splitter(
         fold_bucket_size = trainval_count // k
 
         sorted_individums = sorted(individums, key=lambda x: len(x.value), reverse=True)  # type: ignore
-
+        
         sizes = [0 for _ in range(k)]
         num_images_fold = [0 for _ in range(k)]
 
@@ -522,8 +523,8 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 if __name__ == "__main__":
     dir = generate_kfold_split(
-        dataset_dir=Path("/workspaces/gorillatracker/data/ground_truth/bristol/full_images"),
-        output_dir=Path("compressed/test"),
+        dataset_dir=Path("/workspaces/gorillatracker/data/ground_truth/cxl_all/face_images"),
+        output_dir=Path("/workspaces/gorillatracker/data/splits"),
         mode="openset",
         seed=42,
         trainval=80,
