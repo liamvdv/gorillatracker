@@ -3,6 +3,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
 import lightning as L
+from lightning.pytorch.utilities.types import LRSchedulerConfigType
 import numpy as np
 import pandas as pd
 import timm
@@ -465,7 +466,7 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
-                lr_scheduler = {
+                lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
                     "frequency": self.lr_interval,
