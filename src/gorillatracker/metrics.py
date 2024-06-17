@@ -13,16 +13,17 @@ import sklearn
 import torch
 import torchmetrics as tm
 import wandb
-from sklearn.neighbors import NearestNeighbors
-from sklearn.metrics import accuracy_score, f1_score, precision_score
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
+from sklearn.metrics import accuracy_score, f1_score, precision_score
+from sklearn.neighbors import NearestNeighbors
 from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -272,20 +273,22 @@ def knn(
         "f1": f1.item(),
         "precision": precision.item(),
     }
-    
-    
-def knn_ssl(data: pd.DataFrame,
-            average: Literal["micro", "macro", "weighted", "none"] = "weighted",
-            k: int = 5,
-            dm: NletDataModule) -> Dict[str, Any]:
-    
+
+
+def knn_ssl(
+    data: pd.DataFrame,
+    dm: NletDataModule,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
+    k: int = 5,
+) -> Dict[str, Any]:
+
     _, labels, embeddings, _ = get_partition_from_dataframe(data, partition="val")
-    
+
     negatives = {}
     true_labels = []
     pred_labels = []
     pred_labels_top5 = []
-    
+
     en = LinearSequenceEncoder()
     labels = torch.tensor(en.encode_list(labels.tolist()))
     current_val_index = 0
@@ -294,16 +297,16 @@ def knn_ssl(data: pd.DataFrame,
         image = dm.val[current_val_index].contrastive_sampler.find_any_image(decoded_label)
         negative_labels = dm.val[current_val_index].contrastive_sampler.negative_classes(image)
         negatives[label.item()] = en.encode_list(negative_labels)
-    
+
     for label in labels.unique():
         subset_labels = negatives[label.item()] + [label.item()]
-        if(len(subset_labels) < 2):
+        if len(subset_labels) < 2:
             continue
-        subset_mask = torch.isin(labels,torch.tensor(subset_labels))
+        subset_mask = torch.isin(labels, torch.tensor(subset_labels))
         subset_embeddings = embeddings[subset_mask]
         subset_label_values = labels[subset_mask]
-        knn = NearestNeighbors(n_neighbors=max(5,k)+1,algorithm='auto').fit(subset_embeddings.numpy())
-        current_label_mask = (subset_label_values == label.item())
+        knn = NearestNeighbors(n_neighbors=max(5, k) + 1, algorithm="auto").fit(subset_embeddings.numpy())
+        current_label_mask = subset_label_values == label.item()
         current_label_embeddings = subset_embeddings[current_label_mask]
         distances, indices = knn.kneighbors(current_label_embeddings.numpy())
         distances = distances[:, 1:]
@@ -314,10 +317,10 @@ def knn_ssl(data: pd.DataFrame,
             true_labels.append(label.item())
             pred_labels.append(most_common)
             pred_labels_top5.append(neighbor_labels[:5].numpy())
-                    
+
     true_labels = torch.tensor(true_labels)
     pred_labels = torch.tensor(pred_labels)
-    
+
     pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
     top5_correct = []
     for i, true_label in enumerate(true_labels):
@@ -329,9 +332,9 @@ def knn_ssl(data: pd.DataFrame,
 
     accuracy = accuracy_score(true_labels, pred_labels)
     f1 = f1_score(true_labels, pred_labels, average=average)
-    precision = precision_score(true_labels, pred_labels, average=average,zero_division=0)
-    
-    return {'accuracy': accuracy, 'accuracy_top5': top5_accuracy, 'f1': f1, 'precision': precision}
+    precision = precision_score(true_labels, pred_labels, average=average, zero_division=0)
+
+    return {"accuracy": accuracy, "accuracy_top5": top5_accuracy, "f1": f1, "precision": precision}
 
 
 def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
