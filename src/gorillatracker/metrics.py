@@ -274,9 +274,13 @@ def knn(
     }
     
     
-def knn_ssl(embeddings: torch.Tensor, labels: torch.Tensor, k:int, average: Literal["micro", "macro", "weighted", "none"], dm: NletDataModule) -> Dict[str, Any]:
-    print (dm.dataset_class)
-    print(dm.val)
+def knn_ssl(data: pd.DataFrame,
+            average: Literal["micro", "macro", "weighted", "none"] = "weighted",
+            k: int = 5,
+            dm: NletDataModule) -> Dict[str, Any]:
+    
+    _, labels, embeddings, _ = get_partition_from_dataframe(data, partition="val")
+    
     negatives = {}
     true_labels = []
     pred_labels = []
