@@ -272,6 +272,62 @@ def knn(
         "f1": f1.item(),
         "precision": precision.item(),
     }
+    
+    
+def knn_ssl(embeddings: torch.Tensor, labels: torch.Tensor, k:int, average: Literal["micro", "macro", "weighted", "none"], dm: NletDataModule) -> Dict[str, Any]:
+    print (dm.dataset_class)
+    print(dm.val)
+    negatives = {}
+    true_labels = []
+    pred_labels = []
+    pred_labels_top5 = []
+    
+    en = LinearSequenceEncoder()
+    labels = torch.tensor(en.encode_list(labels.tolist()))
+    current_val_index = 0
+    for label in labels.unique():
+        decoded_label = en.decode(label.item())
+        image = dm.val[current_val_index].contrastive_sampler.find_any_image(decoded_label)
+        negative_labels = dm.val[current_val_index].contrastive_sampler.negative_classes(image)
+        negatives[label.item()] = en.encode_list(negative_labels)
+    
+    for label in labels.unique():
+        subset_labels = negatives[label.item()] + [label.item()]
+        if(len(subset_labels) < 2):
+            continue
+        subset_mask = torch.isin(labels,torch.tensor(subset_labels))
+        subset_embeddings = embeddings[subset_mask]
+        subset_label_values = labels[subset_mask]
+        knn = NearestNeighbors(n_neighbors=max(5,k)+1,algorithm='auto').fit(subset_embeddings.numpy())
+        current_label_mask = (subset_label_values == label.item())
+        current_label_embeddings = subset_embeddings[current_label_mask]
+        distances, indices = knn.kneighbors(current_label_embeddings.numpy())
+        distances = distances[:, 1:]
+        indices = indices[:, 1:]
+        for idx_list in indices:
+            neighbor_labels = subset_label_values[idx_list]
+            most_common = torch.mode(neighbor_labels[:k]).values.item()
+            true_labels.append(label.item())
+            pred_labels.append(most_common)
+            pred_labels_top5.append(neighbor_labels[:5].numpy())
+                    
+    true_labels = torch.tensor(true_labels)
+    pred_labels = torch.tensor(pred_labels)
+    
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
+    top5_correct = []
+    for i, true_label in enumerate(true_labels):
+        if true_label in pred_labels_top5_tensor[i]:
+            top5_correct.append(1)
+        else:
+            top5_correct.append(0)
+    top5_accuracy = sum(top5_correct) / len(top5_correct)
+
+    accuracy = accuracy_score(true_labels, pred_labels)
+    f1 = f1_score(true_labels, pred_labels, average=average)
+    precision = precision_score(true_labels, pred_labels, average=average,zero_division=0)
+    
+    return {'accuracy': accuracy, 'accuracy_top5': top5_accuracy, 'f1': f1, 'precision': precision}
 
 
 def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
