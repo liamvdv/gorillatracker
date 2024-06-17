@@ -133,7 +133,9 @@ def evaluate_embeddings(
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
     le = LinearSequenceEncoder()
     data["label"] = data["label"].astype(int)
-    data["label"] = le.encode_list(data["label"].tolist())
+    # NOTE(joscha): hacky way to get true labels for ssl
+    if "ssl" not in dataloader_name.lower():
+        data["label"] = le.encode_list(data["label"].tolist())
 
     results = {metric_name: metric(data) for metric_name, metric in metrics.items()}
 
@@ -281,7 +283,7 @@ def knn_ssl(
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
 ) -> Dict[str, Any]:
-
+    #TODO: add true label
     _, labels, embeddings, _ = get_partition_from_dataframe(data, partition="val")
 
     negatives = {}

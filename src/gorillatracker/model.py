@@ -572,7 +572,7 @@ class BaseModule(L.LightningModule):
                 "knn_ssl_macro": partial(knn_ssl, k=1, dm=self.dm, average="macro"),
                 "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
             }
-            if "ssl" in dataloader_name
+            if "ssl" in dataloader_name.lower()
             else metrics
         )
 

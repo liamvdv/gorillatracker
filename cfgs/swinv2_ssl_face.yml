@@ -74,7 +74,7 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-dev10-10-10_2024-04-18_percentage-80-10-10_split_20240614_0931.pkl"
 feature_types: ["face_45", "face_90"]
 
-data_resize_transform: 224
+data_resize_transform: 192
 
 additional_val_dataset_classes: [gorillatracker.datasets.bristol.BristolDataset]
 additional_val_data_dirs: [/workspaces/gorillatracker/data/splits/bristol]
