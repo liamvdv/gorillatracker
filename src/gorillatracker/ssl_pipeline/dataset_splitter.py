@@ -9,7 +9,7 @@ from typing import Literal, Union
 import dill as pickle
 from simple_parsing import field
 from sqlalchemy import Select, create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 import gorillatracker.ssl_pipeline.video_filter_queries as vq
 from gorillatracker.ssl_pipeline.models import Video
@@ -54,7 +54,6 @@ class SplitArgs:
             self.name = f"{self.name}_{self.version}_{self.split_by}-{self.train_split}-{self.val_split}-{self.test_split}_split"
         else:
             self.name = f"{self.name}_{self.version}_{self.split_by}_split"
-
         current_time = dt.datetime.now().strftime("%Y%m%d_%H%M")
         self.name = f"{self.name}_{current_time}"
 
@@ -80,6 +79,12 @@ class SplitArgs:
         else:
             raise ValueError("Invalid split_by argument")
 
+    def create_session(self) -> Session:
+        """Create a new session."""
+        engine = create_engine(self.db_uri)
+        session = sessionmaker(bind=engine)
+        return session()
+
     def build_query(
         self, range: tuple[dt.datetime, dt.datetime], max_videos: int, allow_none_date: bool = False
     ) -> Select[tuple[Video]]:
@@ -87,6 +92,7 @@ class SplitArgs:
         query = vq.date_filter(query, range, allow_none_date)
         query = vq.hour_filter(query, self.hours)
         query = vq.video_length_filter(query, self.video_length[0], self.video_length[1])
+        query = vq.random_video_order(query)
         query = vq.video_count_filter(query, max_videos)
         return query
 
@@ -104,11 +110,10 @@ class SplitArgs:
 
     def split_by_time(self) -> None:
         """Split the videos based on the time range."""
-        engine = create_engine(self.db_uri)
-        session = sessionmaker(bind=engine)
+        session = self.create_session()
         query = self.build_query((dt.datetime.min, dt.datetime.max), sys.maxsize)
         query = vq.order_by_time(query)
-        videos = vq.get_videos_from_query(query, session())
+        videos = vq.get_videos_from_query(query, session)
         train_end = int(len(videos) * self.train_split / 100)
         val_end = train_end + int(len(videos) * self.val_split / 100)
         self._train_video_ids = (videos[:train_end])[: self.max_train_videos]
@@ -120,10 +125,9 @@ class SplitArgs:
         assert (
             self.train_split + self.val_split + self.test_split == 100
         ), "The sum of the split percentages must be 100"
-        engine = create_engine(self.db_uri)
-        session = sessionmaker(bind=engine)
+        session = self.create_session()
         query = self.build_query((dt.datetime.min, dt.datetime.max), sys.maxsize, True)
-        videos = vq.get_videos_from_query(query, session())
+        videos = vq.get_videos_from_query(query, session)
         train_end = int(len(videos) * self.train_split / 100)
         val_end = train_end + int(len(videos) * self.val_split / 100)
         self._train_video_ids = (videos[:train_end])[: self.max_train_videos]
@@ -135,33 +139,31 @@ class SplitArgs:
         assert (
             self.train_split + self.val_split + self.test_split == 100
         ), "The sum of the split percentages must be 100"
-        engine = create_engine(self.db_uri)
-        session = sessionmaker(bind=engine)
-        cameras = vq.get_camera_ids(session())
+        session = self.create_session()
+        cameras = vq.get_camera_ids(session)
         train_cameras = cameras[: int(len(cameras) * self.train_split / 100)]
         val_cameras = cameras[len(train_cameras) : len(train_cameras) + int(len(cameras) * self.val_split / 100)]
         test_cameras = cameras[len(train_cameras) + len(val_cameras) :]
         self._train_video_ids = vq.get_videos_from_query(
-            vq.camera_id_filter(self.build_train_query(), train_cameras), session()
+            vq.camera_id_filter(self.build_train_query(), train_cameras), session
         )[: self.max_train_videos]
         self._val_video_ids = vq.get_videos_from_query(
-            vq.camera_id_filter(self.build_val_query(), val_cameras), session()
+            vq.camera_id_filter(self.build_val_query(), val_cameras), session
         )[: self.max_val_videos]
         self._test_video_ids = vq.get_videos_from_query(
-            vq.camera_id_filter(self.build_test_query(), test_cameras), session()
+            vq.camera_id_filter(self.build_test_query(), test_cameras), session
         )[: self.max_test_videos]
 
     def split_custom(self) -> None:
         """Split the videos based on custom criteria."""
-        engine = create_engine(self.db_uri)
-        session = sessionmaker(bind=engine)
-        self._train_video_ids = vq.get_videos_from_query(self.build_train_query(), session())
+        session = self.create_session()
+        self._train_video_ids = vq.get_videos_from_query(self.build_train_query(), session)
         val_query = self.build_val_query()
         val_query = vq.video_not_in(val_query, self._train_video_ids)
-        self._val_video_ids = vq.get_videos_from_query(val_query, session())
+        self._val_video_ids = vq.get_videos_from_query(val_query, session)
         test_query = self.build_test_query()
         test_query = vq.video_not_in(test_query, self._train_video_ids + self._val_video_ids)
-        self._test_video_ids = vq.get_videos_from_query(test_query, session())
+        self._test_video_ids = vq.get_videos_from_query(test_query, session)
         assert len(self._train_video_ids) != 0 and len(self._val_video_ids) != 0, "train and val cannot be empty"
 
     def save_to_pickle(self) -> None:
@@ -186,9 +188,9 @@ if __name__ == "__main__":
         version="2024-04-18",
         save_path="/workspaces/gorillatracker/data/splits/SSL/",
         split_by="percentage",
-        train_split=80,
-        val_split=10,
-        test_split=10,
+        train_split=90,
+        val_split=5,
+        test_split=5,
         train_starttime=dt.datetime(2010, 1, 1),
         train_endtime=dt.datetime(2030, 1, 1),
         val_starttime=dt.datetime(2010, 1, 1),
@@ -197,15 +199,16 @@ if __name__ == "__main__":
         test_endtime=dt.datetime(2030, 1, 1),
         hours=list(range(0, 24)),  # only videos from certain hours of the day
         video_length=(0, 1000000),  # min, max video length in seconds
-        max_train_videos=1000,  # max videos in train bucket
-        max_val_videos=10,  # max videos in val bucket
-        max_test_videos=10,  # max videos in test bucket
+        max_train_videos=300000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
     )
-    if False:
+    if True:
         args.create_split()
         args.save_to_pickle()
         print("Split created and saved")
     else:
-        split_path = "/workspaces/gorillatracker/data/splits/SSL/SSL-dev10vid_2024-04-18_percentage-100-0-0_split_20240606_1452.pkl"
+        split_path = "data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-90-5-5_split_seed42_20240614_1235.pkl"
         args = SplitArgs.load_pickle(split_path)
     print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))
+    print(args.train_video_ids()[:5])

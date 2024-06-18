@@ -28,6 +28,11 @@ def video_count_filter(query: Select[tuple[Video]], num_videos: int) -> Select[t
     return query.limit(num_videos)
 
 
+def random_video_order(query: Select[tuple[Video]]) -> Select[tuple[Video]]:
+    # NOTE: not seedable
+    return query.order_by(func.random())
+
+
 def hour_filter(query: Select[tuple[Video]], hours: list[Union[int, None]]) -> Select[tuple[Video]]:
     """Filter the query to return videos from a specific time of the day."""
     if None in hours:
