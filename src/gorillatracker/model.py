@@ -9,7 +9,7 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from facenet_pytorch import InceptionResnetV1
+# from facenet_pytorch import InceptionResnetV1
 from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
@@ -298,7 +298,7 @@ class BaseModule(L.LightningModule):
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
-        log_train_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader(), n_samples=1)
+        # log_train_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader(), n_samples=1)
 
         if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:  # type: ignore
             self.loss_module_train.set_using_memory_bank(True)  # type: ignore
@@ -544,8 +544,8 @@ class BaseModule(L.LightningModule):
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            "pca": pca,
-            "tsne": tsne,
+            # "pca": pca,
+            # "tsne": tsne,
             # "fc_layer": fc_layer,
         }
         metrics |= (
@@ -1152,30 +1152,30 @@ class InceptionV3Wrapper(BaseModule):
         )
 
 
-class FaceNetWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = InceptionResnetV1(pretrained="vggface2")
+# class FaceNetWrapper(BaseModule):
+#     def __init__(  # type: ignore
+#         self,
+#         **kwargs,
+#     ) -> None:
+#         super().__init__(**kwargs)
+#         self.model = InceptionResnetV1(pretrained="vggface2")
 
-        self.model.last_linear = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(1792),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
-        )
-        self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
-        self.set_losses(self.model, **kwargs)
+#         self.model.last_linear = torch.nn.Sequential(
+#             torch.nn.BatchNorm1d(1792),
+#             torch.nn.Dropout(p=self.dropout_p),
+#             torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
+#         )
+#         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
+#         self.set_losses(self.model, **kwargs)
 
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
+#     @classmethod
+#     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+#         return transforms.Compose(
+#             [
+#                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
+#                 transforms_v2.RandomHorizontalFlip(p=0.5),
+#             ]
+#         )
 
 
 class MiewIdNetWrapper(BaseModule):
@@ -1259,7 +1259,7 @@ custom_model_cls = {
     "ConvNextClipWrapper": ConvNextClipWrapper,
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
-    "FaceNet": FaceNetWrapper,
+    # "FaceNet": FaceNetWrapper, 
     "MiewIdNet": MiewIdNetWrapper,
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,

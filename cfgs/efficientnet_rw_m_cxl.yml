@@ -12,11 +12,13 @@ workers: 16                      # Number of workers for data loading
 project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
 run_name: "421-test-crossencounterknn"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
+# run_name: "452-test"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+# wandb_tags: ["knowlegde distillation", "sweep"]            # WandB tags for experiment tracking
 
 model_name_or_path: "EfficientNet_RW_M" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
-fast_dev_run: False             # Enable fast development run
+fast_dev_run: True             # Enable fast development run
 profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
 offline: False                  # Enable offline mode for WandB
 data_preprocessing_only: False  # Run only data preprocessing
@@ -39,7 +41,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
-margin: 1.0                         # Margin for the contrastive loss (triplet loss)
+margin: 0.5                         # Margin for the contrastive loss (triplet loss)
 loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 teacher_model_wandb_link: "https://wandb.ai/gorillas/Embedding-SwinV2-SSL-Face/runs/mqhtj5r5"
 
@@ -51,7 +53,8 @@ start_lr: 1e-5                  # Learning Rate after warmup at the beginning of
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
 max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
-batch_size: 32                  # Training batch size
+
+batch_size: 16                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
@@ -64,7 +67,7 @@ save_model_to_wandb: False       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
-kfold: True                     # Enable kfold cross-validation
+kfold: False                     # Enable kfold cross-validation
 
 # data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
@@ -75,6 +78,10 @@ kfold: True                     # Enable kfold cross-validation
 
 data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+# data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillatracker-video_data-external-datasets-ATRW-atrw_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
+# dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
+# data_dir: /workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25
+# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 
 data_resize_transform: 224
