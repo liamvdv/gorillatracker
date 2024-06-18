@@ -78,7 +78,7 @@ def main(args: TrainingArgs) -> None:
         height_range=args.height_range,
         split_path=args.split_path,
     )
-    if args.force_nlet_builder:
+    if args.force_nlet_builder is not None and args.force_nlet_builder != "none":
         force_nlet_builder(args.force_nlet_builder)
 
     dm = build_data_module(
@@ -95,7 +95,6 @@ def main(args: TrainingArgs) -> None:
     )
 
     ################# Construct model ##############
-
     if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
         model_constructor = ModelConstructor(args, model_cls, dm, wandb_logger)
         model = model_constructor.construct(wandb_logging_module, wandb_logger)

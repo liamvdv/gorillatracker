@@ -109,7 +109,7 @@ class TrainingArgs:
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
     use_inbatch_mixup: bool = field(default=False)
-    force_nlet_builder: Optional[Literal["onelet", "triplet", "quadlet"]] = field(default=None)
+    force_nlet_builder: Literal["onelet", "triplet", "quadlet", "none", None] = field(default=None)
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

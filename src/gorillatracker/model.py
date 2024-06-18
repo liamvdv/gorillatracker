@@ -9,7 +9,7 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from facenet_pytorch import InceptionResnetV1
+# from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
@@ -761,10 +761,10 @@ class VisionTransformerWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+        self.model.head = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
@@ -787,8 +787,10 @@ class VisionTransformerWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -1151,30 +1153,30 @@ class InceptionV3Wrapper(BaseModule):
         )
 
 
-class FaceNetWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = InceptionResnetV1(pretrained="vggface2")
+# class FaceNetWrapper(BaseModule):
+#     def __init__(  # type: ignore
+#         self,
+#         **kwargs,
+#     ) -> None:
+#         super().__init__(**kwargs)
+#         self.model = InceptionResnetV1(pretrained="vggface2")
 
-        self.model.last_linear = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(1792),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
-        )
-        self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
-        self.set_losses(self.model, **kwargs)
+#         self.model.last_linear = torch.nn.Sequential(
+#             torch.nn.BatchNorm1d(1792),
+#             torch.nn.Dropout(p=self.dropout_p),
+#             torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
+#         )
+#         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
+#         self.set_losses(self.model, **kwargs)
 
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
+#     @classmethod
+#     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+#         return transforms.Compose(
+#             [
+#                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
+#                 transforms_v2.RandomHorizontalFlip(p=0.5),
+#             ]
+#         )
 
 
 class MiewIdNetWrapper(BaseModule):
@@ -1258,7 +1260,7 @@ custom_model_cls = {
     "ConvNextClipWrapper": ConvNextClipWrapper,
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
-    "FaceNet": FaceNetWrapper,
+    # "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
