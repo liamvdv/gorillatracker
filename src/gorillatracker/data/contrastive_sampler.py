@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterator
 
 from PIL import Image
 
@@ -42,6 +43,11 @@ class ContrastiveSampler(ABC):
     @abstractmethod
     def __len__(self) -> int:
         pass
+
+    def __iter__(self) -> Iterator[ContrastiveImage]:
+        """Provides an iterator over the dataset."""
+        for idx in range(len(self)):
+            yield self[idx]
 
     @property
     @abstractmethod
