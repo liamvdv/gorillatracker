@@ -12,6 +12,7 @@ from gorillatracker.data.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
+    HardContrastiveClassSampler,
 )
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
@@ -47,7 +48,7 @@ class SSLConfig:
         base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
-        engine = create_engine(GorillaDatasetKISZ.DB_URI, echo=True)
+        engine = create_engine(GorillaDatasetKISZ.DB_URI)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
@@ -82,7 +83,7 @@ class SSLConfig:
     ) -> ContrastiveSampler:
         if self.negative_mining == "random":
             classes = self._group_contrastive_images(contrastive_images)
-            return ContrastiveClassSampler(classes)
+            return HardContrastiveClassSampler(classes)
         elif self.negative_mining == "overlapping":
             tracking_ids = session.execute(tracking_ids_from_videos(video_ids)).scalars().all()
             first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(list(tracking_ids))
@@ -178,9 +179,9 @@ if __name__ == "__main__":
     contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
     after = time.time()
     print(f"Time: {after - before}")
-    # print(len(contrastive_sampler))
-    # for i in range(10):
-    #     contrastive_image = contrastive_sampler[i * 10]
-    #     print(contrastive_image)
-    #     print(contrastive_sampler.positive(contrastive_image))
-    #     print(contrastive_sampler.negative(contrastive_image))
+    print(len(contrastive_sampler))
+    for i in range(10):
+        contrastive_image = contrastive_sampler[i * 10]
+        print(contrastive_image)
+        print(contrastive_sampler.positive(contrastive_image))
+        print(contrastive_sampler.negative(contrastive_image))

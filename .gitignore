@@ -167,3 +167,4 @@ mnist/
 *AVI
 cropped-images/*
 /pretrained_weights/
+*.npy
