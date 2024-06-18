@@ -107,14 +107,15 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataload
 
 def get_partition_from_dataframe(
     data: pd.DataFrame, partition: Literal["val", "train", "test"] = "val"
-) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id]]:
+) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id], torch.Tensor]:
     partition_df = data.where(data["partition"] == partition).dropna()
     partition_labels = torch.tensor(partition_df["label"].tolist()).long()
     partition_embeddings = np.stack(partition_df["embedding"].apply(np.array)).astype(np.float32)
     partition_embeddings = torch.tensor(partition_embeddings)
     partition_ids = partition_df["id"].tolist()
+    partition_encoded_labels = torch.tensor(partition_df["encoded_label"].tolist()).long()
 
-    return partition_df, partition_labels, partition_embeddings, partition_ids
+    return partition_df, partition_labels, partition_embeddings, partition_ids, partition_encoded_labels
 
 
 def evaluate_embeddings(
@@ -133,9 +134,7 @@ def evaluate_embeddings(
     # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
     le = LinearSequenceEncoder()
     data["label"] = data["label"].astype(int)
-    # NOTE(joscha): hacky way to get true labels for ssl
-    if "ssl" not in dataloader_name.lower():
-        data["label"] = le.encode_list(data["label"].tolist())
+    data["encoded_label"] = le.encode_list(data["label"].tolist())
 
     results = {metric_name: metric(data) for metric_name, metric in metrics.items()}
 
@@ -198,10 +197,10 @@ def knn(
     ), "Crossvideo positives can only be used with CXL datasets"
 
     # convert embeddings and labels to tensors
-    _, val_labels, val_embeddings, val_ids = get_partition_from_dataframe(data, partition="val")
+    _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")
     train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])
     if use_train_embeddings:
-        _, train_labels, train_embeddings, _ = get_partition_from_dataframe(data, partition="train")
+        _, _, train_embeddings, _, train_labels = get_partition_from_dataframe(data, partition="train")
 
     combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
@@ -283,8 +282,8 @@ def knn_ssl(
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
 ) -> Dict[str, Any]:
-    #TODO: add true label
-    _, labels, embeddings, _ = get_partition_from_dataframe(data, partition="val")
+    # TODO: add true label
+    _, labels, embeddings, _, _ = get_partition_from_dataframe(data, partition="val")
 
     negatives = {}
     true_labels = []
@@ -294,13 +293,13 @@ def knn_ssl(
     en = LinearSequenceEncoder()
     labels = torch.tensor(en.encode_list(labels.tolist()))
     current_val_index = 0
-    for label in labels.unique():
+    for label in labels.unique():  # type: ignore
         decoded_label = en.decode(label.item())
         image = dm.val[current_val_index].contrastive_sampler.find_any_image(decoded_label)
         negative_labels = dm.val[current_val_index].contrastive_sampler.negative_classes(image)
         negatives[label.item()] = en.encode_list(negative_labels)
 
-    for label in labels.unique():
+    for label in labels.unique():  # type: ignore
         subset_labels = negatives[label.item()] + [label.item()]
         if len(subset_labels) < 2:
             continue
@@ -320,27 +319,27 @@ def knn_ssl(
             pred_labels.append(most_common)
             pred_labels_top5.append(neighbor_labels[:5].numpy())
 
-    true_labels = torch.tensor(true_labels)
-    pred_labels = torch.tensor(pred_labels)
+    true_labels_tensor = torch.tensor(true_labels)
+    pred_labels_tensor = torch.tensor(pred_labels)
 
     pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
     top5_correct = []
-    for i, true_label in enumerate(true_labels):
+    for i, true_label in enumerate(true_labels_tensor):
         if true_label in pred_labels_top5_tensor[i]:
             top5_correct.append(1)
         else:
             top5_correct.append(0)
     top5_accuracy = sum(top5_correct) / len(top5_correct)
 
-    accuracy = accuracy_score(true_labels, pred_labels)
-    f1 = f1_score(true_labels, pred_labels, average=average)
-    precision = precision_score(true_labels, pred_labels, average=average, zero_division=0)
+    accuracy = accuracy_score(true_labels_tensor, pred_labels_tensor)
+    f1 = f1_score(true_labels_tensor, pred_labels_tensor, average=average)
+    precision = precision_score(true_labels_tensor, pred_labels_tensor, average=average, zero_division=0)
 
     return {"accuracy": accuracy, "accuracy_top5": top5_accuracy, "f1": f1, "precision": precision}
 
 
 def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
-    _, labels_in, embeddings_in, _ = get_partition_from_dataframe(data, partition="val")
+    _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
 
     num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
@@ -371,7 +370,7 @@ def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot
 def tsne(
     data: pd.DataFrame, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
-    _, labels_in, embeddings_in, _ = get_partition_from_dataframe(data, partition="val")
+    _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
 
     num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
