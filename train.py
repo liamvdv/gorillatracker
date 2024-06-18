@@ -25,7 +25,7 @@ from gorillatracker.utils.wandb_logger import WandbLoggingModule
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 warnings.filterwarnings("ignore", ".* does not have many workers.*")
-warnings.filterwarnings("ignore", ".*site-packages/torchmetrics/utilities/prints.py:43.*")
+warnings.filterwarnings("ignore", ".*No positive samples in targets.*")
 
 
 def main(args: TrainingArgs) -> None:
