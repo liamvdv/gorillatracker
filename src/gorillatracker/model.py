@@ -30,7 +30,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, log_train_images_to_wandb, pca, tsne
+from gorillatracker.metrics import evaluate_embeddings, knn # log_train_images_to_wandb, pca, tsne
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 

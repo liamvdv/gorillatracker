@@ -143,29 +143,36 @@ def evaluate_embeddings(
             wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
     return results
 
+def get_individual_video_id(id: gtypes.Id) -> str:
+    return "".join(Path(id).name.split("_")[:3]).upper()
 
-def _get_crossvideo_masks(
+def get_individual_id(id: gtypes.Id) -> str: # individual + camera + date
+    return Path(id).name.split("_")[0].upper()
+
+def _get_crossvideo_masks( # TODO
     labels: torch.Tensor, ids: list[gtypes.Id]
 ) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
     distance_mask = torch.zeros((len(labels), len(labels)))
     classification_mask = torch.zeros(len(labels))
 
     individual_video_ids_per_individual = defaultdict(set)
-    transformed_ids = [Path(id).name for id in ids]
-    transformed_ids = ["".join(id.split("_")[:3]).upper() for id in transformed_ids]
+    images_per_ivid = defaultdict(0)
     for i, id in enumerate(ids):
-        id = Path(id).name
-        individual_video_id = "".join(id.split("_")[:3]).upper()  # individual + camera + date
+        individual_video_id = get_individual_video_id(id)
         distance_mask[i] = torch.tensor(
-            [individual_video_id != vi_id for vi_id in transformed_ids]
+            [individual_video_id != get_individual_video_id(anId) for anId in ids]
         )  # 1 if not same video, 0 if same video
 
-        individual_video_ids_per_individual[id.split("_")[0].upper()].add(individual_video_id)
+        individual_video_ids_per_individual[get_individual_id(id)].add(individual_video_id)
+        images_per_ivid[individual_video_id] += 1
 
     for i, id in enumerate(ids):
-        id = Path(id).name
-        individual_video_id = "".join(id.split("_")[:3]).upper()
-        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0].upper()]) > 1
+        individual_id = get_individual_id(id)
+        individual_video_id = get_individual_video_id(id)
+        if len(individual_video_ids_per_individual[individual_id]) > 1 and sum(
+            [images_per_ivid[ivid] for ivid in individual_video_ids_per_individual[individual_id]]
+        ) - images_per_ivid[individual_video_id] > 5: # ensure that there are at least 5 images of the same individual in the dataset
+            classification_mask[i] = 1
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
 
