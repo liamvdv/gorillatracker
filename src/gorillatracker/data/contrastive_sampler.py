@@ -111,6 +111,70 @@ class ContrastiveClassSampler(ContrastiveSampler):
         return negative_classes
 
 
+class SupervisedCrossEncounterSampler(ContrastiveClassSampler):
+    def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]]) -> None:
+        super().__init__(classes)
+
+        self.class_to_individual_video_id = defaultdict(set)
+        for label, samples in classes.items():
+            for sample in samples:
+                individual_video_id = "".join(str(Path(sample.id).name).split("_")[:3])
+                self.class_to_individual_video_id[label].add(individual_video_id)
+
+    def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
+        positive_class = self.sample_to_class[sample]
+        if len(self.classes[positive_class]) == 1:
+            return sample
+
+        if len(self.class_to_individual_video_id[positive_class]) == 1:
+            positives = [s for s in self.classes[positive_class] if s != sample]
+        else:
+            sample_individual_video_id = "".join(str(Path(sample.id).name).split("_")[:3]).upper()
+            positives = [s for s in self.classes[positive_class] if s != sample]
+            positives = [
+                s for s in positives if "".join(str(Path(s.id).name).split("_")[:3]) != sample_individual_video_id
+            ]
+        return random.choice(positives)
+
+
+class SupervisedHardCrossEncounterSampler(ContrastiveClassSampler):
+    def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]]) -> None:
+        super().__init__(classes)
+
+        self.class_to_individual_video_id = defaultdict(set)
+        for label, samples in classes.items():
+            for sample in samples:
+                individual_video_id = "".join(str(Path(sample.id).name).split("_")[:3])
+                self.class_to_individual_video_id[label].add(individual_video_id)
+
+        # NOTE: we overwrite sample, sample_to_class, and classes to only include samples with more than one individual video id
+        self.classes = {
+            label: samples
+            for label, samples in self.classes.items()
+            if len(self.class_to_individual_video_id[label]) > 1
+        }
+        self.samples = [sample for samples in self.classes.values() for sample in samples]
+        self.sample_to_class = {sample: label for label, samples in self.classes.items() for sample in samples}
+
+        logger.info(f"Number of classes: {len(self.classes)}")
+        logger.info(f"Number of samples: {len(self.samples)}")
+
+    def positive(self, sample: ContrastiveImage) -> ContrastiveImage:
+        positive_class = self.sample_to_class[sample]
+        if len(self.classes[positive_class]) == 1:
+            return sample
+
+        if len(self.class_to_individual_video_id[positive_class]) == 1:
+            positives = [s for s in self.classes[positive_class] if s != sample]
+        else:
+            sample_individual_video_id = "".join(str(Path(sample.id).name).split("_")[:3]).upper()
+            positives = [s for s in self.classes[positive_class] if s != sample]
+            positives = [
+                s for s in positives if "".join(str(Path(s.id).name).split("_")[:3]) != sample_individual_video_id
+            ]
+        return random.choice(positives)
+
+
 class CliqueGraphSampler(ContrastiveSampler):
     def __init__(self, graph: IndexedCliqueGraph[ContrastiveImage]):
         self.graph = graph

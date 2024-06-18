@@ -29,7 +29,7 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
         "method": "bayes",  # Specify the search method (random search in this case)
         "metric": {
             "goal": "maximize",
-            "name": "val/embeddings/knn/dataloader_0/accuracy",
+            "name": "", # TODO
         },  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
@@ -46,18 +46,38 @@ sweeps = [
         "entity": "gorillas",
         "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
         "parameters": {
-            "weight_decay": {
-                "values": [
-                    0.7,
-                    0.5,
-                    0.1,
-                ]
-            },
-            "dropout_p": {"values": [0.5, 0.3, 0.1]},
-            "start_lr": {"values": [1e-3, 1e-4, 1e-5]},
-            "end_lr": {"values": [1e-5, 1e-6, 1e-7]},
+            "dataset_class": {"values": [
+                "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset",
+            ]},
+            "loss_mode": {"values": [
+                "offline/l2sp",
+                "online/soft/l2sp",  
+            ]},
+            "l2_alpha": {"values": [0.005]},
+            "l2_beta": {"values": [0.0005]},
+            "batch_size": {"values": [8]},
         },
     },
+    {
+        "project_name": "Embedding-EfficientNetRWM-CXL-OpenSetCrossEncounter",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
+        "parameters": {
+            "dataset_class": {"values": [
+                "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset",
+            ]},
+            "loss_mode": {"values": [
+                "softmax/arcface/l2sp",
+            ]},
+            "l2_alpha": {"values": [0.1]},
+            "l2_beta": {"values": [0.01]},
+            "batch_size": {"values": [32]},
+        },
+    }
 ]
 
 check_sweep_configs(sweeps)

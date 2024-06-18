@@ -11,7 +11,7 @@ from torchvision.transforms import Compose, Normalize, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data.builder import build_data_module
+from gorillatracker.data.builder import build_data_module, force_nlet_builder
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.utils.train import (
@@ -78,6 +78,9 @@ def main(args: TrainingArgs) -> None:
         height_range=args.height_range,
         split_path=args.split_path,
     )
+    if args.force_nlet_builder is not None and args.force_nlet_builder != "none":
+        force_nlet_builder(args.force_nlet_builder)
+
     dm = build_data_module(
         dataset_class_id=args.dataset_class,
         data_dir=args.data_dir,
@@ -92,7 +95,6 @@ def main(args: TrainingArgs) -> None:
     )
 
     ################# Construct model ##############
-
     if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
         model_constructor = ModelConstructor(args, model_cls, dm, wandb_logger)
         model = model_constructor.construct(wandb_logging_module, wandb_logger)

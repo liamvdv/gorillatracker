@@ -19,6 +19,8 @@ from gorillatracker.data.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
+    SupervisedCrossEncounterSampler,
+    SupervisedHardCrossEncounterSampler,
     group_contrastive_images,
 )
 from gorillatracker.transform_utils import SquarePad
@@ -114,6 +116,8 @@ class NletDataModule(L.LightningDataModule):
             raise NotImplementedError("Predict not implemented")
 
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
+        if not hasattr(self, "train"):  # HACK HACK HACK
+            self.setup("fit")
         return DataLoader(
             self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=self.workers
         )
@@ -292,7 +296,9 @@ class SupervisedDataset(NletDataset):
     def class_distribution(self) -> dict[Label, int]:
         return {label: len(samples) for label, samples in self.classes.items()}
 
-    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+    def create_contrastive_sampler(
+        self, base_dir: Path, sampler_class: type = ContrastiveClassSampler
+    ) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
             data_dir/
@@ -306,7 +312,7 @@ class SupervisedDataset(NletDataset):
         dirpath = base_dir / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else base_dir
         assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
         self.classes = group_images_by_label(dirpath)
-        return ContrastiveClassSampler(self.classes)
+        return sampler_class(self.classes)
 
 
 class SupervisedKFoldDataset(KFoldNletDataset):
@@ -318,7 +324,9 @@ class SupervisedKFoldDataset(KFoldNletDataset):
     def class_distribution(self) -> dict[Label, int]:
         return {label: len(samples) for label, samples in self.classes.items()}
 
-    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+    def create_contrastive_sampler(
+        self, base_dir: Path, sampler_class: type = ContrastiveClassSampler
+    ) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
             data_dir/
@@ -347,7 +355,39 @@ class SupervisedKFoldDataset(KFoldNletDataset):
             self.classes = group_images_by_label(dirpath)
         else:
             raise ValueError(f"Invalid partition: {self.partition}")
-        return ContrastiveClassSampler(self.classes)
+        return sampler_class(self.classes)
+
+
+class CrossEncounterSupervisedDataset(SupervisedDataset):
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedCrossEncounterSampler
+        )
+
+
+class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)  # type: ignore
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedCrossEncounterSampler
+        )
+
+
+class HardCrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)  # type: ignore
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedHardCrossEncounterSampler
+        )  # TODO
+
+
+class HardCrossEncounterSupervisedDataset(SupervisedDataset):
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedHardCrossEncounterSampler
+        )
 
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:

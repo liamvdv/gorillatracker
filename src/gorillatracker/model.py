@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 # from facenet_pytorch import InceptionResnetV1
-from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
@@ -389,7 +388,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=images)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images=images)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -471,7 +470,8 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
-                lr_scheduler: LRSchedulerConfigType = {
+                # lr_scheduler: LRSchedulerConfigType = {
+                lr_scheduler = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
                     "frequency": self.lr_interval,
@@ -788,8 +788,10 @@ class VisionTransformerWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -1259,7 +1261,7 @@ custom_model_cls = {
     "ConvNextClipWrapper": ConvNextClipWrapper,
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
-    # "FaceNet": FaceNetWrapper, 
+    # "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,

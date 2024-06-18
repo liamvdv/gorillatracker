@@ -177,6 +177,32 @@ def _get_crossvideo_masks( # TODO
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
 
 
+def _get_crossvideo_masks(
+    labels: torch.Tensor, ids: list[gtypes.Id]
+) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
+    distance_mask = torch.zeros((len(labels), len(labels)))
+    classification_mask = torch.zeros(len(labels))
+
+    individual_video_ids_per_individual = defaultdict(set)
+    transformed_ids = [Path(id).name for id in ids]
+    transformed_ids = ["".join(id.split("_")[:3]).upper() for id in transformed_ids]
+    for i, id in enumerate(ids):
+        id = Path(id).name
+        individual_video_id = "".join(id.split("_")[:3]).upper()  # individual + camera + date
+        distance_mask[i] = torch.tensor(
+            [individual_video_id != vi_id for vi_id in transformed_ids]
+        )  # 1 if not same video, 0 if same video
+
+        individual_video_ids_per_individual[id.split("_")[0].upper()].add(individual_video_id)
+
+    for i, id in enumerate(ids):
+        id = Path(id).name
+        individual_video_id = "".join(id.split("_")[:3]).upper()
+        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0].upper()]) > 1
+
+    return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
+
+
 def knn(
     data: pd.DataFrame,
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
