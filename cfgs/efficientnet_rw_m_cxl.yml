@@ -77,7 +77,6 @@ data_dir: "/workspaces/gorillatracker/datasets/splits/-workspaces-gorillatracker
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 
-
-data_resize_transform: 256
+data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
 additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]

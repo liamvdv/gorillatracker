@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterator
 
 from PIL import Image
 
@@ -43,6 +44,11 @@ class ContrastiveSampler(ABC):
     def __len__(self) -> int:
         pass
 
+    def __iter__(self) -> Iterator[ContrastiveImage]:
+        """Provides an iterator over the dataset."""
+        for idx in range(len(self)):
+            yield self[idx]
+
     @property
     @abstractmethod
     def class_labels(self) -> list[gtypes.Label]:
@@ -62,6 +68,13 @@ class ContrastiveSampler(ABC):
     def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
         """Return all possible negative labels for a sample"""
         pass
+
+    # HACK(memben): ...
+    def find_any_image(self, label: Label) -> ContrastiveImage:
+        for image in self:
+            if image.class_label == label:
+                return image
+        raise ValueError(f"No image found for label {label}")
 
 
 class ContrastiveClassSampler(ContrastiveSampler):
