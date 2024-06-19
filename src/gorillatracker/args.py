@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Union
 
 from simple_parsing import field, list_field
 
