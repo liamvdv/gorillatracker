@@ -6,7 +6,7 @@ import torch.ao.quantization.quantize_fx as quantize_fx
 import torch.nn as nn
 from ai_edge_torch.quantize.pt2e_quantizer import PT2EQuantizer
 from torch._export import capture_pre_autograd_graph
-from torch.ao.quantization import allow_exported_model_train_eval # type: ignore
+from torch.ao.quantization import allow_exported_model_train_eval  # type: ignore
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import get_symmetric_quantization_config
 from torch.fx import GraphModule
