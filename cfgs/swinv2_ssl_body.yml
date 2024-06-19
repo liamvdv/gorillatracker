@@ -35,8 +35,8 @@ beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.001                       # Alpha for the l2sp loss
-l2_beta: 0.001                       # Beta for the l2sp loss
+l2_alpha: 0.002                       # Alpha for the l2sp loss
+l2_beta: 0.0002                      # Beta for the l2sp loss
 path_to_pretrained_weights: "pretrained_weights/swinv2_base.pth"    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
@@ -77,5 +77,6 @@ data_resize_transform: 192
 
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
 additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"

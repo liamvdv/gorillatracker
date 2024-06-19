@@ -35,8 +35,8 @@ beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.001                       # Alpha for the l2sp loss
-l2_beta: 0.001                       # Beta for the l2sp loss
+l2_alpha: 0.002                       # Alpha for the l2sp loss
+l2_beta: 0.0002                      # Beta for the l2sp loss
 path_to_pretrained_weights: "pretrained_weights/swinv2_base.pth"    # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
@@ -54,6 +54,7 @@ warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is per
 initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
 start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+stepwise_schedule: True
 
 
 batch_size: 128                  # Training batch size
@@ -63,7 +64,7 @@ max_epochs: 10                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-val_check_interval: 1.0
+val_check_interval: 250
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 1      # Embedding save interval
 knn_with_train: False           
@@ -71,12 +72,13 @@ knn_with_train: False
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
-split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-100-0-0_split.pkl"
+split_path: "/workspaces/gorillatracker/data/splits/SSL/10000-SSL-Video-Split_2024-04-18_percentage-90-5-5_split_20240618_1121.pkl"
 feature_types: ["face_45", "face_90"]
+n_samples: 5
 
-data_resize_transform: 224
+data_resize_transform: 192
 
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+additional_val_dataset_classes: ["gorillatracker.datasets.cxl.CXLDataset", "gorillatracker.datasets.bristol.BristolDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25", "/workspaces/gorillatracker/data/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
