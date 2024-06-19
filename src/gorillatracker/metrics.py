@@ -309,8 +309,7 @@ def knn_ssl(
         knn = NearestNeighbors(n_neighbors=max(5, k) + 1, algorithm="auto").fit(subset_embeddings.numpy())
         current_label_mask = subset_label_values == label.item()
         current_label_embeddings = subset_embeddings[current_label_mask]
-        distances, indices = knn.kneighbors(current_label_embeddings.numpy())
-        distances = distances[:, 1:]
+        _, indices = knn.kneighbors(current_label_embeddings.numpy())
         indices = indices[:, 1:]
         for idx_list in indices:
             neighbor_labels = subset_label_values[idx_list]
