@@ -78,7 +78,7 @@ def main(args: TrainingArgs) -> None:
         height_range=args.height_range,
         split_path=args.split_path,
     )
-    if args.force_nlet_builder is not None and args.force_nlet_builder != "none":
+    if args.force_nlet_builder is not None and args.force_nlet_builder != "None":
         force_nlet_builder(args.force_nlet_builder)
 
     dm = build_data_module(
