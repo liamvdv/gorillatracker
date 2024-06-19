@@ -153,9 +153,9 @@ def get_individual_video_id(id: gtypes.Id) -> str:
 def get_individual_id(id: gtypes.Id) -> str: # individual + camera + date
     return Path(id).name.split("_")[0].upper()
 
-def _get_crossvideo_masks( # TODO
-    labels: torch.Tensor, ids: list[gtypes.Id]
-) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
+def _get_crossvideo_masks(
+    labels: torch.Tensor, ids: list[gtypes.Id], min_images_for_matching: int = 3
+) -> tuple[torch.Tensor, torch.Tensor]:
     distance_mask = torch.zeros((len(labels), len(labels)))
     classification_mask = torch.zeros(len(labels))
 
@@ -175,7 +175,7 @@ def _get_crossvideo_masks( # TODO
         individual_video_id = get_individual_video_id(id)
         if len(individual_video_ids_per_individual[individual_id]) > 1 and sum(
             [images_per_ivid[ivid] for ivid in individual_video_ids_per_individual[individual_id]]
-        ) - images_per_ivid[individual_video_id] > 5: # ensure that there are at least 5 images of the same individual in the dataset
+        ) - images_per_ivid[individual_video_id] > min_images_for_matching:
             classification_mask[i] = 1
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
