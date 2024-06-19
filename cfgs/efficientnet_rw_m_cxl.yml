@@ -5,7 +5,7 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: True      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 8                      # Number of workers for data loading
+workers: 16                      # Number of workers for data loading
 
 
 # Model and Training Arguments
@@ -29,15 +29,15 @@ dropout_p: 0.32
 use_quantization_aware_training: False
 use_dist_term: False
 
-force_nlet_builder: none
+
 weight_decay: 1e-1              # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.005                      # Alpha for the l2sp loss
-l2_beta: 0.0005                       # Beta for the l2sp loss
+l2_alpha: 0.1                      # Alpha for the l2sp loss
+l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
