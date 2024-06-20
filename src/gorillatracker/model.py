@@ -331,6 +331,17 @@ class BaseModule(L.LightningModule):
 
         return flat_images, flat_labels_onehot
 
+    def predict_step(
+        self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0
+    ) -> tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]:
+        batch_size = lazy_batch_size(batch)
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        anchor_ids = list(flat_ids[:batch_size])
+        anchor_images = flat_images[:batch_size]
+        anchor_labels = flat_labels[:batch_size]
+        embeddings = self.forward(anchor_images)
+        return anchor_ids, embeddings, anchor_labels
+
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         _, images, _ = batch
         _, flat_images, flat_labels = flatten_batch(batch)

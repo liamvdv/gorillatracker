@@ -8,8 +8,8 @@ from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import logger
 from simple_parsing import parse
 from torchvision.transforms import Compose, Normalize, Resize
+import debugpy
 
-from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.builder import build_data_module
 from gorillatracker.model import get_model_cls
@@ -30,8 +30,6 @@ warnings.filterwarnings("ignore", ".*No positive samples in targets.*")
 
 def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
-    current_process_rank = get_rank()
-    logger.config(rank=current_process_rank, print_rank0_only=True)
     if args.accelerator == "cuda":
         num_available_gpus = torch.cuda.device_count()
         if num_available_gpus > args.num_devices:
@@ -42,8 +40,13 @@ def main(args: TrainingArgs) -> None:
         # if not torch.cuda.is_available():
         #     logger.error("CUDA is not available, you should change the accelerator with --accelerator cpu|tpu|mps.")
         #     exit(1)
-    if current_process_rank == 0 and args.debug:
-        wait_for_debugger()  # TODO: look into debugger usage
+    if args.debug:
+        port = 5678
+        debugpy.listen(("0.0.0.0", port))
+        logger.info(
+            f"Waiting for client to attach on port {port}... NOTE: if using docker, you need to forward the port with -p {port}:{port}."
+        )
+        debugpy.wait_for_client()
 
     args.seed = seed_everything(workers=True, seed=args.seed)
 
@@ -100,9 +103,6 @@ def main(args: TrainingArgs) -> None:
     #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
-    wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
-        cleanup_local=True, cleanup_online=False, size_limit=20
-    )
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
         monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
@@ -121,19 +121,14 @@ def main(args: TrainingArgs) -> None:
     callbacks = (
         [
             checkpoint_callback,  # keep this at the top
-            wandb_disk_cleanup_callback,
             lr_monitor,
             early_stopping,
         ]
         if not args.kfold
         else [
-            wandb_disk_cleanup_callback,
             lr_monitor,
         ]
     )
-
-    if args.accelerator == "cuda":
-        callbacks.append(CUDAMetricsCallback())
 
     # Initialize trainer
     supported_quantizations = ["nf4", "nf4-dq", "fp4", "fp4-dq", "int8", "int8-training"]
@@ -141,15 +136,14 @@ def main(args: TrainingArgs) -> None:
         args.plugins = BitsandbytesPrecision(mode=args.precision)  # type: ignore
         args.precision = "16-true"
 
-    if current_process_rank == 0:
-        logger.info(
-            f"Total optimizer epochs: {args.max_epochs} | "
-            f"Model Log Frequency: {args.save_interval} | "
-            f"Effective batch size: {args.batch_size} | "
-        )
+    logger.info(
+        f"Total optimizer epochs: {args.max_epochs} | "
+        f"Model Log Frequency: {args.save_interval} | "
+        f"Effective batch size: {args.batch_size} | "
+    )
 
     ################# Start training #################
-    logger.info(f"Rank {current_process_rank} | Starting training...")
+    logger.info("Starting training...")
     assert not (
         args.use_quantization_aware_training and args.kfold
     ), "Quantization aware training not supported with kfold"
@@ -182,5 +176,4 @@ if __name__ == "__main__":
 
     # parses the config file as default and overwrites with command line arguments
     # therefore allowing sweeps to overwrite the defaults in config file
-    current_process_rank = get_rank()
     main(parsed_arg_groups)
