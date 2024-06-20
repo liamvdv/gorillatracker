@@ -1279,7 +1279,5 @@ custom_model_cls = {
 
 def get_model_cls(model_name: str) -> Type[BaseModule]:
     model_cls = custom_model_cls.get(model_name, None)
-    if not model_cls:
-        module, cls = model_name.rsplit(".", 1)
-        model_cls = getattr(importlib.import_module(module), cls)
+    assert model_cls is not None, f"Model {model_name} not found in custom_model_cls"
     return model_cls
