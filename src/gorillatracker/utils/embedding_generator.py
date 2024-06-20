@@ -35,7 +35,7 @@ def df_from_predictions(predictions: tuple[list[gtypes.Id], torch.Tensor, torch.
                         "embedding": [embedding],
                         "label": [label],
                         "input": [input_img],
-                        "label_string": [str(label)],
+                        "label_string": [str(label.item())],
                     }
                 ),
             ]
