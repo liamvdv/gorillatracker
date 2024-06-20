@@ -120,7 +120,9 @@ class NletDataModule(L.LightningDataModule):
     # batched_values = torch.Tensor((ap1, ap2, ap3), (p1, p2, p3), ...)
     # batched_labels = torch.Tensor((ap1, ap2, ap3), (p1, p2, p3), ...)
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
-        if not hasattr(self, "train"):  # HACK HACK HACK
+        if not hasattr(
+            self, "train"
+        ):  # HACK(rob2u): we enforce setup to be called (somehow it's not always called, problem in val_before_training)
             self.setup("fit")
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)
 
