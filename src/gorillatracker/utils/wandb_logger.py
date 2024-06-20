@@ -7,7 +7,6 @@ from typing import Any, Optional
 from lightning.pytorch.loggers.wandb import WandbLogger
 from print_on_steroids import logger
 
-from dlib.frameworks.pytorch import get_rank
 from gorillatracker.args import TrainingArgs
 
 
@@ -79,10 +78,8 @@ class WandbLoggingModule:
         )
         wandb_logger.log_hyperparams(dataclasses.asdict(self.args))
 
-        current_process_rank = get_rank()
-        if current_process_rank == 0:
-            logger.info(self.args)
-        if current_process_rank == 0 and not self.args.resume and not self.args.offline:
+        logger.info(self.args)
+        if self.args.resume and not self.args.offline:
             assert wandb_logger.version is not None, "W&B logger version is None. This should not happen."
             wandb_logger.experiment.name = self.args.run_name + "-" + time.strftime("%Y-%m-%d-%H-%M-%S")
 
@@ -103,8 +100,6 @@ class WandbLoggingModule:
         """
         wandb_model_id_regex = r"wandb:.*"
         if re.search(wandb_model_id_regex, checkpoint_path):
-            if get_rank() == 0:
-                logger.info("Downloading W&B checkpoint...")
             wandb_model_id = checkpoint_path.split(":")[1]
             model_tag = checkpoint_path.split(":")[2] if len(checkpoint_path.split(":")) == 3 else "latest"
 

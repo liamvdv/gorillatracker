@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict, List, Literal, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 
@@ -20,7 +20,6 @@ class FocalLoss(torch.nn.Module):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         # assert len(alphas) == len(target), "Alphas must be the same length as the target"
-
         logpt = -self.ce(input, target)
         pt = torch.exp(logpt)
         loss = -((1 - pt) ** self.gamma) * logpt
@@ -81,7 +80,11 @@ class ArcFaceLoss(torch.nn.Module):
         self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: Optional[torch.Tensor] = None,
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
         embeddings = embeddings.to(self.accelerator)
@@ -128,7 +131,7 @@ class ArcFaceLoss(torch.nn.Module):
         output = torch.mean(output, dim=2)  # batch x num_classes
 
         assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
-        loss = self.ce(output, labels)
+        loss = self.ce(output, labels) if labels_onehot is None else self.ce(output, labels_onehot)
         if self.use_class_weights:
             loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
@@ -156,7 +159,11 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         self.is_eval = False
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: Optional[torch.Tensor] = None,
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         angle_margin = torch.Tensor([self.angle_margin]).to(embeddings.device)
         if not self.is_eval:
@@ -169,6 +176,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         return super().forward(
             embeddings,
             labels,
+            labels_onehot=labels_onehot,
         )
 
     def eval(self) -> Any:
@@ -186,7 +194,11 @@ class AdaFaceLoss(ArcFaceLoss):
         self.norm = torch.nn.BatchNorm1d(1, affine=False, momentum=momentum).to(kwargs.get("accelerator", "cpu"))
 
     def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor = torch.Tensor()
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        labels_onehot: Optional[torch.Tensor] = None,
+        **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         if self.norm.running_mean.device != embeddings.device:  # type: ignore
             self.norm = self.norm.to(embeddings.device)
@@ -201,7 +213,7 @@ class AdaFaceLoss(ArcFaceLoss):
             self.cos_m = torch.cos(g_angle)
             self.sin_m = torch.sin(g_angle)
             self.additive_margin = g_additive
-        return super().forward(embeddings, labels, images)
+        return super().forward(embeddings, labels, labels_onehot=labels_onehot, **kwargs)
 
     def eval(self) -> Any:
         self.is_eval = True
