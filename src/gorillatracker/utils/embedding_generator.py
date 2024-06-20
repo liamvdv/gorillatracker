@@ -68,6 +68,9 @@ def load_model_from_wandb(
     checkpoint = torch.load(model, map_location=torch.device("cpu"))
     model_state_dict = checkpoint["state_dict"]
 
+    model_config["num_classes"] = [0] * 3  # HACK
+    model_config["class_distribution"] = [{}] * 3  # HACK
+
     model = model_cls(**model_config)
 
     if (
@@ -123,6 +126,24 @@ def get_model_for_run_url(run_url: str, eval_mode: bool = True) -> BaseModule:
             "l2_alpha",
             "l2_beta",
             "path_to_pretrained_weights",
+            "num_classes",
+            "class_distribution",
+            "num_val_dataloaders",
+            "dropout_p",
+            "accelerator",
+            "use_wildme_model",
+            "k_subcenters",
+            "use_focal_loss",
+            "label_smoothing",
+            "use_class_weights",
+            "margin",
+            "s",
+            "delta_t",
+            "mem_bank_start_epoch",
+            "lambda_membank",
+            "teacher_model_wandb_link",
+            "use_dist_term",
+            "batch_size",
             # NOTE(liamvdv): might need be extended by other keys if model keys change
         )
     }
@@ -182,7 +203,6 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cpu", no
 
 
 def get_dataset(
-    model: BaseModule,
     partition: Literal["train", "val", "test"],
     data_dir: str,
     dataset_class: str,
@@ -194,7 +214,13 @@ def get_dataset(
         base_dir=Path(data_dir),
         nlet_builder=build_onelet,
         partition=partition,
-        transform=model.get_tensor_transforms() if transform is None else transform,
+        transform=(
+            transforms.Compose(
+                [cls.get_transforms(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]
+            )
+            if transform is None
+            else transform
+        ),
     )
 
 
@@ -230,8 +256,8 @@ def generate_embeddings_from_run(
     assert data_dir is not None, "data_dir must be provided"
     assert dataset_cls is not None, "dataset_cls must be provided"
 
-    train_dataset = get_dataset(partition="train", data_dir=data_dir, model=model, dataset_class=dataset_cls)
-    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], model=model, dataset_class=dataset_cls)
+    train_dataset = get_dataset(partition="train", data_dir=data_dir, dataset_class=dataset_cls)
+    val_dataset = get_dataset(partition="val", data_dir=args["data_dir"], dataset_class=dataset_cls)
 
     val_df = generate_embeddings(model, val_dataset)
     val_df["partition"] = "val"

@@ -1,0 +1,83 @@
+{
+    "global": {
+        "run_name": "baseline-sweep-13-06",
+        "wandb_tags": [
+            "sweep",
+            "baseline"
+        ],
+        "use_quantization_aware_training": false,
+        "max_epochs": 40,
+        "early_stopping_patience": 6,
+        "embedding_size": 256,
+        "data_resize_transform": 224,
+        "loss_mode": "softmax/arcface",
+        "data_dir": "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
+        "dataset_class": "gorillatracker.datasets.cxl.CXLDataset",
+        "kfold": false,
+        "val_before_training": true,
+        "lr_schedule": "exponential",
+        "workers": 16
+    },
+    "global_sweep_parameters": {
+        "weight_decay": {
+            "values": [
+                0.7,
+                0.5,
+                0.1
+            ]
+        },
+        "dropout_p": {
+            "values": [
+                0.5,
+                0.3,
+                0.1
+            ]
+        },
+        "start_lr": {
+            "values": [
+                1e-3,
+                1e-4,
+                1e-5
+            ]
+        },
+        "end_lr": {
+            "values": [
+                1e-5,
+                1e-6,
+                1e-7
+            ]
+        }
+    },
+    "experiments": [
+        {
+            "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ResNet152-CXL-OpenSet",
+            "config_path": "./cfgs/resnet152_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-CXL-Open",
+            "config_path": "./cfgs/convnextv2base_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-SwinV2Large-CXL-Open",
+            "config_path": "./cfgs/swinv2_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ViT-CXL-OpenSet",
+            "config_path": "./cfgs/visiontransformer_cxl.yml",
+            "parameters": {}
+        }
+    ]
+}

@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, Union
 
+import pandas as pd
 import torch
 import torch.nn as nn
 from ai_edge_torch.model import TfLiteModel
@@ -31,7 +32,18 @@ def get_knn_accuracy(
     images = images.to(device)
     generated_image_embeddings = quantized_model(images)
     validation_labels = labels
-    knn_results = knn(generated_image_embeddings, validation_labels, knn_number)
+
+    data = pd.DataFrame(
+        {  # TODO(rob2u): IDK if this works ask kajo to test and fix together
+            "embeddings": generated_image_embeddings,
+            "labels": validation_labels,
+            "id": range(len(validation_labels)),  # HACK
+            "partition": "val",
+            "dataset": "CXL",
+        }
+    )
+
+    knn_results = knn(data, k=knn_number)
     return knn_results
 
 
@@ -46,7 +58,17 @@ def get_knn_accuracy_tflite(
     generated_image_embeddings = model(images)
     generated_image_embeddings = torch.tensor(generated_image_embeddings)
     validation_labels = labels
-    knn_results = knn(generated_image_embeddings, validation_labels, knn_number)
+    data = pd.DataFrame(
+        {  # TODO(rob2u): IDK if this works ask kajo to test and fix together
+            "embeddings": generated_image_embeddings,
+            "labels": validation_labels,
+            "id": range(len(validation_labels)),  # HACK
+            "partition": "val",
+            "dataset": "CXL",
+        }
+    )
+
+    knn_results = knn(data, k=knn_number)
     return knn_results
 
 

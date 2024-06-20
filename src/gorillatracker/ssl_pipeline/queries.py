@@ -53,6 +53,7 @@ def multiple_videos_filter(video_ids: list[int]) -> Select[tuple[TrackingFrameFe
         return filter(lambda x: x.tracking.video_id in video_ids, frame_features)
     ```
     """
+    # NOTE(memben): Alternative of using a intermediate Video result and joining it, turned out to be not a difference
     return select(TrackingFrameFeature).where(TrackingFrameFeature.video_id.in_(video_ids))
 
 

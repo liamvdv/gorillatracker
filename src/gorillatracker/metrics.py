@@ -1,6 +1,7 @@
-from functools import partial
+from collections import defaultdict
 from itertools import islice
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional
 
 import lightning as L
 import matplotlib.pyplot as plt
@@ -15,133 +16,20 @@ import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from sklearn.manifold import TSNE
+from sklearn.metrics import accuracy_score, f1_score, precision_score
+from sklearn.neighbors import NearestNeighbors
 from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
 Runner = Any
 
 
-class LogEmbeddingsToWandbCallback(L.Callback):
-    """
-    A pytorch lightning callback that saves embeddings to wandb and logs them.
-
-    Args:
-        every_n_val_epochs: Save embeddings every n epochs as a wandb artifact (of validation set).
-        log_share: Log embeddings to wandb every n epochs.
-    """
-
-    def __init__(
-        self,
-        every_n_val_epochs: int,
-        knn_with_train: bool,
-        wandb_run: Runner,
-        dm: NletDataModule,
-        use_quantization_aware_training: bool = False,
-        fast_dev_run: bool = False,
-    ) -> None:
-        super().__init__()
-        self.embedding_artifacts: List[str] = []
-        self.every_n_val_epochs = every_n_val_epochs
-        self.knn_with_train = knn_with_train
-        self.run = wandb_run
-        self.dm = dm
-        self.use_quantization_aware_training = use_quantization_aware_training
-        self.kfold_k: Optional[int] = None
-        self.fast_dev_run = fast_dev_run
-
-    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
-        assert trainer.model is not None, "Model must be initalized before validation phase."
-        train_embedding_batches = []
-        train_labels = torch.tensor([])
-        for batch in self.dm.train_dataloader():
-            batch_size = lazy_batch_size(batch)
-            _, flat_images, flat_labels = flatten_batch(batch)
-            anchor_labels = flat_labels[:batch_size]
-            anchor_images = flat_images[:batch_size].to(trainer.model.device)
-            embeddings = trainer.model(anchor_images)
-            train_embedding_batches.append(embeddings)
-            train_labels = torch.cat([train_labels, anchor_labels], dim=0)
-        train_embeddings = torch.cat(train_embedding_batches, dim=0)
-        assert len(train_embeddings) == len(train_labels)
-        return train_embeddings.cpu(), train_labels.cpu()
-
-    def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        embeddings_table_list = pl_module.embeddings_table_list
-        current_step = trainer.global_step
-
-        assert trainer.max_epochs is not None
-        for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
-            dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
-            table = wandb.Table(columns=embeddings_table.columns.to_list(), data=embeddings_table.values)  # type: ignore
-            artifact = wandb.Artifact(
-                name="run_{0}_step_{1}_dataloader_{2}".format(self.run.name, current_step, dataloader_name),
-                type="embeddings",
-                metadata={"step": current_step},
-                description="Embeddings from step {}".format(current_step),
-            )
-            artifact.add(table, "embeddings_table_step_{}".format(current_step))
-            self.run.log_artifact(artifact)
-            self.embedding_artifacts.append(artifact.name)
-
-            train_embeddings, train_labels = (
-                self._get_train_embeddings_for_knn(trainer) if self.knn_with_train else (None, None)
-            )
-
-            metrics = {
-                "knn5": partial(knn, k=5),
-                "knn": partial(knn, k=1),
-                "knn5_macro": partial(knn, k=5, average="macro"),
-                "knn_macro": partial(knn, k=1, average="macro"),
-                "pca": pca,
-                "tsne": tsne,
-                # "fc_layer": fc_layer,
-            }
-            metrics |= (
-                {
-                    "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                    "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                    "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
-                    "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
-                }
-                if self.knn_with_train
-                else {}
-            )
-            metrics = metrics if not self.fast_dev_run else {}
-
-            # log to wandb
-            evaluate_embeddings(
-                data=embeddings_table,
-                embedding_name="val/embeddings",
-                metrics=metrics,
-                train_embeddings=train_embeddings,
-                train_labels=train_labels,
-                kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
-                dataloader_name=dataloader_name,
-            )
-            # clear the table where the embeddings are stored
-            # pl_module.embeddings_table = pd.DataFrame(columns=pl_module.embeddings_table_columns)  # reset embeddings table
-
-    def on_train_epoch_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        log_train_images_to_wandb(self.run, trainer, n_samples=1)
-
-    def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        if trainer.model.dtype == torch.float32 and not self.use_quantization_aware_training:  # type: ignore
-            log_grad_cam_images_to_wandb(self.run, trainer)
-
-
-# now add stuff to evaluate the embeddings / the model that created the embeddings
-# 1. add a fully connected layer to the model that takes the embeddings as input and outputs the labels -> then train this model -> evaluate false positive, false negative, accuracy, ...)
-# 2. use different kinds of clustering algorithms to cluster the embeddings -> evaluate (false positive, false negative, accuracy, ...)
-# 3. use some kind of FLDA ({(m_1 - m_2)^2/(s_1^2 + s_2^2)} like metric to evaluate the quality of the embeddings
-# 4. try kNN with different k values to evaluate the quality of the embeddings
-# 5. enjoy
 def load_embeddings_from_wandb(embedding_name: str, run: Runner) -> pd.DataFrame:
     """Load embeddings from wandb Artifact."""
     # Data is a pandas Dataframe with columns: label, embedding_0, embedding_1, ... loaded from wandb from the
@@ -167,13 +55,15 @@ def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples
     return samples
 
 
-def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 1) -> None:
+def log_train_images_to_wandb(
+    run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1
+) -> None:
     """
     Log nlet images from the train dataloader to wandb.
     Visual sanity check to see if the dataloader works as expected.
     """
     # get first n_samples triplets from the train dataloader
-    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=n_samples)  # type: ignore
+    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=n_samples)
     for i, sample in enumerate(samples):
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
         row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
@@ -186,18 +76,20 @@ def log_train_images_to_wandb(run: Runner, trainer: L.Trainer, n_samples: int = 
         run.log({f"epoch_{trainer.current_epoch}_nlet_{1+i}": artifacts})
 
 
-def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
+@torch.enable_grad()  # type: ignore
+def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer, train_dataloader: Dataloader[gtypes.Nlet]) -> None:
     # NOTE(liamvdv): inverse grad cam support to model since we might not be using
     #                a model which grad cam does not support.
     # NOTE(liamvdv): Transform models may have different interpretations.
     assert trainer.model is not None, "Must only call log_grad_cam_images... after model was initialized."
+
     if not hasattr(trainer.model, "get_grad_cam_layer"):
         return
     target_layer = trainer.model.get_grad_cam_layer()
     get_reshape_transform = getattr(trainer.model, "get_grad_cam_reshape_transform", lambda: None)
     cam = GradCAM(model=trainer.model, target_layers=[target_layer], reshape_transform=get_reshape_transform())
 
-    samples = get_n_samples_from_dataloader(trainer.train_dataloader, n_samples=1)  # type: ignore
+    samples = get_n_samples_from_dataloader(train_dataloader, n_samples=1)
     wandb_images: List[wandb.Image] = []
     for sample in samples:
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
@@ -213,38 +105,38 @@ def log_grad_cam_images_to_wandb(run: Runner, trainer: L.Trainer) -> None:
     run.log({"Grad-CAM": wandb_images})
 
 
+def get_partition_from_dataframe(
+    data: pd.DataFrame, partition: Literal["val", "train", "test"] = "val"
+) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id], torch.Tensor]:
+    partition_df = data.where(data["partition"] == partition).dropna()
+    partition_labels = torch.tensor(partition_df["label"].tolist()).long()
+    partition_embeddings = np.stack(partition_df["embedding"].apply(np.array)).astype(np.float32)
+    partition_embeddings = torch.tensor(partition_embeddings)
+    partition_ids = partition_df["id"].tolist()
+    partition_encoded_labels = torch.tensor(partition_df["encoded_label"].tolist()).long()
+
+    return partition_df, partition_labels, partition_embeddings, partition_ids, partition_encoded_labels
+
+
 def evaluate_embeddings(
-    data: pd.DataFrame,
+    data: pd.DataFrame,  # columns: label, embedding, id, partition
     embedding_name: str,
     metrics: Dict[str, Any],
-    train_embeddings: Optional[torch.Tensor] = None,
-    train_labels: Optional[gtypes.MergedLabels] = None,
     kfold_k: Optional[int] = None,
-    dataloader_name: str = "Unkonwn",
-) -> Dict[str, Any]:  # data is DataFrame with columns: label and embedding
-    assert (train_embeddings is not None and train_labels is not None) or (
-        train_embeddings is None and train_labels is None
-    )
+    dataloader_name: str = "Unknown",
+) -> Dict[str, Any]:
 
-    # Transform any type to numeric type labels
-    val_labels = torch.tensor(data["label"])
-    train_labels = train_labels.clone().detach() if train_labels is not None else torch.tensor([])  # type: ignore
-    val_labels = val_labels.type(torch.int64)
-    train_labels = train_labels.type(torch.int64)
+    assert (
+        all([column in data.columns for column in ["label", "embedding", "id", "partition", "dataset"]])
+        and len(data.columns) == 5
+    ), "Dataframe must have columns: label, embedding, id, partition. More are not allowed!"
 
-    val_train_labels = torch.cat([val_labels, train_labels], dim=0)
+    # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
+    le = LinearSequenceEncoder()
+    data["label"] = data["label"].astype(int)
+    data["encoded_label"] = le.encode_list(data["label"].tolist())
 
-    nval = len(val_labels)
-    val_labels, train_labels = val_train_labels[:nval], val_train_labels[nval:]
-    val_embeddings = np.stack(data["embedding"].apply(np.array)).astype(np.float32)
-    val_embeddings = torch.tensor(val_embeddings)
-
-    assert len(val_embeddings) > 0, "No validation embeddings given."
-
-    results = {
-        metric_name: metric(val_embeddings, val_labels, train_embeddings=train_embeddings, train_labels=train_labels)
-        for metric_name, metric in metrics.items()
-    }
+    results = {metric_name: metric(data) for metric_name, metric in metrics.items()}
 
     kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
     for metric_name, result in results.items():
@@ -252,49 +144,42 @@ def evaluate_embeddings(
             for key, value in result.items():
                 wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value})
         else:
-            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result})
-
+            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
     return results
 
 
+def _get_crossvideo_masks(
+    labels: torch.Tensor, ids: list[gtypes.Id]
+) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
+    distance_mask = torch.zeros((len(labels), len(labels)))
+    classification_mask = torch.zeros(len(labels))
+
+    individual_video_ids_per_individual = defaultdict(set)
+    transformed_ids = [Path(id).name for id in ids]
+    transformed_ids = ["".join(id.split("_")[:3]).upper() for id in transformed_ids]
+    for i, id in enumerate(ids):
+        id = Path(id).name
+        individual_video_id = "".join(id.split("_")[:3]).upper()  # individual + camera + date
+        distance_mask[i] = torch.tensor(
+            [individual_video_id != vi_id for vi_id in transformed_ids]
+        )  # 1 if not same video, 0 if same video
+
+        individual_video_ids_per_individual[id.split("_")[0].upper()].add(individual_video_id)
+
+    for i, id in enumerate(ids):
+        id = Path(id).name
+        individual_video_id = "".join(id.split("_")[:3]).upper()
+        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0].upper()]) > 1
+
+    return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
+
+
 def knn(
-    val_embeddings: torch.Tensor,
-    val_labels: torch.Tensor,
+    data: pd.DataFrame,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
     use_train_embeddings: bool = False,
-    train_embeddings: Optional[torch.Tensor] = None,
-    train_labels: Optional[torch.Tensor] = None,
-    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
-) -> Dict[str, Any]:
-    if use_train_embeddings and (train_embeddings is None or train_labels is None):
-        raise ValueError("If use_train_embeddings is set to True, train_embeddings/train_labels must be provided.")
-
-    # NOTE(rob2u): necessary for sanity checking dataloader and val only (problem when not range 0:n-1)
-    le = LinearSequenceEncoder()
-    val_labels_encoded = torch.tensor(le.encode_list(val_labels.tolist()))
-
-    if use_train_embeddings:
-        train_labels_encoded = torch.tensor(le.encode_list(train_labels.tolist()))  # type: ignore
-        # print("Using train embeddings for knn")
-        return knn_with_train(
-            val_embeddings,
-            val_labels_encoded,
-            k=k,
-            train_embeddings=train_embeddings,  # type: ignore
-            train_labels=train_labels_encoded,
-            average=average,
-        )
-    else:
-        return knn_naive(val_embeddings, val_labels_encoded, k=k, average=average)
-
-
-def knn_with_train(
-    val_embeddings: torch.Tensor,
-    val_labels: torch.Tensor,
-    train_embeddings: torch.Tensor,
-    train_labels: torch.Tensor,
-    average: Literal["micro", "macro", "weighted", "none"],
-    k: int = 5,
+    use_crossvideo_positives: bool = False,
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -306,11 +191,16 @@ def knn_with_train(
     4. Select only the validation part of the classification matrix (len(val_embeddings) x num_classes)
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
+
+    assert not use_crossvideo_positives or all(
+        ["CXL" in row["dataset"] for _, row in data.iterrows()]
+    ), "Crossvideo positives can only be used with CXL datasets"
+
     # convert embeddings and labels to tensors
-    val_embeddings = val_embeddings.clone().detach()
-    val_labels = torch.tensor(val_labels.tolist())
-    train_embeddings = train_embeddings.clone().detach()
-    train_labels = torch.tensor(train_labels.tolist())
+    _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")
+    train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])
+    if use_train_embeddings:
+        _, _, train_embeddings, _, train_labels = get_partition_from_dataframe(data, partition="train")
 
     combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
@@ -321,8 +211,13 @@ def knn_with_train(
         k = num_classes
 
     distance_matrix = pairwise_euclidean_distance(combined_embeddings)
-
     distance_matrix.fill_diagonal_(float("inf"))
+
+    distance_mask: torch.Tensor
+    classification_mask: torch.Tensor
+    if use_crossvideo_positives:
+        distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
         distance_matrix,
@@ -342,7 +237,12 @@ def knn_with_train(
 
     # Select only the validation part of the classification matrix
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
-    assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
+
+    if use_crossvideo_positives:  # remove all with only one individual_video_id
+        val_classification_matrix = val_classification_matrix[classification_mask]
+        val_labels = val_labels[classification_mask]
+
+    # assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
 
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
@@ -376,75 +276,70 @@ def knn_with_train(
     }
 
 
-def knn_naive(
-    val_embeddings: torch.Tensor,
-    val_labels: torch.Tensor,
-    average: Literal["micro", "macro", "weighted", "none"],
+def knn_ssl(
+    data: pd.DataFrame,
+    dm: NletDataModule,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
 ) -> Dict[str, Any]:
-    num_classes = len(torch.unique(val_labels))
-    if num_classes < k:
-        print(f"Number of classes {num_classes} is smaller than k {k} -> setting k to {num_classes}")
-        k = num_classes
+    # TODO: add true label
+    _, labels, embeddings, _, _ = get_partition_from_dataframe(data, partition="val")
 
-    # convert embeddings and labels to tensors
-    val_embeddings = val_embeddings.clone().detach()
-    val_labels = torch.tensor(val_labels.tolist())
+    negatives = {}
+    true_labels = []
+    pred_labels = []
+    pred_labels_top5 = []
 
-    distance_matrix = pairwise_euclidean_distance(val_embeddings)
+    en = LinearSequenceEncoder()
+    labels = torch.tensor(en.encode_list(labels.tolist()))
+    current_val_index = 0
+    for label in labels.unique():  # type: ignore
+        decoded_label = en.decode(label.item())
+        image = dm.val[current_val_index].contrastive_sampler.find_any_image(decoded_label)
+        negative_labels = dm.val[current_val_index].contrastive_sampler.negative_classes(image)
+        negatives[label.item()] = en.encode_list(negative_labels)
 
-    # Ensure distances on the diagonal are set to a large value so they are ignored
-    distance_matrix.fill_diagonal_(float("inf"))
+    for label in labels.unique():  # type: ignore
+        subset_labels = negatives[label.item()] + [label.item()]
+        if len(subset_labels) < 2:
+            continue
+        subset_mask = torch.isin(labels, torch.tensor(subset_labels))
+        subset_embeddings = embeddings[subset_mask]
+        subset_label_values = labels[subset_mask]
+        knn = NearestNeighbors(n_neighbors=max(5, k) + 1, algorithm="auto").fit(subset_embeddings.numpy())
+        current_label_mask = subset_label_values == label.item()
+        current_label_embeddings = subset_embeddings[current_label_mask]
+        _, indices = knn.kneighbors(current_label_embeddings.numpy())
+        indices = indices[:, 1:]
+        for idx_list in indices:
+            neighbor_labels = subset_label_values[idx_list]
+            most_common = torch.mode(neighbor_labels[:k]).values.item()
+            true_labels.append(label.item())
+            pred_labels.append(most_common)
+            pred_labels_top5.append(neighbor_labels[:5].numpy())
 
-    # Find the indices of the closest embeddings for each embedding
-    classification_matrix = torch.zeros((len(val_embeddings), k))
+    true_labels_tensor = torch.tensor(true_labels)
+    pred_labels_tensor = torch.tensor(pred_labels)
 
-    _, closest_indices = torch.topk(distance_matrix, k, largest=False, sorted=True)
-    assert closest_indices.shape == (len(val_embeddings), k)
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
+    top5_correct = []
+    for i, true_label in enumerate(true_labels_tensor):
+        if true_label in pred_labels_top5_tensor[i]:
+            top5_correct.append(1)
+        else:
+            top5_correct.append(0)
+    top5_accuracy = sum(top5_correct) / len(top5_correct)
 
-    closest_labels = val_labels[closest_indices]
-    assert closest_labels.shape == closest_indices.shape
+    accuracy = accuracy_score(true_labels_tensor, pred_labels_tensor)
+    f1 = f1_score(true_labels_tensor, pred_labels_tensor, average=average)
+    precision = precision_score(true_labels_tensor, pred_labels_tensor, average=average, zero_division=0)
 
-    classification_matrix = torch.zeros((len(val_embeddings), num_classes))
-    for i in range(num_classes):
-        classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
-    assert classification_matrix.shape == (len(val_embeddings), num_classes)
-
-    accuracy = tm.functional.accuracy(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
-    )
-    assert accuracy is not None
-    accuracy_top5 = tm.functional.accuracy(
-        classification_matrix,
-        val_labels,
-        task="multiclass",
-        num_classes=num_classes,
-        top_k=5 if num_classes >= 5 else num_classes,
-    )
-    assert accuracy_top5 is not None
-    auroc = tm.functional.auroc(classification_matrix, val_labels, task="multiclass", num_classes=num_classes)
-    assert auroc is not None
-    f1 = tm.functional.f1_score(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
-    )
-    assert f1 is not None
-    precision = tm.functional.precision(
-        classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
-    )
-    assert precision is not None
-
-    return {
-        "accuracy": accuracy.item(),
-        "accuracy_top5": accuracy_top5.item(),
-        "auroc": auroc.item(),
-        "f1": f1.item(),
-        "precision": precision.item(),
-    }
+    return {"accuracy": accuracy, "accuracy_top5": top5_accuracy, "f1": f1, "precision": precision}
 
 
-def pca(
-    embeddings_in: torch.Tensor, labels_in: torch.Tensor, **kwargs: Any
-) -> wandb.Image:  # generate a 2D plot of the embeddings
+def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
+    _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
+
     num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()
@@ -472,8 +367,10 @@ def pca(
 
 
 def tsne(
-    embeddings_in: torch.Tensor, labels_in: torch.Tensor, with_pca: bool = False, count: int = 1000, **kwargs: Any
+    data: pd.DataFrame, with_pca: bool = False, count: int = 1000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
+    _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
+
     num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()
@@ -512,7 +409,6 @@ def tsne(
 
 
 if __name__ == "__main__":
-    # Test the EmbeddingAnalyzer and Accuracy metric
     run = wandb.init(entity="gorillas", project="MNIST-EfficientNetV2", name="test_embeddings2")
     data = load_embeddings_from_wandb("run_MNISTTest5-2023-11-11-15-17-17_epoch_10:v0", run)
     results = evaluate_embeddings(

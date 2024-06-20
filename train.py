@@ -7,12 +7,11 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import logger
 from simple_parsing import parse
-from torchvision.transforms import Compose, Resize
+from torchvision.transforms import Compose, Normalize, Resize
 
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, wait_for_debugger  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.builder import build_data_module
-from gorillatracker.metrics import LogEmbeddingsToWandbCallback
 from gorillatracker.model import get_model_cls
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.utils.train import (
@@ -26,7 +25,7 @@ from gorillatracker.utils.wandb_logger import WandbLoggingModule
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 warnings.filterwarnings("ignore", ".* does not have many workers.*")
-warnings.filterwarnings("ignore", ".*site-packages/torchmetrics/utilities/prints.py:43.*")
+warnings.filterwarnings("ignore", ".*No positive samples in targets.*")
 
 
 def main(args: TrainingArgs) -> None:
@@ -54,10 +53,19 @@ def main(args: TrainingArgs) -> None:
 
     ################# Construct model class ##############
     model_cls = get_model_cls(args.model_name_or_path)
+
     #################### Construct Data Module #################
-    model_transforms = model_cls.get_tensor_transforms()
-    if args.data_resize_transform is not None:
-        model_transforms = Compose([Resize(args.data_resize_transform, antialias=True), model_transforms])
+    def resize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    def normalize_transform(x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    if args.data_resize_transform:
+        resize_transform = Resize((args.data_resize_transform, args.data_resize_transform))
+    if args.use_normalization:
+        normalize_transform = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    model_transforms = Compose([resize_transform, normalize_transform])
 
     ssl_config = SSLConfig(
         tff_selection=args.tff_selection,
@@ -86,20 +94,11 @@ def main(args: TrainingArgs) -> None:
     ################# Construct model ##############
 
     if not args.kfold:  # NOTE(memben): As we do not yet have the parameters to initalize the model
-        model_constructor = ModelConstructor(args, model_cls, dm)
+        model_constructor = ModelConstructor(args, model_cls, dm, wandb_logger)
         model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
-
-    embeddings_logger_callback = LogEmbeddingsToWandbCallback(
-        every_n_val_epochs=args.embedding_save_interval,
-        knn_with_train=args.knn_with_train,
-        wandb_run=wandb_logger.experiment,
-        dm=dm,
-        use_quantization_aware_training=args.use_quantization_aware_training,
-        fast_dev_run=args.fast_dev_run,
-    )
 
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(
         cleanup_local=True, cleanup_online=False, size_limit=20
@@ -125,13 +124,11 @@ def main(args: TrainingArgs) -> None:
             wandb_disk_cleanup_callback,
             lr_monitor,
             early_stopping,
-            embeddings_logger_callback,
         ]
         if not args.kfold
         else [
             wandb_disk_cleanup_callback,
             lr_monitor,
-            embeddings_logger_callback,
         ]
     )
 
@@ -164,7 +161,6 @@ def main(args: TrainingArgs) -> None:
             callbacks=callbacks,
             wandb_logger=wandb_logger,
             wandb_logging_module=wandb_logging_module,
-            embeddings_logger_callback=embeddings_logger_callback,
         )
     elif args.use_quantization_aware_training:
         model, trainer = train_using_quantization_aware_training(

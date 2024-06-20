@@ -77,13 +77,12 @@ class NletDataModule(L.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         assert stage in {"fit", "validate", "test", "predict"}
-
         if stage == "fit":
             self.train = self.dataset_class(
                 self.data_dir,
                 nlet_builder=self.nlet_builder,
                 partition="train",
-                transform=transforms.Compose([self.model_transforms, self.training_transforms]),
+                transform=transforms.Compose([self.training_transforms, self.model_transforms]),
                 **self.kwargs,
             )
 
@@ -245,6 +244,8 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
             or
             <label>_<...>.jpg
     """
+    assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
+
     samples = []
     image_paths = list(dirpath.glob("*.jpg"))
     image_paths = image_paths + list(dirpath.glob("*.png"))
