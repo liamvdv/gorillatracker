@@ -53,7 +53,7 @@ initial_lr: 1e-5                # Initial learning rate before warmup(must be > 
 start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-batch_size: 32                 # Training batch size
+batch_size: 8                 # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 max_epochs: 50               # Training goal (large number)
@@ -67,12 +67,14 @@ check_val_every_n_epoch: 5      # Check validation every n epochs
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-force_nlet_builder: "quadlet"
+# force_nlet_builder: "quadlet"
 data_dir: "/workspaces/gorillatracker/datasets/splits/-workspaces-gorillatracker-data-ground_truth-cxl_all-face_images-kfold-actual_openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
-# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
-# dataset_class: "KFoldCXLDatasetId = "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+
+# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 
 data_resize_transform: 224
