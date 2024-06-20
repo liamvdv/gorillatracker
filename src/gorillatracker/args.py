@@ -135,7 +135,7 @@ class TrainingArgs:
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
     negative_mining: Literal["random", "overlapping"] = field(default="random")
     n_samples: int = field(default=15)
-    feature_types: list[Literal["body", "face_90", "face_45", "body_with_face"]] = field(default_factory=lambda: ["body"])
+    feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)
     min_images_per_tracking: int = field(default=3)
     width_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
@@ -154,5 +154,8 @@ class TrainingArgs:
             self.height_range[0] is None or self.height_range[1] is None or self.height_range[0] <= self.height_range[1]
         ):
             raise ValueError("min_height should be <= max_height")
+        assert all(
+            s in ["body", "face_90", "face_45", "body_with_face"] for s in self.feature_types
+        ), "Invalid feature type"
         if self.grad_clip <= 0:
             self.grad_clip = None

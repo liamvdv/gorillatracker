@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
 from typing import List, Literal, Optional
-from tqdm import tqdm
 
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session, load_only
+from tqdm import tqdm
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
@@ -36,7 +36,7 @@ class SSLConfig:
     tff_selection: Literal["random", "equidistant"]
     negative_mining: Literal["random", "overlapping"]
     n_samples: int
-    feature_types: list[Literal["body", "face_90", "face_45", "body_with_face"]]
+    feature_types: List[str]
     min_confidence: float
     min_images_per_tracking: int
     split_path: Path
@@ -123,7 +123,9 @@ class SSLConfig:
         BATCH_SIZE = 200
         num_batches = len(video_ids) // BATCH_SIZE
         tffs = []
-        for i in tqdm(range(num_batches + 1), desc="Sampling TrackingFrameFeatures", total=num_batches + 1, unit="batch"):
+        for i in tqdm(
+            range(num_batches + 1), desc="Sampling TrackingFrameFeatures", total=num_batches + 1, unit="batch"
+        ):
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
             sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
             tffs.extend(list(sampler.sample(session)))
