@@ -29,7 +29,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
+from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, tsne
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -388,7 +388,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images=images)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=images)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -470,8 +470,7 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
-                # lr_scheduler: LRSchedulerConfigType = {
-                lr_scheduler = {
+                lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
                     "frequency": self.lr_interval,

@@ -147,39 +147,6 @@ def evaluate_embeddings(
             wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
     return results
 
-def get_individual_video_id(id: gtypes.Id) -> str:
-    return "".join(Path(id).name.split("_")[:3]).upper()
-
-def get_individual_id(id: gtypes.Id) -> str: # individual + camera + date
-    return Path(id).name.split("_")[0].upper()
-
-def _get_crossvideo_masks(
-    labels: torch.Tensor, ids: list[gtypes.Id], min_images_for_matching: int = 3
-) -> tuple[torch.Tensor, torch.Tensor]:
-    distance_mask = torch.zeros((len(labels), len(labels)))
-    classification_mask = torch.zeros(len(labels))
-
-    individual_video_ids_per_individual = defaultdict(set)
-    images_per_ivid = defaultdict(0)
-    for i, id in enumerate(ids):
-        individual_video_id = get_individual_video_id(id)
-        distance_mask[i] = torch.tensor(
-            [individual_video_id != get_individual_video_id(anId) for anId in ids]
-        )  # 1 if not same video, 0 if same video
-
-        individual_video_ids_per_individual[get_individual_id(id)].add(individual_video_id)
-        images_per_ivid[individual_video_id] += 1
-
-    for i, id in enumerate(ids):
-        individual_id = get_individual_id(id)
-        individual_video_id = get_individual_video_id(id)
-        if len(individual_video_ids_per_individual[individual_id]) > 1 and sum(
-            [images_per_ivid[ivid] for ivid in individual_video_ids_per_individual[individual_id]]
-        ) - images_per_ivid[individual_video_id] > min_images_for_matching:
-            classification_mask[i] = 1
-
-    return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
-
 
 def _get_crossvideo_masks(
     labels: torch.Tensor, ids: list[gtypes.Id]
