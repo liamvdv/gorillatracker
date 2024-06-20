@@ -189,8 +189,8 @@ def knn(
     """
 
     assert not use_crossvideo_positives or all(
-        ["CXL" in row["dataset"] for _, row in data.iterrows()]
-    ), "Crossvideo positives can only be used with CXL datasets"
+        ["CXL" in row["dataset"] or "Bristol" in row["dataset"] for _, row in data.iterrows()]
+    ), "Crossvideo positives can only be used with CXL or Bristol datasets"
 
     # convert embeddings and labels to tensors
     _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")
