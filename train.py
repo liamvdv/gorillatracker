@@ -1,6 +1,7 @@
 import warnings
 from pathlib import Path
 
+import debugpy
 import torch
 from lightning import seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
@@ -8,7 +9,6 @@ from lightning.pytorch.plugins import BitsandbytesPrecision
 from print_on_steroids import logger
 from simple_parsing import parse
 from torchvision.transforms import Compose, Normalize, Resize
-import debugpy
 
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.builder import build_data_module
