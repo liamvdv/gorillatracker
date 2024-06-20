@@ -122,9 +122,7 @@ class NletDataModule(L.LightningDataModule):
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
         if not hasattr(self, "train"):  # HACK HACK HACK
             self.setup("fit")
-        return DataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers
-        )
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
