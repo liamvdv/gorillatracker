@@ -21,6 +21,7 @@ from gorillatracker.data.contrastive_sampler import (
     ContrastiveSampler,
     SupervisedCrossEncounterSampler,
     SupervisedHardCrossEncounterSampler,
+    get_individual,
     group_contrastive_images,
 )
 from gorillatracker.transform_utils import SquarePad
@@ -257,7 +258,7 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
     image_paths = image_paths + list(dirpath.glob("*.png"))
     for image_path in image_paths:
         if "_" in image_path.name:
-            label = image_path.name.split("_")[0]
+            label = get_individual(image_path)  # type: ignore
         else:
             label = image_path.name.split("-")[0]
         samples.append(ContrastiveImage(str(image_path), image_path, LabelEncoder.encode(label)))
