@@ -10,13 +10,13 @@ channels:
   - pyviz/label/dev
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
-  - pytorch=2.4.0
-  - torchvision=0.19.0
+  - pytorch=2.4.0.dev20240604
+  - torchvision=0.19.0.dev20240605
+  - transformers
   - wandb
   - lightning
   - accelerate
-  - torchvision
-  - transformers
+  - sentencepiece
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
 

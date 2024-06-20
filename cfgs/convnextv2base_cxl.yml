@@ -6,14 +6,14 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
 precision: 32           # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 4                      # Number of workers for data loading
+workers: 16                      # Number of workers for data loading
 
 
 # Model and Training Arguments
 
 project_name: "Embedding-ConvNeXtV2-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "115-run-exploratory-sweeps-low-learning-rate-different-modes" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep"]            # WandB tags for experiment tracking
+run_name: "332-use-student-teacher-distillation-and-efficient-net" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["non-kfold"]            # WandB tags for experiment tracking
 model_name_or_path: "ConvNeXtV2_Base" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -25,8 +25,9 @@ seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
 early_stopping_patience: 3      # Early stopping patience (number of epochs)
-embedding_size: 128
+embedding_size: 256
 dropout_p: 0.32
+use_quantization_aware_training: False
 
 weight_decay: 0.2              # Weight decay
 beta1: 0.9                      # Adam optimizer's beta1 parameter
@@ -37,38 +38,37 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "pretrained_weights/convnextv2_base.pth"    # Path to the pretrained weights for the l2sp loss
-
-margin: 1.0                   # Margin for the contrastive loss (triplet loss)
-s: 64.0                         # Scale for the softmax losses 
-delta_t: 50                    # Delta t for the vpl loss
-mem_bank_start_epoch: 10         # Epoch to start using the memory bank
-lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+margin: 1.0                     # Margin for the contrastive loss (triplet loss)
+loss_mode: "online/soft"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+teacher_model_wandb_link: "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/y94y8uu7?nw=nwuserkajohpi"       # WandB link to the teacher model for using knowledge distillation
 
 
-lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
+lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+initial_lr: 1e-4                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-batch_size: 12                # Training batch size
-grad_clip: 1.0                   # Gradient clipping value
-gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 15               # Training goal (large number)
-val_before_training: True      # Perform validation before training
+max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
+
+batch_size: 8                  # Training batch size
+grad_clip: 1.0                  # Gradient clipping value
+gradient_accumulation_steps: 2  # Gradient accumulation steps
+val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: False                     # Perform kfold cross validation
 
 save_interval: 2               # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
+save_model_to_wandb: True       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "data/splits/ground_truth-rohan-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+data_resize_transform: 224
 
 additional_val_dataset_classes: Null
 additional_val_data_dirs: Null

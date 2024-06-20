@@ -31,4 +31,4 @@ jobs:
         WANDB_API_KEY: ${{ secrets.WANDB_SECRET }}
       run: |
         # TODO(liamvdv): keep disabled until review complete; then "yes\nyes"
-        echo -e "yes\nno" | python3 scripts/clean_wandb.py apply /tmp/wandb_cleanup.json
+        echo -e "yes\nyes" | python3 scripts/clean_wandb.py apply /tmp/wandb_cleanup.json

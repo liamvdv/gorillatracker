@@ -55,11 +55,11 @@ initial_lr: 1e-5                # Initial learning rate before warmup(must be > 
 start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-batch_size: 4                # Training batch size
+batch_size: 8                # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
 gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 12               # Training goal (large number)
-val_before_training: True      # Perform validation before training
+val_before_training: False      # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: False                     # Perform kfold cross validation
 
@@ -71,6 +71,7 @@ embedding_save_interval: 2      # Embedding save interval
 
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+data_resize_transform: 224
 
 additional_val_dataset_classes: Null
 additional_val_data_dirs: Null

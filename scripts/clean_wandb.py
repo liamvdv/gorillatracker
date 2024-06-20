@@ -99,7 +99,7 @@ class WandbCleaner:
     def __init__(self, rules, entity=ENTITY):
         self.rules = rules
         self.entity = entity
-        self.delete_after = timedelta(days=7)
+        self.delete_after = timedelta(days=1)
         self.targets = []
 
     def iter_runs(self) -> Generator[Run, None, None]:

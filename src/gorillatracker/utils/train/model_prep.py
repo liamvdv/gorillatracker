@@ -10,10 +10,13 @@ from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 class ModelConstructor:
-    def __init__(self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule) -> None:
+    def __init__(
+        self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule, wandb_logger: WandbLogger
+    ) -> None:
         self.args = args
         self.model_cls = model_cls
         self.dm = dm
+        self.wandb_logger = wandb_logger
         self.model_args = self.model_args_from_training_args()
 
     def model_args_from_training_args(self) -> dict[str, Any]:
@@ -41,6 +44,7 @@ class ModelConstructor:
         dataset_names = self.dm.get_dataset_class_names()
 
         return dict(
+            data_module=self.dm,
             model_name_or_path=args.model_name_or_path,
             from_scratch=args.from_scratch,
             weight_decay=args.weight_decay,
@@ -80,6 +84,11 @@ class ModelConstructor:
             use_dist_term=args.use_dist_term,
             use_inbatch_mixup=args.use_inbatch_mixup,
             teacher_model_wandb_link=args.teacher_model_wandb_link,
+            knn_with_train=args.knn_with_train,
+            use_quantization_aware_training=args.use_quantization_aware_training,
+            fast_dev_run=args.fast_dev_run,
+            every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
+            wandb_run=self.wandb_logger.experiment,
         )
 
     def construct(
