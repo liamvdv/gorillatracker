@@ -20,3 +20,7 @@ test:
 	# TODO(liamvdv): Await fix https://github.com/Lightning-AI/pytorch-lightning/issues/16756
 	# lightning_utilities use deprecated pkg_resources API
 	pytest -W ignore::DeprecationWarning  tests
+
+.PHONY: nbclean
+nbclean: 
+	nbstripout notebooks/reidentification.ipynb

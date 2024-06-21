@@ -55,6 +55,7 @@ dependencies:
   - pytest
   - typer
   - ipywidgets
+  - nbstripout
 
   # pip dependencies
   - pip

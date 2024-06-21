@@ -24,11 +24,12 @@ class EmbeddingProjector:
             "umap": umap.UMAP(),
         }
 
-    def reduce_dimensions(self, embeddings: npt.NDArray[np.float_], method: str = "tsne") -> npt.NDArray[np.float_]:
+    def reduce_dimensions(self, embeddings: npt.NDArray[np.float_]) -> npt.NDArray[np.float_]:
         assert len(embeddings) > 2
-        algorithm = TSNE(n_components=2, perplexity=1)
-        if len(embeddings) > 30:
-            algorithm = self.algorithms.get(method, TSNE(n_components=2))
+        # perplexity is the number of nearest neighbors that is used in other manifold learning algorithms
+        # needs to be lower than the number of samples
+        perplexity = min(30, len(embeddings) - 1)
+        algorithm = TSNE(n_components=2, perplexity=perplexity)
         return algorithm.fit_transform(embeddings)
 
     def plot_clusters(

@@ -9,7 +9,7 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from facenet_pytorch import InceptionResnetV1
+# from facenet_pytorch import InceptionResnetV1
 from print_on_steroids import logger
 from torch.optim import AdamW
 from torchvision import transforms
@@ -1092,39 +1092,39 @@ class InceptionV3Wrapper(BaseModule):
         )
 
 
-class FaceNetWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = InceptionResnetV1(pretrained="vggface2")
+# class FaceNetWrapper(BaseModule):
+#     def __init__(  # type: ignore
+#         self,
+#         **kwargs,
+#     ) -> None:
+#         super().__init__(**kwargs)
+#         self.model = InceptionResnetV1(pretrained="vggface2")
+        
+#         self.model.last_linear = torch.nn.Sequential(
+#             torch.nn.BatchNorm1d(1792),
+#             torch.nn.Dropout(p=self.dropout_p),
+#             torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
+#         )
+#         self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
+#         self.set_losses(self.model, **kwargs)
 
-        self.model.last_linear = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(1792),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
-        )
-        self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
-        self.set_losses(self.model, **kwargs)
+#     @classmethod
+#     def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+#         return transforms.Compose(
+#             [
+#                 transforms.Resize((192), antialias=True),
+#                 transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+#             ]
+#         )
 
-    @classmethod
-    def get_tensor_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.Resize((192), antialias=True),
-                transforms_v2.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
+#     @classmethod
+#     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+#         return transforms.Compose(
+#             [
+#                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
+#                 transforms_v2.RandomHorizontalFlip(p=0.5),
+#             ]
+#         )
 
 
 class MiewIdNetWrapper(BaseModule):
@@ -1213,7 +1213,7 @@ custom_model_cls = {
     "ConvNextClipWrapper": ConvNextClipWrapper,
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
-    "FaceNet": FaceNetWrapper,
+    # "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,

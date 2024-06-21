@@ -157,7 +157,7 @@ def generate_embeddings(model: BaseModule, dataset: Any, device: str = "cuda", b
                 input_img = transforms.ToPILImage()(batch_inputs[i].cpu())
                 label_string = dataset.mapping[labels[i].item()] if hasattr(dataset, "mapping") else None
                 
-                all_ids.append(ids[i].item())
+                all_ids.append(ids[i])
                 all_embeddings.append(embeddings[i].numpy())
                 all_labels.append(labels[i].item())
                 all_inputs.append(input_img)
