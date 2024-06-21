@@ -1,13 +1,11 @@
 import logging
-from typing import Any, Callable, Dict, List, Literal, Union
+from typing import Any, Callable, Literal
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
-import gorillatracker.utils.l2sp_regularisation as l2
-from gorillatracker.losses.arcface_loss import ArcFaceLoss, VariationalPrototypeLearning
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -193,7 +191,13 @@ class TripletLossOnline(nn.Module):
         self.margin = margin
         self.mode = mode
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> gtypes.LossPosNegDist:
+    def forward(
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor,
+        dist_calc: Callable[[torch.Tensor], torch.Tensor] = euclidean_distance_matrix,
+        **kwargs: Any,
+    ) -> gtypes.LossPosNegDist:
         """computes loss value.
 
         Args:
@@ -206,7 +210,7 @@ class TripletLossOnline(nn.Module):
 
         # step 1 - get distance matrix
         # shape: (batch_size, batch_size)
-        distance_matrix = euclidean_distance_matrix(embeddings)
+        distance_matrix = dist_calc(embeddings)
 
         # step 2 - compute loss values for all triplets by applying broadcasting to distance matrix
 
@@ -293,7 +297,7 @@ class TripletLossOffline(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, **kwargs: Any) -> gtypes.LossPosNegDist:
         """
         Compute loss.
 
@@ -327,98 +331,12 @@ class TripletLossOfflineNative(nn.Module):
         self.margin = margin
         self.loss = nn.TripletMarginLoss(margin=margin)
 
-    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels) -> gtypes.LossPosNegDist:
+    def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, **kwargs: Any) -> gtypes.LossPosNegDist:
         # Offline has 3 chunks, anchors, postives and negatives.
         third = embeddings.size()[0] // 3
         anchors, positives, negatives = embeddings[:third], embeddings[third : 2 * third], embeddings[2 * third :]
         NO_VALUE = torch.tensor([-1])
         return self.loss(anchors, positives, negatives), NO_VALUE, NO_VALUE
-
-
-class L2SPRegularization_Wrapper(nn.Module):
-    """Wrapper that adds L2SP regularization to any loss"""
-
-    def __init__(
-        self,
-        loss: nn.Module,
-        model: nn.Module,
-        path_to_pretrained_weights: str,
-        alpha: float,
-        beta: float,
-        log_func: Callable[[str, float], None] = lambda x, y: None,
-    ):
-        super().__init__()
-        assert path_to_pretrained_weights is not None, "Path to pretrained weights must be provided"
-        self.loss = loss
-        self.model = model
-        self.l2sp_loss = l2.L2_SP(model, path_to_pretrained_weights, alpha, beta)
-        self.log = log_func
-
-    def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
-        standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
-        l2sp_loss = self.l2sp_loss(self.model)
-        if type(l2sp_loss) == torch.Tensor:
-            self.log("l2_sp", l2sp_loss.item())
-        else:
-            self.log("l2_sp", l2sp_loss)
-        return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean
-
-
-def get_loss(
-    loss_mode: str,
-    log_func: Callable[[str, float], None] = lambda x, y: None,
-    **kw_args: Any,
-) -> Callable[[torch.Tensor, gtypes.BatchLabel], gtypes.LossPosNegDist]:
-    l2sp = False
-    if "l2sp" in loss_mode:
-        loss_mode = loss_mode.replace("/l2sp", "")
-        l2sp = True
-
-    loss_module: Union[torch.nn.Module, None] = None
-
-    if loss_mode == "online/hard":
-        loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
-    elif loss_mode == "online/semi-hard":
-        loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"])
-    elif loss_mode == "online/soft":
-        loss_module = TripletLossOnline(mode="soft", margin=kw_args["margin"])
-    elif loss_mode == "offline":
-        loss_module = TripletLossOffline(margin=kw_args["margin"])
-    elif loss_mode == "offline/native":
-        loss_module = TripletLossOfflineNative(margin=kw_args["margin"])
-    elif loss_mode == "softmax/arcface":
-        loss_module = ArcFaceLoss(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            accelerator=kw_args["accelerator"],
-        )
-    elif loss_mode == "softmax/vpl":
-        loss_module = VariationalPrototypeLearning(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-            accelerator=kw_args["accelerator"],
-        )
-    else:
-        raise ValueError(f"Loss mode {loss_mode} not supported")
-
-    if l2sp:
-        return L2SPRegularization_Wrapper(
-            loss=loss_module,
-            model=kw_args["model"],
-            path_to_pretrained_weights=kw_args["path_to_pretrained_weights"],
-            alpha=kw_args["l2_alpha"],
-            beta=kw_args["l2_beta"],
-            log_func=log_func,
-        )
-
-    return loss_module
 
 
 if __name__ == "__main__":

@@ -4,21 +4,19 @@ channels:
   - conda-forge
   - nodefaults
   - pyviz/label/dev
+  # - pytorch-nightly
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
   # ML libraries
-  - pytorch::pytorch>=2.0 # or don't specify the version and use latest stable
+    # https://anaconda.org/pytorch-nightly/pytorch/
+  - pytorch=2.3.0=*cpu*
+  - torchvision
   # CUDA only on linux and windows
   - wandb
   - lightning
-  - transformers
-  - tokenizers
-  - datasets
-  - evaluate
-  - accelerate
-  - sentencepiece
   - torchvision
+  - transformers
   - faiss-cpu
   - timm  # maybe necessary to switch to faiss-cuda
 
@@ -31,12 +29,9 @@ dependencies:
   - matplotlib
 
   # Misc
-  - pydantic
   - jsonlines
   - zstandard
-  - debugpy
   - tqdm
-  - ipykernel
   - bokeh
   - colorcet
   - shapely
@@ -48,7 +43,6 @@ dependencies:
   - mypy
   - pytest
   - typer
-  - ipywidgets
 
   # pip dependencies
   - pip

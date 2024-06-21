@@ -258,8 +258,6 @@ class TrackingFrameFeature(Base):
     tracking: Mapped[Tracking] = relationship(back_populates="frame_features")
     video: Mapped[Video] = relationship(back_populates="tracking_frame_features")
 
-    Index("idx_frame_feature", "tracking_id", "frame_nr", "feature_type", unique=True)
-
     @validates("bbox_x_center_n", "bbox_y_center_n", "bbox_width_n", "bbox_height_n", "confidence")
     def validate_normalization(self, key: str, value: float) -> float:
         if not 0 <= value <= 1:
@@ -279,6 +277,10 @@ class TrackingFrameFeature(Base):
             str(self.tracking_frame_feature_id % 2**16),
             f"{self.tracking_frame_feature_id}.png",
         )
+
+    __table_args__ = (
+        Index("idx_tracking_id_frame_nr_feature_type", "tracking_id", "frame_nr", "feature_type", unique=True),
+    )
 
     def __lt__(self, other: TrackingFrameFeature) -> bool:
         return self.tracking_frame_feature_id < other.tracking_frame_feature_id

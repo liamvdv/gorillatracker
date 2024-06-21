@@ -1,27 +1,50 @@
-from typing import Any, Type, Union
+from typing import Any, Type
 
 import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data_modules import NletDataModule
+from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.model import BaseModule
-from gorillatracker.ssl_pipeline.data_module import SSLDataModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
 class ModelConstructor:
     def __init__(
-        self, args: TrainingArgs, model_cls: Type[BaseModule], dm: Union[SSLDataModule, NletDataModule]
+        self, args: TrainingArgs, model_cls: Type[BaseModule], dm: NletDataModule, wandb_logger: WandbLogger
     ) -> None:
         self.args = args
         self.model_cls = model_cls
         self.dm = dm
+        self.wandb_logger = wandb_logger
         self.model_args = self.model_args_from_training_args()
 
     def model_args_from_training_args(self) -> dict[str, Any]:
         args = self.args
+
+        num_classes = None
+        class_distribution = None
+        # TODO(memben): this is not logical for multiple datasets
+        if "softmax" in args.loss_mode:
+            # HACK(memben): To force load the datasets
+            self.dm.setup("fit")
+            self.dm.setup("test")
+
+            num_classes = (
+                self.dm.get_num_classes("train"),
+                self.dm.get_num_classes("val"),
+                self.dm.get_num_classes("test"),
+            )
+            class_distribution = (
+                self.dm.get_class_distribution("train"),
+                self.dm.get_class_distribution("val"),
+                self.dm.get_class_distribution("test"),
+            )
+
+        dataset_names = self.dm.get_dataset_class_names()
+
         return dict(
+            data_module=self.dm,
             model_name_or_path=args.model_name_or_path,
             from_scratch=args.from_scratch,
             weight_decay=args.weight_decay,
@@ -45,20 +68,27 @@ class ModelConstructor:
             delta_t=args.delta_t,
             mem_bank_start_epoch=args.mem_bank_start_epoch,
             lambda_membank=args.lambda_membank,
-            num_classes=(
-                (self.dm.get_num_classes("train"), self.dm.get_num_classes("val"), self.dm.get_num_classes("test"))  # type: ignore
-                if not args.use_ssl
-                else (-1, -1, -1)
-            ),
-            num_val_dataloaders=(
-                1 + len(args.additional_val_dataset_classes) if args.additional_val_dataset_classes else 1
-            ),
+            num_classes=num_classes,
+            class_distribution=class_distribution,
+            dataset_names=dataset_names,
             dropout_p=args.dropout_p,
             accelerator=args.accelerator,
             l2_alpha=args.l2_alpha,
             l2_beta=args.l2_beta,
             path_to_pretrained_weights=args.path_to_pretrained_weights,
             use_wildme_model=args.use_wildme_model,
+            k_subcenters=args.k_subcenters,
+            use_focal_loss=args.use_focal_loss,
+            label_smoothing=args.label_smoothing,
+            use_class_weights=args.use_class_weights,
+            use_dist_term=args.use_dist_term,
+            use_inbatch_mixup=args.use_inbatch_mixup,
+            teacher_model_wandb_link=args.teacher_model_wandb_link,
+            knn_with_train=args.knn_with_train,
+            use_quantization_aware_training=args.use_quantization_aware_training,
+            fast_dev_run=args.fast_dev_run,
+            every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
+            wandb_run=self.wandb_logger.experiment,
         )
 
     def construct(

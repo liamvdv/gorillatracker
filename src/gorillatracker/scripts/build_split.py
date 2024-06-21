@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import ultralytics
@@ -72,7 +73,7 @@ def generate_split_save_metadata_cxl(
         The path to the generated split.
     """
     cxl_cropped_split_path = generate_split(
-        dataset=dataset,
+        dataset_dir=Path(dataset),
         mode="openset",
         seed=seed,
     )
@@ -96,7 +97,7 @@ def generate_split_save_metadata_cxl(
 if __name__ == "__main__":
     bristol_split_dir = str(
         generate_split(
-            dataset="ground_truth/bristol/full_images",
+            dataset_dir=Path("data/ground_truth/bristol/full_images"),
             mode="openset",
             seed=69,
         )

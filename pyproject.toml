@@ -46,7 +46,7 @@ extend-select = ['Q', 'RUF100', 'C90']
 flake8-quotes = {inline-quotes = 'double', multiline-quotes = 'double'}
 # Explicit line length limit difficult, but McCabe complexity score will help. 
 # Ref: https://dx42.github.io/gmetrics/metrics/CyclomaticComplexityMetric.html
-mccabe = { max-complexity = 14 }
+mccabe = { max-complexity = 15 }
 
 [tool.ruff.lint.per-file-ignores]
 

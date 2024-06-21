@@ -78,6 +78,12 @@ class UnionFind(Generic[T]):
     def get_members(self, x: T) -> list[T]:
         return self.members[self.find(x)]
 
+    def delete_set(self, root: T) -> None:
+        members_to_delete = self.members.pop(root)
+        for member in members_to_delete:
+            self.root.pop(member)
+            self.rank.pop(member)
+
 
 class CliqueGraph(Generic[T]):
     """A graph consisting of cliques, allowing operations to merge two cliques
@@ -251,3 +257,12 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
             set(adjacent_clique_representatives)
         ), "Must be unique. Logic Error."
         return set(adjacent_clique_representatives)
+
+    def prune_cliques_without_neighbors(self) -> None:
+        deleted_vertices = set()
+        roots = self.union_find.members.keys()
+        for root in list(roots):
+            if len(self.get_adjacent_cliques(root)) == 0:
+                deleted_vertices.update(self.get_clique(root))
+                self.union_find.delete_set(root)
+        self.vertices = list(set(self.vertices) - deleted_vertices)
