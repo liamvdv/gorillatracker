@@ -36,7 +36,7 @@ beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.1                       # Alpha for the l2sp loss
+l2_alpha: 0.1                      # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
@@ -51,7 +51,7 @@ start_lr: 1e-5                  # Learning Rate after warmup at the beginning of
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
 max_epochs: 50                  # Number of training epochs (should be > warmup_epochs)
-batch_size: 32                  # Training batch size
+batch_size: 16                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
@@ -73,9 +73,9 @@ kfold: True                     # Enable kfold cross-validation
 # data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillatracker-video_data-external-datasets-ATRW-atrw_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
 # dataset_class: "gorillatracker.datasets.atrw.KFoldATRWDataset"
 
-data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
+data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_openset_seed42_square_kfold-5" # <- CXL2
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
