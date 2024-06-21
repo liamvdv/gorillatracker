@@ -71,7 +71,7 @@ knn_with_train: False
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
 use_ssl: True
-split_path: "/workspaces/gorillatracker/data/splits/SSL/5000-SSL-Video-Split_2024-04-18_percentage-90-5-5_split_20240617_1218.pkl"
+split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
 feature_types: ["face_90", face_45]
 n_samples: 5
 min_images_per_tracking: 50
