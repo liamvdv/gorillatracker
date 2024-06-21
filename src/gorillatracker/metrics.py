@@ -1,4 +1,3 @@
-from collections import defaultdict
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
 
@@ -149,23 +148,28 @@ def evaluate_embeddings(
 
 
 def _get_crossvideo_masks(
-    labels: torch.Tensor, ids: list[gtypes.Id]
+    labels: torch.Tensor, ids: list[gtypes.Id], min_samples: int = 3
 ) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
     distance_mask = torch.zeros((len(labels), len(labels)))
     classification_mask = torch.zeros(len(labels))
 
-    individual_video_ids_per_individual = defaultdict(set)
     for i, id in enumerate(ids):
         individual_video_id = get_individual_video_id(id)
         distance_mask[i] = torch.tensor(
             [individual_video_id != get_individual_video_id(id2) for id2 in ids]
         )  # 1 if not same video, 0 if same video
 
-        individual_video_ids_per_individual[get_individual(id)].add(individual_video_id)
-
-    for i, id in enumerate(ids):
-        individual_video_id = get_individual_video_id(id)
-        classification_mask[i] = len(individual_video_ids_per_individual[get_individual(id)]) > 1
+        if (
+            len(
+                [
+                    id2
+                    for id2 in ids
+                    if individual_video_id != get_individual_video_id(id2) and get_individual(id2) == get_individual(id)
+                ]
+            )
+            > min_samples
+        ):
+            classification_mask[i] = True
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
 
