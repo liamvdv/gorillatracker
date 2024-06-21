@@ -12,8 +12,8 @@ workers: 40                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ViT-SSL-Body"
-run_name: "451-first-baseline" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep"]            # WandB tags for experiment tracking
+run_name: "459-test-body-with-face-l2sp" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: ["baseline"]            # WandB tags for experiment tracking
 model_name_or_path: "ViT_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -43,15 +43,15 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "offline/native/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
 initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
 
 batch_size: 64                # Training batch size
@@ -62,7 +62,7 @@ val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
 kfold: False                     # Perform kfold cross validation
 
-val_check_interval: 250
+val_check_interval: 100
 save_interval: 2               # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 2      # Embedding save interval
 knn_with_train: False
@@ -71,9 +71,10 @@ knn_with_train: False
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
 use_ssl: True
-split_path: "/workspaces/gorillatracker/data/splits/SSL/5000-SSL-Video-Split_2024-04-18_percentage-90-5-5_split_20240617_1218.pkl"
+split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
 n_samples: 5
 min_images_per_tracking: 50
+feature_types: ["body_with_face"]
 
 data_resize_transform: 224
 
