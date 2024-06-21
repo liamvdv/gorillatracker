@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 import gorillatracker.type_helper as gtypes
+import torchvision.transforms as transforms
 
 
 class OfflineResponseBasedLoss(nn.Module):
@@ -20,11 +21,14 @@ class OfflineResponseBasedLoss(nn.Module):
             param.requires_grad = False
 
         self.loss = nn.MSELoss()
+        self.resize_transform = transforms.Resize((192, 192))
 
     def forward(
         self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor, **kwargs: Any
     ) -> gtypes.LossPosNegDist:
-        teacher_embeddings = self.teacher_model(images)
+        image_copy = images.clone()
+        image_copy = self.resize_transform(image_copy)
+        teacher_embeddings = self.teacher_model(image_copy)
         return (
             self.loss(embeddings, teacher_embeddings),
             torch.Tensor([-1.0]),
