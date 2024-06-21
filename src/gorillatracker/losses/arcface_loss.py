@@ -42,6 +42,7 @@ class ArcFaceLoss(torch.nn.Module):
         use_focal_loss: bool = False,
         label_smoothing: float = 0.0,
         use_class_weights: bool = False,
+        purpose: Literal["val", "train"] = "train",
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -59,18 +60,26 @@ class ArcFaceLoss(torch.nn.Module):
         self.num_samples = (
             sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0
         )
-
+        self.purpose = purpose
         self.accelerator = accelerator
-        self.prototypes = torch.nn.Parameter(
-            torch.zeros(
-                (k_subcenters, num_classes, embedding_size),
-                device=accelerator,
-                dtype=torch.float32,
-            )
-        )
 
-        tmp_rng = torch.Generator(device=accelerator)
-        torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
+        self.prototypes: Union[torch.nn.Parameter, torch.Tensor]
+        if self.purpose == "train":
+            self.prototypes = torch.nn.Parameter(
+                torch.zeros(
+                    (k_subcenters, num_classes, embedding_size),
+                    device=accelerator,
+                    dtype=torch.float32,
+                ),
+                requires_grad=True,
+            )
+            tmp_rng = torch.Generator(device=accelerator)
+            torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
+        else:
+            self.prototypes = torch.zeros(
+                (k_subcenters, num_classes, embedding_size), device=accelerator, dtype=torch.float32
+            )
+
         self.ce: Union[FocalLoss, torch.nn.CrossEntropyLoss]
         if use_focal_loss:
             self.ce = FocalLoss(num_classes=num_classes, label_smoothing=label_smoothing, *args, **kwargs)  # type: ignore
@@ -141,6 +150,9 @@ class ArcFaceLoss(torch.nn.Module):
 
     def update(self, weights: torch.Tensor, num_classes: int, le: LinearSequenceEncoder) -> None:
         """Sets the weights of the prototypes"""
+
+        assert self.purpose == "val", "Manually setting the prototypes is only allowed for validation"
+
         self.num_classes = num_classes
         self.le = le
 
@@ -149,7 +161,7 @@ class ArcFaceLoss(torch.nn.Module):
         if torch.cuda.is_available() and self.prototypes.device != weights.device:
             weights = weights.cuda()
 
-        self.prototypes = torch.nn.Parameter(weights)
+        self.prototypes = weights
 
 
 class ElasticArcFaceLoss(ArcFaceLoss):
