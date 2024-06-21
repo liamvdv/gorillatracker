@@ -48,8 +48,6 @@ class TrainingArgs:
     debug: bool = field(default=False)
     from_scratch: bool = field(default=False)
     early_stopping_patience: int = 3
-    early_stopping_metric: str = "val/embeddings/knn/accuracy"
-    early_stopping_mode: Literal["min", "max"] = "max"
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)

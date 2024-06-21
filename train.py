@@ -106,14 +106,14 @@ def main(args: TrainingArgs) -> None:
     checkpoint_callback = ModelCheckpoint(
         filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
         monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
-        mode=args.early_stopping_mode,
+        mode="min",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
     )
 
     early_stopping = EarlyStopping(
-        monitor=f"{dm.get_dataset_class_names()[0]}/{args.early_stopping_metric}",
-        mode=args.early_stopping_mode,
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
+        mode="min",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
