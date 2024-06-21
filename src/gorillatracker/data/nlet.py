@@ -62,9 +62,6 @@ class NletDataModule(L.LightningDataModule):
         assert (
             len(eval_datasets) == len(dataset_names) - 1
         ), "eval_datasets and eval_dataset_names must have the same length"
-        assert (
-            dataset_class not in eval_datasets
-        ), "dataset_class should not be in eval_datasets, as it will be added automatically"
 
         self.data_dir = data_dir
         self.dataset_class = dataset_class

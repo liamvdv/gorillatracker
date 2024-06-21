@@ -12,7 +12,7 @@ workers: 16                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ViT-CXL-OpenSet"
-run_name: "440-crossencounter" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "452-better-eval" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "ViT_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
@@ -67,16 +67,16 @@ check_val_every_n_epoch: 5      # Check validation every n epochs
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-# force_nlet_builder: "quadlet"
-data_dir: "/workspaces/gorillatracker/datasets/splits/-workspaces-gorillatracker-data-ground_truth-cxl_all-face_images-kfold-actual_openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
-dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
-# dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
-# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
-
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 
+force_nlet_builder: "quadlet"
+data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
+dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+
 data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
