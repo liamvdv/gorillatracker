@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from itertools import groupby
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -7,12 +6,12 @@ from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session, load_only
 from tqdm import tqdm
 
-import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
     CliqueGraphSampler,
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
+    group_contrastive_images,
 )
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
@@ -82,7 +81,7 @@ class SSLConfig:
         session: Session,
     ) -> ContrastiveSampler:
         if self.negative_mining == "random":
-            classes = self._group_contrastive_images(contrastive_images)
+            classes = group_contrastive_images(contrastive_images)
             return ContrastiveClassSampler(classes)
         elif self.negative_mining == "overlapping":
             tracking_ids = session.execute(tracking_ids_from_videos(video_ids)).scalars().all()
@@ -138,17 +137,6 @@ class SSLConfig:
             ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id)  # type: ignore
             for f in tracked_features
         ]
-
-    def _group_contrastive_images(
-        self, contrastive_images: List[ContrastiveImage]
-    ) -> dict[gtypes.Label, List[ContrastiveImage]]:
-        groups = groupby(contrastive_images, lambda x: x.class_label)
-        classes: dict[gtypes.Label, List[ContrastiveImage]] = {}
-        for group in groups:
-            class_label, sample_iter = group
-            samples = list(sample_iter)
-            classes[class_label] = samples
-        return classes
 
     def _merge_same_class_vertices(self, graph: MultiLayerCliqueGraph[ContrastiveImage]) -> None:
         # NOTE(V1nce1): Should be functionality of MultiLayerCliqueGraph and could be extended
