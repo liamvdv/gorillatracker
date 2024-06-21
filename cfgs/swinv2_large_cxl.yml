@@ -44,7 +44,7 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "online/soft"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "softmax/arcface"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
@@ -71,7 +71,7 @@ embedding_save_interval: 2      # Embedding save interval
 
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
-data_resize_transform: 224
+data_resize_transform: 256
 
 additional_val_dataset_classes: Null
 additional_val_data_dirs: Null

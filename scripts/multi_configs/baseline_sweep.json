@@ -7,7 +7,9 @@
         ],
         "use_quantization_aware_training": false,
         "max_epochs": 40,
-        "early_stopping_patience": 6,
+        "early_stopping_patience": 4,
+        "early_stopping_metric": "val/embeddings/knn/accuracy",
+        "early_stopping_mode": "max",
         "embedding_size": 256,
         "data_resize_transform": 224,
         "loss_mode": "softmax/arcface",
@@ -52,7 +54,9 @@
         {
             "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
             "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
-            "parameters": {}
+            "parameters": {
+                "batch_size": 16
+            }
         },
         {
             "project_name": "Embedding-ResNet152-CXL-OpenSet",
@@ -72,7 +76,9 @@
         {
             "project_name": "Embedding-SwinV2Large-CXL-Open",
             "config_path": "./cfgs/swinv2_large_cxl.yml",
-            "parameters": {}
+            "parameters": {
+                "data_resize_transform": 256
+            }
         },
         {
             "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
