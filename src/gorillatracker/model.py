@@ -1,4 +1,3 @@
-import importlib
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
@@ -9,7 +8,6 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from facenet_pytorch import InceptionResnetV1
 from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
@@ -30,7 +28,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, log_train_images_to_wandb, pca, tsne
+from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -331,6 +329,17 @@ class BaseModule(L.LightningModule):
 
         return flat_images, flat_labels_onehot
 
+    def predict_step(
+        self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0
+    ) -> tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]:
+        batch_size = lazy_batch_size(batch)
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        anchor_ids = list(flat_ids[:batch_size])
+        anchor_images = flat_images[:batch_size]
+        anchor_labels = flat_labels[:batch_size]
+        embeddings = self.forward(anchor_images)
+        return anchor_ids, embeddings, anchor_labels
+
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         _, images, _ = batch
         _, flat_images, flat_labels = flatten_batch(batch)
@@ -544,8 +553,8 @@ class BaseModule(L.LightningModule):
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            "pca": pca,
             "tsne": tsne,
+            # "pca": pca,
             # "fc_layer": fc_layer,
         }
         metrics |= (
@@ -562,9 +571,21 @@ class BaseModule(L.LightningModule):
             {
                 "knn_crossencounter": partial(knn, k=1, use_crossvideo_positives=True),
                 "knn5_crossencounter": partial(knn, k=5, use_crossvideo_positives=True),
+                "knn_crossencounter_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossencounter_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
             }
-            if "CXL" in dataloader_name
+            if "CXL" in dataloader_name or "Bristol" in dataloader_name
             else {}
+        )
+        metrics = (
+            {
+                "knn_ssl": partial(knn_ssl, k=1, dm=self.dm),
+                "knn5_ssl": partial(knn_ssl, k=5, dm=self.dm),
+                "knn_ssl_macro": partial(knn_ssl, k=1, dm=self.dm, average="macro"),
+                "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
+            }
+            if "ssl" in dataloader_name.lower()
+            else metrics
         )
 
         metrics = metrics if not self.fast_dev_run else {}
@@ -788,8 +809,10 @@ class VisionTransformerWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -1152,32 +1175,6 @@ class InceptionV3Wrapper(BaseModule):
         )
 
 
-class FaceNetWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = InceptionResnetV1(pretrained="vggface2")
-
-        self.model.last_linear = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(1792),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=1792, out_features=self.embedding_size),
-        )
-        self.model.last_bn = torch.nn.BatchNorm1d(self.embedding_size)
-        self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
 class MiewIdNetWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -1259,7 +1256,6 @@ custom_model_cls = {
     "ConvNextClipWrapper": ConvNextClipWrapper,
     "VisionTransformerDinoV2": VisionTransformerDinoV2Wrapper,
     "VisionTransformerClip": VisionTransformerClipWrapper,
-    "FaceNet": FaceNetWrapper,
     "MiewIdNet": MiewIdNetWrapper,
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
@@ -1268,7 +1264,5 @@ custom_model_cls = {
 
 def get_model_cls(model_name: str) -> Type[BaseModule]:
     model_cls = custom_model_cls.get(model_name, None)
-    if not model_cls:
-        module, cls = model_name.rsplit(".", 1)
-        model_cls = getattr(importlib.import_module(module), cls)
+    assert model_cls is not None, f"Model {model_name} not found in custom_model_cls"
     return model_cls

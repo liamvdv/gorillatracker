@@ -6,16 +6,14 @@ distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
 precision: 32           # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
-workers: 4                      # Number of workers for data loading
+workers: 16                      # Number of workers for data loading
 
 
 # Model and Training Arguments
 
 project_name: "Embedding-ViT-CXL-OpenSet"
-run_name: "115-run-exploratory-sweeps-low-learning-rate-different-modes" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep"]            # WandB tags for experiment tracking
-run_name: "143-explore-regularisierung-l2sp" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["sweep"]            # WandB tags for experiment tracking
+run_name: "440-crossencounter" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "ViT_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -45,33 +43,40 @@ s: 64.0                         # Scale for the softmax losses
 delta_t: 50                    # Delta t for the vpl loss
 mem_bank_start_epoch: 10         # Epoch to start using the memory bank
 lambda_membank: 0.5            # Lambda for the memory bank loss
-loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 
-lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
+lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
 initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
 start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
-batch_size: 8                # Training batch size
+batch_size: 8                 # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
-gradient_accumulation_steps: 4  # Gradient accumulation steps
-max_epochs: 12               # Training goal (large number)
-val_before_training: False      # Perform validation before training
+gradient_accumulation_steps: 1  # Gradient accumulation steps
+max_epochs: 50               # Training goal (large number)
+val_before_training: True      # Perform validation before training
 only_val: False                 # Perform only validation
-kfold: False                     # Perform kfold cross validation
-
-save_interval: 2               # Model checkpoint save interval as a fraction of total steps
-embedding_save_interval: 2      # Embedding save interval
+kfold: True                     # Perform kfold cross validation
+save_interval: 10               # Model checkpoint save interval as a fraction of total steps
+embedding_save_interval: 10      # Embedding save interval
+check_val_every_n_epoch: 5      # Check validation every n epochs
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 
-data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
-data_resize_transform: 224
+# force_nlet_builder: "quadlet"
+data_dir: "/workspaces/gorillatracker/datasets/splits/-workspaces-gorillatracker-data-ground_truth-cxl_all-face_images-kfold-actual_openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
+dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-additional_val_dataset_classes: Null
-additional_val_data_dirs: Null
+# data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+
+
+data_resize_transform: 224
+additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/splits/ground_truth-bristol-cropped_images_face-closedset-mintraincount-3-seed-42-train-0-val-100-test-0"]

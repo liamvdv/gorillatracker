@@ -1,17 +1,17 @@
 from dataclasses import dataclass
-from itertools import groupby
 from pathlib import Path
 from typing import List, Literal, Optional
 
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session, load_only
+from tqdm import tqdm
 
-import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
     CliqueGraphSampler,
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
+    group_contrastive_images,
 )
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
@@ -35,7 +35,7 @@ class SSLConfig:
     tff_selection: Literal["random", "equidistant"]
     negative_mining: Literal["random", "overlapping"]
     n_samples: int
-    feature_types: list[str]
+    feature_types: List[str]
     min_confidence: float
     min_images_per_tracking: int
     split_path: Path
@@ -81,7 +81,7 @@ class SSLConfig:
         session: Session,
     ) -> ContrastiveSampler:
         if self.negative_mining == "random":
-            classes = self._group_contrastive_images(contrastive_images)
+            classes = group_contrastive_images(contrastive_images)
             return ContrastiveClassSampler(classes)
         elif self.negative_mining == "overlapping":
             tracking_ids = session.execute(tracking_ids_from_videos(video_ids)).scalars().all()
@@ -119,11 +119,12 @@ class SSLConfig:
         return query
 
     def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
-        print("Sampling TrackingFrameFeatures...")
         BATCH_SIZE = 200
         num_batches = len(video_ids) // BATCH_SIZE
         tffs = []
-        for i in range(num_batches + 1):
+        for i in tqdm(
+            range(num_batches + 1), desc="Sampling TrackingFrameFeatures", total=num_batches + 1, unit="batch"
+        ):
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
             sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
             tffs.extend(list(sampler.sample(session)))
@@ -136,17 +137,6 @@ class SSLConfig:
             ContrastiveImage(str(f.tracking_frame_feature_id), f.cache_path(base_path), f.tracking_id)  # type: ignore
             for f in tracked_features
         ]
-
-    def _group_contrastive_images(
-        self, contrastive_images: List[ContrastiveImage]
-    ) -> dict[gtypes.Label, List[ContrastiveImage]]:
-        groups = groupby(contrastive_images, lambda x: x.class_label)
-        classes: dict[gtypes.Label, List[ContrastiveImage]] = {}
-        for group in groups:
-            class_label, sample_iter = group
-            samples = list(sample_iter)
-            classes[class_label] = samples
-        return classes
 
     def _merge_same_class_vertices(self, graph: MultiLayerCliqueGraph[ContrastiveImage]) -> None:
         # NOTE(V1nce1): Should be functionality of MultiLayerCliqueGraph and could be extended
@@ -161,7 +151,7 @@ if __name__ == "__main__":
         tff_selection="equidistant",
         negative_mining="random",
         n_samples=15,
-        feature_types=["body"],
+        feature_types=["body_with_face"],
         min_confidence=0.5,
         min_images_per_tracking=10,
         width_range=(None, None),

@@ -172,7 +172,7 @@ def compute_split(samples: int, train: int, val: int, test: int, kfold: bool) ->
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = False
+TEST = True
 
 
 def copy(src: Path, dst: Path) -> None:
@@ -315,8 +315,8 @@ def kfold_splitter(
             test_size += 1
             fold_bucket_iterator += 1
 
-        test_bucket.extend(ungroup(individums[fold_bucket_iterator:]))
-        test_size += len(individums[fold_bucket_iterator:])
+        test_bucket.extend(ungroup(sorted_individums[fold_bucket_iterator:]))
+        test_size += len(sorted_individums[fold_bucket_iterator:])
 
     for i, fold_bucket in enumerate(fold_buckets):
         print(f"Fold {i}: {len(fold_bucket)} images, {sizes[i]} individuals")
@@ -399,7 +399,7 @@ def generate_kfold_split(
     test: int = 20,
     k: int = 5,
 ) -> Path:
-    name = f"{str(dataset_dir).replace('/', '-')}-kfold-{mode}-seed-{seed}-trainval-{trainval}-test-{test}-k-{k}"
+    name = f"{str(dataset_dir).replace('/', '-')}-kfold-actual_{mode}-seed-{seed}-trainval-{trainval}-test-{test}-k-{k}"
     output_dir = output_dir / name
 
     images = read_ground_truth(dataset_dir)
@@ -412,6 +412,16 @@ def generate_kfold_split(
         seed=seed,
         k=k,
     )
+
+    unique_individuals = group(images)
+    unique_labels = dict([(individual.label, 0) for individual in unique_individuals])
+    for i, fold_bucket in enumerate((fold_buckets + [test_bucket])):
+        individuals = group(fold_bucket)
+        for individual in individuals:
+            unique_labels[individual.label] += 1
+            if unique_labels[individual.label] > 1:
+                print(f"Individual {individual.label} appears in multiple folds ({i}).")
+
     # stats_and_confirm(name, images, fold_buckets, [], test_bucket)
     for i, fold_bucket in enumerate(fold_buckets):
         write_entries(fold_bucket, output_dir / f"fold-{i}")
@@ -522,14 +532,15 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 if __name__ == "__main__":
     dir = generate_kfold_split(
-        dataset_dir=Path("/workspaces/gorillatracker/data/ground_truth/bristol/full_images"),
-        output_dir=Path("compressed/test"),
+        dataset_dir=Path("/workspaces/gorillatracker/data/ground_truth/cxl_all/face_images"),
+        output_dir=Path("/workspaces/gorillatracker/data/splits"),
         mode="openset",
         seed=42,
         trainval=80,
         test=20,
         k=5,
     )
+    print(dir)
 
 # NOTE(liamvdv): Images per Individual heavly screwed. Image distribution around 73 / 17 / 10 for Individual Distribution 50 / 25 / 25.
 # dir = generate_split(
