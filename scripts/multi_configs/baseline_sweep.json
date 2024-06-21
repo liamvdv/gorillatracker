@@ -7,7 +7,7 @@
         ],
         "use_quantization_aware_training": false,
         "max_epochs": 40,
-        "early_stopping_patience": 4,
+        "early_stopping_patience": 8,
         "embedding_size": 256,
         "data_resize_transform": 224,
         "loss_mode": "softmax/arcface",
