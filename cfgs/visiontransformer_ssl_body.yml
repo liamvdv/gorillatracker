@@ -50,8 +50,8 @@ lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
 initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
 
 batch_size: 64                # Training batch size
