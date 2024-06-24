@@ -50,7 +50,7 @@ s: 64.0                             # Scale for the softmax losses
 # use_dist_term: True                     # Use the distance term for the loss
 # use_inbatch_mixup: True                 # Use in batch mixup
 # label_smoothing: 0.05                # Label smoothing value
-loss_mode: "softmax/arcface/l2sp"          # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
+loss_mode: "online/soft"          # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "cosine"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
@@ -66,7 +66,7 @@ gradient_accumulation_steps: 1  # Gradient accumulation steps
 max_epochs: 50                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
-kfold: True                     # Perform kfold cross validation
+kfold: False                     # Perform kfold cross validation
 knn_with_train: True 
 
 save_interval: 25                # Model checkpoint save interval as a fraction of total steps
@@ -81,12 +81,12 @@ check_val_every_n_epoch: 5      # Perform validation every n epochs
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 # force_nlet_builder: "quadlet"
-data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
-dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 192
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
 

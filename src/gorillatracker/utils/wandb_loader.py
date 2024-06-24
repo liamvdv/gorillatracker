@@ -1,6 +1,7 @@
 from typing import Type
 from urllib.parse import urlparse
 
+import torch
 import wandb
 from wandb.apis.public.runs import Run
 
@@ -28,23 +29,24 @@ def get_run(url: str) -> Run:
     run = wandb_api.run(path=f"{entity}/{project}/{run_id}")  # type: ignore[no-untyped-call]
     return run
 
+def get_model_for_run_url(run_url: str) -> BaseModule:
+    run = get_run(run_url)
+    return get_model_from_run(run)
+
+def get_model_from_run(run: Run) -> BaseModule:
+    model_cls = get_model_cls(run.config["model_name_or_path"])
+    artifact = get_latest_model_checkpoint(run)
+    artifact_dir = artifact.download()
+    model = artifact_dir + "/model.ckpt"
+    return load_model(model_cls, model)
+
 
 def get_latest_model_checkpoint(run: Run) -> wandb.Artifact:
     models: list[wandb.Artifact] = [a for a in run.logged_artifacts() if a.type == "model"]  # type: ignore[no-untyped-call]
     return max(models, key=lambda a: a.created_at)
 
 
-def load_model(model_cls: Type[BaseModule], model_path: str) -> BaseModule:
+def load_model(model_cls: Type[BaseModule], ckpt_path: str) -> BaseModule:
     print(model_cls)
-    print(model_path)
-    model = model_cls.load_from_checkpoint(model_path, data_module=None, wandb_run=None)
-    return model
-
-
-def get_model_for_run_url(run_url: str) -> BaseModule:
-    run = get_run(run_url)
-    model_cls = get_model_cls(run.config["model_name_or_path"])
-    artifact = get_latest_model_checkpoint(run)
-    artifact_dir = artifact.download()
-    model = artifact_dir + "/model.ckpt"
-    return load_model(model_cls, model)
+    print(ckpt_path)
+    return model_cls.load_from_checkpoint(ckpt_path, data_module=None, wandb_run=None) # state_dict=model_state_dict, 

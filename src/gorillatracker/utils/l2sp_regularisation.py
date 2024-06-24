@@ -148,6 +148,7 @@ class L2_SP(nn.Module):
             for k in list(model_copy.__dict__.keys()):
                 if k != "model" and not k.startswith("_"):
                     del model_copy.__dict__[k]
+            os.makedirs(os.path.dirname(path_to_pretrained_weights), exist_ok=True)
             torch.save(model_copy.state_dict(), path_to_pretrained_weights)
             log.warning(
                 f"Pretrained weights not found. Saving current model as pretrained weights at: \n {path_to_pretrained_weights}"
