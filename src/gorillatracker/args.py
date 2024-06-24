@@ -91,6 +91,7 @@ class TrainingArgs:
         "softmax/elasticface",
         "softmax/vpl",
         "offline/native/l2sp",
+        "offline/l2sp",
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
@@ -108,6 +109,7 @@ class TrainingArgs:
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
     use_inbatch_mixup: bool = field(default=False)
+    force_nlet_builder: Literal["onelet", "triplet", "quadlet", "None"] = field(default="None")
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)

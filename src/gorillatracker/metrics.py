@@ -1,6 +1,5 @@
 from collections import defaultdict
 from itertools import islice
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import lightning as L
@@ -23,6 +22,7 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.contrastive_sampler import get_individual, get_individual_video_id
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -155,21 +155,17 @@ def _get_crossvideo_masks(
     classification_mask = torch.zeros(len(labels))
 
     individual_video_ids_per_individual = defaultdict(set)
-    transformed_ids = [Path(id).name for id in ids]
-    transformed_ids = ["".join(id.split("_")[:3]).upper() for id in transformed_ids]
     for i, id in enumerate(ids):
-        id = Path(id).name
-        individual_video_id = "".join(id.split("_")[:3]).upper()  # individual + camera + date
+        individual_video_id = get_individual_video_id(id)
         distance_mask[i] = torch.tensor(
-            [individual_video_id != vi_id for vi_id in transformed_ids]
+            [individual_video_id != get_individual_video_id(id2) for id2 in ids]
         )  # 1 if not same video, 0 if same video
 
-        individual_video_ids_per_individual[id.split("_")[0].upper()].add(individual_video_id)
+        individual_video_ids_per_individual[get_individual(id)].add(individual_video_id)
 
     for i, id in enumerate(ids):
-        id = Path(id).name
-        individual_video_id = "".join(id.split("_")[:3]).upper()
-        classification_mask[i] = len(individual_video_ids_per_individual[id.split("_")[0].upper()]) > 1
+        individual_video_id = get_individual_video_id(id)
+        classification_mask[i] = len(individual_video_ids_per_individual[get_individual(id)]) > 1
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
 
@@ -193,8 +189,8 @@ def knn(
     """
 
     assert not use_crossvideo_positives or all(
-        ["CXL" in row["dataset"] for _, row in data.iterrows()]
-    ), "Crossvideo positives can only be used with CXL datasets"
+        ["CXL" in row["dataset"] or "Bristol" in row["dataset"] for _, row in data.iterrows()]
+    ), "Crossvideo positives can only be used with CXL or Bristol datasets"
 
     # convert embeddings and labels to tensors
     _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")

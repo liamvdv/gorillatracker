@@ -19,6 +19,9 @@ from gorillatracker.data.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
+    SupervisedCrossEncounterSampler,
+    SupervisedHardCrossEncounterSampler,
+    get_individual,
     group_contrastive_images,
 )
 from gorillatracker.transform_utils import SquarePad
@@ -113,38 +116,29 @@ class NletDataModule(L.LightningDataModule):
         if stage == "predict":
             raise NotImplementedError("Predict not implemented")
 
+    # NOTE(memben): The dataloader batches like:
+    # batched_ids = ((ap1, ap2, ap3), (p1, p2, p3), ...)
+    # batched_values = torch.Tensor((ap1, ap2, ap3), (p1, p2, p3), ...)
+    # batched_labels = torch.Tensor((ap1, ap2, ap3), (p1, p2, p3), ...)
     def train_dataloader(self) -> DataLoader[gtypes.Nlet]:
-        return DataLoader(
-            self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.collate_fn, num_workers=self.workers
-        )
+        if not hasattr(
+            self, "train"
+        ):  # HACK(rob2u): we enforce setup to be called (somehow it's not always called, problem in val_before_training)
+            self.setup("fit")
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(
-                val, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=self.workers
-            )
-            for val in self.val
+            DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(
-                test, batch_size=self.batch_size, shuffle=False, collate_fn=self.collate_fn, num_workers=self.workers
-            )
-            for test in self.test
+            DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for test in self.test
         ]
 
     def predict_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:  # TODO(memben)
         raise NotImplementedError
-
-    def collate_fn(self, batch: list[gtypes.Nlet]) -> gtypes.NletBatch:
-        ids = tuple(nlet[0] for nlet in batch)
-        values = tuple(nlet[1] for nlet in batch)
-        labels = tuple(nlet[2] for nlet in batch)
-        batched_ids = tuple(zip(*ids))
-        batched_values = tuple(zip(*values))
-        batched_labels = tuple(zip(*labels))
-        return batched_ids, batched_values, batched_labels
 
     def get_dataset_class_names(self) -> list[str]:
         return self.dataset_names
@@ -264,7 +258,7 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
     image_paths = image_paths + list(dirpath.glob("*.png"))
     for image_path in image_paths:
         if "_" in image_path.name:
-            label = image_path.name.split("_")[0]
+            label = get_individual(image_path)  # type: ignore
         else:
             label = image_path.name.split("-")[0]
         samples.append(ContrastiveImage(str(image_path), image_path, LabelEncoder.encode(label)))
@@ -292,7 +286,9 @@ class SupervisedDataset(NletDataset):
     def class_distribution(self) -> dict[Label, int]:
         return {label: len(samples) for label, samples in self.classes.items()}
 
-    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+    def create_contrastive_sampler(
+        self, base_dir: Path, sampler_class: type = ContrastiveClassSampler
+    ) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
             data_dir/
@@ -306,7 +302,7 @@ class SupervisedDataset(NletDataset):
         dirpath = base_dir / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else base_dir
         assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
         self.classes = group_images_by_label(dirpath)
-        return ContrastiveClassSampler(self.classes)
+        return sampler_class(self.classes)
 
 
 class SupervisedKFoldDataset(KFoldNletDataset):
@@ -318,7 +314,9 @@ class SupervisedKFoldDataset(KFoldNletDataset):
     def class_distribution(self) -> dict[Label, int]:
         return {label: len(samples) for label, samples in self.classes.items()}
 
-    def create_contrastive_sampler(self, base_dir: Path) -> ContrastiveClassSampler:
+    def create_contrastive_sampler(
+        self, base_dir: Path, sampler_class: type = ContrastiveClassSampler
+    ) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
             data_dir/
@@ -347,7 +345,47 @@ class SupervisedKFoldDataset(KFoldNletDataset):
             self.classes = group_images_by_label(dirpath)
         else:
             raise ValueError(f"Invalid partition: {self.partition}")
-        return ContrastiveClassSampler(self.classes)
+        return sampler_class(self.classes)
+
+
+class CrossEncounterSupervisedDataset(SupervisedDataset):
+    """Ensure that the positive sample is always from a different video except there is only one video present in the dataset."""
+
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedCrossEncounterSampler
+        )
+
+
+class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
+    """Ensure that the positive sample is always from a different video except there is only one video present in the dataset."""
+
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)  # type: ignore
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedCrossEncounterSampler
+        )
+
+
+class HardCrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
+    """Ensure that the positive sample is always from a different video and discard samples where only one video is present."""
+
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)  # type: ignore
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedHardCrossEncounterSampler
+        )  # TODO
+
+
+class HardCrossEncounterSupervisedDataset(SupervisedDataset):
+    """Ensure that the positive sample is always from a different video and discard samples where only one video is present."""
+
+    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(data_dir=data_dir, *args, **kwargs)
+        self.contrastive_sampler = self.create_contrastive_sampler(
+            data_dir, sampler_class=SupervisedHardCrossEncounterSampler
+        )
 
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:
