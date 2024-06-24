@@ -817,6 +817,17 @@ class VisionTransformerWrapper(BaseModule):
         )
 
 
+class VisionTransformerFrozenWrapper(VisionTransformerWrapper):
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.freeze()
+        for param in self.model.head.parameters():
+            param.requires_grad = True
+
+
 class VisionTransformerDinoV2Wrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -1246,6 +1257,7 @@ custom_model_cls = {
     "SwinV2Base": SwinV2BaseWrapper,
     "SwinV2LargeWrapper": SwinV2LargeWrapper,
     "ViT_Large": VisionTransformerWrapper,
+    "ViT_Large_Frozen": VisionTransformerFrozenWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
     "ResNet50Wrapper": ResNet50Wrapper,

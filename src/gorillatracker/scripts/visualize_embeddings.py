@@ -53,7 +53,7 @@ class EmbeddingProjector:
         save(fig)
         """
         color_names = cc.glasbey
-        color_lst = [color_names[label * 2] for label in labels]
+        color_lst = [color_names[(label * 2) % len(color_names)] for label in labels]
         data = {
             "x": low_dim_embeddings[:, 0],
             "y": low_dim_embeddings[:, 1],

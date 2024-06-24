@@ -27,12 +27,12 @@ from gorillatracker.ssl_pipeline.queries import (
     min_count_filter,
     multiple_videos_filter,
 )
-from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
+from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler, EmbeddingDistantSampler
 
 
 @dataclass(kw_only=True)  # type: ignore
 class SSLConfig:
-    tff_selection: Literal["random", "equidistant"]
+    tff_selection: Literal["random", "equidistant", "embeddingdistant"]
     negative_mining: Literal["random", "overlapping"]
     n_samples: int
     feature_types: List[str]
@@ -71,6 +71,8 @@ class SSLConfig:
             return RandomSampler(query, self.n_samples)
         elif self.tff_selection == "equidistant":
             return EquidistantSampler(query, self.n_samples)
+        elif self.tff_selection == "embeddingdistant":
+            return EmbeddingDistantSampler(query, self.n_samples)
         else:
             raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
 
