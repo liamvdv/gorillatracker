@@ -22,24 +22,41 @@ def generate_embeddings(
     return flat_ids, concatenated_embeddings, concatenated_labels
 
 
-def df_from_predictions(predictions: tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]) -> pd.DataFrame:
-    prediction_df = pd.DataFrame(columns=["id", "embedding", "label", "input", "label_string"])
-    for id, embedding, label in zip(*predictions):
-        input_img = Image.open(id)
-        prediction_df = pd.concat(
-            [
-                prediction_df,
-                pd.DataFrame(
-                    {
-                        "id": [id],
-                        "embedding": [embedding],
-                        "label": [label],
-                        "input": [input_img],
-                        "label_string": [str(label.item())],
-                    }
-                ),
-            ]
-        )
+def df_from_predictions(predictions: tuple[list[str], torch.Tensor, torch.Tensor]) -> pd.DataFrame:
+    """
+    Returns a DataFrame with the following columns:
+    - id: str|int
+    - embedding: torch.Tensor
+    - label: int
+    - input: PIL.Image
+    - label_string: str
+    """
+    ids, embeddings, labels = predictions
 
-    prediction_df.reset_index(drop=False, inplace=True)
+    id_list = []
+    embedding_list = []
+    label_list = []
+    input_list = []
+    label_string_list = []
+
+    for id, embedding, label in zip(ids, embeddings, labels):
+        input_img = Image.open(id)
+        id_list.append(id)
+        embedding_list.append(embedding)
+        label_list.append(int(label))
+        input_list.append(input_img)
+        label_string_list.append(str(label.item()))
+
+    prediction_df = pd.DataFrame(
+        {
+            "id": id_list,
+            "embedding": embedding_list,
+            "label": label_list,
+            "input": input_list,
+            "label_string": label_string_list,
+        }
+    )
+
+    prediction_df.reset_index(drop=True, inplace=True)
+
     return prediction_df
