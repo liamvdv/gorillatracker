@@ -949,7 +949,7 @@ class SwinV2LargeWrapper(BaseModule):
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(256, scale=(0.75, 1.0)),
             ]
         )
 
