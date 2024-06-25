@@ -321,7 +321,8 @@ def knn_ssl(
     true_labels_tensor = torch.tensor(true_labels)
     pred_labels_tensor = torch.tensor(pred_labels)
 
-    pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
+    pred_labels_top5_nparray = np.array(pred_labels_top5)
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5_nparray)
     top5_correct = []
     for i, true_label in enumerate(true_labels_tensor):
         if true_label in pred_labels_top5_tensor[i]:
