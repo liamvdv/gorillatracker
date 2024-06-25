@@ -94,6 +94,7 @@ def main(args: TrainingArgs) -> None:
         training_transforms=model_cls.get_training_transforms(),
         additional_eval_datasets_ids=args.additional_val_dataset_classes,
         additional_eval_data_dirs=[Path(d) for d in args.additional_val_data_dirs],
+        dataset_names=args.dataset_names,
         ssl_config=ssl_config,
     )
 
