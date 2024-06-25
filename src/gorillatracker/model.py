@@ -954,7 +954,7 @@ class SwinV2BaseWrapper(BaseModule):
         )
         
         model_cpy = copy.deepcopy(self.model)
-        model_cpy.head = torch.nn.Identity()
+        model_cpy.head.fc = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
