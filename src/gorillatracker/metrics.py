@@ -372,13 +372,13 @@ def tsne(
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
 
-    num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]
+    num_classes = len(np.unique(labels))
     if len(labels) < 50:
         return None
     if with_pca:
