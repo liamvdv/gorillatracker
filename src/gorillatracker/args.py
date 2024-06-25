@@ -135,7 +135,7 @@ class TrainingArgs:
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
-    negative_mining: Literal["random", "overlapping"] = field(default="random")
+    negative_mining: Literal["random", "overlapping", "social_groups"] = field(default="random")
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)
