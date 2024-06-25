@@ -1,3 +1,4 @@
+import copy
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
@@ -791,7 +792,9 @@ class VisionTransformerWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
@@ -949,7 +952,10 @@ class SwinV2BaseWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+        
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
