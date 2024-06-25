@@ -53,7 +53,7 @@ class EmbeddingProjector:
         output_file(filename="embedding.html")
         save(fig)
         """
-        color_names = cc.glasbey
+        color_names = cc.glasbey + cc.glasbey_warm
         color_lst = [color_names[label * 2] for label in labels]
         data = {
             "x": low_dim_embeddings[:, 0],
