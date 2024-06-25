@@ -3,12 +3,13 @@
         "run_name": "443-take-baselines-for-models",
         "wandb_tags": [
             "sweep",
-            "quantization_aware_training"
+            "baseline"
         ],
-        "use_quantization_aware_training": true,
+        "use_quantization_aware_training": false,
         "max_epochs": 40,
         "early_stopping_patience": 8,
         "embedding_size": 256,
+        "data_resize_transform": 224,
         "loss_mode": "softmax/arcface",
         "data_dir": "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
         "dataset_class": "gorillatracker.datasets.cxl.CXLDataset",
@@ -49,11 +50,38 @@
     },
     "experiments": [
         {
+            "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
+            "parameters": {
+                "batch_size": 16
+            }
+        },
+        {
+            "project_name": "Embedding-ResNet152-CXL-OpenSet",
+            "config_path": "./cfgs/resnet152_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-CXL-Open",
+            "config_path": "./cfgs/convnextv2base_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_cxl.yml",
+            "parameters": {}
+        },
+        {
             "project_name": "Embedding-SwinV2Large-CXL-Open",
             "config_path": "./cfgs/swinv2_large_cxl.yml",
             "parameters": {
                 "data_resize_transform": 256
             }
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
+            "config_path": "./cfgs/convnextv2huge_cxl.yml",
+            "parameters": {}
         }
     ]
 }

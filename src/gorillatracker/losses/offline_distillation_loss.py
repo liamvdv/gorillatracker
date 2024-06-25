@@ -21,7 +21,7 @@ class OfflineResponseBasedLoss(nn.Module):
             param.requires_grad = False
 
         self.loss = nn.MSELoss()
-        self.resize_transform = transforms.Resize((192, 192))
+        self.resize_transform = transforms.Resize((256, 256))
 
     def forward(
         self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor, **kwargs: Any
