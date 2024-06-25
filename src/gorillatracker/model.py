@@ -606,18 +606,12 @@ class EfficientNetV2Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         is_from_scratch = kwargs.get("from_scratch", False)
-        self.model = (
-            efficientnet_v2_l()
-            if is_from_scratch
-            else efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
-        )
-        # self.model.classifier = torch.nn.Sequential(
-        #     torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
-        # )
+        self.model = timm.create_model("tf_efficientnetv2_l.in21k", pretrained=not is_from_scratch)
+
         self.model.classifier = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.classifier[1].in_features),
+            torch.nn.BatchNorm1d(self.model.classifier.in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
 
