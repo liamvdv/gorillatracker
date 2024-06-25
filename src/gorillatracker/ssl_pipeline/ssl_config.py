@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Sequence
 
 from sqlalchemy import Select, create_engine
 from sqlalchemy.orm import Session, load_only
@@ -16,8 +16,12 @@ from gorillatracker.data.contrastive_sampler import (
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph, MultiLayerCliqueGraph
 from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
 from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
-from gorillatracker.ssl_pipeline.negative_mining_queries import find_overlapping_trackings, tracking_ids_from_videos
+from gorillatracker.ssl_pipeline.models import Tracking, TrackingFrameFeature
+from gorillatracker.ssl_pipeline.negative_mining_queries import (
+    find_overlapping_trackings,
+    find_social_group_negatives,
+    trackings_from_videos,
+)
 from gorillatracker.ssl_pipeline.queries import (
     associated_filter,
     bbox_filter,
@@ -33,7 +37,7 @@ from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSample
 @dataclass(kw_only=True)  # type: ignore
 class SSLConfig:
     tff_selection: Literal["random", "equidistant"]
-    negative_mining: Literal["random", "overlapping"]
+    negative_mining: Literal["random", "overlapping", "social_groups"]
     n_samples: int
     feature_types: List[str]
     min_confidence: float
@@ -84,19 +88,9 @@ class SSLConfig:
             classes = group_contrastive_images(contrastive_images)
             return ContrastiveClassSampler(classes)
         elif self.negative_mining == "overlapping":
-            tracking_ids = session.execute(tracking_ids_from_videos(video_ids)).scalars().all()
-            first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(list(tracking_ids))
-            overlapping_trackings = find_overlapping_trackings(session, video_ids)
-            for left, right in overlapping_trackings:
-                first_layer.partition(left, right)
-
-            parent_edges: dict[ContrastiveImage, Optional[int]] = {img: img.class_label for img in contrastive_images}
-            second_layer = MultiLayerCliqueGraph(
-                vertices=contrastive_images, parent=first_layer, parent_edges=parent_edges
-            )
-            self._merge_same_class_vertices(second_layer)
-            second_layer.prune_cliques_without_neighbors()
-            return CliqueGraphSampler(second_layer)
+            return self._create_two_layer_clique_sampler(contrastive_images, video_ids, session)
+        elif self.negative_mining == "social_groups":
+            return self._create_three_layer_clique_sampler(contrastive_images, video_ids, session)
         else:
             raise ValueError(f"Unknown negative mining method: {self.negative_mining}")
 
@@ -144,6 +138,45 @@ class SSLConfig:
             children_list = list(childrens)
             for i in range(len(children_list) - 1):
                 graph.merge(children_list[i], children_list[i + 1])
+
+    def _create_two_layer_clique_sampler(
+        self, contrastive_images: List[ContrastiveImage], video_ids: List[int], session: Session
+    ) -> CliqueGraphSampler:
+        trackings = session.execute(trackings_from_videos(video_ids)).scalars().all()
+        first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph([tracking.tracking_id for tracking in trackings])
+        overlapping_trackings = find_overlapping_trackings(session, video_ids)
+        for left, right in overlapping_trackings:
+            first_layer.partition(left, right)
+
+        parent_edges: dict[ContrastiveImage, Optional[int]] = {img: img.class_label for img in contrastive_images}
+        second_layer = MultiLayerCliqueGraph(vertices=contrastive_images, parent=first_layer, parent_edges=parent_edges)
+        self._merge_same_class_vertices(second_layer)
+        second_layer.prune_cliques_without_neighbors()
+        return CliqueGraphSampler(second_layer)
+
+    def _create_three_layer_clique_sampler(
+        self, contrastive_images: List[ContrastiveImage], video_ids: List[int], session: Session
+    ) -> CliqueGraphSampler:
+        first_layer: IndexedCliqueGraph[int] = IndexedCliqueGraph(list(video_ids))
+        video_negatives = find_social_group_negatives(session, video_ids)
+        for left, right in video_negatives:
+            first_layer.partition(left, right)
+        trackings: Sequence[Tracking] = session.execute(trackings_from_videos(video_ids)).scalars().all()
+        first_parent_edges: dict[int, Optional[int]] = {
+            trackings.tracking_id: trackings.video_id for trackings in trackings
+        }
+        second_layer = MultiLayerCliqueGraph(
+            vertices=list(first_parent_edges.keys()), parent=first_layer, parent_edges=first_parent_edges
+        )
+        second_parent_edges: dict[ContrastiveImage, Optional[int]] = {
+            img: img.class_label for img in contrastive_images
+        }
+        third_layer = MultiLayerCliqueGraph(
+            vertices=contrastive_images, parent=second_layer, parent_edges=second_parent_edges
+        )
+        self._merge_same_class_vertices(third_layer)
+        third_layer.prune_cliques_without_neighbors()
+        return CliqueGraphSampler(third_layer)
 
 
 if __name__ == "__main__":
