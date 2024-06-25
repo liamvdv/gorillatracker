@@ -50,7 +50,7 @@ end_lr: 1e-6                    # End learning rate (for the learning rate sched
 
 max_epochs: 30                  # Number of training epochs (should be > warmup_epochs)
 
-batch_size: 8                  # Training batch size
+batch_size: 6                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 2  # Gradient accumulation steps
 val_before_training: True       # Perform validation before training
