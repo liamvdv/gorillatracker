@@ -119,7 +119,27 @@ def feature_type_filter(
         return filter(lambda x: x.feature_type in self.feature_types, frame_features)
     ```
     """
+    if "body_with_face" in feature_types:
+        return bodies_with_face_filter(query)
     return query.where(TrackingFrameFeature.feature_type.in_(feature_types))
+
+
+def bodies_with_face_filter(query: Select[tuple[TrackingFrameFeature]]) -> Select[tuple[TrackingFrameFeature]]:
+    """
+    Filters the query to include only TrackingFrameFeature instances with a body feature and a face feature in the same frame.
+    """
+    subquery = (
+        select(
+            TrackingFrameFeature.tracking_id,
+            TrackingFrameFeature.frame_nr,
+        ).where(TrackingFrameFeature.feature_type == "face_90")
+    ).subquery()
+    query = query.where(
+        TrackingFrameFeature.feature_type == "body",
+        TrackingFrameFeature.tracking_id == subquery.c.tracking_id,
+        TrackingFrameFeature.frame_nr == subquery.c.frame_nr,
+    )
+    return query
 
 
 def confidence_filter(

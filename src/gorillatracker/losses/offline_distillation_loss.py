@@ -9,7 +9,7 @@ import torchvision.transforms as transforms
 
 class OfflineResponseBasedLoss(nn.Module):
     def __init__(self, teacher_model_wandb_link: str):
-        from gorillatracker.utils.embedding_generator import get_model_for_run_url
+        from gorillatracker.utils.wandb_loader import get_model_for_run_url
 
         super().__init__()
         assert teacher_model_wandb_link != "", "Teacher model link is not provided"

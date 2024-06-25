@@ -262,7 +262,7 @@ class MultiLayerCliqueGraph(IndexedCliqueGraph[K]):
         deleted_vertices = set()
         roots = self.union_find.members.keys()
         for root in list(roots):
-            if len(self.get_adjacent_cliques(root)) == 0:
+            if len(self._get_adjacent_clique_roots(root)) == 0:
                 deleted_vertices.update(self.get_clique(root))
                 self.union_find.delete_set(root)
         self.vertices = list(set(self.vertices) - deleted_vertices)

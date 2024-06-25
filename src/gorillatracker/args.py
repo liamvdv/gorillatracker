@@ -91,6 +91,7 @@ class TrainingArgs:
         "softmax/elasticface",
         "softmax/vpl",
         "offline/native/l2sp",
+        "offline/l2sp",
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
@@ -108,6 +109,7 @@ class TrainingArgs:
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
     use_inbatch_mixup: bool = field(default=False)
+    force_nlet_builder: Literal["onelet", "triplet", "quadlet", "None"] = field(default="None")
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)
@@ -133,7 +135,7 @@ class TrainingArgs:
     use_ssl: bool = field(default=False)
     tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
-    negative_mining: Literal["random", "overlapping"] = field(default="random")
+    negative_mining: Literal["random", "overlapping", "social_groups"] = field(default="random")
     n_samples: int = field(default=15)
     feature_types: list[str] = field(default_factory=lambda: ["body"])
     min_confidence: float = field(default=0.5)
@@ -154,5 +156,8 @@ class TrainingArgs:
             self.height_range[0] is None or self.height_range[1] is None or self.height_range[0] <= self.height_range[1]
         ):
             raise ValueError("min_height should be <= max_height")
+        assert all(
+            s in ["body", "face_90", "face_45", "body_with_face"] for s in self.feature_types
+        ), "Invalid feature type"
         if self.grad_clip <= 0:
             self.grad_clip = None

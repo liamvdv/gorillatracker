@@ -14,7 +14,7 @@ from gorillatracker.model import BaseModule
 from gorillatracker.quantization.export_model import convert_model_to_tflite
 from gorillatracker.quantization.performance_evaluation import evaluate_model
 from gorillatracker.quantization.utils import get_model_input, log_model_to_file
-from gorillatracker.utils.embedding_generator import get_model_for_run_url
+from gorillatracker.utils.wandb_loader import get_model_for_run_url
 
 
 def parse_args() -> argparse.Namespace:

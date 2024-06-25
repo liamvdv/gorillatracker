@@ -146,6 +146,7 @@ dmypy.json
 # everything that has to do with run-results
 /template
 /ultralytics
+/lightning_logs
 yolov8n.pt
 /.vscode
 .devcontainer/devcontainer.json
@@ -167,3 +168,5 @@ mnist/
 *AVI
 cropped-images/*
 /pretrained_weights/
+*.npy
+*/lightning_logs/*

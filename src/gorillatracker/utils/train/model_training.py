@@ -15,7 +15,6 @@ from torch.ao.quantization import allow_exported_model_train_eval
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
-from dlib import get_rank  # type: ignore
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.model import BaseModule
@@ -73,12 +72,8 @@ def train_and_validate_model(
         logger.success("Fit complete")
 
     ########### Save checkpoint ###########
-    current_process_rank = get_rank()
 
-    if current_process_rank == 0:
-        save_model(args, callbacks[0], wandb_logger, trainer, model_name_suffix)
-    else:
-        logger.info("Rank is not 0, skipping checkpoint saving...")
+    save_model(args, callbacks[0], wandb_logger, trainer, model_name_suffix)
 
     return model, trainer
 
@@ -94,14 +89,13 @@ def train_and_validate_using_kfold(
     # TODO(memben):!!! Fix kfold_k
 
     dataloader_name = dm.get_dataset_class_names()[0]
-    current_process_rank = get_rank()
     kfold_k = int(str(args.data_dir).split("-")[-1])
 
     # Inject kfold_k into the datamodule TODO(memben): is there a better way?
     dm.kwargs["k"] = kfold_k
 
     for val_i in range(kfold_k):
-        logger.info(f"Rank {current_process_rank} | k-fold iteration {val_i+1} / {kfold_k}")
+        logger.info(f"k-fold iteration {val_i+1} / {kfold_k}")
 
         # Inject val_i into the datamodule  TODO(memben): is there a better way?
         dm.kwargs["val_i"] = val_i

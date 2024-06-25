@@ -1,4 +1,3 @@
-import importlib
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
@@ -9,6 +8,7 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
+from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 from torchvision import transforms
@@ -28,7 +28,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, log_train_images_to_wandb, pca, tsne
+from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -208,6 +208,8 @@ class BaseModule(L.LightningModule):
             "label",
             "embedding",
             "id",
+            "partition",  # val for validation, train for training
+            "dataset",
         ]  # note that the dataloader usually returns the order (id, embedding, label)
         self.dataset_names = dataset_names
         self.embeddings_table_list = [
@@ -327,6 +329,17 @@ class BaseModule(L.LightningModule):
 
         return flat_images, flat_labels_onehot
 
+    def predict_step(
+        self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0
+    ) -> tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]:
+        batch_size = lazy_batch_size(batch)
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        anchor_ids = list(flat_ids[:batch_size])
+        anchor_images = flat_images[:batch_size]
+        anchor_labels = flat_labels[:batch_size]
+        embeddings = self.forward(anchor_images)
+        return anchor_ids, embeddings, anchor_labels
+
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         _, images, _ = batch
         _, flat_images, flat_labels = flatten_batch(batch)
@@ -350,18 +363,21 @@ class BaseModule(L.LightningModule):
         self,
         anchor_ids: list[str],
         anchor_embeddings: torch.Tensor,
-        anchor_labels: gtypes.MergedLabels,
+        anchor_labels: torch.Tensor,
         dataloader_idx: int,
     ) -> None:
         # save anchor embeddings of validation step for later analysis in W&B
         embeddings = torch.reshape(anchor_embeddings, (-1, self.embedding_size))
         embeddings = embeddings.cpu()
 
-        assert len(self.embeddings_table_columns) == 3
+        assert len(self.embeddings_table_columns) == 5, "Embeddings table columns are not set correctly."
+        anchor_labels_list = anchor_labels.tolist()
         data = {
-            self.embeddings_table_columns[0]: (anchor_labels.tolist()),  # type: ignore
+            self.embeddings_table_columns[0]: [int(x) for x in anchor_labels_list],
             self.embeddings_table_columns[1]: [embedding.numpy() for embedding in embeddings],
             self.embeddings_table_columns[2]: anchor_ids,
+            self.embeddings_table_columns[3]: "val",
+            self.embeddings_table_columns[4]: self.dataset_names[dataloader_idx],
         }
 
         df = pd.DataFrame(data)
@@ -382,7 +398,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings, flat_labels, images)
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=images)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -464,7 +480,7 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
-                lr_scheduler = {
+                lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
                     "frequency": self.lr_interval,
@@ -491,35 +507,54 @@ class BaseModule(L.LightningModule):
             )
             return {"optimizer": optimizer, "lr_scheduler": plateau_scheduler}
 
-    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, gtypes.MergedLabels]:
+    def _get_train_embeddings_for_knn(self, trainer: L.Trainer) -> Tuple[torch.Tensor, torch.Tensor, list[gtypes.Id]]:
         assert trainer.model is not None, "Model must be initalized before validation phase."
         train_embedding_batches = []
         train_labels = torch.tensor([])
+        train_ids: list[gtypes.Id] = []
         for batch in self.dm.train_dataloader():
             batch_size = lazy_batch_size(batch)
-            _, flat_images, flat_labels = flatten_batch(batch)
+            flat_ids, flat_images, flat_labels = flatten_batch(batch)
             anchor_labels = flat_labels[:batch_size]
             anchor_images = flat_images[:batch_size].to(trainer.model.device)
+            anchor_ids = flat_ids[:batch_size]
             embeddings = trainer.model(anchor_images)
             train_embedding_batches.append(embeddings)
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
+            train_ids.extend(anchor_ids)
         train_embeddings = torch.cat(train_embedding_batches, dim=0)
         assert len(train_embeddings) == len(train_labels)
-        return train_embeddings.cpu(), train_labels.cpu()
+        return train_embeddings.cpu(), train_labels.cpu(), train_ids
 
     def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> None:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
-        train_embeddings, train_labels = (
-            self._get_train_embeddings_for_knn(self.trainer) if self.knn_with_train else (None, None)
-        )
+        if self.knn_with_train:
+            train_embeddings, train_labels, train_ids = self._get_train_embeddings_for_knn(self.trainer)
+
+            # add train embeddings to the embeddings table
+            embeddings_table = pd.concat(
+                [
+                    embeddings_table,
+                    pd.DataFrame(
+                        {
+                            "label": [int(x) for x in train_labels.tolist()],
+                            "embedding": train_embeddings.tolist(),
+                            "id": train_ids,
+                            "partition": "train",
+                            "dataset": dataloader_name,
+                        }
+                    ),
+                ],
+                ignore_index=True,
+            )
 
         metrics = {
             "knn5": partial(knn, k=5),
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            "pca": pca,
             "tsne": tsne,
+            # "pca": pca,
             # "fc_layer": fc_layer,
         }
         metrics |= (
@@ -532,6 +567,27 @@ class BaseModule(L.LightningModule):
             if self.knn_with_train
             else {}
         )
+        metrics |= (
+            {
+                "knn_crossencounter": partial(knn, k=1, use_crossvideo_positives=True),
+                "knn5_crossencounter": partial(knn, k=5, use_crossvideo_positives=True),
+                "knn_crossencounter_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossencounter_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
+            }
+            if "CXL" in dataloader_name or "Bristol" in dataloader_name
+            else {}
+        )
+        metrics = (
+            {
+                "knn_ssl": partial(knn_ssl, k=1, dm=self.dm),
+                "knn5_ssl": partial(knn_ssl, k=5, dm=self.dm),
+                "knn_ssl_macro": partial(knn_ssl, k=1, dm=self.dm, average="macro"),
+                "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
+            }
+            if "ssl" in dataloader_name.lower()
+            else metrics
+        )
+
         metrics = metrics if not self.fast_dev_run else {}
 
         # log to wandb
@@ -539,8 +595,6 @@ class BaseModule(L.LightningModule):
             data=embeddings_table,
             embedding_name="val/embeddings",
             metrics=metrics,
-            train_embeddings=train_embeddings,
-            train_labels=train_labels,
             kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
             dataloader_name=dataloader_name,
         )
@@ -723,10 +777,10 @@ class VisionTransformerWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+        self.model.head = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
@@ -749,8 +803,10 @@ class VisionTransformerWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms.RandomErasing(p=0.5, value=(0.707, 0.973, 0.713), scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
+                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
+                transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
 
@@ -762,11 +818,11 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
     ) -> None:
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+        self.model.reset_classifier(self.embedding_size)
+        self.model.head = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         self.set_losses(self.model, **kwargs)
@@ -789,10 +845,10 @@ class VisionTransformerClipWrapper(BaseModule):
         super().__init__(**kwargs)
         self.model = timm.create_model("vit_base_patch16_clip_224.metaclip_2pt5b", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
+        self.model.head = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(self.model.head.in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
 
@@ -1202,7 +1258,5 @@ custom_model_cls = {
 
 def get_model_cls(model_name: str) -> Type[BaseModule]:
     model_cls = custom_model_cls.get(model_name, None)
-    if not model_cls:
-        module, cls = model_name.rsplit(".", 1)
-        model_cls = getattr(importlib.import_module(module), cls)
+    assert model_cls is not None, f"Model {model_name} not found in custom_model_cls"
     return model_cls

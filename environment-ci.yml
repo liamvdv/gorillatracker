@@ -9,7 +9,8 @@ dependencies:
   - python=3.10 # or don't specify the version and use latest stable
 
   # ML libraries
-  - pytorch=2.3.1
+    # https://anaconda.org/pytorch-nightly/pytorch/
+  - pytorch=2.3.0=*cpu*
   - torchvision
   # CUDA only on linux and windows
   - wandb

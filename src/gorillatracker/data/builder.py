@@ -1,9 +1,13 @@
 from pathlib import Path
-from typing import Optional, Type
+from typing import Literal, Optional, Type
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import (
+    CrossEncounterSupervisedDataset,
+    CrossEncounterSupervisedKFoldDataset,
     FlatNletBuilder,
+    HardCrossEncounterSupervisedDataset,
+    HardCrossEncounterSupervisedKFoldDataset,
     NletDataModule,
     NletDataset,
     SupervisedDataset,
@@ -15,16 +19,22 @@ from gorillatracker.data.nlet import (
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 
+HardCrossEncounterSupervisedKFoldDatasetId = "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
+HardCrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"
+CrossEncounterKFoldSupervisedDatasetId = "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
+CrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.CrossEncounterSupervisedDataset"
 BristolDatasetId = "gorillatracker.datasets.bristol.BristolDataset"
 CXLDatasetId = "gorillatracker.datasets.cxl.CXLDataset"
 CZooDatasetId = "gorillatracker.datasets.chimp.CZooDataset"
 CTaiDatasetId = "gorillatracker.datasets.chimp.CTaiDataset"
 Cows2021DatasetId = "gorillatracker.datasets.cows2021.Cows2021Dataset"
+SeaturtleDatasetId = "gorillatracker.datasets.seaturtle.SeaturtleDataset"
 ATRWDatasetId = "gorillatracker.datasets.atrw.ATRWDataset"
 KFoldCZooDatasetId = "gorillatracker.datasets.chimp.KFoldCZooDataset"
 KFoldCTaiDatasetId = "gorillatracker.datasets.chimp.KFoldCTaiDataset"
 KFoldCXLDatasetId = "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"  # TODO change this cxl.KFoldCXLDataset
 KFoldCows2021DatasetId = "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
+KFoldSeaturtleDatasetId = "gorillatracker.datasets.seaturtle.KFoldSeaturtleDataset"
 KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 
@@ -32,14 +42,20 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     BristolDatasetId: SupervisedDataset,
     CXLDatasetId: SupervisedDataset,
     KFoldCXLDatasetId: SupervisedKFoldDataset,
+    HardCrossEncounterSupervisedKFoldDatasetId: HardCrossEncounterSupervisedKFoldDataset,
+    HardCrossEncounterSupervisedDatasetId: HardCrossEncounterSupervisedDataset,
+    CrossEncounterKFoldSupervisedDatasetId: CrossEncounterSupervisedKFoldDataset,
+    CrossEncounterSupervisedDatasetId: CrossEncounterSupervisedDataset,
     SSLDatasetId: SSLDataset,
     CZooDatasetId: SupervisedDataset,
     CTaiDatasetId: SupervisedDataset,
     Cows2021DatasetId: SupervisedDataset,
+    SeaturtleDatasetId: SupervisedDataset,
     ATRWDatasetId: SupervisedDataset,
     KFoldCZooDatasetId: SupervisedKFoldDataset,
     KFoldCTaiDatasetId: SupervisedKFoldDataset,
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
+    KFoldSeaturtleDatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
 }
 
@@ -49,6 +65,16 @@ nlet_requirements: dict[str, FlatNletBuilder] = {
     "online": build_quadlet,
     "distillation": build_triplet,
 }
+
+
+def force_nlet_builder(builder_identifier: Literal["onelet", "triplet", "quadlet"]) -> None:
+    if builder_identifier:
+        global nlet_requirements
+        nlet_requirements = {
+            "softmax": build_onelet if builder_identifier == "onelet" else build_triplet,
+            "offline": build_triplet if builder_identifier == "triplet" else build_quadlet,
+            "online": build_quadlet if builder_identifier == "quadlet" else build_onelet,
+        }
 
 
 def build_data_module(
