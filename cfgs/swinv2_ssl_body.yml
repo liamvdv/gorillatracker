@@ -4,7 +4,7 @@ accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
 force_deterministic: False      # Force deterministic behavior
-precision: 16                   # Training precision (e.g., "bf16-mixed")
+precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
 workers: 40                      # Number of workers for data loading
 
