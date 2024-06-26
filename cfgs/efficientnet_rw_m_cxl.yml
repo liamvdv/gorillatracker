@@ -77,5 +77,5 @@ data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_opens
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null
