@@ -86,6 +86,7 @@ def build_data_module(
     training_transforms: gtypes.TensorTransform,
     additional_eval_datasets_ids: list[str] = [],
     additional_eval_data_dirs: list[Path] = [],
+    dataset_names: list[str] = [],
     ssl_config: Optional[SSLConfig] = None,
 ) -> NletDataModule:
     assert dataset_class_id in dataset_registry, f"Dataset class {dataset_class_id} not found in registry"
@@ -95,13 +96,21 @@ def build_data_module(
     assert len(additional_eval_datasets_ids) == len(
         additional_eval_data_dirs
     ), "Length mismatch between eval datasets and dirs"
+    # additional_dataset_names can be empty, but if not, it must have the same length as additional_eval_datasets_ids
+    assert (
+        not dataset_names or len(dataset_names) == len(additional_eval_datasets_ids) + 1
+    ), "Length mismatch between dataset_names and eval datasets"
 
     if dataset_class_id == SSLDatasetId:
         assert ssl_config is not None, "ssl_config must be set for SSLDataset"
 
     dataset_class = dataset_registry[dataset_class_id]
     eval_datasets = [dataset_registry[cls_id] for cls_id in additional_eval_datasets_ids]
-    dataset_names = [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
+    dataset_names = (
+        [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
+        if not dataset_names
+        else dataset_names
+    )
     print(f"Dataset names: {dataset_names}")
 
     nlet_builder = next((builder for mode, builder in nlet_requirements.items() if loss_mode.startswith(mode)), None)
