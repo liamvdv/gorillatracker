@@ -55,7 +55,7 @@ def run_experiment(
 
 
 if __name__ == "__main__":
-    with open("scripts/multi_configs/baseline_sweep_fix.json", "r") as file:
+    with open("scripts/multi_configs/knowledge_distillation.json", "r") as file:
         json_file = json.load(file)
         experiments = json_file["experiments"]
         global_parameters = json_file["global"]

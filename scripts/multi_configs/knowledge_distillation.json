@@ -11,13 +11,15 @@
         "embedding_size": 256,
         "data_resize_transform": 224,
         "loss_mode": "distillation/offline/response-based",
-        "teacher_model_wandb_link": "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/workspace?nw=nwuserkajohpi",
+        "teacher_model_wandb_link": "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/hg1f88h9?nw=nwuserkajohpi",
         "data_dir": "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
         "dataset_class": "gorillatracker.datasets.cxl.CXLDataset",
         "kfold": false,
         "val_before_training": true,
         "lr_schedule": "exponential",
-        "workers": 16
+        "workers": 16,
+        "additional_val_dataset_classes": [],
+        "additional_val_data_dirs": []
     },
     "global_sweep_parameters": {
         "weight_decay": {
