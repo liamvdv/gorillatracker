@@ -170,3 +170,4 @@ cropped-images/*
 /pretrained_weights/
 *.npy
 */lightning_logs/*
+plots/
