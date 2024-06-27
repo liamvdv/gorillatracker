@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
-import numpy as np
 from PIL import Image
 
 import gorillatracker.type_helper as gtypes
@@ -208,6 +207,8 @@ class CliqueGraphSampler(ContrastiveSampler):
     def negative_classes(self, sample: ContrastiveImage) -> list[Label]:
         adjacent_cliques = self.graph.get_adjacent_cliques(sample)
         return [root.class_label for root in adjacent_cliques.keys()]
+
+
 
 
 def get_individual(id: gtypes.Id) -> str:
