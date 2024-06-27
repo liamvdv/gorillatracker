@@ -192,10 +192,6 @@ def knn(
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
 
-    assert not use_crossvideo_positives or all(
-        ["CXL" in row["dataset"] or "Bristol" in row["dataset"] for _, row in data.iterrows()]
-    ), "Crossvideo positives can only be used with CXL or Bristol datasets"
-
     # convert embeddings and labels to tensors
     _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")
     train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])

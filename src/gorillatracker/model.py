@@ -528,6 +528,7 @@ class BaseModule(L.LightningModule):
 
     def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> None:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
+        dataloader_id = self.dm.get_dataset_ids()[dataloader_idx]
         if self.knn_with_train:
             train_embeddings, train_labels, train_ids = self._get_train_embeddings_for_knn(self.trainer)
 
@@ -574,7 +575,7 @@ class BaseModule(L.LightningModule):
                 "knn_crossencounter_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
                 "knn5_crossencounter_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
             }
-            if "CXL" in dataloader_name or "Bristol" in dataloader_name
+            if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
             else {}
         )
         metrics = (
@@ -584,7 +585,7 @@ class BaseModule(L.LightningModule):
                 "knn_ssl_macro": partial(knn_ssl, k=1, dm=self.dm, average="macro"),
                 "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
             }
-            if "ssl" in dataloader_name.lower()
+            if "ssl" in dataloader_id.lower()
             else metrics
         )
 

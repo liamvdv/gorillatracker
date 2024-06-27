@@ -106,11 +106,8 @@ def build_data_module(
 
     dataset_class = dataset_registry[dataset_class_id]
     eval_datasets = [dataset_registry[cls_id] for cls_id in additional_eval_datasets_ids]
-    dataset_names = (
-        [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
-        if not dataset_names
-        else dataset_names
-    )
+    dataset_ids = [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
+    dataset_names = dataset_names if dataset_names else dataset_ids
     print(f"Dataset names: {dataset_names}")
 
     nlet_builder = next((builder for mode, builder in nlet_requirements.items() if loss_mode.startswith(mode)), None)
@@ -125,6 +122,7 @@ def build_data_module(
         model_transforms=model_transforms,
         training_transforms=training_transforms,
         eval_datasets=eval_datasets,
+        dataset_ids=dataset_ids,
         dataset_names=dataset_names,
         eval_data_dirs=additional_eval_data_dirs,
         ssl_config=ssl_config,
