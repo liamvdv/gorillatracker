@@ -1,16 +1,16 @@
-from collections import defaultdict
+import concurrent.futures
+import logging
 import random
+from collections import defaultdict
+from concurrent.futures import Future, ProcessPoolExecutor
+from multiprocessing import shared_memory
 from typing import Iterator, Optional
 
-
 import numpy as np
-from concurrent.futures import Future, ProcessPoolExecutor
 from scipy.spatial import distance
-from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
-from multiprocessing import shared_memory
-import concurrent.futures
 from tqdm import tqdm
-import logging
+
+from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
 
 log = logging.getLogger(__name__)
 

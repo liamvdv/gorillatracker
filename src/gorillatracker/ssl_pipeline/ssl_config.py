@@ -31,7 +31,7 @@ from gorillatracker.ssl_pipeline.queries import (
     min_count_filter,
     multiple_videos_filter,
 )
-from gorillatracker.ssl_pipeline.sampler import equidistant_sample, random_sample, embedding_distant_sample
+from gorillatracker.ssl_pipeline.sampler import embedding_distant_sample, equidistant_sample, random_sample
 
 
 @dataclass(kw_only=True)  # type: ignore

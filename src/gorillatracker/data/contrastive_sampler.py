@@ -6,12 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
+import numpy as np
 from PIL import Image
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.ssl_pipeline.data_structures import IndexedCliqueGraph
 from gorillatracker.type_helper import Id, Label
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,12 @@
-import numpy as np
 from pathlib import Path
-from gorillatracker.utils import embedding_generator
-from gorillatracker.data.nlet import NletDataModule, build_onelet
-from gorillatracker.data.ssl import SSLDataset
-from gorillatracker.utils import wandb_loader
+
+import numpy as np
 from torchvision.transforms import Compose, Normalize, Resize
 
+from gorillatracker.data.nlet import NletDataModule, build_onelet
+from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
+from gorillatracker.utils import embedding_generator, wandb_loader
 
 DATA_DIR = Path("/workspaces/gorillatracker/video_data/cropped-images/2024-04-18")
 
