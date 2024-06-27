@@ -192,10 +192,6 @@ def knn(
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
 
-    assert not use_crossvideo_positives or all(
-        ["CXL" in row["dataset"] or "Bristol" in row["dataset"] for _, row in data.iterrows()]
-    ), "Crossvideo positives can only be used with CXL or Bristol datasets"
-
     # convert embeddings and labels to tensors
     _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")
     train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])
@@ -321,7 +317,8 @@ def knn_ssl(
     true_labels_tensor = torch.tensor(true_labels)
     pred_labels_tensor = torch.tensor(pred_labels)
 
-    pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
+    pred_labels_top5_nparray = np.array(pred_labels_top5)
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5_nparray)
     top5_correct = []
     for i, true_label in enumerate(true_labels_tensor):
         if true_label in pred_labels_top5_tensor[i]:
@@ -371,13 +368,13 @@ def tsne(
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
 
-    num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]
+    num_classes = len(np.unique(labels))
     if len(labels) < 50:
         return None
     if with_pca:

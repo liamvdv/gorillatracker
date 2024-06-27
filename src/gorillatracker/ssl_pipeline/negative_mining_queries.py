@@ -43,16 +43,13 @@ def build_overlapping_trackings_query(video_ids: Sequence[int]) -> Select[tuple[
 
 
 def find_overlapping_trackings(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
-    negative_tuples = fetch_negative_tuples(session, video_ids, build_overlapping_trackings_query)
+    BATCH_SIZE = 200
+    negative_tuples = fetch_negative_tuples(session, video_ids, build_overlapping_trackings_query, BATCH_SIZE)
     return negative_tuples
 
 
-def tracking_ids_from_videos(video_ids: Sequence[int]) -> Select[tuple[int]]:
-    return (
-        select(Tracking.tracking_id)
-        .where(Video.video_id.in_(video_ids))
-        .join(Video, Tracking.video_id == Video.video_id)
-    )
+def trackings_from_videos(video_ids: Sequence[int]) -> Select[tuple[Tracking]]:
+    return select(Tracking).where(Video.video_id.in_(video_ids)).join(Video, Tracking.video_id == Video.video_id)
 
 
 def great_circle_distance(
@@ -144,18 +141,21 @@ def social_group_negatives(video_ids: Sequence[int]) -> Select[tuple[int, int]]:
 
 
 def find_social_group_negatives(session: Session, video_ids: Sequence[int]) -> Sequence[tuple[int, int]]:
-    negative_tuples = fetch_negative_tuples(session, video_ids, social_group_negatives)
+    BATCH_SIZE = 200  # NOTE: Number of negatives is correlated with the batch size
+    negative_tuples = fetch_negative_tuples(session, video_ids, social_group_negatives, BATCH_SIZE)
     return negative_tuples
 
 
 def fetch_negative_tuples(
-    session: Session, video_ids: Sequence[int], query_builder: Callable[[Sequence[int]], Select[tuple[int, int]]]
+    session: Session,
+    video_ids: Sequence[int],
+    query_builder: Callable[[Sequence[int]], Select[tuple[int, int]]],
+    batch_size: int = 200,
 ) -> Sequence[tuple[int, int]]:
-    BATCH_SIZE = 200
-    num_batches = len(video_ids) // BATCH_SIZE
+    num_batches = len(video_ids) // batch_size
     negative_tuples = []
     for i in range(num_batches + 1):
-        batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+        batch_video_ids = video_ids[i * batch_size : (i + 1) * batch_size]
         stmt = query_builder(batch_video_ids)
         result = session.execute(stmt).all()
         negative_tuples.extend([(row[0], row[1]) for row in result])
