@@ -13,6 +13,7 @@ from gorillatracker.data.nlet import (
     SupervisedDataset,
     SupervisedKFoldDataset,
     build_onelet,
+    build_pair,
     build_quadlet,
     build_triplet,
 )
@@ -61,16 +62,18 @@ dataset_registry: dict[str, Type[NletDataset]] = {
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
     "softmax": build_onelet,
+    "ntxent": build_pair,
     "offline": build_triplet,
     "online": build_quadlet,
 }
 
 
-def force_nlet_builder(builder_identifier: Literal["onelet", "triplet", "quadlet"]) -> None:
+def force_nlet_builder(builder_identifier: Literal["onelet", "pair", "triplet", "quadlet"]) -> None:
     if builder_identifier:
         global nlet_requirements
         nlet_requirements = {
             "softmax": build_onelet if builder_identifier == "onelet" else build_triplet,
+            "ntxent": build_pair if builder_identifier == "pair" else build_pair,
             "offline": build_triplet if builder_identifier == "triplet" else build_quadlet,
             "online": build_quadlet if builder_identifier == "quadlet" else build_onelet,
         }
