@@ -107,7 +107,7 @@ class SSLConfig:
     def _sample_tracking_frame_features(self, video_ids: list[int], session: Session) -> list[TrackingFrameFeature]:
         BATCH_SIZE = 200
         num_batches = len(video_ids) // BATCH_SIZE
-        tffs = []
+        tffs: list[TrackingFrameFeature] = []
         for i in tqdm(
             range(num_batches + 1), desc="Sampling TrackingFrameFeatures", total=num_batches + 1, unit="batch"
         ):

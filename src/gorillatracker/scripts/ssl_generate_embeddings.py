@@ -17,7 +17,7 @@ def generate_perceptional_embeddings(
         "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
     ),
     save_path: Path = Path("/workspaces/gorillatracker/"),
-):
+) -> None:
     DATASET_CLS = SSLDataset
 
     # Sample everything
@@ -57,8 +57,8 @@ def generate_perceptional_embeddings(
 
     ids_train, embeddings_train, _ = embedding_generator.generate_embeddings(model, data_module.train_dataloader())
     ids_val, embeddings_val, _ = embedding_generator.generate_embeddings(model, data_module.val_dataloader()[0])
-    ids = ids_train + ids_val
-    ids = np.array([int(Path(ids).stem) for ids in ids])
+    image_ids = ids_train + ids_val
+    ids = np.array([int(Path(ids).stem) for ids in image_ids])
     embeddings = np.concatenate([embeddings_train, embeddings_val])
     np.save(save_path / "vit_ids.npy", ids)
     np.save(save_path / "vit_embeddings.npy", embeddings)

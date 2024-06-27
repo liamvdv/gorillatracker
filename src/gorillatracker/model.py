@@ -821,7 +821,7 @@ class VisionTransformerWrapper(BaseModule):
 class VisionTransformerFrozenWrapper(VisionTransformerWrapper):
     def __init__(
         self,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.freeze()

@@ -1,4 +1,3 @@
-import concurrent.futures
 import logging
 import random
 from collections import defaultdict
@@ -7,6 +6,7 @@ from multiprocessing import shared_memory
 from typing import Iterator, Optional
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.spatial import distance
 from tqdm import tqdm
 
@@ -68,8 +68,8 @@ def max_min_dispatch(
 ) -> list[int]:
     shm_ids = shared_memory.SharedMemory(name=shm_name_ids)
     shm_embeddings = shared_memory.SharedMemory(name=shm_name_embeddings)
-    ids = np.ndarray(shape_ids, dtype=np.int64, buffer=shm_ids.buf)
-    embeddings = np.ndarray(shape_embeddings, dtype=np.float32, buffer=shm_embeddings.buf)
+    ids: NDArray[np.int32] = np.ndarray(shape_ids, dtype=np.int64, buffer=shm_ids.buf)
+    embeddings: NDArray[np.float32] = np.ndarray(shape_embeddings, dtype=np.float32, buffer=shm_embeddings.buf)
 
     mask = np.isin(ids, tff_ids, assume_unique=True)
     filtered_ids = ids[mask]
@@ -81,7 +81,7 @@ def max_min_dispatch(
     return list(filtered_ids[ranking])
 
 
-def max_min_dist_ranking(embeddings: np.ndarray, n_samples: int) -> np.ndarray:
+def max_min_dist_ranking(embeddings: NDArray[np.float32], n_samples: int) -> NDArray[np.int32]:
     dist_matrix = distance.cdist(embeddings, embeddings, "cosine")
     ranked_points = [0]
     remaining_points = set(range(1, embeddings.shape[0]))
@@ -103,18 +103,20 @@ def embedding_distant_sample(
     frame_features: list[TrackingFrameFeature], n_samples: int
 ) -> Iterator[TrackingFrameFeature]:
     # HACK(memben): hardcoded for now
-    IDS = "/workspaces/gorillatracker/ids.npy"
-    EMBEDDINGS = "/workspaces/gorillatracker/embeddings.npy"
+    IDS = "/workspaces/gorillatracker/video_data/ssl_embeddings/ids.npy"
+    EMBEDDINGS = "/workspaces/gorillatracker/video_data/ssl_embeddings/embeddings.npy"
 
-    ids: np.ndarray = np.load(IDS, mmap_mode="r")
-    embeddings: np.ndarray = np.load(EMBEDDINGS, mmap_mode="r")
+    ids: NDArray[np.int32] = np.load(IDS, mmap_mode="r")
+    embeddings: NDArray[np.float32] = np.load(EMBEDDINGS, mmap_mode="r")
 
     tracking_id_grouped = group_by_tracking_id(frame_features)
 
     shm_ids = shared_memory.SharedMemory(create=True, size=ids.nbytes)
     shm_embeddings = shared_memory.SharedMemory(create=True, size=embeddings.nbytes)
-    shared_ids = np.ndarray(ids.shape, dtype=ids.dtype, buffer=shm_ids.buf)
-    shared_embeddings = np.ndarray(embeddings.shape, dtype=embeddings.dtype, buffer=shm_embeddings.buf)
+    shared_ids: NDArray[np.int32] = np.ndarray(ids.shape, dtype=ids.dtype, buffer=shm_ids.buf)
+    shared_embeddings: NDArray[np.float32] = np.ndarray(
+        embeddings.shape, dtype=embeddings.dtype, buffer=shm_embeddings.buf
+    )
     np.copyto(shared_ids, ids)
     np.copyto(shared_embeddings, embeddings)
 

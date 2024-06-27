@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
 
-from sqlalchemy import Select, alias, and_, func, literal_column, or_, select, union_all, update
+from sqlalchemy import Select, alias, and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.models import Camera, Task, TaskStatus, TaskType, TrackingFrameFeature, Video
