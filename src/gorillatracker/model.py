@@ -1,3 +1,4 @@
+import copy
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
 
@@ -265,6 +266,7 @@ class BaseModule(L.LightningModule):
             # log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
             log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
+            purpose="train",
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -289,6 +291,7 @@ class BaseModule(L.LightningModule):
             use_class_weights=use_class_weights,
             use_dist_term=use_dist_term,
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
+            purpose="val",
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -675,8 +678,9 @@ class EfficientNetV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.classifier = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.blocks[-1].conv
@@ -709,8 +713,9 @@ class EfficientNetRW_M(BaseModule):
             torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.classifier = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         return self.model.conv_head
@@ -744,7 +749,9 @@ class ConvNeXtV2BaseWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
 
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         return self.model.stages[-1].blocks[-1].conv_dw
@@ -773,7 +780,10 @@ class ConvNeXtV2HugeWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
 
 class VisionTransformerWrapper(BaseModule):
@@ -790,7 +800,9 @@ class VisionTransformerWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
@@ -832,7 +844,9 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -859,7 +873,9 @@ class VisionTransformerClipWrapper(BaseModule):
             torch.nn.BatchNorm1d(self.embedding_size),
         )
 
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -889,6 +905,10 @@ class ConvNextClipWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
+
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
         self.set_losses(self.model, **kwargs)
 
     @classmethod
@@ -915,6 +935,11 @@ class ConvNextWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
+
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
+
         self.set_losses(self.model, **kwargs)
 
     @classmethod
@@ -948,7 +973,10 @@ class SwinV2BaseWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
@@ -1003,7 +1031,10 @@ class SwinV2LargeWrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.head.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1033,7 +1064,10 @@ class ResNet18Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.layer4[-1]
@@ -1065,7 +1099,9 @@ class ResNet152Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # return self.model.layer4[-1]
@@ -1097,7 +1133,9 @@ class ResNet50Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -1158,8 +1196,9 @@ class InceptionV3Wrapper(BaseModule):
             torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
-
-        self.set_losses(self.model, **kwargs)
+        model_cpy = copy.deepcopy(self.model)
+        model_cpy.fc = torch.nn.Identity()
+        self.set_losses(model=model_cpy, **kwargs)
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         return self.model.Mixed_7c.branch_pool

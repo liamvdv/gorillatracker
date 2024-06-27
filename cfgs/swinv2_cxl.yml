@@ -60,7 +60,7 @@ start_lr: 1e-5                  # Learning Rate after warmup at the beginning of
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 
 
-batch_size: 16                 # Training batch size
+batch_size: 8                 # Training batch size
 grad_clip: 1.0                 # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 max_epochs: 50                  # Training goal (large number)
@@ -80,13 +80,13 @@ check_val_every_n_epoch: 5      # Perform validation every n epochs
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
-# force_nlet_builder: "quadlet"
-data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
+force_nlet_builder: "quadlet"
+data_dir: "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
 dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 192
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
 
