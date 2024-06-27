@@ -1,3 +1,4 @@
+from collections import defaultdict
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
 
@@ -149,26 +150,26 @@ def evaluate_embeddings(
 
 def _get_crossvideo_masks(
     labels: torch.Tensor, ids: list[gtypes.Id], min_samples: int = 3
-) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
+) -> tuple[torch.Tensor, torch.Tensor]:
     distance_mask = torch.zeros((len(labels), len(labels)))
     classification_mask = torch.zeros(len(labels))
 
+    vids_per_id: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+    idx_per_vid: defaultdict[str, list[int]] = defaultdict(list)
+    for i,id in enumerate(ids):
+        individual_video_id = get_individual_video_id(id)
+        vids_per_id[get_individual(id)][individual_video_id] += 1
+        idx_per_vid[individual_video_id].append(i)
+
     for i, id in enumerate(ids):
         individual_video_id = get_individual_video_id(id)
-        distance_mask[i] = torch.tensor(
-            [individual_video_id != get_individual_video_id(id2) for id2 in ids]
-        )  # 1 if not same video, 0 if same video
+        
+        distance_mask_ = [True] * len(ids)
+        for idx in idx_per_vid[individual_video_id]:
+            distance_mask_[idx] = False
+        distance_mask[i] = torch.tensor(distance_mask_)  # 1 if not same video, 0 if same video
 
-        if (
-            len(
-                [
-                    id2
-                    for id2 in ids
-                    if individual_video_id != get_individual_video_id(id2) and get_individual(id2) == get_individual(id)
-                ]
-            )
-            > min_samples
-        ):
+        if sum(vids_per_id[get_individual(id)].values()) - vids_per_id[get_individual(id)][individual_video_id] >= min_samples:
             classification_mask[i] = True
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
@@ -364,7 +365,7 @@ def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot
 
 
 def tsne(
-    data: pd.DataFrame, with_pca: bool = False, count: int = 1000, **kwargs: Any
+    data: pd.DataFrame, with_pca: bool = False, count: int = 2000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
 

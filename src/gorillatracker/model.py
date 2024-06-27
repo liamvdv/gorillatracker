@@ -554,7 +554,7 @@ class BaseModule(L.LightningModule):
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            "tsne": tsne,
+            "tsne": partial(tsne, with_pca=True),
             # "pca": pca,
             # "fc_layer": fc_layer,
         }
