@@ -209,8 +209,6 @@ class CliqueGraphSampler(ContrastiveSampler):
         return [root.class_label for root in adjacent_cliques.keys()]
 
 
-
-
 def get_individual(id: gtypes.Id) -> str:
     file_name = Path(id).name
     return file_name.split("_")[0].upper()
