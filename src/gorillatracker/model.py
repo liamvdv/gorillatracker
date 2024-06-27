@@ -570,10 +570,10 @@ class BaseModule(L.LightningModule):
         )
         metrics |= (
             {
-                "knn_crossencounter": partial(knn, k=1, use_crossvideo_positives=True),
-                "knn5_crossencounter": partial(knn, k=5, use_crossvideo_positives=True),
-                "knn_crossencounter_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
-                "knn5_crossencounter_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn_crossvideo": partial(knn, k=1, use_crossvideo_positives=True),
+                "knn5_crossvideo": partial(knn, k=5, use_crossvideo_positives=True),
+                "knn_crossvideo_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossvideo_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
             }
             if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
             else {}
