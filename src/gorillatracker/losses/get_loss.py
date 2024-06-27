@@ -3,12 +3,17 @@ from typing import Any, Callable, Union
 import torch
 
 import gorillatracker.type_helper as gtypes
-
-from .arcface_loss import AdaFaceLoss, ArcFaceLoss, ElasticArcFaceLoss, VariationalPrototypeLearning
-from .dist_term_loss import CombinedLoss
-from .l2sp import L2SPRegularization_Wrapper
-from .offline_distillation_loss import OfflineResponseBasedLoss
-from .triplet_loss import TripletLossOffline, TripletLossOfflineNative, TripletLossOnline
+from gorillatracker.losses.arcface_loss import (
+    AdaFaceLoss,
+    ArcFaceLoss,
+    ElasticArcFaceLoss,
+    VariationalPrototypeLearning,
+)
+from gorillatracker.losses.dist_term_loss import CombinedLoss
+from gorillatracker.losses.l2sp import L2SPRegularization_Wrapper
+from gorillatracker.losses.ntxent import NTXentLoss
+from gorillatracker.losses.offline_distillation_loss import OfflineResponseBasedLoss
+from gorillatracker.losses.triplet_loss import TripletLossOffline, TripletLossOfflineNative, TripletLossOnline
 
 
 def get_loss(
@@ -94,6 +99,8 @@ def get_loss(
             mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
             accelerator=kw_args["accelerator"],
         )
+    elif loss_mode == "ntxent":
+        loss_module = NTXentLoss(temperature=kw_args["temperature"])
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
 
