@@ -156,20 +156,23 @@ def _get_crossvideo_masks(
 
     vids_per_id: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
     idx_per_vid: defaultdict[str, list[int]] = defaultdict(list)
-    for i,id in enumerate(ids):
+    for i, id in enumerate(ids):
         individual_video_id = get_individual_video_id(id)
         vids_per_id[get_individual(id)][individual_video_id] += 1
         idx_per_vid[individual_video_id].append(i)
 
     for i, id in enumerate(ids):
         individual_video_id = get_individual_video_id(id)
-        
+
         distance_mask_ = [True] * len(ids)
         for idx in idx_per_vid[individual_video_id]:
             distance_mask_[idx] = False
         distance_mask[i] = torch.tensor(distance_mask_)  # 1 if not same video, 0 if same video
 
-        if sum(vids_per_id[get_individual(id)].values()) - vids_per_id[get_individual(id)][individual_video_id] >= min_samples:
+        if (
+            sum(vids_per_id[get_individual(id)].values()) - vids_per_id[get_individual(id)][individual_video_id]
+            >= min_samples
+        ):
             classification_mask[i] = True
 
     return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
