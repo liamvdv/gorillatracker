@@ -154,7 +154,7 @@ def _get_crossvideo_masks(
     distance_mask = torch.zeros((len(labels), len(labels)))
     classification_mask = torch.zeros(len(labels))
 
-    vids_per_id: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+    vids_per_id: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0)) # NOTE: individual_id -> (individual_video_id -> num_images))
     idx_per_vid: defaultdict[str, list[int]] = defaultdict(list)
     for i, id in enumerate(ids):
         individual_video_id = get_individual_video_id(id)
