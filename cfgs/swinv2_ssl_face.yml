@@ -11,8 +11,8 @@ workers: 40                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-SwinV2-SSL-VAL-TEST" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "376-ssl-val-first-test" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-SwinV2-SSL-Face-10k" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "426-hard-mining" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["baseline"]            # WandB tags for experiment tracking
 model_name_or_path: "SwinV2Base"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -71,12 +71,14 @@ knn_with_train: False
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
-split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-90-5-5_split_20240618_1103.pkl"
-feature_types: ["face_45", "face_90"]
+split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
+feature_types: ["face_90"]
+tff_selection: "embeddingdistant"
+negative_mining: "overlapping"
 
 data_resize_transform: 192
 
 additional_val_dataset_classes: [gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset]
-additional_val_data_dirs: [/workspaces/gorillatracker/data/splits/bristol, /workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25]
+additional_val_data_dirs: [/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_filtered, /workspaces/gorillatracker/data/supervised/cxl_all/face_images]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
