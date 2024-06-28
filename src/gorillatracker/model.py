@@ -226,6 +226,7 @@ class BaseModule(L.LightningModule):
         delta_t: int,
         mem_bank_start_epoch: int,
         lambda_membank: float,
+        temperature: float,
         embedding_size: int,
         batch_size: int,
         num_classes: Optional[tuple[int, int, int]],
@@ -253,6 +254,7 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
+            temperature=temperature,
             accelerator=accelerator,
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
@@ -279,6 +281,7 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
+            temperature=temperature,
             accelerator=accelerator,
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
