@@ -1,0 +1,55 @@
+[
+    {
+        "project_name": "Embedding-VitLarge-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/visiontransformer_cxl.yml",
+        "parameters": {
+            "dropout_p": {
+                "max": 0.5,
+                "min": 0.0,
+                "distribution": "uniform"
+            },
+            "l2_alpha": {
+                "mu": -3,
+                "sigma": 1.0,
+                "distribution": "log_normal"
+            },
+            "l2_beta": {
+                "mu": -4.6,
+                "sigma": 1.0,
+                "distribution": "log_normal"
+            },
+            "start_lr": {
+                "mu": -11.0,
+                "sigma": 1.0,
+                "distribution": "log_normal"
+            },
+            "margin": {
+                "max": 1.5,
+                "min": 0.0,
+                "distribution": "uniform"
+            },
+            "embedding_size": {
+                "values": [128, 256, 512],
+                "distribution": "categorical"
+            },
+            "loss_mode": {
+                "values": [
+                    "online/soft/l2sp",
+                    "online/soft",
+                    "offline/l2sp",
+                    "offline"
+                ],
+                "distribution": "categorical"
+            },
+            "dataset_class": {
+                "values": [
+                    "gorillatracker.datasets.cxl.CXLDataset",
+                    "gorillatracker.datasets.cxl.CrossEncounterCXLDataset",
+                    "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"
+                ],
+                "distribution": "categorical"
+            }
+        }
+    }
+]
