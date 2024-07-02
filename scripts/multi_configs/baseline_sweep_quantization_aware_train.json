@@ -49,11 +49,38 @@
     },
     "experiments": [
         {
+            "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
+            "parameters": {
+                "batch_size": 16
+            }
+        },
+        {
+            "project_name": "Embedding-ResNet152-CXL-OpenSet",
+            "config_path": "./cfgs/resnet152_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-CXL-Open",
+            "config_path": "./cfgs/convnextv2base_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_cxl.yml",
+            "parameters": {}
+        },
+        {
             "project_name": "Embedding-SwinV2Large-CXL-Open",
             "config_path": "./cfgs/swinv2_large_cxl.yml",
             "parameters": {
                 "data_resize_transform": 256
             }
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
+            "config_path": "./cfgs/convnextv2huge_cxl.yml",
+            "parameters": {}
         }
     ]
 }
