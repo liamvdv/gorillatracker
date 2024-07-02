@@ -226,6 +226,7 @@ class BaseModule(L.LightningModule):
         delta_t: int,
         mem_bank_start_epoch: int,
         lambda_membank: float,
+        temperature: float,
         embedding_size: int,
         batch_size: int,
         num_classes: Optional[tuple[int, int, int]],
@@ -253,6 +254,7 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
+            temperature=temperature,
             accelerator=accelerator,
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
@@ -279,6 +281,7 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
             mem_bank_start_epoch=mem_bank_start_epoch,
             lambda_membank=lambda_membank,
+            temperature=temperature,
             accelerator=accelerator,
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
@@ -353,7 +356,7 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=images, labels_onehot=flat_labels_onehot)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
@@ -401,7 +404,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=images)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -1070,7 +1073,7 @@ class SwinV2LargeWrapper(BaseModule):
                 transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(256, scale=(0.75, 1.0)),
             ]
         )
 

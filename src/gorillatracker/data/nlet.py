@@ -394,6 +394,12 @@ def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[Con
     return (contrastive_sampler[idx],)
 
 
+def build_pair(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage, ContrastiveImage]:
+    anchor_positive = contrastive_sampler[idx]
+    positive = contrastive_sampler.positive(anchor_positive)
+    return (anchor_positive, positive)
+
+
 def build_triplet(
     idx: int, contrastive_sampler: ContrastiveSampler
 ) -> tuple[ContrastiveImage, ContrastiveImage, ContrastiveImage]:
