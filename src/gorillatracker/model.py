@@ -9,6 +9,7 @@ import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
+import wandb
 from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
@@ -443,7 +444,10 @@ class BaseModule(L.LightningModule):
         assert self.trainer.max_epochs is not None
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
             for key, val in self.eval_embeddings_table(embeddings_table, dataloader_idx).items():
-                self.log(key, val, on_epoch=True)
+                if not isinstance(val, wandb.Image):
+                    self.log(key, val, on_epoch=True)
+                else:
+                    self.wandb_run.log({key: val})
 
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
@@ -558,7 +562,7 @@ class BaseModule(L.LightningModule):
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            # "tsne": tsne,
+            "tsne": tsne,
             # "pca": pca,
             # "fc_layer": fc_layer,
         }
