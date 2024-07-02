@@ -14,7 +14,7 @@ workers: 40                      # Number of workers for data loading
 project_name: "Embedding-ViTLarge-SimCLR-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
 run_name: "484-test-lr" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["baseline"]            # WandB tags for experiment tracking
-model_name_or_path: "VisionTransformerDinoV2"  # Model name or path 
+model_name_or_path: "SimCLR"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False               # Enable fast development run

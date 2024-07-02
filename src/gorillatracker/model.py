@@ -32,6 +32,7 @@ from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
+from gorillatracker.model_ssl import SimClRWrapper
 
 
 def warmup_lr(
@@ -1302,6 +1303,7 @@ custom_model_cls = {
     "MiewIdNet": MiewIdNetWrapper,
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
+    "SimCLR": SimClRWrapper,
 }
 
 
