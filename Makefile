@@ -1,4 +1,4 @@
-sources = src tests *.py
+sources = src tests
 
 .PHONY: format
 format:

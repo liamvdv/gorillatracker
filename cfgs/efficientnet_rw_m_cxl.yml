@@ -26,7 +26,7 @@ from_scratch: False             # Train the model from scratch
 early_stopping_patience: 20      # Early stopping patience (number of epochs)
 embedding_size: 256
 dropout_p: 0.32
-use_quantization_aware_training: False
+use_quantization_aware_training: True
 use_dist_term: False
 
 
@@ -64,10 +64,10 @@ save_model_to_wandb: False       # Save the model checkpoint to wandb
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
-kfold: True                     # Enable kfold cross-validation
+kfold: False                     # Enable kfold cross-validation
 
-# data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
-# dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
+data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 # data_dir: "/workspaces/gorillatracker/datasets/splits/ground_truth-cxl-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL1
 # data_dir: "/workspaces/gorillatracker/data/splits/tiger/atrw-workspaces-gorillatracker-video_data-external-datasets-ATRW-atrw_format_adapted-kfold-openset-seed-42-trainval-80-test-20-k-5"
@@ -77,5 +77,5 @@ data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_opens
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
-additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
+additional_val_dataset_classes: Null
+additional_val_data_dirs: Null
