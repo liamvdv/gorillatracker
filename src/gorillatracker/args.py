@@ -74,12 +74,17 @@ class TrainingArgs:
 
     save_model_to_wandb: bool = field(default=False)
 
+    # NTXent Arguments
+    temperature: float = field(default=0.5)
+
+    # ArcFace Arguments
     k_subcenters: int = field(default=1)
-    margin: float = field(default=0.5)
     s: float = field(default=64.0)
     delta_t: int = field(default=100)
     mem_bank_start_epoch: int = field(default=2)
     lambda_membank: float = field(default=0.5)
+
+    margin: float = field(default=0.5)
     loss_mode: Literal[
         "offline",
         "offline/native",
@@ -100,6 +105,7 @@ class TrainingArgs:
         "softmax/adaface/l2sp",
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
+        "ntxent",
     ] = field(default="offline")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
@@ -109,7 +115,7 @@ class TrainingArgs:
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
     use_inbatch_mixup: bool = field(default=False)
-    force_nlet_builder: Literal["onelet", "triplet", "quadlet", "None"] = field(default="None")
+    force_nlet_builder: Literal["onelet", "pair", "triplet", "quadlet", "None"] = field(default="None")
 
     batch_size: int = field(default=8)
     grad_clip: Union[float, None] = field(default=1.0)
@@ -129,6 +135,7 @@ class TrainingArgs:
     data_dir: Path = field(default=Path("./mnist"))
     additional_val_dataset_classes: list[str] = field(default_factory=lambda: [])
     additional_val_data_dirs: list[str] = field(default_factory=lambda: [])
+    dataset_names: list[str] = field(default_factory=lambda: [])
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config

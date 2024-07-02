@@ -1,3 +1,4 @@
+from collections import defaultdict
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
 
@@ -149,25 +150,30 @@ def evaluate_embeddings(
 
 def _get_crossvideo_masks(
     labels: torch.Tensor, ids: list[gtypes.Id], min_samples: int = 3
-) -> tuple[torch.Tensor, torch.Tensor]:  # TODO: Add type hints
+) -> tuple[torch.Tensor, torch.Tensor]:
     distance_mask = torch.zeros((len(labels), len(labels)))
     classification_mask = torch.zeros(len(labels))
 
+    vids_per_id: defaultdict[str, defaultdict[str, int]] = defaultdict(
+        lambda: defaultdict(lambda: 0)
+    )  # NOTE: individual_id -> (individual_video_id -> num_images))
+    idx_per_vid: defaultdict[str, list[int]] = defaultdict(list)
     for i, id in enumerate(ids):
         individual_video_id = get_individual_video_id(id)
-        distance_mask[i] = torch.tensor(
-            [individual_video_id != get_individual_video_id(id2) for id2 in ids]
-        )  # 1 if not same video, 0 if same video
+        vids_per_id[get_individual(id)][individual_video_id] += 1
+        idx_per_vid[individual_video_id].append(i)
+
+    for i, id in enumerate(ids):
+        individual_video_id = get_individual_video_id(id)
+
+        distance_mask_ = [True] * len(ids)
+        for idx in idx_per_vid[individual_video_id]:
+            distance_mask_[idx] = False
+        distance_mask[i] = torch.tensor(distance_mask_)  # 1 if not same video, 0 if same video
 
         if (
-            len(
-                [
-                    id2
-                    for id2 in ids
-                    if individual_video_id != get_individual_video_id(id2) and get_individual(id2) == get_individual(id)
-                ]
-            )
-            > min_samples
+            sum(vids_per_id[get_individual(id)].values()) - vids_per_id[get_individual(id)][individual_video_id]
+            >= min_samples
         ):
             classification_mask[i] = True
 
@@ -191,10 +197,6 @@ def knn(
     4. Select only the validation part of the classification matrix (len(val_embeddings) x num_classes)
     5. Calculate the accuracy, accuracy_top5, auroc and f1 score: Either choose highest probability as class as matched class or check if any of the top 5 classes matches.
     """
-
-    assert not use_crossvideo_positives or all(
-        ["CXL" in row["dataset"] or "Bristol" in row["dataset"] for _, row in data.iterrows()]
-    ), "Crossvideo positives can only be used with CXL or Bristol datasets"
 
     # convert embeddings and labels to tensors
     _, _, val_embeddings, val_ids, val_labels = get_partition_from_dataframe(data, partition="val")
@@ -321,7 +323,8 @@ def knn_ssl(
     true_labels_tensor = torch.tensor(true_labels)
     pred_labels_tensor = torch.tensor(pred_labels)
 
-    pred_labels_top5_tensor = torch.tensor(pred_labels_top5)
+    pred_labels_top5_nparray = np.array(pred_labels_top5)
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5_nparray)
     top5_correct = []
     for i, true_label in enumerate(true_labels_tensor):
         if true_label in pred_labels_top5_tensor[i]:
@@ -367,17 +370,17 @@ def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot
 
 
 def tsne(
-    data: pd.DataFrame, with_pca: bool = False, count: int = 1000, **kwargs: Any
+    data: pd.DataFrame, with_pca: bool = False, count: int = 2000, **kwargs: Any
 ) -> Optional[wandb.Image]:  # generate a 2D plot of the embeddings
     _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")
 
-    num_classes = len(torch.unique(labels_in))
     embeddings = embeddings_in.numpy()
     labels = labels_in.numpy()
 
     indices = np.random.choice(len(embeddings), min(count, len(labels)), replace=False)
     embeddings = embeddings[indices]
     labels = labels[indices]
+    num_classes = len(np.unique(labels))
     if len(labels) < 50:
         return None
     if with_pca:

@@ -72,11 +72,11 @@ check_val_every_n_epoch: 5      # Check validation every n epochs
 
 
 force_nlet_builder: "quadlet"
-data_dir: "/workspaces/gorillatracker/datasets/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
+data_dir: "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
 dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
 data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
-additional_val_data_dirs: ["/workspaces/gorillatracker/datasets/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
