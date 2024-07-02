@@ -72,7 +72,7 @@ class TrainingArgs:
     end_lr: float = field(default=1e-5)
     stepwise_schedule: bool = field(default=False)
 
-    save_model_to_wandb: bool = field(default=False)
+    save_model_to_wandb: Union[Literal["all"], bool] = field(default="all")
 
     # NTXent Arguments
     temperature: float = field(default=0.5)
