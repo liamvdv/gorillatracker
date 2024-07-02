@@ -24,12 +24,12 @@ def get_config(config_path: str) -> Dict[str, Any]:
 
 def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict[str, Dict[str, Any]]) -> None:
     sweep_config = {
-        "program": "train.py",  # Note: not the sweep file, but the training script
+        "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": project_name,
         "method": "bayes",  # Specify the search method (random search in this case)
         "metric": {
             "goal": "maximize",
-            "name": "cxl_train/val/embeddings/knn5_crossvideo/accuracy",
+            "name": "val/embeddings/knn/dataloader_0/accuracy",
         },  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
@@ -42,66 +42,20 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
 
 sweeps = [
     {
-        "project_name": "Embedding-VitLarge-CXL-OpenSet",
+        "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
         "entity": "gorillas",
-        "config_path": "./cfgs/visiontransformer_cxl.yml",
+        "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
         "parameters": {
-            "dropout_p": {
-                "max": 0.5,
-                "min": 0.0,
-                "distribution": "uniform",
-            },
-            "l2_alpha": {
-                "mu": -3,
-                "sigma": 1.0,
-                "distribution": "log_normal",
-            },
-            "l2_beta": {
-                "mu": -4.6,
-                "sigma": 1.0,
-                "distribution": "log_normal",
-            },
-            "start_lr": {
-                "mu": -11.0,
-                "sigma": 1.0,
-                "distribution": "log_normal",
-            },
-            "margin": {
-                "max": 1.5,
-                "min": 0.0,
-                "distribution": "uniform",
-            },
-            "embedding_size": {
-                "values": [128, 256, 512],
-                "distribution": "categorical",
-            },
-            # "batch_size": {
-            #     "values": [4, 8],
-            #     "distribution": "categorical",
-            # },
-            "loss_mode": {
+            "weight_decay": {
                 "values": [
-                    # "softmax/arcface/l2sp",
-                    # "softmax/arcface",
-                    "online/soft/l2sp",
-                    "online/soft",
-                    "offline/l2sp",
-                    "offline",
-                ],
-                "distribution": "categorical",
+                    0.7,
+                    0.5,
+                    0.1,
+                ]
             },
-            # "force_nlet_builder": {
-            #     "values": ["quadlet", "None"],
-            #     "distribution": "categorical",
-            # },
-            "dataset_class": {
-                "values": [
-                    "gorillatracker.datasets.cxl.CXLDataset",
-                    "gorillatracker.datasets.cxl.CrossEncounterCXLDataset",
-                    "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset",
-                ],
-                "distribution": "categorical",
-            },
+            "dropout_p": {"values": [0.5, 0.3, 0.1]},
+            "start_lr": {"values": [1e-3, 1e-4, 1e-5]},
+            "end_lr": {"values": [1e-5, 1e-6, 1e-7]},
         },
     },
 ]
