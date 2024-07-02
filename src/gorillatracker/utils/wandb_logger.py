@@ -71,9 +71,7 @@ class WandbLoggingModule:
         wandb_logger = WandbLogger(
             project=self.project_name,
             entity=self.wandb_entity,
-            # log_model="all", # NOTE: logs all models
-            # log_model=True, # NOTE: logs only the last model (combined with early stopping hopefully the best model)
-            log_model=False,  # NOTE: logs no models -> we are happy with the local checkpoints (best model is saved locally)
+            log_model=self.args.save_model_to_wandb,
             tags=self.args.wandb_tags,
             save_dir="logs/",
             **wandb_extra_args,  # type: ignore
