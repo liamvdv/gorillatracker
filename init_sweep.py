@@ -67,8 +67,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sweep_config_file", type=str, default=None, help="Path to sweep configs directory")
     args = parser.parse_args()
-    if args.sweep_configs:
-        sweeps = json.load(open(args.sweep_configs, "r"))
+    if args.sweep_config_file:
+        sweeps = json.load(open(args.sweep_config_file, "r"))
 
     check_sweep_configs(sweeps)
 

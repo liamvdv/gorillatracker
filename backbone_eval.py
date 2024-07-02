@@ -77,26 +77,28 @@ def run_command(backbone_name: str) -> tuple[Optional[str], Optional[str]]:
     return stdout.decode(), stderr.decode()
 
 
-max_processes = 5
-backbone_list_all = read_backbones_todo_csv("backbone_names_all.csv")
-backbone_list_done = get_existing_runs()
-backbone_list_todo = list(set(backbone_list_all) - set(backbone_list_done))
-print(f"Backbones to evaluate: {len(backbone_list_todo)}")
-# NOTE: we permute the list in order to distribute the load more evenly
-random.shuffle(backbone_list_todo)
-results = []
-with concurrent.futures.ProcessPoolExecutor(max_workers=max_processes) as executor:
-    futures = {executor.submit(run_command, backbone_name): backbone_name for backbone_name in backbone_list_todo}
+if __name__ == "__main__":
+    max_processes = 5
+    backbone_list_all = read_backbones_todo_csv("backbone_names_all.csv")
+    backbone_list_done = get_existing_runs()
+    backbone_list_todo = list(set(backbone_list_all) - set(backbone_list_done))
+    print(f"Backbones to evaluate: {len(backbone_list_todo)}")
+    # NOTE(rob2u): we permute the list in order to distribute the load more evenly
+    random.shuffle(backbone_list_todo)
+    
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_processes) as executor:
+        futures = {executor.submit(run_command, backbone_name): backbone_name for backbone_name in backbone_list_todo}
 
-    for future in concurrent.futures.as_completed(futures):
-        cmd = futures[future]
-        try:
-            stdout, stderr = future.result()
-            if stdout is not None:
-                results.append((cmd, stdout, stderr))
-                print(f"{cmd} completed")
-                # print(f"{cmd} completed with output: {stdout}")
-        except Exception as exc:
-            print(f"{cmd} generated an exception: {exc}")
-            print(f"Output: {stdout}")
-            print(f"Error: {stderr}")
+        for future in concurrent.futures.as_completed(futures):
+            cmd = futures[future]
+            try:
+                stdout, stderr = future.result()
+                if stdout is not None:
+                    results.append((cmd, stdout, stderr))
+                    print(f"{cmd} completed")
+                    # print(f"{cmd} completed with output: {stdout}")
+            except Exception as exc:
+                print(f"{cmd} generated an exception: {exc}")
+                print(f"Output: {stdout}")
+                print(f"Error: {stderr}")

@@ -44,9 +44,7 @@
             },
             "dataset_class": {
                 "values": [
-                    "gorillatracker.datasets.cxl.CXLDataset",
-                    "gorillatracker.datasets.cxl.CrossEncounterCXLDataset",
-                    "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"
+                    "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
                 ],
                 "distribution": "categorical"
             }
