@@ -168,12 +168,12 @@ class ElasticArcFaceLoss(ArcFaceLoss):
     def __init__(
         self,
         margin_sigma: float = 0.01,
-        *args: Any,
         accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cpu",
+        *args: Any,
         **kwargs: Any,
     ) -> None:
-        super(ElasticArcFaceLoss, self).__init__(accelerator=accelerator, *args, **kwargs)
-        self.margin_sigma = margin_sigma
+        super(ElasticArcFaceLoss, self).__init__(accelerator=accelerator, *args, **kwargs)  # type: ignore
+        self.margin_sigma = torch.Tensor([margin_sigma]).to(accelerator)
         self.is_eval = False
         self.accelerator = accelerator
 

@@ -3,6 +3,7 @@ import csv
 import random
 import subprocess
 import time
+from typing import Optional
 
 import pandas as pd
 import timm
@@ -10,25 +11,23 @@ import torch
 import wandb
 
 
-def read_backbones_todo_csv(file_path):
+def read_backbones_todo_csv(file_path: str) -> list[str]:
     with open(file_path, newline="") as csvfile:
         reader = csv.reader(csvfile)
         backbones = [row[0] for row in reader][1:]  # Skip header
     return backbones
 
 
-def get_existing_runs():
+def get_existing_runs() -> list[str]:
     api = wandb.Api()
 
     project_path = "gorillas/EVAL-ALL-CXL-OpenSet"
     runs = api.runs(project_path)
-    parse_name = lambda name: name.split("-")[-1]  # 000-eval-<backbone_name> -> <backbone_name>
-    run_names = [parse_name(run.name) for run in runs]
-
+    run_names = [run.split("-")[-1] for run in runs]  # 000-eval-<backbone_name> -> <backbone_name>
     return run_names
 
 
-def get_command(backbone_name):
+def get_command(backbone_name: str) -> Optional[list[str]]:
     try:
         model = timm.create_model(backbone_name, pretrained=True)
         model = model.eval()
@@ -63,7 +62,7 @@ def get_command(backbone_name):
     ]
 
 
-def run_command(backbone_name):
+def run_command(backbone_name: str) -> tuple[Optional[str], Optional[str]]:
     print(f"Running {backbone_name}")
     time.sleep(60)  # Sleep for 2 minutes to give time for the wandb logging
     if backbone_name in get_existing_runs():

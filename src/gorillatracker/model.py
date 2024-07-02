@@ -1,6 +1,6 @@
 import copy
 from functools import partial
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type, Union
 
 import lightning as L
 import numpy as np
@@ -527,7 +527,7 @@ class BaseModule(L.LightningModule):
         assert len(train_embeddings) == len(train_labels)
         return train_embeddings.cpu(), train_labels.cpu(), train_ids
 
-    def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> None:
+    def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> Dict[str, float]:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
         dataloader_id = self.dm.get_dataset_ids()[dataloader_idx]
         if self.knn_with_train:
@@ -791,7 +791,7 @@ class EvaluationWrapper(BaseModule):
         model_name_or_path: str,
         **kwargs,
     ) -> None:
-        super().__init__(model_name_or_path=model_name_or_path, **kwargs)
+        super().__init__(**kwargs)
         self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch)
         # if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
         # self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)
@@ -1329,9 +1329,13 @@ custom_model_cls = {
 }
 
 
-def get_model_cls(model_name: str) -> Type[BaseModule]:
-    model_cls = custom_model_cls.get(model_name, None)
-    if model_cls == None:
+def get_model_cls(model_name: str) -> Type[Union[BaseModule, EvaluationWrapper]]:
+    model_cls: Type[Union[BaseModule, EvaluationWrapper]]
+    model_cls_resolve = custom_model_cls.get(model_name, None)
+    if model_cls_resolve is None:
         model_cls = EvaluationWrapper
+    else:
+        model_cls = model_cls_resolve
+
     assert model_cls is not None, f"Model {model_name} not found in custom_model_cls"
     return model_cls
