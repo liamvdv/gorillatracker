@@ -61,6 +61,7 @@ dependencies:
       - warmup-scheduler
       - simple_parsing
       - print-on-steroids[exceptions]
+      - wandb[sweeps]
       - ultralytics 
       - lapx>=0.5.2 # for ultralytics tracking
       - types-PyYAML

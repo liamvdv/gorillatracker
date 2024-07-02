@@ -71,7 +71,7 @@ class WandbLoggingModule:
         wandb_logger = WandbLogger(
             project=self.project_name,
             entity=self.wandb_entity,
-            log_model="all",
+            log_model=self.args.save_model_to_wandb,
             tags=self.args.wandb_tags,
             save_dir="logs/",
             **wandb_extra_args,  # type: ignore

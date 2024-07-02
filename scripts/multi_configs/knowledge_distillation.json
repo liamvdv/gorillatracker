@@ -1,5 +1,6 @@
 {
     "global": {
+        "sweep_name": "Knowledge Distillation Sweep",
         "run_name": "443-take-baselines-for-models",
         "use_quantization_aware_training": false,
         "wandb_tags": [
@@ -17,7 +18,8 @@
         "kfold": false,
         "val_before_training": true,
         "lr_schedule": "exponential",
-        "workers": 16
+        "workers": 16,
+        "save_model_to_wandb": false
     },
     "global_sweep_parameters": {
         "weight_decay": {
