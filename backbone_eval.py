@@ -5,7 +5,6 @@ import subprocess
 import time
 from typing import Optional
 
-import pandas as pd
 import timm
 import torch
 import wandb
