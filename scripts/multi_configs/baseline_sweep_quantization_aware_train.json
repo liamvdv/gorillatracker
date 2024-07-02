@@ -1,17 +1,15 @@
 {
     "global": {
         "run_name": "443-take-baselines-for-models",
-        "use_quantization_aware_training": false,
         "wandb_tags": [
             "sweep",
-            "knowledge-distillation"
+            "quantization_aware_training"
         ],
+        "use_quantization_aware_training": true,
         "max_epochs": 40,
-        "early_stopping_patience": 6,
+        "early_stopping_patience": 8,
         "embedding_size": 256,
-        "data_resize_transform": 224,
-        "loss_mode": "distillation/offline/response-based",
-        "teacher_model_wandb_link": "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/hg1f88h9?nw=nwuserkajohpi",
+        "loss_mode": "softmax/arcface",
         "data_dir": "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
         "dataset_class": "gorillatracker.datasets.cxl.CXLDataset",
         "kfold": false,
@@ -71,6 +69,13 @@
             "project_name": "Embedding-EfficientNet-CXL-OpenSet",
             "config_path": "./cfgs/efficientnet_cxl.yml",
             "parameters": {}
+        },
+        {
+            "project_name": "Embedding-SwinV2Large-CXL-Open",
+            "config_path": "./cfgs/swinv2_large_cxl.yml",
+            "parameters": {
+                "data_resize_transform": 256
+            }
         },
         {
             "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
