@@ -126,7 +126,7 @@ class ArcFaceLoss(torch.nn.Module):
             )
         ).clamp(eps, 1.0 - eps)
         phi = (
-            self.cos_m.unsqueeze(1) * cos_theta - self.sin_m.unsqueeze(1) * sine_theta
+            self.cos_m.unsqueeze(1).unsqueeze(2) * cos_theta - self.sin_m.unsqueeze(1).unsqueeze(2) * sine_theta
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
         phi = phi - self.additive_margin.unsqueeze(1)
 
@@ -165,10 +165,11 @@ class ArcFaceLoss(torch.nn.Module):
 
 
 class ElasticArcFaceLoss(ArcFaceLoss):
-    def __init__(self, margin_sigma: float = 0.01, *args: Any, **kwargs: Any) -> None:
-        super(ElasticArcFaceLoss, self).__init__(*args, **kwargs)
+    def __init__(self, margin_sigma: float = 0.01, *args: Any, accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cpu", **kwargs: Any) -> None:
+        super(ElasticArcFaceLoss, self).__init__(accelerator=accelerator, *args, **kwargs)
         self.margin_sigma = margin_sigma
         self.is_eval = False
+        self.accelerator = accelerator
 
     def forward(
         self,
@@ -177,11 +178,11 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         labels_onehot: Optional[torch.Tensor] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
-        angle_margin = torch.Tensor([self.angle_margin]).to(embeddings.device)
+        angle_margin = torch.Tensor([self.angle_margin]).to(self.accelerator)
+        self.margin_sigma = torch.Tensor([self.margin_sigma]).to(self.accelerator)
+
         if not self.is_eval:
-            angle_margin = (self.angle_margin + torch.randn_like(labels, dtype=torch.float32) * self.margin_sigma).to(
-                embeddings.device
-            )  # batch -> scale by self.margin_sigma
+            angle_margin = (angle_margin + torch.randn_like(labels, dtype=torch.float32).to(self.accelerator) * self.margin_sigma).to(self.accelerator)  # batch -> scale by self.margin_sigma
 
         self.cos_m = torch.cos(angle_margin)
         self.sin_m = torch.sin(angle_margin)
