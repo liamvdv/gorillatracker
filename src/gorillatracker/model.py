@@ -406,7 +406,6 @@ class BaseModule(L.LightningModule):
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
                 loss,
-                on_step=True,
                 sync_dist=True,
                 prog_bar=True,
                 add_dataloader_idx=False,
@@ -414,13 +413,11 @@ class BaseModule(L.LightningModule):
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/positive_distance",
                 pos_dist,
-                on_step=True,
                 add_dataloader_idx=False,
             )
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/negative_distance",
                 neg_dist,
-                on_step=True,
                 add_dataloader_idx=False,
             )
             return loss
@@ -442,7 +439,8 @@ class BaseModule(L.LightningModule):
 
         assert self.trainer.max_epochs is not None
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
-            self.eval_embeddings_table(embeddings_table, dataloader_idx)
+            for key, val in self.eval_embeddings_table(embeddings_table, dataloader_idx).items():
+                self.log(key, val, on_epoch=True)
 
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
@@ -557,7 +555,7 @@ class BaseModule(L.LightningModule):
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            "tsne": partial(tsne, with_pca=True),
+            # "tsne": tsne,
             # "pca": pca,
             # "fc_layer": fc_layer,
         }
@@ -595,13 +593,14 @@ class BaseModule(L.LightningModule):
         metrics = metrics if not self.fast_dev_run else {}
 
         # log to wandb
-        evaluate_embeddings(
+        results = evaluate_embeddings(
             data=embeddings_table,
             embedding_name="val/embeddings",
             metrics=metrics,
             kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
             dataloader_name=dataloader_name,
         )
+        return results
 
     def validation_loss_softmax(self, dataloader_name: str, kfold_prefix: str) -> None:
         for i, table in enumerate(self.embeddings_table_list):
@@ -786,23 +785,51 @@ class ConvNeXtV2HugeWrapper(BaseModule):
         self.set_losses(model=model_cpy, **kwargs)
 
 
+class EvaluationWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        model_name_or_path: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(model_name_or_path=model_name_or_path, **kwargs)
+        self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch)
+        # if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
+        # self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)
+
+        self.set_losses(model=self.model, **kwargs)  # NOTE: necessary for eval (sadly)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        return x
+
+
 class VisionTransformerWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.in_features),
+        self.model = timm.create_model(
+            "timm/vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=224
+        )
+
+        in_features = 1024
+        self.embedding_layer = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(in_features),
             torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
+            torch.nn.Linear(in_features=in_features, out_features=self.embedding_size),
             torch.nn.BatchNorm1d(self.embedding_size),
         )
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        x = self.embedding_layer(x)
+        return x
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
@@ -1304,5 +1331,7 @@ custom_model_cls = {
 
 def get_model_cls(model_name: str) -> Type[BaseModule]:
     model_cls = custom_model_cls.get(model_name, None)
+    if model_cls == None:
+        model_cls = EvaluationWrapper
     assert model_cls is not None, f"Model {model_name} not found in custom_model_cls"
     return model_cls

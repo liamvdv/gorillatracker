@@ -165,7 +165,13 @@ class ArcFaceLoss(torch.nn.Module):
 
 
 class ElasticArcFaceLoss(ArcFaceLoss):
-    def __init__(self, margin_sigma: float = 0.01, *args: Any, accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cpu", **kwargs: Any) -> None:
+    def __init__(
+        self,
+        margin_sigma: float = 0.01,
+        *args: Any,
+        accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cpu",
+        **kwargs: Any,
+    ) -> None:
         super(ElasticArcFaceLoss, self).__init__(accelerator=accelerator, *args, **kwargs)
         self.margin_sigma = margin_sigma
         self.is_eval = False
@@ -182,7 +188,11 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         self.margin_sigma = torch.Tensor([self.margin_sigma]).to(self.accelerator)
 
         if not self.is_eval:
-            angle_margin = (angle_margin + torch.randn_like(labels, dtype=torch.float32).to(self.accelerator) * self.margin_sigma).to(self.accelerator)  # batch -> scale by self.margin_sigma
+            angle_margin = (
+                angle_margin + torch.randn_like(labels, dtype=torch.float32).to(self.accelerator) * self.margin_sigma
+            ).to(
+                self.accelerator
+            )  # batch -> scale by self.margin_sigma
 
         self.cos_m = torch.cos(angle_margin)
         self.sin_m = torch.sin(angle_margin)
