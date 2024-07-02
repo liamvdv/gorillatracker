@@ -2,9 +2,9 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+import torchvision.transforms as transforms
 
 import gorillatracker.type_helper as gtypes
-import torchvision.transforms as transforms
 
 
 class OfflineResponseBasedLoss(nn.Module):
