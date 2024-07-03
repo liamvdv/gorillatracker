@@ -1,9 +1,10 @@
 from typing import Literal, Optional
 
-from PIL.Image import Image
-from torchvision.transforms.functional import pad
 import numpy as np
 import torch
+from PIL.Image import Image
+from torchvision.transforms.functional import pad
+
 
 class SquarePad:
     def __call__(self, image: Image) -> Image:
@@ -24,10 +25,12 @@ class SquarePad:
 
 
 """Copied from: https://github.com/TheZino/PlanckianJitter/blob/main/planckianTransforms.py"""
+
+
 class PlanckianJitter:
     """Ramdomly jitter the image illuminant along the planckian locus"""
 
-    def __init__(self, mode: Literal["blackbody", "CIED"] ="blackbody", idx: Optional[int] = None) -> None:
+    def __init__(self, mode: Literal["blackbody", "CIED"] = "blackbody", idx: Optional[int] = None) -> None:
         self.mode = mode
         self.idx = idx
         if self.mode == "blackbody":
@@ -89,14 +92,13 @@ class PlanckianJitter:
                 ]
             )
         else:
-            raise ValueError(
-                'Mode "' + mode + '" not supported. Please choose between "blackbody" or "CIED".')
+            raise ValueError('Mode "' + mode + '" not supported. Please choose between "blackbody" or "CIED".')
 
     def __call__(self, x: Image) -> Image:
 
         image = np.array(x.copy())
         image = image / 255
-        
+
         if self.idx is not None:
             idx = self.idx
         else:
@@ -106,8 +108,8 @@ class PlanckianJitter:
         image[:, :, 0] = image[:, :, 0] * (self.pl[idx, 0] / self.pl[idx, 1])
         image[:, :, 2] = image[:, :, 2] * (self.pl[idx, 2] / self.pl[idx, 1])
         image[image > 1] = 1
-        
-        image_pil: Image = Image.fromarray(np.uint8(image * 255)) # type: ignore
+
+        image_pil: Image = Image.fromarray(np.uint8(image * 255))  # type: ignore
 
         return image_pil
 
