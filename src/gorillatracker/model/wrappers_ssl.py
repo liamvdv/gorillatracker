@@ -38,6 +38,7 @@ class SimClRWrapper(BaseModule):
             ]
         )
 
+
 # TODO: MoCoWrapper is not fully implemented and tested yet.
 class MocoWrapper(BaseModule):
     def __init__(  # type: ignore
