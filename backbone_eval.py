@@ -2,12 +2,27 @@ import concurrent.futures
 import csv
 import random
 import subprocess
+import fcntl
 import time
 from typing import Optional
 
 import timm
 import torch
 import wandb
+
+# NOTE(rob2u): a simple context manager to lock files
+# This avoids the edge case that a task is executed twice
+class FileLock:
+    def __init__(self, file):
+        self.file = file 
+
+    def __enter__(self):
+        fcntl.flock(self.file, fcntl.LOCK_EX)
+        return self.file
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        fcntl.flock(self.file, fcntl.LOCK_UN)
+        self.file.close()
 
 
 def read_backbones_todo_csv(file_path: str) -> list[str]:
@@ -22,7 +37,7 @@ def get_existing_runs() -> list[str]:
 
     project_path = "gorillas/EVAL-ALL-CXL-OpenSet"
     runs = api.runs(project_path)
-    run_names = [run.split("-")[-1] for run in runs]  # 000-eval-<backbone_name> -> <backbone_name>
+    run_names = [run.name.split("-")[-1] for run in runs]  # 000-eval-<backbone_name> -> <backbone_name>
     return run_names
 
 
@@ -62,14 +77,20 @@ def get_command(backbone_name: str) -> Optional[list[str]]:
 
 
 def run_command(backbone_name: str) -> tuple[Optional[str], Optional[str]]:
-    print(f"Running {backbone_name}")
-    time.sleep(60)  # Sleep for 2 minutes to give time for the wandb logging
-    if backbone_name in get_existing_runs():
-        return None, None
+    with FileLock(open(".lock", "w")):
+        print(f"Running {backbone_name}")
+        start_time = time.time()
+        if backbone_name in get_existing_runs():
+            return None, None
 
-    command = get_command(backbone_name)
-    if command is None:
-        return None, None
+        command = get_command(backbone_name)
+        if command is None:
+            return None, None
+        
+        elapsed_time = time.time() - start_time
+        if elapsed_time < 15:
+            time.sleep(15 - int(elapsed_time) + 1)    
+    
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"waiting for {command}")
     stdout, stderr = process.communicate()  # Wait for the process to finish (blocking)
@@ -78,6 +99,8 @@ def run_command(backbone_name: str) -> tuple[Optional[str], Optional[str]]:
 
 
 if __name__ == "__main__":
+    with open(".lock", "w") as f:
+        pass
     max_processes = 5
     backbone_list_all = read_backbones_todo_csv("backbone_names_all.csv")
     backbone_list_done = get_existing_runs()
@@ -100,5 +123,3 @@ if __name__ == "__main__":
                     # print(f"{cmd} completed with output: {stdout}")
             except Exception as exc:
                 print(f"{cmd} generated an exception: {exc}")
-                print(f"Output: {stdout}")
-                print(f"Error: {stderr}")

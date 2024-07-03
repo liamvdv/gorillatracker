@@ -13,7 +13,7 @@ class FocalLoss(torch.nn.Module):
     def __init__(
         self, num_classes: int = 182, gamma: float = 2.0, label_smoothing: float = 0.0, *args: Any, **kwargs: Any
     ) -> None:
-        super(FocalLoss, self).__init__()
+        super().__init__()
         self.num_classes = num_classes
         self.gamma = gamma
         self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=label_smoothing)
@@ -46,7 +46,7 @@ class ArcFaceLoss(torch.nn.Module):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super(ArcFaceLoss, self).__init__()
+        super().__init__()
         self.s = s
         self.angle_margin = torch.Tensor([angle_margin]).to(accelerator)
         self.additive_margin = torch.Tensor([additive_margin]).to(accelerator)
@@ -172,7 +172,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super(ElasticArcFaceLoss, self).__init__(accelerator=accelerator, *args, **kwargs)  # type: ignore
+        super().__init__(accelerator=accelerator, *args, **kwargs)  # type: ignore
         self.margin_sigma = torch.Tensor([margin_sigma]).to(accelerator)
         self.is_eval = False
         self.accelerator = accelerator
@@ -209,7 +209,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
 
 class AdaFaceLoss(ArcFaceLoss):
     def __init__(self, momentum: float = 0.01, h: float = 0.33, *args: Any, **kwargs: Any) -> None:
-        super(AdaFaceLoss, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.is_eval = False
         self.h = h
         self.m1 = self.angle_margin
@@ -262,7 +262,7 @@ class VariationalPrototypeLearning(torch.nn.Module):  # NOTE: this is not the co
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super(VariationalPrototypeLearning, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.s = s
         self.margin = margin
         self.cos_m = math.cos(margin)
