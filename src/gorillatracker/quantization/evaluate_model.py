@@ -10,7 +10,7 @@ from torch.fx import GraphModule
 
 import gorillatracker.quantization.quantization_functions as quantization_functions
 from gorillatracker.data.cxl import CXLDataset
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 from gorillatracker.quantization.export_model import convert_model_to_tflite
 from gorillatracker.quantization.performance_evaluation import evaluate_model
 from gorillatracker.quantization.utils import get_model_input, log_model_to_file

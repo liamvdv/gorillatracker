@@ -11,7 +11,7 @@ from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import get_symmetric_quantization_config
 from torch.fx import GraphModule
 
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 
 
 def calibrate(model: nn.Module, calibration_input: torch.Tensor) -> None:

@@ -4,7 +4,8 @@ from urllib.parse import urlparse
 import wandb
 from wandb.apis.public.runs import Run
 
-from gorillatracker.model import BaseModule, get_model_cls
+from gorillatracker.model.base_module import BaseModule
+from gorillatracker.model.get_model_cls import get_model_cls
 
 
 def parse_wandb_url(url: str) -> tuple[str, str, str]:

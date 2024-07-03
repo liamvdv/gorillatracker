@@ -5,7 +5,7 @@ from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
