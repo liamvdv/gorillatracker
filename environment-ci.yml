@@ -15,6 +15,7 @@ dependencies:
   # CUDA only on linux and windows
   - wandb
   - lightning
+  - lightly
   - torchvision
   - transformers
   - faiss-cpu
