@@ -76,6 +76,7 @@ class TrainingArgs:
 
     # NTXent Arguments
     temperature: float = field(default=0.5)
+    memory_bank_size: int = field(default=0)
 
     # ArcFace Arguments
     k_subcenters: int = field(default=1)

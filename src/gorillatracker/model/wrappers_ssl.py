@@ -39,8 +39,8 @@ class SimClRWrapper(BaseModule):
         )
 
 
-# TODO: MoCoWrapper is not fully implemented and tested yet.
-class MocoWrapper(BaseModule):
+# TODO: MoCoWrapper is not fully tested yet.
+class MoCoWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
         **kwargs,
@@ -68,9 +68,8 @@ class MocoWrapper(BaseModule):
         flat_labels_onehot = None
         if self.use_inbatch_mixup:
             flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
-        half = flat_images.size(0) // 2
-        anchor_embeddings = self.model(flat_images[half:])
-        positive_embeddings = self.model_momentum(flat_images[:half])
+        anchor_embeddings = self.model(images[0])
+        positive_embeddings = self.model_momentum(images[1])
         embeddings = torch.cat([anchor_embeddings, positive_embeddings])
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"

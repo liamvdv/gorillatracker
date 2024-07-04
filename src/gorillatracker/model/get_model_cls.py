@@ -1,7 +1,7 @@
 from typing import Type
 
 from gorillatracker.model.base_module import BaseModule
-from gorillatracker.model.wrappers_ssl import SimClRWrapper
+from gorillatracker.model.wrappers_ssl import MoCoWrapper, SimClRWrapper
 from gorillatracker.model.wrappers_supervised import (
     ConvNextClipWrapper,
     ConvNeXtV2BaseWrapper,
@@ -42,6 +42,7 @@ custom_model_cls = {
     "EfficientNet_RW_M": EfficientNetRW_M,
     "InceptionV3": InceptionV3Wrapper,
     "SimCLR": SimClRWrapper,
+    "MoCo": MoCoWrapper,
 }
 
 
