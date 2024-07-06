@@ -13,7 +13,7 @@ from gorillatracker.data.utils import flatten_batch
 from gorillatracker.model.base_module import BaseModule
 
 
-class SimClRWrapper(BaseModule):
+class SimCLRWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
         **kwargs,
