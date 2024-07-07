@@ -23,6 +23,26 @@ from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.model_miewid import GeM, load_miewid_model  # type: ignore
 
 
+class EvaluationWrapper(BaseModule):
+    def __init__(  # type: ignore
+        self,
+        model_name_or_path: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        model_name_or_path = model_name_or_path.replace("timm/", "")
+        self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch)
+        # if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
+        # self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)
+
+        self.set_losses(model=self.model, **kwargs)  # NOTE: necessary for eval (sadly)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        return x
+
+
 class EfficientNetV2Wrapper(BaseModule):
     def __init__(  # type: ignore
         self,
