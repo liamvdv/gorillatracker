@@ -8,7 +8,7 @@ from ai_edge_torch.model import TfLiteModel
 from torch.fx import GraphModule
 
 from gorillatracker.metrics import knn
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 
 
 def size_of_model_in_mb(model: nn.Module) -> float:

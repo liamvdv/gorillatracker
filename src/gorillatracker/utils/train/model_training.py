@@ -17,7 +17,7 @@ from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, 
 
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 from gorillatracker.quantization.utils import get_model_input
 from gorillatracker.utils.train import ModelConstructor
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
