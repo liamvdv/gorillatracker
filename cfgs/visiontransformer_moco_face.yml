@@ -11,10 +11,10 @@ workers: 40                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-SwinV2-SimCLR-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "478-test-temperature" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-ViTLarge-MoCo-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "484-test-temperature" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["baseline"]            # WandB tags for experiment tracking
-model_name_or_path: "SwinV2Base"  # Model name or path 
+model_name_or_path: "MoCo"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False               # Enable fast development run
@@ -29,7 +29,7 @@ embedding_size: 256
 dropout_p: 0.32
 
 # Optimizer Arguments
-weight_decay: 0.0               # Weight decay if l2sp regularisation is used this is set to 0.0
+weight_decay: 0.2               # Weight decay if l2sp regularisation is used this is set to 0.0
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
@@ -37,10 +37,11 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.002                       # Alpha for the l2sp loss
 l2_beta: 0.0002                      # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/swinv2_base.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/vit_large_dinov2.pth"    # Path to the pretrained weights for the l2sp loss
 
 # NTXent Arguments
-temperature: 0.05
+temperature: 0.04
+memory_bank_size: 4096
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
@@ -60,14 +61,14 @@ end_lr: 1e-5                    # End learning rate (for the learning rate sched
 stepwise_schedule: True
 
 
-batch_size: 128                  # Training batch size
+batch_size: 8                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 max_epochs: 5                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
-val_check_interval: 1.0
+val_check_interval: 0.1
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 1      # Embedding save interval
 knn_with_train: False           
@@ -79,9 +80,10 @@ split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04
 feature_types: ["face_90"]
 n_samples: 5
 
-data_resize_transform: 192
+data_resize_transform: 224
 
-additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.bristol.BristolDataset]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
+additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/val"]
+dataset_names: ["ssl", "cxl-all", "bristol", "cxl-val"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
