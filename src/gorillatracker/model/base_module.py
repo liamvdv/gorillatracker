@@ -1,11 +1,11 @@
 from functools import partial
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Literal, Optional, Tuple
+
 import lightning as L
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torchvision.transforms.v2 as transforms_v2
 import wandb
 from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
