@@ -15,6 +15,7 @@ dependencies:
   - transformers
   - wandb
   - lightning
+  - lightly
   - accelerate
   - sentencepiece
   - faiss-cpu

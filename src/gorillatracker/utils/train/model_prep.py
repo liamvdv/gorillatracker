@@ -5,7 +5,7 @@ from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
@@ -66,6 +66,7 @@ class ModelConstructor:
             batch_size=args.batch_size,
             s=args.s,
             temperature=args.temperature,
+            memory_bank_size=args.memory_bank_size,
             num_classes=num_classes,
             class_distribution=class_distribution,
             dataset_names=dataset_names,

@@ -86,7 +86,7 @@ def get_loss(
             purpose=kw_args["purpose"],
         )
     elif loss_mode == "ntxent":
-        loss_module = NTXentLoss(temperature=kw_args["temperature"])
+        loss_module = NTXentLoss(temperature=kw_args["temperature"], memory_bank_size=kw_args["memory_bank_size"])
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
 

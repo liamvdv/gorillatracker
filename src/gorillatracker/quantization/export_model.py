@@ -8,7 +8,7 @@ from ai_edge_torch.quantize.quant_config import QuantConfig
 from print_on_steroids import print_on_steroids
 from torch.fx import GraphModule
 
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 
 
 def convert_model_to_onnx(
