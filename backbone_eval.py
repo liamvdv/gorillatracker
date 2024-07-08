@@ -88,7 +88,7 @@ def run_command(backbone_name: str) -> tuple[Optional[str], Optional[str]]:
             return None, None
         
         elapsed_time = time.time() - start_time
-        if elapsed_time < 15:
+        if elapsed_time < 15: # NOTE(rob2u): give the process at least 15 seconds to start in order to prevent duplicate wandb runs
             time.sleep(15 - int(elapsed_time) + 1)    
     
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
