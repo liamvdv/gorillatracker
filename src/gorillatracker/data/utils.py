@@ -6,12 +6,13 @@ from gorillatracker.type_helper import FlatNletBatch, NletBatch
 
 
 def lazy_batch_size(batch: NletBatch) -> int:
-    anchor_ids = batch[0][0]
+    anchor_ids = batch[0]
     return len(anchor_ids)
 
 
 def flatten_batch(batch: NletBatch) -> FlatNletBatch:
     ids, images, labels = batch
+    
     # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
     flat_ids = tuple(chain.from_iterable(ids))
     # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)

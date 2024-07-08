@@ -25,7 +25,10 @@ def generate_embeddings(
 def df_from_predictions(predictions: tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]) -> pd.DataFrame:
     prediction_df = pd.DataFrame(columns=["id", "embedding", "label", "input", "label_string"])
     for id, embedding, label in zip(*predictions):
-        input_img = Image.open(id)
+        try:
+            input_img = Image.open(id)
+        except(AttributeError):
+            input_img = None
         prediction_df = pd.concat(
             [
                 prediction_df,
