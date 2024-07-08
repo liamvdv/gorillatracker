@@ -44,10 +44,7 @@ temperature: 0.05
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
-delta_t: 50                         # Delta t for the vpl loss
-mem_bank_start_epoch: 10            # Epoch to start using the memory bank
-lambda_membank: 0.5                 # Lambda for the memory bank loss
-loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
+loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 

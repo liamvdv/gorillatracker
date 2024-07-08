@@ -81,9 +81,6 @@ class TrainingArgs:
     # ArcFace Arguments
     k_subcenters: int = field(default=1)
     s: float = field(default=64.0)
-    delta_t: int = field(default=100)
-    mem_bank_start_epoch: int = field(default=2)
-    lambda_membank: float = field(default=0.5)
 
     margin: float = field(default=0.5)
     loss_mode: Literal[
@@ -95,14 +92,12 @@ class TrainingArgs:
         "softmax/arcface",
         "softmax/adaface",
         "softmax/elasticface",
-        "softmax/vpl",
         "offline/native/l2sp",
         "offline/l2sp",
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
-        "softmax/vpl/l2sp",
         "softmax/adaface/l2sp",
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
