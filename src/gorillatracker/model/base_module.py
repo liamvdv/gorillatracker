@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import wandb
 from lightning.pytorch.utilities.types import LRSchedulerConfigType
 from print_on_steroids import logger
 from torch.optim.adamw import AdamW
@@ -377,7 +378,6 @@ class BaseModule(L.LightningModule):
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
                 loss,
-                on_step=True,
                 sync_dist=True,
                 prog_bar=True,
                 add_dataloader_idx=False,
@@ -385,13 +385,11 @@ class BaseModule(L.LightningModule):
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/positive_distance",
                 pos_dist,
-                on_step=True,
                 add_dataloader_idx=False,
             )
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/negative_distance",
                 neg_dist,
-                on_step=True,
                 add_dataloader_idx=False,
             )
             return loss
@@ -413,7 +411,11 @@ class BaseModule(L.LightningModule):
 
         assert self.trainer.max_epochs is not None
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
-            self.eval_embeddings_table(embeddings_table, dataloader_idx)
+            for key, val in self.eval_embeddings_table(embeddings_table, dataloader_idx).items():
+                if not isinstance(val, wandb.Image):
+                    self.log(key, val, on_epoch=True)
+                else:
+                    self.wandb_run.log({key: val})
 
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
@@ -500,7 +502,7 @@ class BaseModule(L.LightningModule):
         assert len(train_embeddings) == len(train_labels)
         return train_embeddings.cpu(), train_labels.cpu(), train_ids
 
-    def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> None:
+    def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> Dict[str, float]:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
         dataloader_id = self.dm.get_dataset_ids()[dataloader_idx]
         if self.knn_with_train:
@@ -528,7 +530,7 @@ class BaseModule(L.LightningModule):
             "knn": partial(knn, k=1),
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
-            "tsne": partial(tsne, with_pca=True),
+            "tsne": tsne,
             # "pca": pca,
             # "fc_layer": fc_layer,
         }
@@ -566,13 +568,14 @@ class BaseModule(L.LightningModule):
         metrics = metrics if not self.fast_dev_run else {}
 
         # log to wandb
-        evaluate_embeddings(
+        results = evaluate_embeddings(
             data=embeddings_table,
             embedding_name="val/embeddings",
             metrics=metrics,
             kfold_k=self.kfold_k if hasattr(self, "kfold_k") else None,  # TODO(memben)
             dataloader_name=dataloader_name,
         )
+        return results
 
     def validation_loss_softmax(self, dataloader_name: str, kfold_prefix: str) -> None:
         for i, table in enumerate(self.embeddings_table_list):

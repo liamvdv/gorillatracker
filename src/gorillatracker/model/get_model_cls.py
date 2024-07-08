@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Optional, Type
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.wrappers_ssl import MoCoWrapper, SimCLRWrapper
@@ -9,6 +9,7 @@ from gorillatracker.model.wrappers_supervised import (
     ConvNextWrapper,
     EfficientNetRW_M,
     EfficientNetV2Wrapper,
+    EvaluationWrapper,
     InceptionV3Wrapper,
     MiewIdNetWrapper,
     ResNet18Wrapper,
@@ -47,6 +48,10 @@ custom_model_cls = {
 
 
 def get_model_cls(model_name: str) -> Type[BaseModule]:
+    model_cls: Optional[Type[BaseModule]] = None
     model_cls = custom_model_cls.get(model_name, None)
+    if model_cls is None and model_name.startswith("timm/"):
+        model_cls = EvaluationWrapper
+
     assert model_cls is not None, f"Model {model_name} not found in custom_model_cls"
     return model_cls

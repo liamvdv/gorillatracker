@@ -139,13 +139,17 @@ def evaluate_embeddings(
     results = {metric_name: metric(data) for metric_name, metric in metrics.items()}
 
     kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
+    results_parsed = {}
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value})
+                results_parsed.update(
+                    {f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value}
+                )
         else:
-            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
-    return results
+            results_parsed.update({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result})
+
+    return results_parsed
 
 
 def _get_crossvideo_masks(

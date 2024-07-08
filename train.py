@@ -67,7 +67,7 @@ def main(args: TrainingArgs) -> None:
     if args.data_resize_transform:
         resize_transform = Resize((args.data_resize_transform, args.data_resize_transform))
     if args.use_normalization:
-        normalize_transform = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        normalize_transform = Normalize(eval(args.normalization_mean), eval(args.normalization_std))
     model_transforms = Compose([resize_transform, normalize_transform])
 
     ssl_config = SSLConfig(
@@ -107,16 +107,19 @@ def main(args: TrainingArgs) -> None:
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     checkpoint_callback = ModelCheckpoint(
-        filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
-        mode="min",
+        filename="epoch-{epoch}-acc-{"
+        + str(dm.get_dataset_class_names()[0])
+        + "/val/embeddings/knn5_crossvideo/accuracy:.3f}",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy",
+        mode="max",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
+        save_last=True,  # also save the last checkpoint
     )
 
     early_stopping = EarlyStopping(
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
-        mode="min",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy",
+        mode="max",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )

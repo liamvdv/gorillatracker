@@ -110,6 +110,8 @@ class TrainingArgs:
     use_class_weights: bool = field(default=False)
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
+    normalization_mean: str = field(default="[0.485, 0.456, 0.406]")
+    normalization_std: str = field(default="[0.229, 0.224, 0.225]")
     use_inbatch_mixup: bool = field(default=False)
     force_nlet_builder: Literal["onelet", "pair", "triplet", "quadlet", "None"] = field(default="None")
 

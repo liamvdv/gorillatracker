@@ -12,7 +12,7 @@ class FocalLoss(torch.nn.Module):
     def __init__(
         self, num_classes: int = 182, gamma: float = 2.0, label_smoothing: float = 0.0, *args: Any, **kwargs: Any
     ) -> None:
-        super(FocalLoss, self).__init__()
+        super().__init__()
         self.num_classes = num_classes
         self.gamma = gamma
         self.ce = torch.nn.CrossEntropyLoss(reduction="none", label_smoothing=label_smoothing)
@@ -45,7 +45,7 @@ class ArcFaceLoss(torch.nn.Module):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super(ArcFaceLoss, self).__init__()
+        super().__init__()
         self.s = s
         self.angle_margin = torch.Tensor([angle_margin]).to(accelerator)
         self.additive_margin = torch.Tensor([additive_margin]).to(accelerator)
@@ -125,7 +125,7 @@ class ArcFaceLoss(torch.nn.Module):
             )
         ).clamp(eps, 1.0 - eps)
         phi = (
-            self.cos_m.unsqueeze(1) * cos_theta - self.sin_m.unsqueeze(1) * sine_theta
+            self.cos_m.unsqueeze(1).unsqueeze(2) * cos_theta - self.sin_m.unsqueeze(1).unsqueeze(2) * sine_theta
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
         phi = phi - self.additive_margin.unsqueeze(1)
 
@@ -164,10 +164,17 @@ class ArcFaceLoss(torch.nn.Module):
 
 
 class ElasticArcFaceLoss(ArcFaceLoss):
-    def __init__(self, margin_sigma: float = 0.01, *args: Any, **kwargs: Any) -> None:
-        super(ElasticArcFaceLoss, self).__init__(*args, **kwargs)
-        self.margin_sigma = margin_sigma
+    def __init__(
+        self,
+        margin_sigma: float = 0.01,
+        accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cpu",
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(accelerator=accelerator, *args, **kwargs)  # type: ignore
+        self.margin_sigma = torch.Tensor([margin_sigma]).to(accelerator)
         self.is_eval = False
+        self.accelerator = accelerator
 
     def forward(
         self,
@@ -176,10 +183,14 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         labels_onehot: Optional[torch.Tensor] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
-        angle_margin = torch.Tensor([self.angle_margin]).to(embeddings.device)
+        angle_margin = torch.Tensor([self.angle_margin]).to(self.accelerator)
+        self.margin_sigma = torch.Tensor([self.margin_sigma]).to(self.accelerator)
+
         if not self.is_eval:
-            angle_margin = (self.angle_margin + torch.randn_like(labels, dtype=torch.float32) * self.margin_sigma).to(
-                embeddings.device
+            angle_margin = (
+                angle_margin + torch.randn_like(labels, dtype=torch.float32).to(self.accelerator) * self.margin_sigma
+            ).to(
+                self.accelerator
             )  # batch -> scale by self.margin_sigma
 
         self.cos_m = torch.cos(angle_margin)
@@ -197,7 +208,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
 
 class AdaFaceLoss(ArcFaceLoss):
     def __init__(self, momentum: float = 0.01, h: float = 0.33, *args: Any, **kwargs: Any) -> None:
-        super(AdaFaceLoss, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.is_eval = False
         self.h = h
         self.m1 = self.angle_margin
