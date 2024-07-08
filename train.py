@@ -12,7 +12,7 @@ from torchvision.transforms import Compose, Normalize, Resize
 
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.builder import build_data_module, force_nlet_builder
-from gorillatracker.model import get_model_cls
+from gorillatracker.model.get_model_cls import get_model_cls
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.utils.train import (
     ModelConstructor,
