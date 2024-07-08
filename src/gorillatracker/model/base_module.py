@@ -208,9 +208,6 @@ class BaseModule(L.LightningModule):
         loss_mode: str,
         margin: float,
         s: float,
-        delta_t: int,
-        mem_bank_start_epoch: int,
-        lambda_membank: float,
         temperature: float,
         memory_bank_size: int,
         embedding_size: int,
@@ -234,12 +231,9 @@ class BaseModule(L.LightningModule):
             margin=margin,
             embedding_size=embedding_size,
             batch_size=batch_size,
-            delta_t=delta_t,
             s=s,
             num_classes=num_classes[0] if num_classes is not None else None,  # TODO(memben)
             class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
-            mem_bank_start_epoch=mem_bank_start_epoch,
-            lambda_membank=lambda_membank,
             temperature=temperature,
             memory_bank_size=memory_bank_size,
             accelerator=accelerator,
@@ -262,12 +256,9 @@ class BaseModule(L.LightningModule):
             margin=margin,
             embedding_size=embedding_size,
             batch_size=batch_size,
-            delta_t=delta_t,
             s=s,
             num_classes=num_classes[1] if num_classes is not None else None,  # TODO(memben)
             class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
-            mem_bank_start_epoch=mem_bank_start_epoch,
-            lambda_membank=lambda_membank,
             temperature=temperature,
             memory_bank_size=memory_bank_size,
             accelerator=accelerator,
@@ -291,16 +282,6 @@ class BaseModule(L.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         log_train_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader(), n_samples=1)
-
-        if self.loss_mode.endswith("vpl") and self.trainer.current_epoch >= self.loss_module_train.mem_bank_start_epoch:  # type: ignore
-            self.loss_module_train.set_using_memory_bank(True)  # type: ignore
-            logger.info("Using memory bank")
-        elif (
-            self.loss_mode.endswith("vpl/l2sp")
-            and self.trainer.current_epoch >= self.loss_module_train.loss.mem_bank_start_epoch  # type: ignore
-        ):  # is wrapped in l2sp regularization
-            self.loss_module_train.loss.set_using_memory_bank(True)  # type: ignore
-            logger.info("Using memory bank")
 
     def perform_mixup(self, flat_images: torch.Tensor, flat_labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         num_classes: int
