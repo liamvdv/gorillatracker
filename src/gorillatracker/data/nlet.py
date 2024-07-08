@@ -51,6 +51,7 @@ class NletDataModule(L.LightningDataModule):
         training_transforms: gtypes.TensorTransform,
         eval_datasets: list[Type[NletDataset]] = [],
         eval_data_dirs: list[Path] = [],
+        dataset_ids: list[str] = [],
         dataset_names: list[str] = [],
         **kwargs: Any,  # SSLConfig, etc.
     ) -> None:
@@ -72,6 +73,7 @@ class NletDataModule(L.LightningDataModule):
         self.training_transforms = training_transforms
         self.eval_datasets = [dataset_class] + eval_datasets
         self.eval_data_dirs = [data_dir] + eval_data_dirs
+        self.dataset_ids = dataset_ids
         self.dataset_names = dataset_names
         self.kwargs = kwargs
 
@@ -139,6 +141,9 @@ class NletDataModule(L.LightningDataModule):
 
     def get_dataset_class_names(self) -> list[str]:
         return self.dataset_names
+
+    def get_dataset_ids(self) -> list[str]:
+        return self.dataset_ids
 
     # TODO(memben): we probably want tuple[int, list[int], list[int]]
     def get_num_classes(self, partition: Literal["train", "val", "test"]) -> int:
@@ -387,6 +392,12 @@ class HardCrossEncounterSupervisedDataset(SupervisedDataset):
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:
     return (contrastive_sampler[idx],)
+
+
+def build_pair(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage, ContrastiveImage]:
+    anchor_positive = contrastive_sampler[idx]
+    positive = contrastive_sampler.positive(anchor_positive)
+    return (anchor_positive, positive)
 
 
 def build_triplet(

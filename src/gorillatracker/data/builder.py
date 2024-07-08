@@ -13,6 +13,7 @@ from gorillatracker.data.nlet import (
     SupervisedDataset,
     SupervisedKFoldDataset,
     build_onelet,
+    build_pair,
     build_quadlet,
     build_triplet,
 )
@@ -61,16 +62,19 @@ dataset_registry: dict[str, Type[NletDataset]] = {
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
     "softmax": build_onelet,
+    "ntxent": build_pair,
     "offline": build_triplet,
     "online": build_quadlet,
+    "distillation": build_triplet,
 }
 
 
-def force_nlet_builder(builder_identifier: Literal["onelet", "triplet", "quadlet"]) -> None:
+def force_nlet_builder(builder_identifier: Literal["onelet", "pair", "triplet", "quadlet"]) -> None:
     if builder_identifier:
         global nlet_requirements
         nlet_requirements = {
             "softmax": build_onelet if builder_identifier == "onelet" else build_triplet,
+            "ntxent": build_pair if builder_identifier == "pair" else build_pair,
             "offline": build_triplet if builder_identifier == "triplet" else build_quadlet,
             "online": build_quadlet if builder_identifier == "quadlet" else build_onelet,
         }
@@ -86,6 +90,7 @@ def build_data_module(
     training_transforms: gtypes.TensorTransform,
     additional_eval_datasets_ids: list[str] = [],
     additional_eval_data_dirs: list[Path] = [],
+    dataset_names: list[str] = [],
     ssl_config: Optional[SSLConfig] = None,
 ) -> NletDataModule:
     assert dataset_class_id in dataset_registry, f"Dataset class {dataset_class_id} not found in registry"
@@ -95,13 +100,18 @@ def build_data_module(
     assert len(additional_eval_datasets_ids) == len(
         additional_eval_data_dirs
     ), "Length mismatch between eval datasets and dirs"
+    # additional_dataset_names can be empty, but if not, it must have the same length as additional_eval_datasets_ids
+    assert (
+        not dataset_names or len(dataset_names) == len(additional_eval_datasets_ids) + 1
+    ), "Length mismatch between dataset_names and eval datasets"
 
     if dataset_class_id == SSLDatasetId:
         assert ssl_config is not None, "ssl_config must be set for SSLDataset"
 
     dataset_class = dataset_registry[dataset_class_id]
     eval_datasets = [dataset_registry[cls_id] for cls_id in additional_eval_datasets_ids]
-    dataset_names = [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
+    dataset_ids = [cls_id.split(".")[-1] for cls_id in ([dataset_class_id] + additional_eval_datasets_ids)]
+    dataset_names = dataset_names if dataset_names else dataset_ids
     print(f"Dataset names: {dataset_names}")
 
     nlet_builder = next((builder for mode, builder in nlet_requirements.items() if loss_mode.startswith(mode)), None)
@@ -116,6 +126,7 @@ def build_data_module(
         model_transforms=model_transforms,
         training_transforms=training_transforms,
         eval_datasets=eval_datasets,
+        dataset_ids=dataset_ids,
         dataset_names=dataset_names,
         eval_data_dirs=additional_eval_data_dirs,
         ssl_config=ssl_config,

@@ -1,7 +1,11 @@
+import argparse
 import json
 import os
+import pathlib
 from typing import Any, Dict
 
+import pandas as pd
+import wandb
 import yaml
 from wandb import agent, sweep
 
@@ -25,6 +29,9 @@ def get_config(config_path: str) -> Dict[str, Any]:
 def run_experiment(
     project_name: str, config_path: str, parameters: Dict[str, Any], sweep_parameters: Dict[str, Any]
 ) -> None:
+
+    sweep_name = parameters["sweep_name"]
+    parameters.pop("sweep_name")
     # Construct the command with parameter overrides
     params_str = " ".join([f"--{key} {value}" for key, value in parameters.items()])
 
@@ -35,7 +42,7 @@ def run_experiment(
         params_array = params_str.split(" ")
         sweep_config = {
             "program": "./train.py",  # Note: not the sweep file, but the training script
-            "name": project_name,
+            "name": sweep_name,
             "method": "bayes",  # Specify the search method (random search in this case)
             "metric": {
                 "goal": "maximize",
@@ -46,16 +53,43 @@ def run_experiment(
         }
         sweep_id = sweep(sweep=sweep_config, project=project_name, entity="gorillas")
 
-        print(f"SWEEP_PATH=gorillas/{project_name}/{sweep_id}")
-        agent(sweep_id, count=12)
+        sweep_path = f"gorillas/{project_name}/{sweep_id}"
+        print("SWEEP_PATH=" + sweep_path)
+        agent(sweep_id, count=1)
+        save_best_run_results(sweep_path, "CXLDataset/val/embeddings/knn/accuracy")
+
     else:
         command = f"python train.py {params_str} --config_path {config_path}"
         os.system(command)
     print(f"Experiment '{project_name}' has been executed with overridden parameters: {parameters}")
 
 
+def save_best_run_results(sweep_path: str, metric_to_optimize: str) -> None:
+    api = wandb.Api()
+    sweep_instance = api.sweep(sweep_path)
+    best_run = sweep_instance.best_run(order=metric_to_optimize)
+    best_run_metrics = best_run.summary
+    best_run_config = best_run.config
+
+    best_run_metrics = dict(best_run_metrics)
+    best_run_config = dict(best_run_config)
+    best_run_config["sweep_path"] = sweep_path
+    best_run_config["wandb_link"] = f"https://wandb.ai/{sweep_path}/runs/{best_run.id}"
+
+    metrics_log_path = pathlib.Path(f"results/{sweep_path}/metrics.json")
+    config_path = pathlib.Path(f"results/{sweep_path}/config.json")
+    metrics_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame([best_run_metrics]).to_json(metrics_log_path, index=False)
+    pd.DataFrame([best_run_config]).to_json(config_path, index=False)
+
+
 if __name__ == "__main__":
-    with open("scripts/multi_configs/baseline_sweep.json", "r") as file:
+    parser = argparse.ArgumentParser(description="Run multiple experiments with different configurations")
+    parser.add_argument("--config_path", type=str, help="path to the configuration file")
+    args = parser.parse_args()
+
+    with open(args.config_path, "r") as file:
         json_file = json.load(file)
         experiments = json_file["experiments"]
         global_parameters = json_file["global"]

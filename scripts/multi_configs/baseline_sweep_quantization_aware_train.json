@@ -1,16 +1,15 @@
 {
     "global": {
-        "sweep_name": "Baseline Sweep",
+        "sweep_name": "Quantization Aware Training Sweep",
         "run_name": "443-take-baselines-for-models",
         "wandb_tags": [
             "sweep",
-            "baseline"
+            "quantization_aware_training"
         ],
-        "use_quantization_aware_training": false,
+        "use_quantization_aware_training": true,
         "max_epochs": 40,
         "early_stopping_patience": 8,
         "embedding_size": 256,
-        "data_resize_transform": 224,
         "loss_mode": "softmax/arcface",
         "data_dir": "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
         "dataset_class": "gorillatracker.datasets.cxl.CXLDataset",

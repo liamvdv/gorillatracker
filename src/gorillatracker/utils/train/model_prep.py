@@ -68,6 +68,7 @@ class ModelConstructor:
             delta_t=args.delta_t,
             mem_bank_start_epoch=args.mem_bank_start_epoch,
             lambda_membank=args.lambda_membank,
+            temperature=args.temperature,
             num_classes=num_classes,
             class_distribution=class_distribution,
             dataset_names=dataset_names,
