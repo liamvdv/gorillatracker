@@ -10,12 +10,23 @@
         "max_epochs": 40,
         "early_stopping_patience": 8,
         "embedding_size": 256,
+        "data_resize_transform": 224,
         "loss_mode": "softmax/arcface",
-        "data_dir": "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25",
-        "dataset_class": "gorillatracker.datasets.cxl.CXLDataset",
+        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square",
+        "dataset_class": "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset",
+        "dataset_names": [
+            "cxl_train",
+            "bristol"
+        ],
+        "additional_val_dataset_classes": [
+            "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"
+        ],
+        "additional_val_data_dirs": [
+            "gorillatracker.datasets.bristol.BristolDataset"
+        ],
         "kfold": false,
         "val_before_training": true,
-        "lr_schedule": "exponential",
+        "lr_schedule": "cosine",
         "workers": 16,
         "save_model_to_wandb": false
     },

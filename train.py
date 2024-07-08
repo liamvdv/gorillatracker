@@ -147,9 +147,6 @@ def main(args: TrainingArgs) -> None:
 
     ################# Start training #################
     logger.info("Starting training...")
-    assert not (
-        args.use_quantization_aware_training and args.kfold
-    ), "Quantization aware training not supported with kfold"
     if args.kfold:
         train_and_validate_using_kfold(
             args=args,
@@ -158,9 +155,14 @@ def main(args: TrainingArgs) -> None:
             callbacks=callbacks,
             wandb_logger=wandb_logger,
             wandb_logging_module=wandb_logging_module,
+            train_and_validate_function=(
+                train_and_validate_model
+                if not args.use_quantization_aware_training
+                else train_using_quantization_aware_training
+            ),
         )
     elif args.use_quantization_aware_training:
-        model, trainer = train_using_quantization_aware_training(
+        train_using_quantization_aware_training(
             args=args,
             dm=dm,
             model=model,

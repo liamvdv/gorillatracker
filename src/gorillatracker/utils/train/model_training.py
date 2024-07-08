@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Tuple, Type
+from typing import Optional, Tuple, Type, Callable
 
 import numpy as np
 import torch.ao.quantization
@@ -30,6 +30,7 @@ def train_and_validate_model(
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     model_name_suffix: Optional[str] = "",
+    checkpoint_callback: Optional[ModelCheckpoint] = None,
 ) -> Tuple[BaseModule, Trainer]:
     trainer = Trainer(
         num_sanity_val_steps=0,
@@ -85,6 +86,7 @@ def train_and_validate_using_kfold(
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     wandb_logging_module: WandbLoggingModule,
+    train_and_validate_function: Callable = train_and_validate_model,
 ) -> Trainer:
     # TODO(memben):!!! Fix kfold_k
 
@@ -121,12 +123,13 @@ def train_and_validate_using_kfold(
             every_n_epochs=int(args.save_interval),
         )
 
-        _, trainer = train_and_validate_model(
+        _, trainer = train_and_validate_function(
             args,
             dm,
             model_kfold,
             [checkpoint_callback, *callbacks, early_stopping_callback],
             wandb_logger,
+            checkpoint_callback=checkpoint_callback,
         )
 
     if args.kfold and not args.fast_dev_run:
