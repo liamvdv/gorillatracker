@@ -81,3 +81,12 @@ class MoCoWrapper(BaseModule):
         self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         return loss
+    
+    @classmethod
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
+        return transforms.Compose(
+            [
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
+                transforms_v2.RandomHorizontalFlip(p=0.5),
+            ]
+        )
