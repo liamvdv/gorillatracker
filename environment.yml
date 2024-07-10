@@ -10,7 +10,7 @@ channels:
   - pyviz/label/dev
 dependencies:
   - python=3.10 # or don't specify the version and use latest stable
-  - pytorch=2.3.1
+  - pytorch=2.3.1=*cuda12.1*
   - torchvision
   - transformers
   - wandb
