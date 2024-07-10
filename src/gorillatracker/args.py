@@ -102,6 +102,7 @@ class TrainingArgs:
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
         "ntxent",
+        "ntxent/l2sp",
     ] = field(default="offline")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
