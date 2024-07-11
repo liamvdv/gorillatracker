@@ -19,9 +19,9 @@ from torchvision.models import (
 )
 from transformers import ResNetModel
 
-from gorillatracker.transform_utils import PlanckianJitter
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.model_miewid import GeM, load_miewid_model  # type: ignore
+from gorillatracker.transform_utils import PlanckianJitter
 
 
 class EvaluationWrapper(BaseModule):
@@ -181,7 +181,9 @@ class VisionTransformerWrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=224)
+        self.model = timm.create_model(
+            "vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=224
+        )
         # self.model.reset_classifier(self.embedding_size) # TODO
         # self.model.head = torch.nn.Sequential(
         #     torch.nn.BatchNorm1d(self.model.head.in_features),
@@ -189,14 +191,13 @@ class VisionTransformerWrapper(BaseModule):
         #     torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
         #     torch.nn.BatchNorm1d(self.embedding_size),
         # )
-        
-        
+
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
-        
-        self.embedding_layer = torch.nn.Linear(1024, self.embedding_size) # NOTE(rob2u): baseline -> just fc
-        
+
+        self.embedding_layer = torch.nn.Linear(1024, self.embedding_size)  # NOTE(rob2u): baseline -> just fc
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model.forward_features(x)
         x = self.model.forward_head(x, pre_logits=True)
@@ -229,7 +230,6 @@ class VisionTransformerWrapper(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-                
             ]
         )
 

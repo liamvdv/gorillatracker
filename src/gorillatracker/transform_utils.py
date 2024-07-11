@@ -7,7 +7,7 @@ from torchvision.transforms.functional import pad
 
 
 class SquarePad:
-    def __call__(self, image: Image) -> Image:
+    def __call__(self, image: Image.Image) -> Image.Image:
         # calc padding
         width, height = image.size
         aspect_ratio = width / height
@@ -94,7 +94,7 @@ class PlanckianJitter:
         else:
             raise ValueError('Mode "' + mode + '" not supported. Please choose between "blackbody" or "CIED".')
 
-    def __call__(self, x: Image) -> Image:
+    def __call__(self, x: Image.Image) -> Image.Image:
         image = np.array(x.copy())
         image = image / 255
 

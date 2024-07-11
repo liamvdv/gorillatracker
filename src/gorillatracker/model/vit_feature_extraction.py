@@ -5,11 +5,11 @@ import numpy as np
 import timm
 import torch
 import torch.nn as nn
-from torchvision.transforms import v2 as transforms_v2
-from torchvision.transforms import transforms
+from torchvision.transforms import transforms, v2 as transforms_v2
 
-from gorillatracker.transform_utils import PlanckianJitter
 from gorillatracker.model.base_module import BaseModule
+from gorillatracker.transform_utils import PlanckianJitter
+
 
 # TODO(rob2u): test
 # TODO(rob2u): improve embedding_layer
@@ -22,26 +22,34 @@ class ViT_FeatureExtraction(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        
-        self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=224)    
+
+        self.model = timm.create_model(
+            "vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=224
+        )
         self.feature_dim = 1024
-        
-        self.f2a = FeatureToAttributeProjector(self.feature_dim, self.feature_dim, self.feature_dim) # NOTE(rob2u): Project CLS token to synthetic image attribute
-        self.aam = AttributeAttentionModule(self.feature_dim, self.feature_dim) # NOTE(rob2u): extract features from patches using synthetic image attribute
-        self.embedding_layer = torch.nn.Linear(self.feature_dim * 2, self.embedding_size) # NOTE(rob2u): reduce concatenated feature dimension to embedding size
-        
+
+        self.f2a = FeatureToAttributeProjector(
+            self.feature_dim, self.feature_dim, self.feature_dim
+        )  # NOTE(rob2u): Project CLS token to synthetic image attribute
+        self.aam = AttributeAttentionModule(
+            self.feature_dim, self.feature_dim
+        )  # NOTE(rob2u): extract features from patches using synthetic image attribute
+        self.embedding_layer = torch.nn.Linear(
+            self.feature_dim * 2, self.embedding_size
+        )  # NOTE(rob2u): reduce concatenated feature dimension to embedding size
+
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
-        
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         vit_features = self.model.forward_features(x)
         cls_feature = vit_features[:, 0]
         patch_features = vit_features[:, 1:]
-        
+
         synthetic_image_attribute = self.f2a(cls_feature)
         aam_feature, patch_attention_weight = self.aam(patch_features, synthetic_image_attribute)
-        
+
         features = torch.cat([cls_feature, aam_feature], dim=1)
         output = self.embedding_layer(features)
         return output
@@ -72,12 +80,11 @@ class ViT_FeatureExtraction(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-                
             ]
         )
 
-    
-class FeatureToAttributeProjector(nn.Module): 
+
+class FeatureToAttributeProjector(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
@@ -101,15 +108,15 @@ class AttributeAttentionModule(nn.Module):
 
     def forward(self, patch_features, synthetic_image_attribute):
         Q = self.query_proj(synthetic_image_attribute)  # Query
-        K = self.key_proj(patch_features)               # Key
-        V = self.value_proj(patch_features)             # Value
+        K = self.key_proj(patch_features)  # Key
+        V = self.value_proj(patch_features)  # Value
 
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / (K.shape[-1] ** 0.5)
         attention_weights = self.softmax(attention_scores)
         weighted_sum = torch.matmul(attention_weights, V)
 
         return weighted_sum, attention_weights
-    
+
 
 # TODO(rob2u): test
 class LearnedPositionalEmbeddings(nn.Module):
@@ -119,18 +126,18 @@ class LearnedPositionalEmbeddings(nn.Module):
 
     def forward(self, x):
         return x + self.positional_embeddings
-    
+
 
 # FROM: https://towardsdatascience.com/position-embeddings-for-vision-transformers-explained-a6f9add341d5
 def get_sinusoid_encoding(num_tokens, token_len):
-    """ Make Sinusoid Encoding Table
+    """Make Sinusoid Encoding Table
 
-        Args:
-            num_tokens (int): number of tokens
-            token_len (int): length of a token
-            
-        Returns:
-            (torch.FloatTensor) sinusoidal position encoding table
+    Args:
+        num_tokens (int): number of tokens
+        token_len (int): length of a token
+
+    Returns:
+        (torch.FloatTensor) sinusoidal position encoding table
     """
 
     def get_position_angle_vec(i):
@@ -138,16 +145,16 @@ def get_sinusoid_encoding(num_tokens, token_len):
 
     sinusoid_table = np.array([get_position_angle_vec(i) for i in range(num_tokens)])
     sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])
-    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2]) 
+    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])
 
     return torch.FloatTensor(sinusoid_table).unsqueeze(0)
+
 
 # TODO(rob2u): test
 class SinusoidalPositionalEmbeddings(nn.Module):
     def __init__(self, num_patches, dim):
         super().__init__()
         self.positional_embeddings = torch.Tensor(get_sinusoid_encoding(num_patches, dim))
-        
 
     def forward(self, x):
         return x + self.positional_embeddings

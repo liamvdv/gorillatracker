@@ -114,7 +114,10 @@ def train_and_validate_using_kfold(
         )
 
         checkpoint_callback = ModelCheckpoint(
-            filename=kfold_prefix + "-epoch-{epoch}-acc-{cxlkfold/" + kfold_prefix + "/val/embeddings/knn5_crossvideo/accuracy:.3f}", # TODO(rob2u): add val_i here (fold-{val_i})
+            filename=kfold_prefix
+            + "-epoch-{epoch}-acc-{cxlkfold/"
+            + kfold_prefix
+            + "/val/embeddings/knn5_crossvideo/accuracy:.3f}",  # TODO(rob2u): add val_i here (fold-{val_i})
             monitor=f"{dataloader_name}/{kfold_prefix}/val/embeddings/knn5_crossvideo/accuracy",
             mode="max",
             auto_insert_metric_name=False,
