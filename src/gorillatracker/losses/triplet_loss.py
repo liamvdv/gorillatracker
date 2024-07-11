@@ -106,7 +106,7 @@ def get_semi_hard_mask(
     Returns:
         Mask tensor to indicate which distances are actually valid semi-hard distances. Shape: (batch_size, batch_size, batch_size)
         A distance is semi-hard if:
-        `labels[i] == labels[j] and labels[i] != labels[k] and distance_matrix[i][j] < distance_matrix[i][k]`
+        `labels[i] == labels[j] and labels[i] != labels[k] and 0 < distance_matrix[i][k] - distance_matrix[i][j] < margin`
     """
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
@@ -133,7 +133,7 @@ def get_semi_hard_mask(
     # filter out all points where the distance to a negative is smaller than distance to a positive
     # now only the triplets where dist_pos < dist_neg are left
     mask = get_triplet_mask(labels)
-    semi_hard_mask = distance_difference > 0.0
+    semi_hard_mask = torch.logical_and(distance_difference < margin, distance_difference > 0.0)
     semi_hard_mask = semi_hard_mask.to(mask.device)
 
     return torch.logical_and(mask, semi_hard_mask)
@@ -280,7 +280,7 @@ class TripletLossOnline(nn.Module):
         elif (
             self.mode == "semi-hard"
         ):  # select the negatives with a bigger distance than the positive but a difference smaller than the margin
-            semi_hard_mask = get_semi_hard_mask(labels, distance_matrix)
+            semi_hard_mask = get_semi_hard_mask(labels, distance_matrix, self.margin)
             # combine with base mask
             semi_hard_mask = semi_hard_mask.to(mask.device)
             mask = torch.logical_and(mask, semi_hard_mask)

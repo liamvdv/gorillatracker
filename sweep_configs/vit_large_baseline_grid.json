@@ -1,0 +1,32 @@
+[
+    {
+        "project_name": "Embedding-VitLarge-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./cfgs/visiontransformer_cxl.yml",
+        "parameters": {
+            "l2_alpha": {
+               "values": [0.1, 0.01, 0.0]
+            },
+            "l2_beta": {
+                "values": [0.1, 0.01, 0.0]
+            },
+            "start_lr": {
+                "values": [1e-5, 1e-6]
+            },
+            "margin": {
+                "values": [0.2, 0.5]
+            },
+            "embedding_size": {
+                "values": [256]
+            },
+            "loss_mode": {
+                "values": ["online/semi-hard/l2sp", "online/soft/l2sp"]
+            },
+            "dataset_class": {
+                "values": [
+                    "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+                ]
+            }
+        }
+    }
+]

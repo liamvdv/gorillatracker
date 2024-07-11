@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 import numpy as np
 import torch
-from PIL.Image import Image
+from PIL import Image
 from torchvision.transforms.functional import pad
 
 
@@ -95,7 +95,6 @@ class PlanckianJitter:
             raise ValueError('Mode "' + mode + '" not supported. Please choose between "blackbody" or "CIED".')
 
     def __call__(self, x: Image) -> Image:
-
         image = np.array(x.copy())
         image = image / 255
 

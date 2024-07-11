@@ -107,16 +107,16 @@ def train_and_validate_using_kfold(
         model_kfold.kfold_k = val_i
 
         early_stopping_callback = EarlyStopping(
-            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
-            mode="min",
+            monitor=f"{dataloader_name}/{kfold_prefix}/val/embeddings/knn5_crossvideo/accuracy",
+            mode="max",
             min_delta=args.min_delta,
             patience=args.early_stopping_patience,
         )
 
         checkpoint_callback = ModelCheckpoint(
-            filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
-            mode="min",
+            filename=kfold_prefix + "-epoch-{epoch}-acc-{cxlkfold/" + kfold_prefix + "/val/embeddings/knn5_crossvideo/accuracy:.3f}", # TODO(rob2u): add val_i here (fold-{val_i})
+            monitor=f"{dataloader_name}/{kfold_prefix}/val/embeddings/knn5_crossvideo/accuracy",
+            mode="max",
             auto_insert_metric_name=False,
             every_n_epochs=int(args.save_interval),
         )
