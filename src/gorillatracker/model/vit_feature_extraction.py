@@ -85,13 +85,13 @@ class ViT_FeatureExtraction(BaseModule):
 
 
 class FeatureToAttributeProjector(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int) -> None:
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.leaky_relu = nn.LeakyReLU()
         self.fc2 = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, cls_feature):
+    def forward(self, cls_feature: torch.Tensor) -> torch.Tensor:
         x = self.fc1(cls_feature)
         x = self.leaky_relu(x)
         x = self.fc2(x)
@@ -99,14 +99,16 @@ class FeatureToAttributeProjector(nn.Module):
 
 
 class AttributeAttentionModule(nn.Module):
-    def __init__(self, input_dim, proj_dim):
+    def __init__(self, input_dim: int, proj_dim: int) -> None:
         super().__init__()
         self.query_proj = nn.Linear(input_dim, proj_dim)
         self.key_proj = nn.Linear(input_dim, proj_dim)
         self.value_proj = nn.Linear(input_dim, proj_dim)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, patch_features, synthetic_image_attribute):
+    def forward(
+        self, patch_features: torch.Tensor, synthetic_image_attribute: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         Q = self.query_proj(synthetic_image_attribute)  # Query
         K = self.key_proj(patch_features)  # Key
         V = self.value_proj(patch_features)  # Value
@@ -120,16 +122,16 @@ class AttributeAttentionModule(nn.Module):
 
 # TODO(rob2u): test
 class LearnedPositionalEmbeddings(nn.Module):
-    def __init__(self, num_patches, dim):
+    def __init__(self, num_patches: int, dim: int) -> None:
         super().__init__()
         self.positional_embeddings = nn.Parameter(get_sinusoid_encoding(num_patches, dim))
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x + self.positional_embeddings
 
 
 # FROM: https://towardsdatascience.com/position-embeddings-for-vision-transformers-explained-a6f9add341d5
-def get_sinusoid_encoding(num_tokens, token_len):
+def get_sinusoid_encoding(num_tokens: int, token_len: int) -> torch.Tensor:
     """Make Sinusoid Encoding Table
 
     Args:
@@ -140,7 +142,7 @@ def get_sinusoid_encoding(num_tokens, token_len):
         (torch.FloatTensor) sinusoidal position encoding table
     """
 
-    def get_position_angle_vec(i):
+    def get_position_angle_vec(i: int) -> list[float]:
         return [i / np.power(10000, 2 * (j // 2) / token_len) for j in range(token_len)]
 
     sinusoid_table = np.array([get_position_angle_vec(i) for i in range(num_tokens)])
@@ -152,9 +154,9 @@ def get_sinusoid_encoding(num_tokens, token_len):
 
 # TODO(rob2u): test
 class SinusoidalPositionalEmbeddings(nn.Module):
-    def __init__(self, num_patches, dim):
+    def __init__(self, num_patches: int, dim: int) -> None:
         super().__init__()
         self.positional_embeddings = torch.Tensor(get_sinusoid_encoding(num_patches, dim))
 
-    def forward(self, x):
+    def forward(self, x: int) -> torch.Tensor:
         return x + self.positional_embeddings
