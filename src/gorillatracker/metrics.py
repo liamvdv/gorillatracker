@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
 
@@ -14,9 +14,10 @@ import torchmetrics as tm
 import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
+from scipy.stats import chi2
 from sklearn.manifold import TSNE
-from sklearn.metrics import accuracy_score, f1_score, precision_score
-from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import accuracy_score, adjusted_rand_score, f1_score, precision_score
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
@@ -413,6 +414,86 @@ def tsne(
     # print("tsne done")
     plt.close("all")
     return plot
+
+
+def estimate_sigma(samples: np.ndarray, labels: np.ndarray):
+    sigma_squared_estimates = []
+
+    for m in np.unique(labels):
+        class_samples = samples[labels == m]
+        if class_samples.shape[0] < 3:
+            continue
+        S_m = np.cov(class_samples, rowvar=False, bias=False)
+        sigma_squared_m = np.mean(np.diag(S_m))
+        sigma_squared_estimates.append(sigma_squared_m)
+
+    sigma_squared = np.mean(sigma_squared_estimates)
+    sigma = np.sqrt(sigma_squared)
+
+    return sigma
+
+
+def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
+    train_data = data[data["partition"] == "train"]
+    X_train = np.stack(train_data["embedding"].values)
+    y_train = train_data["label"].values
+
+    sigma = estimate_sigma(X_train, y_train, d=d)
+    print(f"Estimated sigma: {sigma}")
+    # NOTE(rob2u): we know ||x - mu||^2 ~ sigma**2 * chi^2(d) -> when we want to find the margin
+    return sigma**2 * chi2.ppf(0.8, d)
+
+
+def open_set_recognition(data: pd.DataFrame, k: int = 1) -> float:
+    margin = calculate_margin(data, k=k) * 9 # NOTE(rob2u): 9 is a magic number that worked well
+    val_data = data[data["partition"] == "val"]
+    
+    known_data = val_data.sample(frac=0.5, random_state=0)
+    unknown_data = val_data.drop(known_data.index)
+
+    X_known = np.stack(known_data["embedding"].values)
+    y_known = known_data["label"].values
+    X_unknown = np.stack(unknown_data["embedding"].values)
+    y_unknown = unknown_data["label"].values
+
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(X_known, y_known)
+
+    current_labels = set(y_known)
+    predicted_labels = []
+
+    def assign_label(new_point):
+        distances, indices = knn.kneighbors([new_point])
+        neighbor_labels = y_known[indices[0]]
+        label_counts = Counter(neighbor_labels)
+        # filter out neighbors that are not within the margin
+        allowed_labels = [
+            label
+            for label, distance in zip(neighbor_labels, distances[0])
+            if distance < margin
+        ]
+        if allowed_labels:
+            return max(allowed_labels, key=lambda x: label_counts[x])
+        else:
+            new_label = max(current_labels) + 1
+            current_labels.add(new_label)
+            return new_label
+
+    for new_point in X_unknown:
+        predicted_label = assign_label(new_point)
+        predicted_labels.append(predicted_label)
+        X_known = np.vstack([X_known, new_point])
+        y_known = np.append(y_known, predicted_label)
+        knn.fit(X_known, y_known)
+
+    return (
+        adjusted_rand_score(y_unknown, predicted_labels),
+        list(known_data["embedding"].values),
+        list(known_data["label"].values),
+        list(X_known),
+        list(known_data["label"].values) + list(y_unknown),
+        list(y_known),
+    )
 
 
 if __name__ == "__main__":
