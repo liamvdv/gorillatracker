@@ -222,9 +222,7 @@ class VisionTransformerDinoV2Wrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = timm.create_model(
-            "vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=192
-        )
+        self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch)
         self.model.reset_classifier(self.embedding_size)
         self.model.head = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.in_features),
