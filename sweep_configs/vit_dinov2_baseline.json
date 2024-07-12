@@ -1,0 +1,34 @@
+[
+    {
+        "project_name": "Sweep-VitLarge-DinoV2-Face",
+        "entity": "gorillas",
+        "config_path": "./cfgs/visiontransformer_dinov2_ssl.yml",
+        "parameters": {
+            "dropout_p": {
+                "max": 0.5,
+                "min": 0.0,
+                "distribution": "uniform"
+            },
+            "start_lr": {
+                "mu": -12.0,
+                "sigma": 2.5,
+                "distribution": "log_normal"
+            },
+            "initial_lr": {
+                "mu": -12.0,
+                "sigma": 2.5,
+                "distribution": "log_normal"
+            },
+            "margin": {
+                "max": 1.0,
+                "min": 0.0,
+                "distribution": "uniform"
+            },
+            "weight_decay": {
+                "max": 0.5,
+                "min": 0.0,
+                "distribution": "uniform"
+            }
+        }
+    }
+]
