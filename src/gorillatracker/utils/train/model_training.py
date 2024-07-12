@@ -115,7 +115,9 @@ def train_and_validate_using_kfold(
 
         checkpoint_callback = ModelCheckpoint(
             filename=kfold_prefix
-            + "-epoch-{epoch}-acc-{cxlkfold/"
+            + "-epoch-{epoch}-acc-{"
+            + dataloader_name
+            + "/"
             + kfold_prefix
             + "/val/embeddings/knn5_crossvideo/accuracy:.3f}",
             monitor=f"{dataloader_name}/{kfold_prefix}/val/embeddings/knn5_crossvideo/accuracy",
