@@ -486,14 +486,9 @@ def open_set_recognition(data: pd.DataFrame, k: int = 1) -> float:
         y_known = np.append(y_known, predicted_label)
         knn.fit(X_known, y_known)
 
-    return (
-        adjusted_rand_score(y_unknown, predicted_labels),
-        list(known_data["embedding"].values),
-        list(known_data["label"].values),
-        list(X_known),
-        list(known_data["label"].values) + list(y_unknown),
-        list(y_known),
-    )
+    return {
+        "ARI": adjusted_rand_score(y_unknown, predicted_labels),
+    }
 
 
 if __name__ == "__main__":
