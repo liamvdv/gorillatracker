@@ -2,7 +2,6 @@ from collections import Counter, defaultdict
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
 
-
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
@@ -226,7 +225,7 @@ def knn(
     classification_mask: torch.Tensor
     if use_crossvideo_positives:
         distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
-        if use_train_embeddings: # add train embeddings to the distance mask (shapes would not match otherwise)
+        if use_train_embeddings:  # add train embeddings to the distance mask (shapes would not match otherwise)
             train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
             distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
             distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
@@ -422,7 +421,8 @@ def tsne(
     return plot
 
 
-def estimate_sigma(samples: np.ndarray, labels: np.ndarray):
+# TODO(rob2u): fix typing
+def estimate_sigma(samples: np.ndarray, labels: np.ndarray) -> float:
     sigma_squared_estimates = []
 
     for m in np.unique(labels):
@@ -443,10 +443,10 @@ def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
     X = np.stack(data["embedding"].values)
     y = data["label"].values
 
-    # NOTE(rob2u): 
+    # NOTE(rob2u):
     # we know ||x - mu||^2 ~ sigma**2 * chi^2(d) -> when we want to find the margin
     # we want to use the euclidean distance, so we take the square root
-    
+
     sigma = estimate_sigma(X, y)
     margin_sq = sigma**2 * chi2.ppf(0.95, d)
     return np.sqrt(margin_sq)
@@ -454,13 +454,15 @@ def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
 
 def openset_clustering(data: pd.DataFrame, k: int = 1) -> dict[str, float]:
     val_data = data[data["partition"] == "val"]
-    
+
     # NOTE(rob2u): average the embeddings for a single video
     val_data.loc[:, "VIDEO_ID"] = val_data.copy()["id"].apply(get_individual_video_id)
     val_data = val_data.groupby(["label", "VIDEO_ID"]).agg({"embedding": "mean"}).reset_index()
     print("Left with", len(val_data), "unique embeddings")
-    
-    margin = calculate_margin(val_data, k=k, d=val_data["embedding"][0].shape[-1]) * 2 # NOTE: multiply by 2 to get the full margin
+
+    margin = (
+        calculate_margin(val_data, k=k, d=val_data["embedding"][0].shape[-1]) * 2
+    )  # NOTE: multiply by 2 to get the full margin
     print("Calculated margin:", margin)
 
     known_data = val_data.sample(frac=0.5, random_state=0)
