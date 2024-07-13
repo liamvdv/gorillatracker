@@ -1,10 +1,12 @@
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
+
 
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import PIL
 import seaborn as sns
@@ -224,6 +226,11 @@ def knn(
     classification_mask: torch.Tensor
     if use_crossvideo_positives:
         distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        if use_train_embeddings: # add train embeddings to the distance mask (shapes would not match otherwise)
+            train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
+            distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
+            distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
+            distance_mask = distance_mask.to(torch.bool)
         distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
@@ -250,7 +257,6 @@ def knn(
         val_labels = val_labels[classification_mask]
 
     # assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
-
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
@@ -421,7 +427,7 @@ def estimate_sigma(samples: np.ndarray, labels: np.ndarray):
 
     for m in np.unique(labels):
         class_samples = samples[labels == m]
-        if class_samples.shape[0] < 3:
+        if class_samples.shape[0] < 2:
             continue
         S_m = np.cov(class_samples, rowvar=False, bias=False)
         sigma_squared_m = np.mean(np.diag(S_m))
@@ -434,20 +440,29 @@ def estimate_sigma(samples: np.ndarray, labels: np.ndarray):
 
 
 def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
-    train_data = data[data["partition"] == "train"]
-    X_train = np.stack(train_data["embedding"].values)
-    y_train = train_data["label"].values
+    X = np.stack(data["embedding"].values)
+    y = data["label"].values
 
-    sigma = estimate_sigma(X_train, y_train, d=d)
-    print(f"Estimated sigma: {sigma}")
-    # NOTE(rob2u): we know ||x - mu||^2 ~ sigma**2 * chi^2(d) -> when we want to find the margin
-    return sigma**2 * chi2.ppf(0.8, d)
+    # NOTE(rob2u): 
+    # we know ||x - mu||^2 ~ sigma**2 * chi^2(d) -> when we want to find the margin
+    # we want to use the euclidean distance, so we take the square root
+    
+    sigma = estimate_sigma(X, y)
+    margin_sq = sigma**2 * chi2.ppf(0.95, d)
+    return np.sqrt(margin_sq)
 
 
-def open_set_recognition(data: pd.DataFrame, k: int = 1) -> float:
-    margin = calculate_margin(data, k=k) * 9 # NOTE(rob2u): 9 is a magic number that worked well
+def openset_clustering(data: pd.DataFrame, k: int = 1) -> dict[str, float]:
     val_data = data[data["partition"] == "val"]
     
+    # NOTE(rob2u): average the embeddings for a single video
+    val_data.loc[:, "VIDEO_ID"] = val_data.copy()["id"].apply(get_individual_video_id)
+    val_data = val_data.groupby(["label", "VIDEO_ID"]).agg({"embedding": "mean"}).reset_index()
+    print("Left with", len(val_data), "unique embeddings")
+    
+    margin = calculate_margin(val_data, k=k, d=val_data["embedding"][0].shape[-1]) * 2 # NOTE: multiply by 2 to get the full margin
+    print("Calculated margin:", margin)
+
     known_data = val_data.sample(frac=0.5, random_state=0)
     unknown_data = val_data.drop(known_data.index)
 
@@ -462,16 +477,12 @@ def open_set_recognition(data: pd.DataFrame, k: int = 1) -> float:
     current_labels = set(y_known)
     predicted_labels = []
 
-    def assign_label(new_point):
+    def assign_label(new_point: npt.ArrayLike) -> int:
         distances, indices = knn.kneighbors([new_point])
         neighbor_labels = y_known[indices[0]]
         label_counts = Counter(neighbor_labels)
         # filter out neighbors that are not within the margin
-        allowed_labels = [
-            label
-            for label, distance in zip(neighbor_labels, distances[0])
-            if distance < margin
-        ]
+        allowed_labels = [label for label, distance in zip(neighbor_labels, distances[0]) if distance < margin]
         if allowed_labels:
             return max(allowed_labels, key=lambda x: label_counts[x])
         else:
