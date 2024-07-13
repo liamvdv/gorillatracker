@@ -1,10 +1,11 @@
-from collections import defaultdict
+from collections import Counter, defaultdict
 from itertools import islice
 from typing import Any, Dict, List, Literal, Optional
 
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import PIL
 import seaborn as sns
@@ -14,9 +15,10 @@ import torchmetrics as tm
 import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
+from scipy.stats import chi2
 from sklearn.manifold import TSNE
-from sklearn.metrics import accuracy_score, f1_score, precision_score
-from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import accuracy_score, adjusted_rand_score, f1_score, precision_score
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from torch.utils.data import DataLoader as Dataloader
 from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
@@ -223,6 +225,11 @@ def knn(
     classification_mask: torch.Tensor
     if use_crossvideo_positives:
         distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        if use_train_embeddings:  # add train embeddings to the distance mask (shapes would not match otherwise)
+            train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
+            distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
+            distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
+            distance_mask = distance_mask.to(torch.bool)
         distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
@@ -249,7 +256,6 @@ def knn(
         val_labels = val_labels[classification_mask]
 
     # assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
-
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
     )
@@ -413,6 +419,85 @@ def tsne(
     # print("tsne done")
     plt.close("all")
     return plot
+
+
+def estimate_sigma(samples: npt.NDArray[np.float32], labels: npt.NDArray[np.int32]) -> float:
+    sigma_squared_estimates = []
+
+    for m in np.unique(labels):
+        class_samples = samples[labels == m]
+        if class_samples.shape[0] < 2:
+            continue
+        S_m = np.cov(class_samples, rowvar=False, bias=False)
+        sigma_squared_m = np.mean(np.diag(S_m))
+        sigma_squared_estimates.append(sigma_squared_m)
+
+    sigma_squared = np.mean(sigma_squared_estimates)
+    sigma = np.sqrt(sigma_squared)
+
+    return sigma
+
+
+def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
+    X = np.stack(data["embedding"].values)
+    y = data["label"].values
+
+    # NOTE(rob2u):
+    # we know ||x - mu||^2 ~ sigma**2 * chi^2(d) -> when we want to find the margin
+    # we want to use the euclidean distance, so we take the square root
+
+    sigma = estimate_sigma(X, np.array(y, dtype=np.int32))
+    margin_sq = sigma**2 * chi2.ppf(0.95, d)
+    return np.sqrt(margin_sq)
+
+
+def openset_clustering(data: pd.DataFrame, k: int = 1) -> dict[str, float]:
+    val_data = data[data["partition"] == "val"].copy()  # NOTE(rob2u): explicitly copy to avoid warning
+
+    # NOTE(rob2u): average the embeddings for a single video
+    val_data["VIDEO_ID"] = val_data["id"].apply(get_individual_video_id)
+    val_data = val_data.groupby(["label", "VIDEO_ID"]).agg({"embedding": "mean"}).reset_index()
+    margin = (
+        calculate_margin(val_data, k=k, d=val_data["embedding"][0].shape[-1]) * 2
+    )  # NOTE: multiply by 2 to get the full margin
+
+    known_data = val_data.sample(frac=0.5, random_state=0)
+    unknown_data = val_data.drop(known_data.index)
+
+    X_known = np.stack(known_data["embedding"].values)
+    y_known = known_data["label"].values
+    X_unknown = np.stack(unknown_data["embedding"].values)
+    y_unknown = unknown_data["label"].values
+
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(X_known, y_known)
+
+    current_labels = set(y_known)
+    predicted_labels = []
+
+    def assign_label(new_point: npt.ArrayLike) -> int:
+        distances, indices = knn.kneighbors([new_point])
+        neighbor_labels = y_known[indices[0]]
+        label_counts = Counter(neighbor_labels)
+        # filter out neighbors that are not within the margin
+        allowed_labels = [label for label, distance in zip(neighbor_labels, distances[0]) if distance < margin]
+        if allowed_labels:
+            return max(allowed_labels, key=lambda x: label_counts[x])
+        else:
+            new_label = max(current_labels) + 1
+            current_labels.add(new_label)
+            return new_label
+
+    for new_point in X_unknown:
+        predicted_label = assign_label(new_point)
+        predicted_labels.append(predicted_label)
+        X_known = np.vstack([X_known, new_point])
+        y_known = np.append(y_known, predicted_label)
+        knn.fit(X_known, y_known)
+
+    return {
+        "ARI": adjusted_rand_score(y_unknown, predicted_labels),
+    }
 
 
 if __name__ == "__main__":

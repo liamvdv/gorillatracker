@@ -15,7 +15,7 @@ from gorillatracker.type_helper import Id, Label
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, order=True, slots=True)  # type: ignore
+@dataclass(frozen=True, order=True, slots=True)
 class ContrastiveImage:
     id: Id
     image_path: Path
