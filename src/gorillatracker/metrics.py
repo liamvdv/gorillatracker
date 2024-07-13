@@ -421,7 +421,6 @@ def tsne(
     return plot
 
 
-# TODO(rob2u): fix typing
 def estimate_sigma(samples: npt.NDArray[np.float32], labels: npt.NDArray[np.int32]) -> float:
     sigma_squared_estimates = []
 
