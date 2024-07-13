@@ -3,7 +3,7 @@
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
-force_deterministic: False      # Force deterministic behavior
+force_deterministic: True      # Force deterministic behavior
 precision: 32           # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
 workers: 16                      # Number of workers for data loading
@@ -12,7 +12,7 @@ workers: 16                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ViT-CXL-OpenSet"
-run_name: "452-better-eval" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "502-add-new-clustering-metric_lessknown" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "ViT_Large" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
@@ -24,8 +24,8 @@ data_preprocessing_only: False  # Run only data preprocessing
 seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
-early_stopping_patience: 5      # Early stopping patience (number of epochs)
-embedding_size: 128
+early_stopping_patience: 2      # Early stopping patience (number of epochs)
+embedding_size: 256
 dropout_p: 0.32
 
 weight_decay: 0.2              # Weight decay
@@ -34,22 +34,26 @@ beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.1                       # Alpha for the l2sp loss
+l2_alpha: 0.01                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/vit_large.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/vit_large_dinvo2.pth"    # Path to the pretrained weights for the l2sp loss
 
-margin: 1.0                   # Margin for the contrastive loss (triplet loss)
+margin: 0.5                  # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
 
-loss_mode: "softmax/arcface/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" 
+loss_mode: "online/soft/l2sp"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" 
 
+
+normalization_mean: "[0.485, 0.456, 0.406]"
+normalization_std: "[0.229, 0.224, 0.225]"
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+initial_lr: 1e-6                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+
 
 batch_size: 8                 # Training batch size
 grad_clip: 1.0                   # Gradient clipping value
@@ -69,12 +73,13 @@ check_val_every_n_epoch: 5      # Check validation every n epochs
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 
-force_nlet_builder: "quadlet"
+# force_nlet_builder: "quadlet"
 data_dir: "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
-dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
+# dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
-# dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
+dataset_names: ["cxlkfold", "bristol"]
 data_resize_transform: 224
 additional_val_dataset_classes: ["gorillatracker.datasets.bristol.BristolDataset"]
 additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"]
