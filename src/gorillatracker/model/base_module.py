@@ -157,7 +157,7 @@ class BaseModule(L.LightningModule):
         super().__init__()
 
         if save_hyperparameters:
-            self.save_hyperparameters(ignore=["save_hyperparameters"])
+            self.save_hyperparameters(ignore=["save_hyperparameters", "data_module"])
 
         ####### Optimizer and Scheduler
         self.weight_decay = weight_decay

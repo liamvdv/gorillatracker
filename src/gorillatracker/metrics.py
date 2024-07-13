@@ -452,17 +452,14 @@ def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
 
 
 def openset_clustering(data: pd.DataFrame, k: int = 1) -> dict[str, float]:
-    val_data = data[data["partition"] == "val"]
+    val_data = data[data["partition"] == "val"].copy()  # NOTE(rob2u): explicitly copy to avoid warning
 
     # NOTE(rob2u): average the embeddings for a single video
-    val_data.loc[:, "VIDEO_ID"] = val_data.copy()["id"].apply(get_individual_video_id)
+    val_data["VIDEO_ID"] = val_data["id"].apply(get_individual_video_id)
     val_data = val_data.groupby(["label", "VIDEO_ID"]).agg({"embedding": "mean"}).reset_index()
-    print("Left with", len(val_data), "unique embeddings")
-
     margin = (
         calculate_margin(val_data, k=k, d=val_data["embedding"][0].shape[-1]) * 2
     )  # NOTE: multiply by 2 to get the full margin
-    print("Calculated margin:", margin)
 
     known_data = val_data.sample(frac=0.5, random_state=0)
     unknown_data = val_data.drop(known_data.index)

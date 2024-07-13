@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 from simple_parsing import field, list_field
 
 
-@dataclass(kw_only=True)  # type: ignore
+@dataclass(kw_only=True)
 class TrainingArgs:
     """
     Argument class for use with simple_parsing that handles the basics of most LLM training scripts. Subclass this to add more arguments. TODO: change this
