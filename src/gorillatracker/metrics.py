@@ -422,7 +422,7 @@ def tsne(
 
 
 # TODO(rob2u): fix typing
-def estimate_sigma(samples: np.ndarray, labels: np.ndarray) -> float:
+def estimate_sigma(samples: npt.NDArray[np.float32], labels: npt.NDArray[np.int32]) -> float:
     sigma_squared_estimates = []
 
     for m in np.unique(labels):
@@ -447,7 +447,7 @@ def calculate_margin(data: pd.DataFrame, k: int = 5, d: int = 2) -> float:
     # we know ||x - mu||^2 ~ sigma**2 * chi^2(d) -> when we want to find the margin
     # we want to use the euclidean distance, so we take the square root
 
-    sigma = estimate_sigma(X, y)
+    sigma = estimate_sigma(X, np.array(y, dtype=np.int32))
     margin_sq = sigma**2 * chi2.ppf(0.95, d)
     return np.sqrt(margin_sq)
 
