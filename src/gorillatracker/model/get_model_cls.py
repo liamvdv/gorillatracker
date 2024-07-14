@@ -22,6 +22,7 @@ from gorillatracker.model.wrappers_supervised import (
     VisionTransformerDinoV2Wrapper,
     VisionTransformerWrapper,
 )
+from gorillatracker.model.wrapper_mae import MaskedVisionTransformer
 
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {
@@ -44,6 +45,7 @@ custom_model_cls = {
     "InceptionV3": InceptionV3Wrapper,
     "SimCLR": SimCLRWrapper,
     "MoCo": MoCoWrapper,
+    "MaskedVisionTransformer": MaskedVisionTransformer,
 }
 
 

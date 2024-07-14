@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 import numpy as np
 import torch
-from PIL.Image import Image
+from PIL import Image
 from torchvision.transforms.functional import pad
 
 

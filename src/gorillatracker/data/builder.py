@@ -66,6 +66,7 @@ nlet_requirements: dict[str, FlatNletBuilder] = {
     "offline": build_triplet,
     "online": build_quadlet,
     "distillation": build_triplet,
+    "mae_mse": build_onelet,
 }
 
 
