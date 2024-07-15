@@ -15,7 +15,7 @@ import gorillatracker.ssl_pipeline.video_filter_queries as vq
 from gorillatracker.ssl_pipeline.models import Video
 
 
-@dataclass(kw_only=True)  # type: ignore
+@dataclass(kw_only=True)
 class SplitArgs:
     db_uri: str
     version: str

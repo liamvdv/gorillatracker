@@ -110,7 +110,7 @@ def main(args: TrainingArgs) -> None:
         filename="epoch-{epoch}-acc-{"
         + str(dm.get_dataset_class_names()[0])
         + "/val/embeddings/knn5_crossvideo/accuracy:.3f}",
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy" if not args.use_ssl else f"{dm.get_dataset_class_names()[1]}/val/embeddings/knn5_crossvideo/accuracy",
         mode="max",
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
@@ -118,7 +118,7 @@ def main(args: TrainingArgs) -> None:
     )
 
     early_stopping = EarlyStopping(
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy",
+        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy" if not args.use_ssl else f"{dm.get_dataset_class_names()[1]}/val/embeddings/knn5_crossvideo/accuracy",
         mode="max",
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
