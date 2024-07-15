@@ -15,7 +15,7 @@ import gorillatracker.ssl_pipeline.video_filter_queries as vq
 from gorillatracker.ssl_pipeline.models import Video
 
 
-@dataclass(kw_only=True)  # type: ignore
+@dataclass(kw_only=True)
 class SplitArgs:
     db_uri: str
     version: str
@@ -48,6 +48,8 @@ class SplitArgs:
     _train_video_ids: list[int] = field(init=False, default_factory=lambda: [])
     _val_video_ids: list[int] = field(init=False, default_factory=lambda: [])
     _test_video_ids: list[int] = field(init=False, default_factory=lambda: [])
+
+    remove_used_videos_from_dir: Union[str, None] = field(default=None)  # takes some time
 
     def _set_name(self) -> None:
         if self.split_by in ["percentage", "camera", "time"]:
@@ -94,6 +96,8 @@ class SplitArgs:
         query = vq.video_length_filter(query, self.video_length[0], self.video_length[1])
         query = vq.random_video_order(query)
         query = vq.video_count_filter(query, max_videos)
+        if self.remove_used_videos_from_dir is not None:
+            query = vq.video_delete_filter(query, self.remove_used_videos_from_dir)
         return query
 
     def build_train_query(self) -> Select[tuple[Video]]:
@@ -204,6 +208,7 @@ if __name__ == "__main__":
         val_endtime=dt.datetime(2030, 1, 1),
         test_starttime=dt.datetime(2010, 1, 1),
         test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
     )
     if True:
         args.create_split()

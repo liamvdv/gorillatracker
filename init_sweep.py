@@ -31,7 +31,7 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
         "method": "bayes",  # Specify the search method (random search in this case)
         "metric": {
             "goal": "maximize",
-            "name": "val/embeddings/knn/dataloader_0/accuracy",
+            "name": "cxl_all/val/embeddings/knn5_crossvideo/accuracy",
         },  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
