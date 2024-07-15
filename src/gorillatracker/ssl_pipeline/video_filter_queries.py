@@ -28,7 +28,7 @@ def read_dir(image_dir: str) -> list[str]:
     return image_paths
 
 
-def video_delete_filter(query: Select[tuple[Video]], image_dir: str) -> Select:
+def video_delete_filter(query: Select[tuple[Video]], image_dir: str) -> Select[tuple[Video]]:
     image_paths = read_dir(image_dir)
     video_files = get_videos_from_images(image_paths)
     conditions = [func.lower(Video.absolute_path).endswith(vf) for vf in video_files]
