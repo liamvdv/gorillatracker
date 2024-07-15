@@ -1,10 +1,39 @@
 import datetime as dt
+import os
 from typing import Union
 
 from sqlalchemy import Integer, Select, and_, case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
 from gorillatracker.ssl_pipeline.models import Camera, Video
+
+
+def get_video_from_image(image_path: str) -> tuple[str, str]:
+    image = image_path.split("_")
+    image[3] = image[3][:3]
+    video_file = f"{image[1]}_{image[2]}_{image[3]}.mp4"
+    avi_file = f"{image[1]}_{image[2]}_{image[3]}.avi"
+    return video_file.lower(), avi_file.lower()
+
+
+def get_videos_from_images(image_paths: list[str]) -> list[str]:
+    video_files = [get_video_from_image(image_path)[0] for image_path in image_paths]
+    video_files = video_files + [get_video_from_image(image_path)[1] for image_path in image_paths]
+    video_files = list(set(video_files))
+    return video_files
+
+
+def read_dir(image_dir: str) -> list[str]:
+    image_paths = [image for image in os.listdir(image_dir)]
+    return image_paths
+
+
+def video_delete_filter(query: Select[tuple[Video]], image_dir: str) -> Select:
+    image_paths = read_dir(image_dir)
+    video_files = get_videos_from_images(image_paths)
+    conditions = [func.lower(Video.absolute_path).endswith(vf) for vf in video_files]
+    combined_condition = or_(*conditions)
+    return query.where(~combined_condition)
 
 
 def get_camera_ids(session: Session) -> list[int]:
