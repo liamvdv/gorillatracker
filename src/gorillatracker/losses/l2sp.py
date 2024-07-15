@@ -29,7 +29,7 @@ class L2SPRegularization_Wrapper(nn.Module):
     def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
         standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
         l2sp_loss = self.l2sp_loss(self.model)
-        if type(l2sp_loss) == torch.Tensor:
+        if isinstance(l2sp_loss, torch.Tensor):
             self.log("l2_sp", l2sp_loss.item())
         else:
             self.log("l2_sp", l2sp_loss)
