@@ -192,15 +192,15 @@ if __name__ == "__main__":
         version="2024-04-18",
         name="SSL-Video-Split",
         save_path="/workspaces/gorillatracker/data/splits/SSL/",
-        split_by="custom",
+        split_by="percentage",
         train_split=90,
         val_split=5,
         test_split=5,
         hours=list(range(0, 24)),  # only videos from certain hours of the day
         video_length=(0, 1000000),  # min, max video length in seconds
-        max_train_videos=3000000,  # max videos in train bucket
-        max_val_videos=1000000,  # max videos in val bucket
-        max_test_videos=10000000,  # max videos in test bucket
+        max_train_videos=300000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
         # starttime and endtime will be ignored if split_by is not custom
         train_starttime=dt.datetime(2010, 1, 1),
         train_endtime=dt.datetime(2030, 1, 1),
