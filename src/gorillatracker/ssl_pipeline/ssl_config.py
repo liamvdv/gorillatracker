@@ -34,7 +34,7 @@ from gorillatracker.ssl_pipeline.queries import (
 from gorillatracker.ssl_pipeline.sampler import embedding_distant_sample, equidistant_sample, random_sample
 
 
-@dataclass(kw_only=True)  # type: ignore
+@dataclass(kw_only=True)
 class SSLConfig:
     tff_selection: Literal["random", "equidistant", "embeddingdistant"]
     negative_mining: Literal["random", "overlapping", "social_groups"]

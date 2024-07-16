@@ -96,6 +96,7 @@ docker run --rm -it --ipc=host --network=host \
     -w /workspaces/gorillatracker \
     -v "${HOME}/data:/workspaces/gorillatracker/data:ro" \
     -v "${HOME}/models/:/workspaces/gorillatracker/models" \
+    -v "${HOME}/pretrained_weights:/workspaces/gorillatracker/pretrained_weights" \
     -v "${PWD}/../.netrc:/home/gorilla/.netrc:ro" \
     -v "${PWD}/../.cache:/home/gorilla/.cache:ro" \
     -v "/mnt/vast-gorilla:/workspaces/gorillatracker/video_data:ro" \
@@ -103,6 +104,7 @@ docker run --rm -it --ipc=host --network=host \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
     --gpus=\"device=${gpus}\" \
+    --name gorillatracker \
     $image /bin/bash -c "${command}"
 
 # print done to console

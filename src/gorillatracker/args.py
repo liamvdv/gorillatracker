@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 from simple_parsing import field, list_field
 
 
-@dataclass(kw_only=True)  # type: ignore
+@dataclass(kw_only=True)
 class TrainingArgs:
     """
     Argument class for use with simple_parsing that handles the basics of most LLM training scripts. Subclass this to add more arguments. TODO: change this
@@ -72,17 +72,15 @@ class TrainingArgs:
     end_lr: float = field(default=1e-5)
     stepwise_schedule: bool = field(default=False)
 
-    save_model_to_wandb: bool = field(default=False)
+    save_model_to_wandb: Union[Literal["all"], bool] = field(default="all")
 
     # NTXent Arguments
     temperature: float = field(default=0.5)
+    memory_bank_size: int = field(default=0)
 
     # ArcFace Arguments
     k_subcenters: int = field(default=1)
     s: float = field(default=64.0)
-    delta_t: int = field(default=100)
-    mem_bank_start_epoch: int = field(default=2)
-    lambda_membank: float = field(default=0.5)
 
     margin: float = field(default=0.5)
     loss_mode: Literal[
@@ -94,14 +92,12 @@ class TrainingArgs:
         "softmax/arcface",
         "softmax/adaface",
         "softmax/elasticface",
-        "softmax/vpl",
         "offline/native/l2sp",
         "offline/l2sp",
         "online/soft/l2sp",
         "online/hard/l2sp",
         "online/semi-hard/l2sp",
         "softmax/arcface/l2sp",
-        "softmax/vpl/l2sp",
         "softmax/adaface/l2sp",
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
@@ -114,6 +110,8 @@ class TrainingArgs:
     use_class_weights: bool = field(default=False)
     use_dist_term: bool = field(default=False)
     use_normalization: bool = field(default=True)
+    normalization_mean: str = field(default="[0.485, 0.456, 0.406]")
+    normalization_std: str = field(default="[0.229, 0.224, 0.225]")
     use_inbatch_mixup: bool = field(default=False)
     force_nlet_builder: Literal["onelet", "pair", "triplet", "quadlet", "None"] = field(default="None")
 

@@ -3,12 +3,7 @@ from typing import Any, Callable, Union
 import torch
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.losses.arcface_loss import (
-    AdaFaceLoss,
-    ArcFaceLoss,
-    ElasticArcFaceLoss,
-    VariationalPrototypeLearning,
-)
+from gorillatracker.losses.arcface_loss import AdaFaceLoss, ArcFaceLoss, ElasticArcFaceLoss
 from gorillatracker.losses.dist_term_loss import CombinedLoss
 from gorillatracker.losses.l2sp import L2SPRegularization_Wrapper
 from gorillatracker.losses.ntxent import NTXentLoss
@@ -90,20 +85,8 @@ def get_loss(
             use_class_weights=kw_args["use_class_weights"],
             purpose=kw_args["purpose"],
         )
-    elif loss_mode == "softmax/vpl":
-        loss_module = VariationalPrototypeLearning(
-            embedding_size=kw_args["embedding_size"],
-            num_classes=kw_args["num_classes"],
-            class_distribution=kw_args["class_distribution"],
-            batch_size=kw_args["batch_size"],
-            s=kw_args["s"],
-            margin=kw_args["margin"],
-            delta_t=kw_args["delta_t"],
-            mem_bank_start_epoch=kw_args["mem_bank_start_epoch"],
-            accelerator=kw_args["accelerator"],
-        )
     elif loss_mode == "ntxent":
-        loss_module = NTXentLoss(temperature=kw_args["temperature"])
+        loss_module = NTXentLoss(temperature=kw_args["temperature"], memory_bank_size=kw_args["memory_bank_size"])
     else:
         raise ValueError(f"Loss mode {loss_mode} not supported")
 

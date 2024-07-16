@@ -37,7 +37,7 @@ l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
 path_to_pretrained_weights: "/workspaces/gorillatracker/models/pretrained_weights/efficientnet_rw_m.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 0.5                         # Margin for the contrastive loss (triplet loss)
-loss_mode: "distillation/offline/response-based"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "distillation/offline/response-based"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" 
 teacher_model_wandb_link: "https://wandb.ai/gorillas/Embedding-SwinV2-SSL-Face/runs/mqhtj5r5"
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
@@ -70,6 +70,6 @@ data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-k
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl_all-face_images-kfold-openset-seed-42-trainval-80-test-20-k-5" # <- CXL2
 dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-data_resize_transform: 192
-additional_val_dataset_classes: []
-additional_val_data_dirs: []
+data_resize_transform: 224
+additional_val_dataset_classes: None
+additional_val_data_dirs: None

@@ -8,10 +8,10 @@ import gorillatracker.type_helper as gtypes
 
 
 class NTXentLoss(nn.Module):
-    def __init__(self, temperature: float = 0.5):
+    def __init__(self, temperature: float = 0.5, memory_bank_size: int = 0):
         super().__init__()
         self.temperature = temperature
-        self.loss = NTXent(temperature=temperature)
+        self.loss = NTXent(temperature=temperature, memory_bank_size=memory_bank_size)
 
     def forward(self, embeddings: torch.Tensor, labels: gtypes.MergedLabels, **kwargs: Any) -> gtypes.LossPosNegDist:
         half = embeddings.size(0) // 2

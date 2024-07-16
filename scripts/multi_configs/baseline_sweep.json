@@ -1,13 +1,14 @@
 {
     "global": {
-        "run_name": "baseline-sweep-13-06",
+        "sweep_name": "Baseline Sweep",
+        "run_name": "443-take-baselines-for-models",
         "wandb_tags": [
             "sweep",
             "baseline"
         ],
         "use_quantization_aware_training": false,
         "max_epochs": 40,
-        "early_stopping_patience": 6,
+        "early_stopping_patience": 8,
         "embedding_size": 256,
         "data_resize_transform": 224,
         "loss_mode": "softmax/arcface",
@@ -16,7 +17,8 @@
         "kfold": false,
         "val_before_training": true,
         "lr_schedule": "exponential",
-        "workers": 16
+        "workers": 16,
+        "save_model_to_wandb": false
     },
     "global_sweep_parameters": {
         "weight_decay": {
@@ -52,7 +54,9 @@
         {
             "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
             "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
-            "parameters": {}
+            "parameters": {
+                "batch_size": 16
+            }
         },
         {
             "project_name": "Embedding-ResNet152-CXL-OpenSet",
@@ -71,12 +75,14 @@
         },
         {
             "project_name": "Embedding-SwinV2Large-CXL-Open",
-            "config_path": "./cfgs/swinv2_cxl.yml",
-            "parameters": {}
+            "config_path": "./cfgs/swinv2_large_cxl.yml",
+            "parameters": {
+                "data_resize_transform": 256
+            }
         },
         {
-            "project_name": "Embedding-ViT-CXL-OpenSet",
-            "config_path": "./cfgs/visiontransformer_cxl.yml",
+            "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
+            "config_path": "./cfgs/convnextv2huge_cxl.yml",
             "parameters": {}
         }
     ]
