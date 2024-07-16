@@ -20,8 +20,8 @@ from gorillatracker.model.wrappers_supervised import (
     SwinV2LargeWrapper,
     VisionTransformerClipWrapper,
     VisionTransformerDinoV2Wrapper,
-    VisionTransformerWrapper,
     VisionTransformerFrozenWrapper,
+    VisionTransformerWrapper,
 )
 
 # NOTE(liamvdv): Register custom model backbones here.
