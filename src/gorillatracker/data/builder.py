@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Literal, Optional, Type
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.combined import CombinedDataset
 from gorillatracker.data.nlet import (
     CrossEncounterSupervisedDataset,
     CrossEncounterSupervisedKFoldDataset,
@@ -19,7 +20,6 @@ from gorillatracker.data.nlet import (
 )
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
-from gorillatracker.data.combined import CombinedDataset
 
 HardCrossEncounterSupervisedKFoldDatasetId = "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 HardCrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"

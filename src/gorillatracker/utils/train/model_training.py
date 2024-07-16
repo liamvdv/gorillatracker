@@ -106,7 +106,9 @@ def train_and_validate_using_kfold(
         model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
         model_kfold.kfold_k = val_i
 
-        metric_name = "/".join([args.stop_saving_metric_name.split("/")[0], kfold_prefix, *args.stop_saving_metric_name.split("/")[1:]])
+        metric_name = "/".join(
+            [args.stop_saving_metric_name.split("/")[0], kfold_prefix, *args.stop_saving_metric_name.split("/")[1:]]
+        )
         early_stopping_callback = EarlyStopping(
             monitor=metric_name,
             mode=args.stop_saving_metric_mode,

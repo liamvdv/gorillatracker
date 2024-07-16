@@ -212,7 +212,9 @@ class NletDataset(Dataset[Nlet], ABC):
         flat_nlet = self.nlet_builder(idx, self.contrastive_sampler)
         return self._stack_flat_nlet(flat_nlet)
 
-    def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet: # Input is tuple[tuple[ContrastiveImage, int], ...] or tuple[ContrastiveImage, ...]
+    def _stack_flat_nlet(
+        self, flat_nlet: FlatNlet
+    ) -> Nlet:  # Input is tuple[tuple[ContrastiveImage, int], ...] or tuple[ContrastiveImage, ...]
         if isinstance(flat_nlet[0], tuple):
             dataset_idx = tuple([val[1] for val in flat_nlet])
             flat_nlet = [nlet[0] for nlet in flat_nlet]
@@ -309,7 +311,9 @@ class SupervisedDataset(NletDataset):
                 test/
                     ...
         """
-        dirpath = Path(base_dir) / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else Path(base_dir)
+        dirpath = (
+            Path(base_dir) / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else Path(base_dir)
+        )
         assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
         self.classes = group_images_by_label(dirpath)
         return sampler_class(self.classes)

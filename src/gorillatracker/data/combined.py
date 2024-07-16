@@ -1,26 +1,26 @@
 from pathlib import Path
-from typing import Any, Callable, Type, Literal
-import torch
+from typing import Any, Callable, Literal, Type
 
-from gorillatracker import type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import ContrastiveSampler, ContrastiveImage, Label
-from gorillatracker.data.nlet import Nlet, FlatNlet, NletDataset
-from gorillatracker.data.ssl import SSLDataset
-from gorillatracker.data.nlet import SupervisedDataset
-from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
+import torch
 from PIL import Image
 from torchvision import transforms
+
+from gorillatracker import type_helper as gtypes
+from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler, Label
+from gorillatracker.data.nlet import FlatNlet, Nlet, NletDataset, SupervisedDataset
+from gorillatracker.data.ssl import SSLDataset
+from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 
 
 class CombinedRandomSampler(ContrastiveSampler):
     def __init__(self, sampler_1: ContrastiveSampler, sampler_2: ContrastiveSampler = None) -> None:
         self.sampler_1 = sampler_1
         self.sampler_2 = sampler_2
-    
+
     def __getitem__(self, idx: int) -> tuple[ContrastiveImage, int]:
         if self.sampler_2 is None:
             return self.sampler_1[idx]
-        
+
         if idx < len(self.sampler_1):
             return (self.sampler_1[idx], 0)
         else:
@@ -64,17 +64,32 @@ class CombinedDataset(NletDataset):
         self.nlet_builder = nlet_builder
         path_1, path_2 = str(base_dir).split(":")
         if partition == "train":
-            self.dataset_1 = dataset1_cls(base_dir=path_1, nlet_builder=nlet_builder, partition=partition, transform=transform, ssl_config=ssl_config, **kwargs)
-            self.dataset_2 = dataset2_cls(base_dir=path_2, nlet_builder=nlet_builder, partition=partition, transform=transform, **kwargs)
+            self.dataset_1 = dataset1_cls(
+                base_dir=path_1,
+                nlet_builder=nlet_builder,
+                partition=partition,
+                transform=transform,
+                ssl_config=ssl_config,
+                **kwargs,
+            )
+            self.dataset_2 = dataset2_cls(
+                base_dir=path_2, nlet_builder=nlet_builder, partition=partition, transform=transform, **kwargs
+            )
             self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         else:
-            self.dataset_1 = dataset1_cls(base_dir=path_1, nlet_builder=nlet_builder, partition=partition, transform=transform, ssl_config=ssl_config, **kwargs)
+            self.dataset_1 = dataset1_cls(
+                base_dir=path_1,
+                nlet_builder=nlet_builder,
+                partition=partition,
+                transform=transform,
+                ssl_config=ssl_config,
+                **kwargs,
+            )
             self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
-        
-        
+
     def __len__(self) -> int:
-        return len(self.dataset_1) + len(self.dataset_2) if self.partition == "train" else len(self.dataset_1)         
-        
+        return len(self.dataset_1) + len(self.dataset_2) if self.partition == "train" else len(self.dataset_1)
+
     def create_contrastive_sampler(
         self, base_dir: Path, sampler_class: type = CombinedRandomSampler
     ) -> CombinedRandomSampler:
@@ -94,10 +109,9 @@ class CombinedDataset(NletDataset):
         else:
             return CombinedRandomSampler(self.dataset_1.contrastive_sampler)
 
-    def class_distribution(self) -> dict[gtypes.Label, int]: # TODO
+    def class_distribution(self) -> dict[gtypes.Label, int]:  # TODO
         return None
-    
+
     @property
     def num_classes(self) -> int:
         return self.dataset_2.num_classes if self.partition == "train" else -1
-    

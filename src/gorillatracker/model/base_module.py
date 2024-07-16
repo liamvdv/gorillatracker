@@ -331,12 +331,12 @@ class BaseModule(L.LightningModule):
         flat_labels_onehot = None
         if self.use_inbatch_mixup:
             flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
-        
+
         flat_images = flat_images.to(self.accelerator)
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot, model = self.model if hasattr(self, "model") else None)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot, model=self.model if hasattr(self, "model") else None)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
@@ -384,7 +384,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term and hasattr(self, "loss_module_val"):
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images, model = self.model if hasattr(self, "model") else None)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images, model=self.model if hasattr(self, "model") else None)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -469,7 +469,7 @@ class BaseModule(L.LightningModule):
             if self.stepwise_schedule:
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
-                    "interval": "epoch", #TODO(rob2u): currently only quick fix
+                    "interval": "epoch",  # TODO(rob2u): currently only quick fix
                     "frequency": 1,
                 }
             else:
@@ -632,7 +632,7 @@ class BaseModule(L.LightningModule):
                 loss, _, _ = loss_module_val(
                     torch.tensor(row["embedding"]).unsqueeze(0),
                     torch.tensor(lse.decode(row["label"])).unsqueeze(0),
-                    model = self.model if hasattr(self, "model") else None,
+                    model=self.model if hasattr(self, "model") else None,
                 )
                 losses.append(loss)
             loss = torch.tensor(losses).mean()

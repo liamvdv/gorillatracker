@@ -25,7 +25,7 @@ l2_alpha: 0.0001                       # Alpha for the l2sp loss
 l2_beta: 0.0005                     # Beta for the l2sp loss
 path_to_pretrained_weights: "pretrained_weights/vit_base_mae.pth"    # Path to the pretrained weights for the l2sp loss
 
-loss_mode: "mae_mse/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
+loss_mode: "mae_mse/arcface/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
@@ -66,8 +66,8 @@ data_resize_transform: 224
 additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset]
 additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/val"]
 dataset_names: ["ssl", "cxl-all", "bristol", "cxl-val"]
-dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
-data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
+# dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
+# data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
 
-# dataset_class: "gorillatracker.datasets.combined.CombinedDataset"
-# data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18:/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/train"
+dataset_class: "gorillatracker.datasets.combined.CombinedDataset"
+data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18:/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/train"
