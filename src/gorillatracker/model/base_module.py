@@ -473,7 +473,7 @@ class BaseModule(L.LightningModule):
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
-                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)), # type: ignore
+                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)),  # type: ignore
                 }
             else:
                 lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}
