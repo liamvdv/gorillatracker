@@ -21,6 +21,7 @@ from gorillatracker.model.wrappers_supervised import (
     VisionTransformerClipWrapper,
     VisionTransformerDinoV2Wrapper,
     VisionTransformerWrapper,
+    VisionTransformerFrozenWrapper,
 )
 
 # NOTE(liamvdv): Register custom model backbones here.
@@ -29,6 +30,7 @@ custom_model_cls = {
     "SwinV2Base": SwinV2BaseWrapper,
     "SwinV2LargeWrapper": SwinV2LargeWrapper,
     "ViT_Large": VisionTransformerWrapper,
+    "ViT_Large_Frozen": VisionTransformerFrozenWrapper,
     "ResNet18": ResNet18Wrapper,
     "ResNet152": ResNet152Wrapper,
     "ResNet50Wrapper": ResNet50Wrapper,
