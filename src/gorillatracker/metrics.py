@@ -48,7 +48,7 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
 def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
     samples: list[gtypes.Nlet] = []
     for batch in dataloader:
-        ids, images, labels = batch
+        ids, images, labels = batch if len(batch) == 3 else batch[:-1]
         row_batch = zip(zip(*ids), zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))

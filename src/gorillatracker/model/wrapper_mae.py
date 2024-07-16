@@ -1,5 +1,7 @@
 import copy
-from typing import Callable
+from itertools import chain
+from pathlib import Path
+from typing import Any, Callable, Optional, Type, Literal
 
 from gorillatracker.model.base_module import BaseModule
 import torch
@@ -16,27 +18,43 @@ from lightly.models.modules import MAEDecoderTIMM, MaskedVisionTransformerTIMM
 from gorillatracker.data.utils import flatten_batch
 from gorillatracker import type_helper as gtypes
 from gorillatracker.metrics import get_n_samples_from_dataloader, tensor_to_image
-from gorillatracker.transform_utils import PlanckianJitter
 from gorillatracker.utils.l2sp_regularisation import L2_SP, L2
+from gorillatracker.losses.arcface_loss import ArcFaceLoss
 
 
-# TODO(rob2u): add type hints
-# TODO(rob2u): use actual MAE model parameters
-# TODO(rob2u): check if normalized reconstruction targets are used
+def flatten_batch_datasetidx(batch: gtypes.NletBatch) -> gtypes.FlatNletBatch:
+    ids, images, labels, dataset_idxs = batch 
+    # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
+    flat_ids = tuple(chain.from_iterable(ids))
+    flat_dsidxs = tuple(chain.from_iterable(dataset_idxs))
+    # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
+    flat_labels = torch.cat(labels)
+    # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
+    flat_images = torch.cat(images)
+    return flat_ids, flat_images, flat_labels, flat_dsidxs
+
+
 class MaskedVisionTransformer(BaseModule):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        
+        self.val_img = None
+        self.encoder_skip_connection = False
+        
+        if self.encoder_skip_connection:
+            self.factor_skip_connection = nn.Parameter(torch.tensor(0.0))
+            self.factor_skip_connection.requires_grad = True
 
         decoder_dim = 512 # decoder_width, default
-        decoder_depth = 8 # default
+        decoder_depth = 4 # default
         decoder_num_heads = 16 # default
         mlp_ratio = 4.0 # default
         proj_drop_rate = 0.0 # default
         attn_drop_rate = 0.0 # default
-        mask_ratio = 0.75 # default
+        mask_ratio = 0.75 # default: 0.75
         
         vit = timm.create_model(
-            "timm/vit_large_patch14_dinov2.lvd142m",
+            "timm/vit_base_patch16_224.mae",
             pretrained=True,
             num_classes=0,
             img_size=224,
@@ -44,11 +62,14 @@ class MaskedVisionTransformer(BaseModule):
         
         self.backbone = MaskedVisionTransformerTIMM(vit=vit)
         self.backbone.vit = timm.create_model(
-            "timm/vit_large_patch14_dinov2.lvd142m",
+            "timm/vit_base_patch16_224.mae",
             pretrained=True,
             num_classes=0,
             img_size=224,
         ) # NOTE(rob2u): workaround to keep the pretrained weights
+        # # freeze backbone
+        # for param in self.backbone.vit.parameters():
+        #     param.requires_grad = False
         
         self.patch_size = vit.patch_embed.patch_size[0]
         self.mask_ratio = mask_ratio
@@ -77,25 +98,49 @@ class MaskedVisionTransformer(BaseModule):
         else:
             raise ValueError(f"Loss mode {self.loss_mode} not supported")
             
-        model_cpy = copy.deepcopy(self.backbone.vit)
-        model_cpy.head = nn.Identity()
+        self.backbone.vit.head = nn.Identity()
+        if self.l2sp:
+            self.l2sp_backbone = L2_SP(
+                self.backbone.vit,
+                kwargs["path_to_pretrained_weights"],
+                kwargs["l2_alpha"],
+                # 0.0,
+                kwargs["l2_beta"],
+            )
+            
+            self.l2_decoder = L2(
+                self.decoder,
+                kwargs["l2_alpha"], 
+            )
+        else:
+            self.l2sp_backbone = lambda x: 0.0
+            self.l2_decoder = lambda x: 0.0
+                
+        self.mse_factor = 100.0
         
-        self.l2sp_backbone = L2_SP(
-            model_cpy,
-            kwargs["path_to_pretrained_weights"],
-            kwargs["l2_alpha"],
-            kwargs["l2_beta"],
-        )
+        self.supervised_loss_factor = 1000.0
         
-        self.l2_decoder = L2(
-            self.decoder,
-            kwargs["l2_alpha"], 
+        if "/arcface" in self.loss_mode:
+            self.supervised_loss = ArcFaceLoss(
+                embedding_size=kwargs["embedding_size"],
+                num_classes=kwargs["num_classes"][0],
+                class_distribution=kwargs["class_distribution"],
+                angle_margin=kwargs["margin"],
+                additive_margin=0.0,
+                s=kwargs["s"],
+                accelerator=self.accelerator,
+                k_subcenters=kwargs["k_subcenters"],
+                use_focal_loss=kwargs["use_focal_loss"],
+                label_smoothing=kwargs["label_smoothing"],
+                use_class_weights=kwargs["use_class_weights"],
+                use_dist_term=kwargs["use_dist_term"],
+                purpose="train",
         )
             
-    def forward_encoder(self, images, idx_keep=None):
+    def forward_encoder(self, images: torch.Tensor, idx_keep: Optional[torch.Tensor] =None) -> torch.Tensor:
         return self.backbone.encode(images=images, idx_keep=idx_keep)
 
-    def forward_decoder(self, x_encoded, idx_keep, idx_mask):
+    def forward_decoder(self, x_encoded: torch.Tensor, idx_keep: torch.Tensor, idx_mask: torch.Tensor) -> torch.Tensor:
         # build decoder input
         batch_size = x_encoded.shape[0]
         x_decode = self.decoder.embed(x_encoded)
@@ -119,32 +164,55 @@ class MaskedVisionTransformer(BaseModule):
         return x
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
-        _, flat_images, _ = flatten_batch(batch)
+        supervised_loss = torch.tensor(0.0).to(self.accelerator)
+        if "/arcface" in self.loss_mode:
+            _, flat_images, flat_labels, dataset_idxs = flatten_batch_datasetidx(batch)
+            flat_images_mae = flat_images[[dataset_idx == 0 for dataset_idx in dataset_idxs]]
+            flat_images_supervised = flat_images[[dataset_idx == 1 for dataset_idx in dataset_idxs]] 
+            flat_labels_supervised = flat_labels[[dataset_idx == 1 for dataset_idx in dataset_idxs]]
+            if flat_images_supervised.shape[0] > 0:    
+                embeddings = self.forward(images=flat_images_supervised)
+                supervised_loss = self.supervised_loss(embeddings=embeddings, labels=flat_labels_supervised)[0]
+        else:
+            _, flat_images_mae, _ = flatten_batch(batch)
         
-        batch_size = flat_images.shape[0]
+        
+        batch_size = flat_images_mae.shape[0]
         idx_keep, idx_mask = utils.random_token_mask(
             size=(batch_size, self.sequence_length),
             mask_ratio=self.mask_ratio,
-            device=flat_images.device,
+            device=flat_images_mae.device,
         )
         
-        flat_images, idx_keep, idx_mask = flat_images.to(self.accelerator), idx_keep.to(self.accelerator), idx_mask.to(self.accelerator)
+        flat_images_mae, idx_keep, idx_mask = flat_images_mae.to(self.accelerator), idx_keep.to(self.accelerator), idx_mask.to(self.accelerator)
         
-        x_encoded = self.forward_encoder(images=flat_images, idx_keep=idx_keep)
+        x_encoded = self.forward_encoder(images=flat_images_mae, idx_keep=idx_keep)
+
+        if self.encoder_skip_connection:
+            images_encoded = self.backbone.images_to_tokens(flat_images_mae)
+            images_encoded = self.backbone.add_prefix_tokens(images_encoded)
+            images_encoded = utils.mask_at_index(images_encoded, idx_mask, self.backbone.mask_token)
+            images_encoded = self.backbone.add_pos_embed(images_encoded)
+            images_encoded = utils.get_at_index(images_encoded, idx_keep)
+            images_encoded = self.backbone.vit.norm_pre(images_encoded)
+            x_encoded = x_encoded + images_encoded * self.factor_skip_connection
+            
+            
         x_pred = self.forward_decoder(
             x_encoded=x_encoded, idx_keep=idx_keep, idx_mask=idx_mask,
         )
         
         # get image patches for masked tokens
-        patches = utils.patchify(flat_images, self.patch_size)
+        patches = utils.patchify(flat_images_mae, self.patch_size)
         # must adjust idx_mask for missing class token
         target = utils.get_at_index(patches, idx_mask - 1).to(self.accelerator)
         
         reg_term_decoder = self.l2_decoder(self.decoder) if self.l2sp else 0.0
         reg_term_encoder = self.l2sp_backbone(self.backbone.vit) if self.l2sp else 0.0
         mse_loss = self.criterion(x_pred, target)
-        total_loss = mse_loss + reg_term_decoder + reg_term_encoder
+        total_loss = mse_loss * self.mse_factor + reg_term_decoder + reg_term_encoder + supervised_loss * self.supervised_loss_factor
         
+        self.log("train/supervised_loss", supervised_loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/mse_loss", mse_loss, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/reg_term_decoder", reg_term_decoder, on_step=True, prog_bar=True, sync_dist=True)
         self.log("train/reg_term_encoder", reg_term_encoder, on_step=True, prog_bar=True, sync_dist=True)
@@ -181,9 +249,13 @@ class MaskedVisionTransformer(BaseModule):
             # unnormalize images
             mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(original_img.device)
             std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1).to(original_img.device)
+            
             original_img = original_img * std + mean
+            original_img = original_img.clamp(0, 1)
             masked_img = masked_img * std + mean
+            masked_img = masked_img.clamp(0, 1)
             reconstructed_img = reconstructed_img * std + mean
+            reconstructed_img = reconstructed_img.clamp(0, 1)
             
             img_pil = tensor_to_image(original_img[0])
             masked_img_pil = tensor_to_image(masked_img[0])
@@ -196,8 +268,62 @@ class MaskedVisionTransformer(BaseModule):
             ]
             self.wandb_run.log({f"epoch_{self.trainer.current_epoch}_nlet_{1+i}": artifacts})
     
+    def validation_step(self, batch: torch.Tuple[torch.Tuple[torch.Tuple[str]] | torch.Tuple[torch.Tensor]], batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
+        if self.val_img is None:
+            self.val_img = batch[1][0][0].unsqueeze(0)
+        return super().validation_step(batch, batch_idx, dataloader_idx)
+    
+    def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
+        if self.val_img is not None:
+            original_img = self.val_img
+            idx_keep, idx_mask = utils.random_token_mask(
+                size=(1, self.sequence_length),
+                mask_ratio=self.mask_ratio,
+                device=original_img.device,
+            )
+            
+            original_img, idx_keep, idx_mask = original_img.to(self.accelerator), idx_keep.to(self.accelerator), idx_mask.to(self.accelerator)
+            x_encoded = self.forward_encoder(images=original_img, idx_keep=idx_keep)
+            x_pred = self.forward_decoder(
+                x_encoded=x_encoded, idx_keep=idx_keep, idx_mask=idx_mask
+            )
+            
+            # get image patches for masked tokens
+            patches = utils.patchify(original_img, self.patch_size)
+            patches_masked = utils.set_at_index(patches, idx_mask - 1, 0) # exclude class token
+            masked_img = utils.unpatchify(patches_masked, self.patch_size)
+            
+            # get image patches for predicted tokens
+            patches_pred = utils.set_at_index(patches, idx_mask - 1, x_pred)
+            reconstructed_img = utils.unpatchify(patches_pred, self.patch_size)
+            
+            # unnormalize images
+            mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(original_img.device)
+            std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1).to(original_img.device)
+            
+            original_img = original_img * std + mean
+            original_img = original_img.clamp(0, 1)
+            masked_img = masked_img * std + mean
+            masked_img = masked_img.clamp(0, 1)
+            reconstructed_img = reconstructed_img * std + mean
+            reconstructed_img = reconstructed_img.clamp(0, 1)
+            
+            img_pil = tensor_to_image(original_img[0])
+            masked_img_pil = tensor_to_image(masked_img[0])
+            reconstructed_img_pil = tensor_to_image(reconstructed_img[0])
+            
+            artifacts = [
+                wandb.Image(img_pil, caption="original"),
+                wandb.Image(masked_img_pil, caption="masked_original"), 
+                wandb.Image(reconstructed_img_pil, caption="reconstruction")
+            ]
+            self.wandb_run.log({f"val_epoch_{self.trainer.current_epoch}": artifacts})
+        
+        return super().on_validation_epoch_end(dataloader_idx)
+    
+    
     @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]: # TODO
+    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms_v2.Compose(
             [
                 # transforms.ToPILImage(),
@@ -215,7 +341,7 @@ if __name__ == "__main__":
     mae = MaskedVisionTransformer(
         wandb_run=wandb_run,
         data_module=data_module,
-        loss_mode="mse",
+        loss_mode="mae_mse",
     )
     # test = (torch.rand(1, 3, 224, 224), torch.rand(1, 3, 224, 224))
     sample_img = Image.open("/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square/AP00_R066_20221118_110aSilver.png")

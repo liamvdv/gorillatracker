@@ -91,7 +91,7 @@ class NletDataModule(L.LightningDataModule):
         if stage == "fit" or stage == "validate":
             self.val = [
                 dataset_class(
-                    data_dir,
+                    base_dir=data_dir,
                     nlet_builder=self.nlet_builder,
                     partition="val",
                     transform=self.model_transforms,
@@ -212,10 +212,18 @@ class NletDataset(Dataset[Nlet], ABC):
         flat_nlet = self.nlet_builder(idx, self.contrastive_sampler)
         return self._stack_flat_nlet(flat_nlet)
 
-    def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
-        ids = tuple(str(img.image_path) for img in flat_nlet)
-        labels = tuple(img.class_label for img in flat_nlet)
-        values = tuple(self.transform(img.image) for img in flat_nlet)
+    def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet: # Input is tuple[tuple[ContrastiveImage, int], ...] or tuple[ContrastiveImage, ...]
+        if isinstance(flat_nlet[0], tuple):
+            dataset_idx = tuple([val[1] for val in flat_nlet])
+            flat_nlet = [nlet[0] for nlet in flat_nlet]
+            ids = tuple(str(img.image_path) for img in flat_nlet)
+            labels = tuple(img.class_label for img in flat_nlet)
+            values = tuple(self.transform(img.image) for img in flat_nlet)
+            return ids, values, labels, dataset_idx
+        else:
+            ids = tuple(str(img.image_path) for img in flat_nlet)
+            labels = tuple(img.class_label for img in flat_nlet)
+            values = tuple(self.transform(img.image) for img in flat_nlet)
         return ids, values, labels
 
     @classmethod
@@ -301,7 +309,7 @@ class SupervisedDataset(NletDataset):
                 test/
                     ...
         """
-        dirpath = base_dir / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else base_dir
+        dirpath = Path(base_dir) / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else Path(base_dir)
         assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
         self.classes = group_images_by_label(dirpath)
         return sampler_class(self.classes)

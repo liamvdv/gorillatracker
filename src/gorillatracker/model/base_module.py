@@ -469,8 +469,8 @@ class BaseModule(L.LightningModule):
             if self.stepwise_schedule:
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
-                    "interval": "step",
-                    "frequency": self.lr_interval,
+                    "interval": "epoch", #TODO(rob2u): currently only quick fix
+                    "frequency": 1,
                 }
             else:
                 lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}
@@ -582,6 +582,7 @@ class BaseModule(L.LightningModule):
             if "ssl" in dataloader_id.lower()
             else metrics
         )
+        metrics = {} if "combined" in dataloader_id.lower() else metrics
 
         metrics = metrics if not self.fast_dev_run else {}
 

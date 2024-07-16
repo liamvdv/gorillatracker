@@ -106,6 +106,8 @@ class TrainingArgs:
         "ntxent",
         "mae_mse",
         "mae_mse/l2sp",
+        "mae_mse/arcface",
+        "mae_mse/arcface/l2sp",
     ] = field(default="offline")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)

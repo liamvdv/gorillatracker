@@ -19,6 +19,7 @@ from gorillatracker.data.nlet import (
 )
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
+from gorillatracker.data.combined import CombinedDataset
 
 HardCrossEncounterSupervisedKFoldDatasetId = "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 HardCrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"
@@ -38,6 +39,7 @@ KFoldCows2021DatasetId = "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
 KFoldSeaturtleDatasetId = "gorillatracker.datasets.seaturtle.KFoldSeaturtleDataset"
 KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
+CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
 
 dataset_registry: dict[str, Type[NletDataset]] = {
     BristolDatasetId: SupervisedDataset,
@@ -58,6 +60,7 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
     KFoldSeaturtleDatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
+    CombinedDatasetId: CombinedDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
@@ -106,7 +109,7 @@ def build_data_module(
         not dataset_names or len(dataset_names) == len(additional_eval_datasets_ids) + 1
     ), "Length mismatch between dataset_names and eval datasets"
 
-    if dataset_class_id == SSLDatasetId:
+    if dataset_class_id == SSLDatasetId or dataset_class_id == CombinedDatasetId:
         assert ssl_config is not None, "ssl_config must be set for SSLDataset"
 
     dataset_class = dataset_registry[dataset_class_id]
