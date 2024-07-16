@@ -15,6 +15,12 @@ lint:
 mypy:
 	mypy $(sources) --exclude ^dlib/
 
+.PHONY: all
+all:
+	make format
+	make lint
+	make mypy
+
 .PHONY: test
 test:
 	# TODO(liamvdv): Await fix https://github.com/Lightning-AI/pytorch-lightning/issues/16756
