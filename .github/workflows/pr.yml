@@ -62,8 +62,8 @@ jobs:
         uses: mamba-org/setup-micromamba@v1
         with:
           environment-file: environment-ci.yml
-          cache-dependencies: true
-          cache-environment-key: micromamba-env-${{ hashFiles('environment-ci.yml') }}
+          # cache-dependencies: true
+          # cache-environment-key: micromamba-env-${{ hashFiles('environment-ci.yml') }}
           init-shell: >-
             bash
 
