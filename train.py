@@ -105,21 +105,19 @@ def main(args: TrainingArgs) -> None:
 
     #################### Trainer #################
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
-
+    
     checkpoint_callback = ModelCheckpoint(
-        filename="epoch-{epoch}-acc-{"
-        + str(dm.get_dataset_class_names()[0])
-        + "/val/embeddings/knn5_crossvideo/accuracy:.3f}",
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy",
-        mode="max",
+        filename="epoch-{epoch}-acc-{" + args.stop_saving_metric_name + ":.3f}",
+        monitor=args.stop_saving_metric_name,
+        mode=args.stop_saving_metric_mode,
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
         save_last=True,  # also save the last checkpoint
     )
 
     early_stopping = EarlyStopping(
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy",
-        mode="max",
+        monitor=args.stop_saving_metric_name,
+        mode=args.stop_saving_metric_mode,
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
