@@ -1,16 +1,12 @@
-import copy
 from itertools import chain
-from pathlib import Path
-from typing import Any, Callable, Literal, Optional, Type
+from typing import Any, Callable, Optional, Union
 
 import timm
 import torch
 import wandb
 from lightly.models import utils
 from lightly.models.modules import MAEDecoderTIMM, MaskedVisionTransformerTIMM
-from PIL import Image
 from torch import nn
-from torchvision import transforms
 from torchvision.transforms import v2 as transforms_v2
 
 from gorillatracker import type_helper as gtypes
@@ -20,12 +16,16 @@ from gorillatracker.metrics import get_n_samples_from_dataloader, tensor_to_imag
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.utils.l2sp_regularisation import L2, L2_SP
 
+BatchDatasetidxType = tuple[tuple[tuple[str], ...], tuple[torch.Tensor], tuple[torch.Tensor], tuple[tuple[int], ...]]
 
-def flatten_batch_datasetidx(batch):
+
+def flatten_batch_datasetidx(
+    batch: BatchDatasetidxType,
+) -> tuple[tuple[str, ...], torch.Tensor, torch.Tensor, tuple[int, ...]]:
     ids, images, labels, dataset_idxs = batch
     # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
-    flat_ids = tuple(chain.from_iterable(ids))
-    flat_dsidxs = tuple(chain.from_iterable(dataset_idxs))
+    flat_ids: tuple[str, ...] = tuple(chain.from_iterable(ids))
+    flat_dsidxs: tuple[int, ...] = tuple(chain.from_iterable(dataset_idxs))
     # transform ((a1, a2), (p1, p2), (n1, n2)) to (a1, a2, p1, p2, n1, n2)
     flat_labels = torch.cat(labels)
     # transform ((a1: Tensor, a2: Tensor), (p1: Tensor, p2: Tensor), (n1: Tensor, n2: Tensor))  to (a1, a2, p1, p2, n1, n2)
@@ -37,7 +37,7 @@ class MaskedVisionTransformer(BaseModule):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        self.val_img = None
+        self.val_img: Union[None, torch.Tensor] = None
         self.encoder_skip_connection = False
 
         if self.encoder_skip_connection:
@@ -92,12 +92,14 @@ class MaskedVisionTransformer(BaseModule):
             self.l2sp = True
             loss_mode = loss_mode.replace("/l2sp", "")
 
-        if loss_mode == "mae_mse":
+        if loss_mode.startswith("mae_mse"):
             self.criterion = nn.MSELoss()
         else:
             raise ValueError(f"Loss mode {self.loss_mode} not supported")
 
         self.backbone.vit.head = nn.Identity()
+        self.l2sp_backbone: Union[L2_SP, Callable[[Any], float]]
+        self.l2_decoder: Union[L2, L2_SP, Callable[[Any], float]]
         if self.l2sp:
             self.l2sp_backbone = L2_SP(
                 self.backbone.vit,
@@ -127,7 +129,7 @@ class MaskedVisionTransformer(BaseModule):
                 angle_margin=kwargs["margin"],
                 additive_margin=0.0,
                 s=kwargs["s"],
-                accelerator=self.accelerator,
+                accelerator=self.accelerator,  # type: ignore
                 k_subcenters=kwargs["k_subcenters"],
                 use_focal_loss=kwargs["use_focal_loss"],
                 label_smoothing=kwargs["label_smoothing"],
@@ -160,10 +162,10 @@ class MaskedVisionTransformer(BaseModule):
         x = self.backbone.vit.forward_head(x, pre_logits=True)
         return x
 
-    def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
+    def training_step(self, batch: Union[gtypes.NletBatch, BatchDatasetidxType], batch_idx: int) -> torch.Tensor:  # type: ignore
         supervised_loss = torch.tensor(0.0).to(self.accelerator)
         if "/arcface" in self.loss_mode:
-            _, flat_images, flat_labels, dataset_idxs = flatten_batch_datasetidx(batch)
+            _, flat_images, flat_labels, dataset_idxs = flatten_batch_datasetidx(batch)  # type: ignore
             flat_images_mae = flat_images[[dataset_idx == 0 for dataset_idx in dataset_idxs]]
             flat_images_supervised = flat_images[[dataset_idx == 1 for dataset_idx in dataset_idxs]]
             flat_labels_supervised = flat_labels[[dataset_idx == 1 for dataset_idx in dataset_idxs]]
@@ -171,7 +173,7 @@ class MaskedVisionTransformer(BaseModule):
                 embeddings = self.forward(images=flat_images_supervised)
                 supervised_loss = self.supervised_loss(embeddings=embeddings, labels=flat_labels_supervised)[0]
         else:
-            _, flat_images_mae, _ = flatten_batch(batch)
+            _, flat_images_mae, _ = flatten_batch(batch)  # type: ignore
 
         batch_size = flat_images_mae.shape[0]
         idx_keep, idx_mask = utils.random_token_mask(
@@ -278,7 +280,7 @@ class MaskedVisionTransformer(BaseModule):
 
     def validation_step(
         self,
-        batch: torch.Tuple[torch.Tuple[torch.Tuple[str]] | torch.Tuple[torch.Tensor]],
+        batch: gtypes.NletBatch,
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> torch.Tensor:
@@ -348,23 +350,3 @@ class MaskedVisionTransformer(BaseModule):
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
-
-
-if __name__ == "__main__":
-    wandb_run = None
-    data_module = None
-    mae = MaskedVisionTransformer(
-        wandb_run=wandb_run,
-        data_module=data_module,
-        loss_mode="mae_mse",
-    )
-    # test = (torch.rand(1, 3, 224, 224), torch.rand(1, 3, 224, 224))
-    sample_img = Image.open(
-        "/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square/AP00_R066_20221118_110aSilver.png"
-    )
-    sample_img = transforms_v2.Resize((224, 224))(sample_img)
-    sample_img = transforms_v2.ToTensor()(sample_img).unsqueeze(0)
-    test = (sample_img, sample_img)
-    test_label = (torch.tensor([0]), torch.tensor([1]))
-    loss = mae.training_step((("0", "1"), test, test_label), 0)
-    print(loss)

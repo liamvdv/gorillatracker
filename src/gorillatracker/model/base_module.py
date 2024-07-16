@@ -289,8 +289,7 @@ class BaseModule(L.LightningModule):
         return self.model(x)
 
     def on_train_epoch_start(self) -> None:
-        # log_train_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader(), n_samples=1)
-        return
+        log_train_images_to_wandb(self.wandb_run, self.trainer, self.dm.train_dataloader(), n_samples=1)
 
     def perform_mixup(self, flat_images: torch.Tensor, flat_labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         num_classes: int
