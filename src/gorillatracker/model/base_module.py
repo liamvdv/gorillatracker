@@ -434,7 +434,7 @@ class BaseModule(L.LightningModule):
                 self.max_epochs * int(1 / self.lr_interval),
                 self.warmup_epochs,
             )
-        else: 
+        else:
             return combine_schedulers(
                 self.warmup_mode,
                 self.lr_schedule,  # type: ignore
@@ -473,7 +473,7 @@ class BaseModule(L.LightningModule):
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
-                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)), 
+                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)), # type: ignore
                 }
             else:
                 lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}

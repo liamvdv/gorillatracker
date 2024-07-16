@@ -4,9 +4,9 @@ from typing import Callable
 import timm
 import torch
 import torchvision.transforms.v2 as transforms_v2
-from lightly.models.modules.heads import MoCoProjectionHead, SimCLRProjectionHead, BYOLProjectionHead
-from lightly.models.utils import deactivate_requires_grad, update_momentum
 from lightly.loss import NegativeCosineSimilarity
+from lightly.models.modules.heads import BYOLProjectionHead, MoCoProjectionHead, SimCLRProjectionHead
+from lightly.models.utils import deactivate_requires_grad, update_momentum
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
@@ -43,7 +43,6 @@ class SimCLRWrapper(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-                
             ]
         )
 
@@ -90,7 +89,7 @@ class MoCoWrapper(BaseModule):
         self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
         return loss
-    
+
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
@@ -103,10 +102,10 @@ class MoCoWrapper(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-                
             ]
         )
-        
+
+
 class BYOLWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -127,7 +126,7 @@ class BYOLWrapper(BaseModule):
 
         self.model_momentum = copy.deepcopy(self.model)
         deactivate_requires_grad(self.model_momentum)
-        
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = self.model(x)
         z = self.prediction_head(y)
@@ -147,16 +146,19 @@ class BYOLWrapper(BaseModule):
         # Calculate both embeddings and momentum embeddings for anchor and positive images
         anchor_embeddings = self.model(images[0])
         positive_embeddings = self.model(images[1])
-        
+
         anchor_embeddings_momentum = self.forward_momentum(images[0])
         positive_embeddings_momentum = self.forward_momentum(images[1])
 
-        loss = 0.5 * (self.criterion(anchor_embeddings, positive_embeddings_momentum) + self.criterion(anchor_embeddings_momentum, positive_embeddings))
+        loss = 0.5 * (
+            self.criterion(anchor_embeddings, positive_embeddings_momentum)
+            + self.criterion(anchor_embeddings_momentum, positive_embeddings)
+        )
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
         return loss
-    
+
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
@@ -169,6 +171,5 @@ class BYOLWrapper(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-                
             ]
         )
