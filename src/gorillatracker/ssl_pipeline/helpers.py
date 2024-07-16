@@ -124,14 +124,43 @@ class BoundingBox:
 
     @classmethod
     def from_tracking_frame_feature(cls, frame_feature: TrackingFrameFeature) -> BoundingBox:
+        image_width = int(frame_feature.bbox_width / frame_feature.bbox_width_n)
+        image_height = int(frame_feature.bbox_height / frame_feature.bbox_height_n)
         return cls(
-            frame_feature.bbox_x_center_n,
-            frame_feature.bbox_y_center_n,
-            frame_feature.bbox_width_n,
-            frame_feature.bbox_height_n,
-            frame_feature.confidence,
-            int(frame_feature.bbox_width / frame_feature.bbox_width_n),
-            int(frame_feature.bbox_height / frame_feature.bbox_height_n),
+            x_center_n=frame_feature.bbox_x_center_n,
+            y_center_n=frame_feature.bbox_y_center_n,
+            width_n=frame_feature.bbox_width_n,
+            height_n=frame_feature.bbox_height_n,
+            confidence=frame_feature.confidence,
+            image_width=image_width,
+            image_height=image_height,
+        )
+
+    @classmethod
+    def from_tracking_frame_feature_squared(cls, frame_feature: TrackingFrameFeature) -> BoundingBox:
+        image_width = int(frame_feature.bbox_width / frame_feature.bbox_width_n)
+        image_height = int(frame_feature.bbox_height / frame_feature.bbox_height_n)
+
+        # Calculate the maximum dimension in pixels
+        max_dim_px = min(
+            max(frame_feature.bbox_width, frame_feature.bbox_height),
+            min(2 * frame_feature.bbox_x_center_n * image_width, 2 * (1 - frame_feature.bbox_x_center_n) * image_width),
+            min(
+                2 * frame_feature.bbox_y_center_n * image_height, 2 * (1 - frame_feature.bbox_y_center_n) * image_height
+            ),
+        )
+
+        # Convert max_dim_px back to normalized coordinates
+        max_dim_n_w = max_dim_px / image_width
+        max_dim_n_h = max_dim_px / image_height
+        return cls(
+            x_center_n=frame_feature.bbox_x_center_n,
+            y_center_n=frame_feature.bbox_y_center_n,
+            width_n=max_dim_n_w,
+            height_n=max_dim_n_h,
+            confidence=frame_feature.confidence,
+            image_width=image_width,
+            image_height=image_height,
         )
 
 
