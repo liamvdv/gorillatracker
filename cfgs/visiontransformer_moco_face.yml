@@ -64,6 +64,7 @@ gradient_accumulation_steps: 1  # Gradient accumulation steps
 max_epochs: 5                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
+save_model_to_wandb: False   
 
 val_check_interval: 0.25
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
@@ -83,4 +84,4 @@ additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorilla
 additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/val"]
 dataset_names: ["ssl", "cxl-all", "bristol", "cxl-val"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
-data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
+data_dir: "/workspaces/gorillatracker/cropped-images-squared/2024-04-18"

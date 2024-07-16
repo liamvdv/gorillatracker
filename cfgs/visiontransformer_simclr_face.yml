@@ -80,7 +80,7 @@ n_samples: 4
 data_resize_transform: 224
 
 additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_images", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42/val"]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_image_square", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square/val"]
 dataset_names: ["ssl", "cxl-all", "bristol", "cxl-val"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
-data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
+data_dir: "/workspaces/gorillatracker/cropped-images-squared/2024-04-18"

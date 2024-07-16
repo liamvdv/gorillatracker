@@ -3,17 +3,18 @@
 accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
 num_devices: 1                  # Number of devices (GPUs) to use
 distributed_strategy: "auto"    # Distributed training strategy (if applicable)
-force_deterministic: True      # Force deterministic behavior
+force_deterministic: False      # Force deterministic behavior
 precision: 32                   # Training precision (e.g., "bf16-mixed")
 compile: False                  # Compile the model for faster execution
 workers: 40                      # Number of workers for data loading
 
+
 # Model and Training Arguments
 
-project_name: "Embedding-ViTLarge-SimCLR-Body" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "484-first-baseline" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-ViTLarge-MoCo-Body" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+run_name: "484-smaller-lr" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["test"]            # WandB tags for experiment tracking
-model_name_or_path: "SimCLR"  # Model name or path 
+model_name_or_path: "MoCo"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False               # Enable fast development run
@@ -25,22 +26,22 @@ debug: False                      # Enable debug mode
 from_scratch: False               # Train the model from scratch
 early_stopping_patience: 5        # Early stopping patience (number of epochs)
 embedding_size: 256
-dropout_p: 0.032
+dropout_p: 0.12
 
 # Optimizer Arguments
-weight_decay: 0.005               # Weight decay if l2sp regularisation is used this is set to 0.0
+weight_decay: 0.15               # Weight decay if l2sp regularisation is used this is set to 0.0
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.1                       # Alpha for the l2sp loss
-l2_beta: 0.01                      # Beta for the l2sp loss
+l2_alpha: 0.002                       # Alpha for the l2sp loss
+l2_beta: 0.0002                      # Beta for the l2sp loss
 path_to_pretrained_weights: "pretrained_weights/vit_large_dinov2.pth"    # Path to the pretrained weights for the l2sp loss
 
 # NTXent Arguments
-temperature: 0.05
-memory_bank_size: 0
+temperature: 0.04
+memory_bank_size: 4096
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
@@ -48,35 +49,34 @@ loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "onlin
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 
-lr_schedule: "constant"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
+lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 5e-7                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 5e-7                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 5e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 5e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
 
 
 batch_size: 64                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 4                  # Training goal (large number)
+max_epochs: 2                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
+save_model_to_wandb: False   
 
-val_check_interval: 1.0
+val_check_interval: 0.25
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 1      # Embedding save interval
-knn_with_train: False    
-save_model_to_wandb: False       
+knn_with_train: False           
 
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
 feature_types: ["body_with_face"]
-n_samples: 3
-min_images_per_tracking: 150
+n_samples: 5
 
 data_resize_transform: 224
 
