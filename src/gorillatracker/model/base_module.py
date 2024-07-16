@@ -423,16 +423,28 @@ class BaseModule(L.LightningModule):
         ]  # reset embeddings table
 
     def lambda_schedule(self, epoch: int) -> float:
-        return combine_schedulers(
-            self.warmup_mode,
-            self.lr_schedule,  # type: ignore
-            epoch,
-            self.initial_lr,
-            self.start_lr,
-            self.end_lr,
-            self.max_epochs,
-            self.warmup_epochs,
-        )
+        if self.stepwise_schedule:
+            return combine_schedulers(
+                self.warmup_mode,
+                self.lr_schedule,  # type: ignore
+                epoch,
+                self.initial_lr,
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs * int(1 / self.lr_interval),
+                self.warmup_epochs,
+            )
+        else: 
+            return combine_schedulers(
+                self.warmup_mode,
+                self.lr_schedule,  # type: ignore
+                epoch,
+                self.initial_lr,
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs,
+                self.warmup_epochs,
+            )
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         logger.info(
@@ -445,7 +457,7 @@ class BaseModule(L.LightningModule):
 
         optimizer = AdamW(
             self.model.parameters(),
-            lr=self.initial_lr,
+            lr=self.start_lr,
             betas=(self.beta1, self.beta2),
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
@@ -456,10 +468,11 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
+                # NOTE: Appearently the best way to get the epoch length is to use the dataloader length https://github.com/Lightning-AI/pytorch-lightning/issues/5449
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
-                    "frequency": self.lr_interval,
+                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)), 
                 }
             else:
                 lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}
