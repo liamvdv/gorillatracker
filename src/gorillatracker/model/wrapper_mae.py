@@ -119,7 +119,7 @@ class MaskedVisionTransformer(BaseModule):
 
         self.mse_factor = 100.0
 
-        self.supervised_loss_factor = 1000.0
+        self.supervised_loss_factor = 10.0
 
         if "/arcface" in self.loss_mode:
             self.supervised_loss = ArcFaceLoss(

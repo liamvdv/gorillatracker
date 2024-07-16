@@ -6,7 +6,7 @@ workers: 64                      # Number of workers for data loading
 
 # Model and Training Arguments
 project_name: "Embedding-ViTLarge-MAE-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "500-add-mae_vit_base_patch16_224_mae_mask75_batch128_acc4_msefac100_depth4_l2high" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "500-add-mae_vit_base_patch16_224_mae_mask75_batch128_acc4_msefac100_depth4_l2high_supervised10" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 model_name_or_path: "MaskedVisionTransformer"  # Model name or path 
 fast_dev_run: False               # Enable fast development run
 early_stopping_patience: 100        # Early stopping patience (number of epochs)
