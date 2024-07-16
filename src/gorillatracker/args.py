@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 from simple_parsing import field, list_field
 
 
-@dataclass(kw_only=True)  # type: ignore
+@dataclass(kw_only=True)
 class TrainingArgs:
     """
     Argument class for use with simple_parsing that handles the basics of most LLM training scripts. Subclass this to add more arguments. TODO: change this
@@ -140,7 +140,7 @@ class TrainingArgs:
 
     # SSL Config
     use_ssl: bool = field(default=False)
-    tff_selection: Literal["random", "equidistant"] = field(default="equidistant")
+    tff_selection: Literal["random", "equidistant", "embeddingdistant"] = field(default="equidistant")
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
     negative_mining: Literal["random", "overlapping", "social_groups"] = field(default="random")
     n_samples: int = field(default=15)
