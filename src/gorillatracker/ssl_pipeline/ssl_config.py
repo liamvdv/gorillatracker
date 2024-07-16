@@ -31,12 +31,12 @@ from gorillatracker.ssl_pipeline.queries import (
     min_count_filter,
     multiple_videos_filter,
 )
-from gorillatracker.ssl_pipeline.sampler import EquidistantSampler, RandomSampler, Sampler
+from gorillatracker.ssl_pipeline.sampler import embedding_distant_sample, equidistant_sample, random_sample
 
 
 @dataclass(kw_only=True)
 class SSLConfig:
-    tff_selection: Literal["random", "equidistant"]
+    tff_selection: Literal["random", "equidistant", "embeddingdistant"]
     negative_mining: Literal["random", "overlapping", "social_groups"]
     n_samples: int
     feature_types: List[str]
@@ -51,7 +51,7 @@ class SSLConfig:
         base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
-        engine = create_engine(GorillaDatasetKISZ.DB_URI)
+        engine = create_engine(GorillaDatasetKISZ.DB_URI, echo=False)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
@@ -69,14 +69,6 @@ class SSLConfig:
             return split.test_video_ids()
         else:
             raise ValueError(f"Unknown partition: {partition}")
-
-    def _create_tff_sampler(self, query: Select[tuple[TrackingFrameFeature]]) -> Sampler:
-        if self.tff_selection == "random":
-            return RandomSampler(query, self.n_samples)
-        elif self.tff_selection == "equidistant":
-            return EquidistantSampler(query, self.n_samples)
-        else:
-            raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
 
     def _create_contrastive_sampler(
         self,
@@ -112,17 +104,25 @@ class SSLConfig:
         )
         return query
 
-    def _sample_tracking_frame_features(self, video_ids: List[int], session: Session) -> List[TrackingFrameFeature]:
+    def _sample_tracking_frame_features(self, video_ids: list[int], session: Session) -> list[TrackingFrameFeature]:
         BATCH_SIZE = 200
         num_batches = len(video_ids) // BATCH_SIZE
-        tffs = []
+        tffs: list[TrackingFrameFeature] = []
         for i in tqdm(
             range(num_batches + 1), desc="Sampling TrackingFrameFeatures", total=num_batches + 1, unit="batch"
         ):
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
-            sampler = self._create_tff_sampler(self._build_query(batch_video_ids))
-            tffs.extend(list(sampler.sample(session)))
-        return tffs
+            batch_tffs = session.execute(self._build_query(batch_video_ids)).scalars().all()
+            tffs += batch_tffs
+
+        if self.tff_selection == "random":
+            return list(random_sample(tffs, self.n_samples))
+        elif self.tff_selection == "equidistant":
+            return list(equidistant_sample(tffs, self.n_samples))
+        elif self.tff_selection == "embeddingdistant":
+            return list(embedding_distant_sample(tffs, self.n_samples))
+        else:
+            raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
 
     def _create_contrastive_images(
         self, tracked_features: List[TrackingFrameFeature], base_path: Path
@@ -199,9 +199,9 @@ if __name__ == "__main__":
     contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
     after = time.time()
     print(f"Time: {after - before}")
-    # print(len(contrastive_sampler))
-    # for i in range(10):
-    #     contrastive_image = contrastive_sampler[i * 10]
-    #     print(contrastive_image)
-    #     print(contrastive_sampler.positive(contrastive_image))
-    #     print(contrastive_sampler.negative(contrastive_image))
+    print(len(contrastive_sampler))
+    for i in range(10):
+        contrastive_image = contrastive_sampler[i * 10]
+        print(contrastive_image)
+        print(contrastive_sampler.positive(contrastive_image))
+        print(contrastive_sampler.negative(contrastive_image))

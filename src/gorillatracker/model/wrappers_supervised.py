@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 from typing import Any, Callable
 
@@ -214,6 +216,17 @@ class VisionTransformerWrapper(BaseModule):
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
+
+
+class VisionTransformerFrozenWrapper(VisionTransformerWrapper):
+    def __init__(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.freeze()
+        for param in self.model.head.parameters():
+            param.requires_grad = True
 
 
 class VisionTransformerDinoV2Wrapper(BaseModule):
