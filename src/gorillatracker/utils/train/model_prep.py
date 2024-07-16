@@ -59,7 +59,7 @@ class ModelConstructor:
             start_lr=args.start_lr,
             end_lr=args.end_lr,
             stepwise_schedule=args.stepwise_schedule,
-            lr_interval=args.val_check_interval,
+            lr_interval=args.lr_interval,
             margin=args.margin,
             loss_mode=args.loss_mode,
             embedding_size=args.embedding_size,

@@ -128,7 +128,7 @@ class BaseModule(L.LightningModule):
         start_lr: float,
         end_lr: float,
         stepwise_schedule: bool,
-        lr_interval: int,
+        lr_interval: float,
         beta1: float,
         beta2: float,
         epsilon: float = 1e-8,
@@ -469,6 +469,7 @@ class BaseModule(L.LightningModule):
             )
             if self.stepwise_schedule:
                 # NOTE: Appearently the best way to get the epoch length is to use the dataloader length https://github.com/Lightning-AI/pytorch-lightning/issues/5449
+                self.trainer.fit_loop.setup_data()
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
