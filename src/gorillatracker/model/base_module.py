@@ -15,14 +15,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import (
-    evaluate_embeddings,
-    knn,
-    knn_ssl,
-    log_train_images_to_wandb,
-    openset_clustering,
-    tsne,
-)
+from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
@@ -541,7 +534,6 @@ class BaseModule(L.LightningModule):
             "knn5_macro": partial(knn, k=5, average="macro"),
             "knn_macro": partial(knn, k=1, average="macro"),
             "tsne": tsne,
-            "openset_clustering": openset_clustering,
             # "pca": pca,
             # "fc_layer": fc_layer,
         }
