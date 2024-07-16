@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Literal, Optional, Sequence
 
 from sqlalchemy import Select, create_engine
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, defer, load_only
 from tqdm import tqdm
 
 from gorillatracker.data.contrastive_sampler import (
@@ -36,7 +36,7 @@ from gorillatracker.ssl_pipeline.sampler import embedding_distant_sample, equidi
 
 @dataclass(kw_only=True)
 class SSLConfig:
-    tff_selection: Literal["random", "equidistant", "embeddingdistant"]
+    tff_selection: Literal["random", "equidistant", "embeddingdistant", "movement"]
     negative_mining: Literal["random", "overlapping", "social_groups"]
     n_samples: int
     feature_types: List[str]
@@ -45,6 +45,10 @@ class SSLConfig:
     split_path: Path
     width_range: tuple[Optional[int], Optional[int]]
     height_range: tuple[Optional[int], Optional[int]]
+    movement_delta: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        assert self.tff_selection != "movement" or self.movement_delta is not None, "Combination not allowed"
 
     def get_contrastive_sampler(
         self,
@@ -100,7 +104,11 @@ class SSLConfig:
                 TrackingFrameFeature.tracking_frame_feature_id,
                 TrackingFrameFeature.tracking_id,
                 TrackingFrameFeature.frame_nr,
-            )
+                TrackingFrameFeature.bbox_x_center_n,
+                TrackingFrameFeature.bbox_y_center_n,
+            ),
+            # NOTE(memben): prevent n + 1 queries
+            defer("*", raiseload=True),
         )
         return query
 
@@ -121,6 +129,7 @@ class SSLConfig:
             return list(equidistant_sample(tffs, self.n_samples))
         elif self.tff_selection == "embeddingdistant":
             return list(embedding_distant_sample(tffs, self.n_samples))
+
         else:
             raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
 
