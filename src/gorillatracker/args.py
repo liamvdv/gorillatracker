@@ -71,6 +71,7 @@ class TrainingArgs:
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
     stepwise_schedule: bool = field(default=False)
+    lr_interval: float = field(default=1)
 
     save_model_to_wandb: Union[Literal["all"], bool] = field(default=False)
 

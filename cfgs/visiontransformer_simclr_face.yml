@@ -55,7 +55,7 @@ initial_lr: 1e-5                # Initial learning rate before warmup(must be > 
 start_lr: 1e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
-
+lr_interval: 0.25
 
 batch_size: 64                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
