@@ -86,7 +86,7 @@ def movement_sample_tracking(
         assert buckets, "No buckets were created"
         return []
 
-    sampled_buckets = random.sample(list(buckets.values()), n_samples)
+    sampled_buckets = random.sample(list(buckets.values()), min(n_samples, len(buckets)))
     return [random.choice(bucket) for bucket in sampled_buckets]
 
 

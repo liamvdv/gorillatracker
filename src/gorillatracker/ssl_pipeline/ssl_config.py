@@ -31,7 +31,12 @@ from gorillatracker.ssl_pipeline.queries import (
     min_count_filter,
     multiple_videos_filter,
 )
-from gorillatracker.ssl_pipeline.sampler import embedding_distant_sample, equidistant_sample, random_sample
+from gorillatracker.ssl_pipeline.sampler import (
+    embedding_distant_sample,
+    equidistant_sample,
+    random_sample,
+    movement_sample,
+)
 
 
 @dataclass(kw_only=True)
@@ -129,7 +134,11 @@ class SSLConfig:
             return list(equidistant_sample(tffs, self.n_samples))
         elif self.tff_selection == "embeddingdistant":
             return list(embedding_distant_sample(tffs, self.n_samples))
-
+        elif self.tff_selection == "movement":
+            assert self.movement_delta is not None, "Movement delta must be set"
+            samples = list(movement_sample(tffs, self.n_samples, self.movement_delta))
+            print(f"Sampled {len(samples)} tracking frame features through movement")
+            return samples
         else:
             raise ValueError(f"Unknown TFF selection method: {self.tff_selection}")
 
