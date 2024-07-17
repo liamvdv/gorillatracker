@@ -60,7 +60,7 @@ lr_interval: 0.25
 batch_size: 64                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 4                  # Training goal (large number)
+max_epochs: 2                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -73,7 +73,7 @@ save_model_to_wandb: False
 # Config and Data Arguments
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
-split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
+split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl"
 feature_types: ["body_with_face"]
 n_samples: 5
 
