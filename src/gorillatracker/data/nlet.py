@@ -235,7 +235,7 @@ class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
     """Ensure that the positive sample is always from a different video except there is only one video present in the dataset."""
 
     def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
-        super().__init__(base_dir=base_dir, *args, **kwargs)
+        super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
             base_dir, sampler_class=SupervisedCrossEncounterSampler
         )
