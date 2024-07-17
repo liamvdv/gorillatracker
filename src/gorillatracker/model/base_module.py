@@ -458,7 +458,7 @@ class BaseModule(L.LightningModule):
 
         optimizer = AdamW(
             self.model.parameters(),
-            lr=self.start_lr,
+            lr=self.initial_lr,
             betas=(self.beta1, self.beta2),
             eps=self.epsilon,
             weight_decay=self.weight_decay if "l2sp" not in self.loss_mode else 0.0,
