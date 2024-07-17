@@ -424,6 +424,7 @@ class BaseModule(L.LightningModule):
 
     def lambda_schedule(self, epoch: int) -> float:
         if self.stepwise_schedule:
+            # NOTE: We have (1 / lr_interval) lr epochs per epoch
             return combine_schedulers(
                 self.warmup_mode,
                 self.lr_schedule,  # type: ignore

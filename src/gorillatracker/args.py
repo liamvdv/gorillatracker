@@ -168,3 +168,4 @@ class TrainingArgs:
         ), "Invalid feature type"
         if self.grad_clip <= 0:
             self.grad_clip = None
+        assert self.lr_interval <= 1, "lr_interval should be <= 1"
