@@ -426,16 +426,29 @@ class BaseModule(L.LightningModule):
         ]  # reset embeddings table
 
     def lambda_schedule(self, epoch: int) -> float:
-        return combine_schedulers(
-            self.warmup_mode,
-            self.lr_schedule,  # type: ignore
-            epoch,
-            self.initial_lr,
-            self.start_lr,
-            self.end_lr,
-            self.max_epochs,
-            self.warmup_epochs,
-        )
+        if self.stepwise_schedule:
+            # NOTE: We have (1 / lr_interval) lr epochs per epoch
+            return combine_schedulers(
+                self.warmup_mode,
+                self.lr_schedule,  # type: ignore
+                epoch,
+                self.initial_lr,
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs * int(1 / self.lr_interval),
+                self.warmup_epochs,
+            )
+        else:
+            return combine_schedulers(
+                self.warmup_mode,
+                self.lr_schedule,  # type: ignore
+                epoch,
+                self.initial_lr,
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs,
+                self.warmup_epochs,
+            )
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         logger.info(
@@ -459,10 +472,12 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
+                # NOTE: Appearently the best way to get the epoch length is to use the dataloader length https://github.com/Lightning-AI/pytorch-lightning/issues/5449
+                self.trainer.fit_loop.setup_data()
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
-                    "interval": "epoch",  # TODO(rob2u): currently only quick fix
-                    "frequency": 1,
+                    "interval": "step",
+                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)),  # type: ignore
                 }
             else:
                 lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}

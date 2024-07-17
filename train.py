@@ -104,8 +104,8 @@ def main(args: TrainingArgs) -> None:
         model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Trainer #################
-    lr_monitor = LearningRateMonitor(logging_interval="epoch")
-    
+    lr_monitor = LearningRateMonitor(logging_interval="step" if args.stepwise_schedule else "epoch")
+
     checkpoint_callback = ModelCheckpoint(
         filename="epoch-{epoch}-acc-{" + args.stop_saving_metric_name + ":.3f}",
         monitor=args.stop_saving_metric_name,

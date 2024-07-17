@@ -73,6 +73,7 @@ class TrainingArgs:
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
     stepwise_schedule: bool = field(default=False)
+    lr_interval: float = field(default=1)  # Fraction of an epoch after which learning rate is updated
 
     save_model_to_wandb: Union[Literal["all"], bool] = field(default=False)
 
@@ -108,6 +109,7 @@ class TrainingArgs:
         "mae_mse/l2sp",
         "mae_mse/arcface",
         "mae_mse/arcface/l2sp",
+        "ntxent/l2sp",
     ] = field(default="offline")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
@@ -172,3 +174,4 @@ class TrainingArgs:
         ), "Invalid feature type"
         if self.grad_clip <= 0:
             self.grad_clip = None
+        assert self.lr_interval <= 1, "lr_interval should be <= 1"
