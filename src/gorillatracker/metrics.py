@@ -23,7 +23,7 @@ from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import get_individual, get_individual_video_id
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -68,6 +68,14 @@ def log_train_images_to_wandb(
         # a row (nlet) can either be (ap, p, n) OR (ap, p, n, an)
         row_meaning = ("positive_anchor", "positive", "negative", "negative_anchor")
         _, row_images, row_labels = sample
+        # denormalize images
+        row_images_tensor = torch.cat(row_images, dim=0)
+        row_images_tensor = row_images_tensor * torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1) + torch.tensor(
+            [0.485, 0.456, 0.406]
+        ).view(1, 3, 1, 1)
+        row_images_tensor = row_images_tensor.clamp(0, 1)
+        row_images = tuple([img for img in row_images_tensor])
+
         img_label_meaning = zip(row_images, row_labels, row_meaning)
         artifacts = [
             wandb.Image(tensor_to_image(img), caption=f"{meaning} label={label}")

@@ -12,7 +12,7 @@ from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne

@@ -9,7 +9,6 @@ from gorillatracker.data.nlet import (
     FlatNletBuilder,
     HardCrossEncounterSupervisedDataset,
     HardCrossEncounterSupervisedKFoldDataset,
-    NletDataModule,
     NletDataset,
     SupervisedDataset,
     SupervisedKFoldDataset,
@@ -18,6 +17,7 @@ from gorillatracker.data.nlet import (
     build_quadlet,
     build_triplet,
 )
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 

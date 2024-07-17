@@ -16,7 +16,7 @@ from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.quantization.utils import get_model_input
 from gorillatracker.utils.train import ModelConstructor

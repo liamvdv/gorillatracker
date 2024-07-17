@@ -104,8 +104,8 @@ class MaskedVisionTransformer(BaseModule):
             self.l2sp_backbone = L2_SP(
                 self.backbone.vit,
                 kwargs["path_to_pretrained_weights"],
-                kwargs["l2_alpha"],
-                # 0.0,
+                # kwargs["l2_alpha"],
+                0.0,
                 kwargs["l2_beta"],
             )
 
@@ -119,7 +119,7 @@ class MaskedVisionTransformer(BaseModule):
 
         self.mse_factor = 100.0
 
-        self.supervised_loss_factor = 10.0
+        self.supervised_loss_factor = 30.0
 
         if "/arcface" in self.loss_mode:
             self.supervised_loss = ArcFaceLoss(

@@ -3,7 +3,8 @@ from pathlib import Path
 import numpy as np
 from torchvision.transforms import Compose, Normalize, Resize
 
-from gorillatracker.data.nlet import NletDataModule, build_onelet
+from gorillatracker.data.nlet import build_onelet
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.utils import embedding_generator, wandb_loader
