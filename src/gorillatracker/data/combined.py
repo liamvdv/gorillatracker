@@ -18,8 +18,6 @@ FlatNletWithDSID = tuple[tuple[ContrastiveImage, int], ...]
 NletWithDSID = tuple[tuple[str, ...], tuple[torch.Tensor, ...], tuple[gtypes.Label, ...], tuple[int, ...]]
 
 
-# TODO(rob2u): integrate nletbuilder
-# TODO(rob2u): remove stuff from nlet (addiitions)
 class CombinedRandomSampler(ContrastiveSampler):
     def __init__(self, sampler_1: ContrastiveSampler, sampler_2: Optional[ContrastiveSampler] = None) -> None:
         self.sampler_1 = sampler_1
