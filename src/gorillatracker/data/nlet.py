@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Literal, Protocol, Type
+from typing import Any, Callable, Literal, Protocol, Type, Union
 
 import lightning as L
 import torch
@@ -15,10 +15,12 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.combined import CombinedDataset
 from gorillatracker.data.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
     ContrastiveSampler,
+    FlatNlet,
     SupervisedCrossEncounterSampler,
     SupervisedHardCrossEncounterSampler,
     get_individual,
@@ -27,8 +29,6 @@ from gorillatracker.data.contrastive_sampler import (
 from gorillatracker.transform_utils import SquarePad
 from gorillatracker.type_helper import Label, Nlet
 from gorillatracker.utils.labelencoder import LabelEncoder
-
-FlatNlet = tuple[ContrastiveImage, ...]
 
 
 class FlatNletBuilder(Protocol):
@@ -43,13 +43,13 @@ class NletDataModule(L.LightningDataModule):
     def __init__(
         self,
         data_dir: Path,
-        dataset_class: Type[NletDataset],
+        dataset_class: Union[Type[NletDataset], Type[CombinedDataset]],
         nlet_builder: FlatNletBuilder,
         batch_size: int,
         workers: int,
         model_transforms: gtypes.TensorTransform,
         training_transforms: gtypes.TensorTransform,
-        eval_datasets: list[Type[NletDataset]] = [],
+        eval_datasets: list[Union[Type[NletDataset], Type[CombinedDataset]]] = [],
         eval_data_dirs: list[Path] = [],
         dataset_ids: list[str] = [],
         dataset_names: list[str] = [],
@@ -124,16 +124,16 @@ class NletDataModule(L.LightningDataModule):
             self, "train"
         ):  # HACK(rob2u): we enforce setup to be called (somehow it's not always called, problem in val_before_training)
             self.setup("fit")
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)  # type: ignore
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val
+            DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val  # type: ignore
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         return [
-            DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for test in self.test
+            DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for test in self.test  # type: ignore
         ]
 
     def predict_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:  # TODO(memben)
@@ -212,20 +212,10 @@ class NletDataset(Dataset[Nlet], ABC):
         flat_nlet = self.nlet_builder(idx, self.contrastive_sampler)
         return self._stack_flat_nlet(flat_nlet)
 
-    def _stack_flat_nlet(
-        self, flat_nlet: FlatNlet
-    ) -> Nlet:  # Input is tuple[tuple[ContrastiveImage, int], ...] or tuple[ContrastiveImage, ...]
-        if isinstance(flat_nlet[0], tuple):
-            dataset_idx = tuple([val[1] for val in flat_nlet])
-            flat_nlet = [nlet[0] for nlet in flat_nlet]
-            ids = tuple(str(img.image_path) for img in flat_nlet)
-            labels = tuple(img.class_label for img in flat_nlet)
-            values = tuple(self.transform(img.image) for img in flat_nlet)
-            return ids, values, labels, dataset_idx
-        else:
-            ids = tuple(str(img.image_path) for img in flat_nlet)
-            labels = tuple(img.class_label for img in flat_nlet)
-            values = tuple(self.transform(img.image) for img in flat_nlet)
+    def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
+        ids = tuple(str(img.image_path) for img in flat_nlet)
+        labels = tuple(img.class_label for img in flat_nlet)
+        values = tuple(self.transform(img.image) for img in flat_nlet)
         return ids, values, labels
 
     @classmethod
@@ -311,9 +301,7 @@ class SupervisedDataset(NletDataset):
                 test/
                     ...
         """
-        dirpath = (
-            Path(base_dir) / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else Path(base_dir)
-        )
+        dirpath = base_dir / Path(self.partition) if os.path.exists(base_dir / Path(self.partition)) else base_dir
         assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
         self.classes = group_images_by_label(dirpath)
         return sampler_class(self.classes)

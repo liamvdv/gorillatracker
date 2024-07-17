@@ -53,7 +53,7 @@ class MaskedVisionTransformer(BaseModule):
         mask_ratio = 0.75  # default: 0.75
 
         vit = timm.create_model(
-            "timm/vit_base_patch16_224.mae",
+            "timm/vit_large_patch16_224.mae",
             pretrained=True,
             num_classes=0,
             img_size=224,
@@ -61,7 +61,7 @@ class MaskedVisionTransformer(BaseModule):
 
         self.backbone = MaskedVisionTransformerTIMM(vit=vit)
         self.backbone.vit = timm.create_model(
-            "timm/vit_base_patch16_224.mae",
+            "timm/vit_large_patch16_224.mae",
             pretrained=True,
             num_classes=0,
             img_size=224,

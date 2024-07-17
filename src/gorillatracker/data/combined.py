@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Type, Union
 
@@ -6,12 +7,19 @@ from PIL import Image
 from torchvision import transforms
 
 from gorillatracker import type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler
-from gorillatracker.data.nlet import FlatNlet, NletDataset, SupervisedDataset
+from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler, FlatNlet
+from gorillatracker.data.nlet import NletDataset, SupervisedDataset
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
+from gorillatracker.transform_utils import SquarePad
+from gorillatracker.type_helper import Nlet
+
+FlatNletWithDSID = tuple[tuple[ContrastiveImage, int], ...]
+NletWithDSID = tuple[tuple[str, ...], tuple[torch.Tensor, ...], tuple[gtypes.Label, ...], tuple[int, ...]]
 
 
+# TODO(rob2u): integrate nletbuilder
+# TODO(rob2u): remove stuff from nlet (addiitions)
 class CombinedRandomSampler(ContrastiveSampler):
     def __init__(self, sampler_1: ContrastiveSampler, sampler_2: Optional[ContrastiveSampler] = None) -> None:
         self.sampler_1 = sampler_1
@@ -50,7 +58,7 @@ class CombinedRandomSampler(ContrastiveSampler):
         raise NotImplementedError
 
 
-class CombinedDataset(NletDataset):
+class CombinedDataset:
     def __init__(
         self,
         base_dir: Path,
@@ -120,3 +128,44 @@ class CombinedDataset(NletDataset):
     @property
     def num_classes(self) -> int:
         return self.dataset_2.num_classes if self.partition == "train" else -1
+
+    def __getitem__(self, idx: int) -> Union[Nlet, NletWithDSID]:
+        # NOTE(memben): We want to cache the nlets for the validation and test sets
+        if self.partition in {"val", "test"}:
+            return self._get_cached_item(idx)
+        else:
+            return self._get_item(idx)
+
+    @lru_cache(maxsize=None)
+    def _get_cached_item(self, idx: int) -> Union[Nlet, NletWithDSID]:
+        return self._get_item(idx)
+
+    def _get_item(self, idx: int) -> Union[Nlet, NletWithDSID]:
+        flat_nlet: Union[FlatNletWithDSID, FlatNlet] = self.nlet_builder(idx, self.contrastive_sampler)
+        if isinstance(flat_nlet[0], ContrastiveImage):
+            return self._stack_flat_nlet(flat_nlet)  # type: ignore
+        else:
+            return self._stack_flat_nlet_with_dsid(flat_nlet)  # type: ignore
+
+    def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:  # Input is tuple[tuple[ContrastiveImage, int], ...]
+        ids = tuple(str(img.image_path) for img in flat_nlet)
+        labels = tuple(img.class_label for img in flat_nlet)
+        values = tuple(self.transform(img.image) for img in flat_nlet)
+        return ids, values, labels
+
+    def _stack_flat_nlet_with_dsid(self, flat_nlet_with_dsidx: FlatNletWithDSID) -> NletWithDSID:
+        dataset_idx: tuple[int, ...] = tuple([val[1] for val in flat_nlet_with_dsidx])
+        flat_nlet: FlatNlet = tuple([nlet[0] for nlet in flat_nlet_with_dsidx])
+        ids = tuple(str(img.image_path) for img in flat_nlet)
+        labels = tuple(img.class_label for img in flat_nlet)
+        values = tuple(self.transform(img.image) for img in flat_nlet)
+        return ids, values, labels, dataset_idx
+
+    @classmethod
+    def get_transforms(cls) -> gtypes.Transform:
+        return transforms.Compose(
+            [
+                SquarePad(),
+                transforms.ToTensor(),
+            ]
+        )

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal, Optional, Type
+from typing import Literal, Optional, Type, Union
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.combined import CombinedDataset
@@ -41,7 +41,7 @@ KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
 
-dataset_registry: dict[str, Type[NletDataset]] = {
+dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     BristolDatasetId: SupervisedDataset,
     CXLDatasetId: SupervisedDataset,
     KFoldCXLDatasetId: SupervisedKFoldDataset,
