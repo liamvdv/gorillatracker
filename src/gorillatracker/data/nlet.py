@@ -102,7 +102,7 @@ class NletDataset(Dataset[Nlet], ABC):
 class KFoldNletDataset(NletDataset):
     def __init__(
         self,
-        data_dir: Path,
+        base_dir: Path,
         nlet_builder: Callable[[int, ContrastiveSampler], FlatNlet],
         partition: Literal["train", "val", "test"],
         val_i: int,
@@ -113,7 +113,7 @@ class KFoldNletDataset(NletDataset):
         assert val_i < k, "val_i must be less than k"
         self.k = k
         self.val_i = val_i
-        super().__init__(data_dir, nlet_builder, partition, transform)
+        super().__init__(base_dir, nlet_builder, partition, transform)
 
 
 def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:
@@ -141,7 +141,7 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
 class SupervisedDataset(NletDataset):
     """
     A dataset that assumes the following directory structure:
-        data_dir/
+        base_dir/
             train/
                 ...
             val/
@@ -164,7 +164,7 @@ class SupervisedDataset(NletDataset):
     ) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
-            data_dir/
+            base_dir/
                 train/
                     ...
                 val/
@@ -192,7 +192,7 @@ class SupervisedKFoldDataset(KFoldNletDataset):
     ) -> ContrastiveClassSampler:
         """
         Assumes directory structure:
-            data_dir/
+            base_dir/
                 fold-0/
                     ...
                 fold-(k-1)/
@@ -224,40 +224,40 @@ class SupervisedKFoldDataset(KFoldNletDataset):
 class CrossEncounterSupervisedDataset(SupervisedDataset):
     """Ensure that the positive sample is always from a different video except there is only one video present in the dataset."""
 
-    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
-        super().__init__(base_dir=data_dir, *args, **kwargs)  # type: ignore
+    def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
-            data_dir, sampler_class=SupervisedCrossEncounterSampler
+            base_dir, sampler_class=SupervisedCrossEncounterSampler
         )
 
 
 class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
     """Ensure that the positive sample is always from a different video except there is only one video present in the dataset."""
 
-    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
-        super().__init__(base_dir=data_dir, *args, **kwargs)
+    def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(base_dir=base_dir, *args, **kwargs)
         self.contrastive_sampler = self.create_contrastive_sampler(
-            data_dir, sampler_class=SupervisedCrossEncounterSampler
+            base_dir, sampler_class=SupervisedCrossEncounterSampler
         )
 
 
 class HardCrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
     """Ensure that the positive sample is always from a different video and discard samples where only one video is present."""
 
-    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
-        super().__init__(data_dir=data_dir, *args, **kwargs)  # type: ignore
+    def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
-            data_dir, sampler_class=SupervisedHardCrossEncounterSampler
+            base_dir, sampler_class=SupervisedHardCrossEncounterSampler
         )  # TODO
 
 
 class HardCrossEncounterSupervisedDataset(SupervisedDataset):
     """Ensure that the positive sample is always from a different video and discard samples where only one video is present."""
 
-    def __init__(self, data_dir: Path, *args: Any, **kwargs: Any):
-        super().__init__(base_dir=data_dir, *args, **kwargs)  # type: ignore
+    def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
+        super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
-            data_dir, sampler_class=SupervisedHardCrossEncounterSampler
+            base_dir, sampler_class=SupervisedHardCrossEncounterSampler
         )
 
 
