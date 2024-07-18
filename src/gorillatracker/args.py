@@ -74,6 +74,8 @@ class TrainingArgs:
     lr_interval: float = field(default=1)  # Fraction of an epoch after which learning rate is updated
 
     save_model_to_wandb: Union[Literal["all"], bool] = field(default=False)
+    stop_saving_metric_name: str = "cxl/val/embeddings/knn5_crossvideo/accuracy"
+    stop_saving_metric_mode: Literal["min", "max"] = "max"
 
     # NTXent Arguments
     temperature: float = field(default=0.5)
