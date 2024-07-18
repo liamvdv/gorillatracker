@@ -220,7 +220,11 @@ def knn(
     distance_matrix: torch.Tensor
     if distance_metric == "cosine":
         distance_matrix = (
-            torch.nn.functional.cosine_similarity(combined_embeddings, combined_embeddings) * -1.0 + 1.0
+            torch.nn.functional.cosine_similarity(
+                combined_embeddings.unsqueeze(0), combined_embeddings.unsqueeze(1), dim=-1
+            )
+            * -1.0
+            + 1.0
         )  # range [0, 2]
     elif distance_metric == "euclidean":
         distance_matrix = pairwise_euclidean_distance(combined_embeddings)  # range [0, inf]
