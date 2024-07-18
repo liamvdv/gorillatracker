@@ -190,6 +190,7 @@ def knn(
     k: int = 5,
     use_train_embeddings: bool = False,
     use_crossvideo_positives: bool = False,
+    distance_metric: Literal["euclidean", "cosine"] = "euclidean",
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -216,7 +217,14 @@ def knn(
     if num_classes < k:
         k = num_classes
 
-    distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+    distance_matrix: torch.Tensor
+    if distance_metric == "cosine":
+        distance_matrix = torch.nn.functional.cosine_similarity(combined_embeddings, combined_embeddings) * -1.0 + 1.0 # range [0, 2]
+    elif distance_metric == "euclidean":
+        distance_matrix = pairwise_euclidean_distance(combined_embeddings)    # range [0, inf]
+    else:
+        raise ValueError(f"Unknown distance metric: {distance_metric}")
+    
     distance_matrix.fill_diagonal_(float("inf"))
 
     distance_mask: torch.Tensor
