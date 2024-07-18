@@ -291,7 +291,7 @@ def knn(
 
     return {
         "accuracy": accuracy.item(),
-        "accuracy_top5": accuracy_top5.item(),
+        "accuracy_top5": accuracy_top5.item() if k >= 5 else accuracy.item(),
         "auroc": auroc.item(),
         "f1": f1.item(),
         "precision": precision.item(),
