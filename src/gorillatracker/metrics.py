@@ -239,6 +239,22 @@ def knn(
     classification_matrix = torch.zeros((len(combined_embeddings), num_classes))
     for i in range(num_classes):
         classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
+
+    # NOTE(rob2u): break ties by using the nearest neighbor (tie is when the the two closest neighbors have the same label)
+    for i in range(len(combined_embeddings)):
+        max_prob = torch.max(classification_matrix[i])
+        max_prob_indices = torch.where(max_prob - classification_matrix[i] < 1e-6)[0]
+
+        if len(max_prob_indices) == 1:
+            continue
+            # add 1e-6 to the closest indice of the max_prob_indices substract elsewhere (in max_prob_indices)
+
+        classification_matrix[i, max_prob_indices] += (1e-6) / len(max_prob_indices)
+        for j in range(k):
+            if closest_indices[i][j] in max_prob_indices:
+                classification_matrix[i][closest_labels[i][j].to(torch.int)] += 1e-6
+                break
+
     assert classification_matrix.shape == (len(combined_embeddings), num_classes)
 
     # Select only the validation part of the classification matrix
