@@ -560,9 +560,13 @@ class BaseModule(L.LightningModule):
                 "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
                 "knn-with-train_cos": partial(knn, k=1, use_train_embeddings=True),
                 "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
-                "knn5-with-train_macro_cos": partial(knn, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"),
+                "knn5-with-train_macro_cos": partial(
+                    knn, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
                 "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
-                "knn-with-train_macro_cos": partial(knn, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"),
+                "knn-with-train_macro_cos": partial(
+                    knn, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
             }
             if self.knn_with_train
             else {}
@@ -574,9 +578,13 @@ class BaseModule(L.LightningModule):
                 "knn5_crossvideo": partial(knn, k=5, use_crossvideo_positives=True),
                 "knn5_crossvideo_cos": partial(knn, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn_crossvideo_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
-                "knn_crossvideo_macro_cos": partial(knn, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"),
+                "knn_crossvideo_macro_cos": partial(
+                    knn, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
                 "knn5_crossvideo_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
-                "knn5_crossvideo_macro_cos": partial(knn, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"),
+                "knn5_crossvideo_macro_cos": partial(
+                    knn, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
             }
             if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
             else {}
