@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import torch
 import torch.nn.functional as F
