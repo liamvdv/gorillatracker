@@ -131,7 +131,7 @@ def train_and_validate_using_kfold(
             args,
             dm,
             model_kfold,
-            [max_metric_logger_callback, checkpoint_callback, *callbacks, early_stopping_callback],
+            [checkpoint_callback, max_metric_logger_callback, *callbacks, early_stopping_callback],
             wandb_logger,
         )
 
