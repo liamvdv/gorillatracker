@@ -91,6 +91,7 @@ class ModelConstructor:
             embedding_id=args.embedding_id,
             pool_mode=args.pool_mode,
             fix_img_size=args.fix_img_size,
+            freeze_backbone=args.freeze_backbone,
         )
 
     def construct(

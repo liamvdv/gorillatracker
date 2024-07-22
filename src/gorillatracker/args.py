@@ -36,7 +36,9 @@ class TrainingArgs:
     project_name: str = field(default="")
     run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
-    model_name_or_path: str = field(default="EfficientNetV2")
+    model_name_or_path: str = field(default="timm/efficientnetv2_rw_m")  # TODO
+    freeze_backbone: bool = field(default=False)
+
     use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)

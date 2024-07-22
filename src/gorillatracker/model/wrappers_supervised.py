@@ -18,7 +18,7 @@ def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW",
     if id == "gem":
         return FormatWrapper(GeM(), format)
     elif id == "gem_c":
-        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format) # TODO(rob2u): test
+        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format)  # TODO(rob2u): test
     elif id == "gap":
         return FormatWrapper(GAP(), format)
     else:
@@ -57,6 +57,7 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
 # TODO(rob2u): add freeze option
 # TODO(rob2u): switch print to logger
 
+
 # NOTE(rob2u): We used the following models from timm:
 # efficientnetv2_rw_m — EfficientNetRW_M
 # convnextv2_base — ConvNeXtV2BaseWrapper
@@ -81,7 +82,7 @@ class TimmWrapper(nn.Module):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        
+
         assert pool_mode == "none" or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
         if img_size is not None:
             print("Setting img_size to", img_size)
@@ -212,6 +213,7 @@ class BasicModel(BaseModule):
         pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None,
         fix_img_size: Optional[int] = None,
         embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        freeze_backbone: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -234,6 +236,10 @@ class BasicModel(BaseModule):
             dropout_p=dropout_p,
         )
         self.set_losses(self.model_wrapper.model, **kwargs)
+
+        if freeze_backbone:
+            for param in self.model_wrapper.model.parameters():
+                param.requires_grad = False
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # TODO check for l2sp
         x = self.model_wrapper(x)
