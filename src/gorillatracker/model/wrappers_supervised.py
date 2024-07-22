@@ -164,8 +164,9 @@ class EvaluationWrapper(BaseModule):
         super().__init__(**kwargs)
         model_name_or_path = model_name_or_path.replace("timm/", "")
         self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch)
-        # if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
-        # self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)
+        if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
+            print("We wont use image size greater than 768!!!")
+            self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)  
 
         self.set_losses(model=self.model, **kwargs)  # NOTE: necessary for eval (sadly)
 
