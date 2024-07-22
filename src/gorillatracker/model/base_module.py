@@ -457,7 +457,7 @@ class BaseModule(L.LightningModule):
             )
 
         optimizer = AdamW(
-            self.model.parameters(),
+            self.parameters(),
             lr=self.initial_lr,
             betas=(self.beta1, self.beta2),
             eps=self.epsilon,

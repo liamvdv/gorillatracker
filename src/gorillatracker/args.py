@@ -52,7 +52,7 @@ class TrainingArgs:
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
     embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = field(default="linear")
-    pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = field(default=None)
+    pool_mode: Literal["gem", "gap", "gem_c", "none"] = field(default="none")
     fix_img_size: Optional[int] = field(default=None)
 
     use_quantization_aware_training: bool = field(default=False)

@@ -18,7 +18,7 @@ def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW",
     if id == "gem":
         return FormatWrapper(GeM(), format)
     elif id == "gem_c":
-        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format)  # TODO
+        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format) # TODO(rob2u): test
     elif id == "gap":
         return FormatWrapper(GAP(), format)
     else:
@@ -55,7 +55,7 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
 
 
 # TODO(rob2u): add freeze option
-
+# TODO(rob2u): switch print to logger
 
 # NOTE(rob2u): We used the following models from timm:
 # efficientnetv2_rw_m — EfficientNetRW_M
@@ -75,17 +75,19 @@ class TimmWrapper(nn.Module):
         embedding_size: int,
         embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
         dropout_p: float = 0.0,
-        pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None,
+        pool_mode: Literal["gem", "gap", "gem_c", "none"] = "none",
         img_size: Optional[int] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        assert pool_mode is None or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
+        
+        assert pool_mode == "none" or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
         if img_size is not None:
             print("Setting img_size to", img_size)
             self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0, img_size=img_size)
-        self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0)
+        else:
+            self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0)
         self.num_features = self.model.num_features
 
         self.reset_if_necessary(pool_mode)
@@ -104,7 +106,9 @@ class TimmWrapper(nn.Module):
         x = self.embedding_layer(x)
         return x
 
-    def reset_if_necessary(self, pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None) -> None:
+    def reset_if_necessary(self, pool_mode: Optional[Literal["gem", "gap", "gem_c", "none"]] = None) -> None:
+        if pool_mode == "none":
+            pool_mode = None
         if (
             hasattr(self.model, "head")
             # NOTE(rob2u): see https://github.com/huggingface/pytorch-image-models/blob/main/timm/layers/classifier.py#L73
@@ -215,7 +219,8 @@ class BasicModel(BaseModule):
         assert (
             len(model_name_or_path.split("/")) == 2
         ), "model_name_or_path should be in the format '<wrapper_id/>efficientnetv2_rw_m'."
-        wrapper_cls: Optional[Type[nn.Module]] = model_wrapper_registry.get(model_name_or_path.split["/"][0], None)  # type: ignore
+        print("Using model", model_name_or_path)
+        wrapper_cls: Optional[Type[nn.Module]] = model_wrapper_registry.get(model_name_or_path.split("/")[0], None)
         if wrapper_cls is None:
             raise ValueError(f"Model wrapper {wrapper_cls} not found in model_wrapper_registry.")
         backbone_name = model_name_or_path.split("/")[-1]
@@ -227,7 +232,6 @@ class BasicModel(BaseModule):
             embedding_size=self.embedding_size,
             embedding_id=embedding_id,
             dropout_p=dropout_p,
-            **kwargs,
         )
         self.set_losses(self.model_wrapper.model, **kwargs)
 
