@@ -30,11 +30,12 @@ def get_loss(
         ), "class_distribution must be set for class weights"
 
     if loss_mode == "online/hard":
-        loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"])
+        loss_module = TripletLossOnline(mode="hard", margin=kw_args["margin"], dist_calc=kw_args["loss_dist_term"])
     elif loss_mode == "online/semi-hard":
         loss_module = TripletLossOnline(mode="semi-hard", margin=kw_args["margin"], dist_calc=kw_args["loss_dist_term"])
     elif loss_mode == "online/soft":
-        loss_module = TripletLossOnline(mode="soft", margin=kw_args["margin"])
+        print(f"using {kw_args['loss_dist_term']} distance term")
+        loss_module = TripletLossOnline(mode="soft", margin=kw_args["margin"], dist_calc=kw_args["loss_dist_term"])
     elif loss_mode == "offline":
         loss_module = TripletLossOffline(margin=kw_args["margin"])
     elif loss_mode == "offline/native":
