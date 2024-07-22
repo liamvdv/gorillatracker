@@ -130,7 +130,6 @@ def get_semi_hard_mask(
     # filter out all points where the distance to a negative is smaller than distance to a positive
     # now only the triplets where dist_pos < dist_neg are left
     mask = get_triplet_mask(labels)
-    semi_hard_mask = distance_difference > 0.0
     semi_hard_mask = torch.logical_and(distance_difference < margin, distance_difference > 0.0)
     semi_hard_mask = semi_hard_mask.to(mask.device)
 
