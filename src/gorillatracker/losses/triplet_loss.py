@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import torch
 import torch.nn.functional as F
@@ -106,7 +106,7 @@ def get_semi_hard_mask(
     Returns:
         Mask tensor to indicate which distances are actually valid semi-hard distances. Shape: (batch_size, batch_size, batch_size)
         A distance is semi-hard if:
-        `labels[i] == labels[j] and labels[i] != labels[k] and distance_matrix[i][j] < distance_matrix[i][k]`
+        `labels[i] == labels[j] and labels[i] != labels[k] and 0 < distance_matrix[i][k] - distance_matrix[i][j] < margin`
     """
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
@@ -119,21 +119,18 @@ def get_semi_hard_mask(
     )
     labels_equal = (tensor_labels.unsqueeze(0) == tensor_labels.unsqueeze(1)).to(device)
     labels_not_equal = torch.logical_not(labels_equal)
-
     distance_matrix_pos = distance_matrix * torch.logical_and(labels_equal, indices_not_equal).float()
     distance_matrix_neg = distance_matrix * torch.logical_and(labels_not_equal, indices_not_equal).float()
-
     # filter out all points where the distance to a negative is smaller than the max distance to a positive
     distance_difference = distance_matrix_neg.unsqueeze(1).repeat(1, batch_size, 1) - distance_matrix_pos.unsqueeze(
         2
     ).repeat(
         1, 1, batch_size
     )  # shape: (anchor: batch_size,positive: batch_size, negative: batch_size)
-
     # filter out all points where the distance to a negative is smaller than distance to a positive
     # now only the triplets where dist_pos < dist_neg are left
     mask = get_triplet_mask(labels)
-    semi_hard_mask = distance_difference > 0.0
+    semi_hard_mask = torch.logical_and(distance_difference < margin, distance_difference > 0.0)
     semi_hard_mask = semi_hard_mask.to(mask.device)
 
     return torch.logical_and(mask, semi_hard_mask)
@@ -148,22 +145,17 @@ def euclidean_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     Returns:
     Distance matrix of shape (batch_size, batch_size)
     """
-    # step 1 - compute the dot product
+
+    # NOTE(rob2u): ||a - b|| = sqrt(||a||^2 + ||b||^2 - 2 * a * b)
 
     # shape: (batch_size, batch_size)
     dot_product = torch.mm(embeddings, embeddings.t())
 
-    # step 2 - extract the squared Euclidean norm from the diagonal
-
     # shape: (batch_size,)
     squared_norm = torch.diag(dot_product)
 
-    # step 3 - compute squared Euclidean distances
-
     # shape: (batch_size, batch_size)
     distance_matrix = F.relu(squared_norm.unsqueeze(0) - 2 * dot_product + squared_norm.unsqueeze(1))
-
-    # step 4 - compute the non-squared distances
 
     # handle numerical stability
     # derivative of the square root operation applied to 0 is infinite
@@ -173,6 +165,21 @@ def euclidean_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     # use this mask to set indices with a value of 0 to eps
     distance_matrix_stable = torch.sqrt(distance_matrix + mask * eps) * (1.0 - mask)
     return distance_matrix_stable
+
+
+def angular_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
+    """Computation of Angular distance matrix
+
+    Args:
+    x: Input tensor of shape (batch_size, embedding_dim)
+
+    Returns:
+    Distance matrix of shape (batch_size, batch_size)
+    """
+    cosine_similarity = F.cosine_similarity(embeddings.unsqueeze(1), embeddings.unsqueeze(0), dim=2)
+    angular_distance = (1 - cosine_similarity) / 2
+    angular_distance = angular_distance.clamp(min=0.0, max=1.0)
+    return angular_distance
 
 
 class TripletLossOnline(nn.Module):
@@ -186,16 +193,26 @@ class TripletLossOnline(nn.Module):
       margin: Margin value in the Triplet Loss equation
     """
 
-    def __init__(self, margin: float = 1.0, mode: Literal["hard", "semi-hard", "soft"] = "semi-hard") -> None:
+    def __init__(
+        self,
+        margin: float = 1.0,
+        mode: Literal["hard", "semi-hard", "soft"] = "semi-hard",
+        dist_calc: Literal["cosine", "euclidean"] = "euclidean",
+    ) -> None:
         super().__init__()
         self.margin = margin
         self.mode = mode
+        if dist_calc == "cosine":
+            self.dist_calc = angular_distance_matrix
+        elif dist_calc == "euclidean":
+            self.dist_calc = euclidean_distance_matrix
+        else:
+            raise ValueError("Distance calculation must be either 'cosine' or 'euclidean'")
 
     def forward(
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        dist_calc: Callable[[torch.Tensor], torch.Tensor] = euclidean_distance_matrix,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.
@@ -210,7 +227,7 @@ class TripletLossOnline(nn.Module):
 
         # step 1 - get distance matrix
         # shape: (batch_size, batch_size)
-        distance_matrix = dist_calc(embeddings)
+        distance_matrix = self.dist_calc(embeddings)
 
         # step 2 - compute loss values for all triplets by applying broadcasting to distance matrix
 
@@ -280,7 +297,7 @@ class TripletLossOnline(nn.Module):
         elif (
             self.mode == "semi-hard"
         ):  # select the negatives with a bigger distance than the positive but a difference smaller than the margin
-            semi_hard_mask = get_semi_hard_mask(labels, distance_matrix)
+            semi_hard_mask = get_semi_hard_mask(labels, distance_matrix, self.margin)
             # combine with base mask
             semi_hard_mask = semi_hard_mask.to(mask.device)
             mask = torch.logical_and(mask, semi_hard_mask)
