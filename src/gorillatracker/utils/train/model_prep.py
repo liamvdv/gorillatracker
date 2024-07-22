@@ -92,6 +92,7 @@ class ModelConstructor:
             pool_mode=args.pool_mode,
             fix_img_size=args.fix_img_size,
             freeze_backbone=args.freeze_backbone,
+            loss_dist_term=args.loss_dist_term,
         )
 
     def construct(

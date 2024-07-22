@@ -220,12 +220,13 @@ class BasicModel(BaseModule):
 
         assert (
             len(model_name_or_path.split("/")) == 2
-        ), "model_name_or_path should be in the format '<wrapper_id/>efficientnetv2_rw_m'."
+        ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
         print("Using model", model_name_or_path)
-        wrapper_cls: Optional[Type[nn.Module]] = model_wrapper_registry.get(model_name_or_path.split("/")[0], None)
-        if wrapper_cls is None:
-            raise ValueError(f"Model wrapper {wrapper_cls} not found in model_wrapper_registry.")
-        backbone_name = model_name_or_path.split("/")[-1]
+        wrapper_cls:Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
+        if model_name_or_path.startswith("hf-hub"): # Example: hf-hub:BVRA/MegaDescriptor-T-224
+            backbone_name = model_name_or_path.split("/")[-1]
+        else: # Example: timm/efficientnetv2_rw_m
+            backbone_name = model_name_or_path.split("/")[-1]
 
         self.model_wrapper = wrapper_cls(
             backbone_name=backbone_name,

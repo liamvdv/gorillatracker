@@ -250,6 +250,7 @@ class BaseModule(L.LightningModule):
             log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -274,6 +275,7 @@ class BaseModule(L.LightningModule):
             use_dist_term=use_dist_term,
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="val",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -542,9 +544,13 @@ class BaseModule(L.LightningModule):
 
         metrics = {
             "knn5": partial(knn, k=5),
+            "knn5_cos": partial(knn, k=5, distance_metric="cosine"),
             "knn": partial(knn, k=1),
+            "knn_cos": partial(knn, k=1, distance_metric="cosine"),
             "knn5_macro": partial(knn, k=5, average="macro"),
+            "knn5_macro_cos": partial(knn, k=5, average="macro", distance_metric="cosine"),
             "knn_macro": partial(knn, k=1, average="macro"),
+            "knn_macro_cos": partial(knn, k=1, average="macro", distance_metric="cosine"),
             "tsne": tsne,
             # "pca": pca,
             # "fc_layer": fc_layer,
@@ -552,9 +558,17 @@ class BaseModule(L.LightningModule):
         metrics |= (
             {
                 "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                "knn5-with-train_cos": partial(knn, k=5, use_train_embeddings=True),
                 "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                "knn-with-train_cos": partial(knn, k=1, use_train_embeddings=True),
                 "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
+                "knn5-with-train_macro_cos": partial(
+                    knn, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
                 "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
+                "knn-with-train_macro_cos": partial(
+                    knn, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
             }
             if self.knn_with_train
             else {}
@@ -562,9 +576,17 @@ class BaseModule(L.LightningModule):
         metrics |= (
             {
                 "knn_crossvideo": partial(knn, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_cos": partial(knn, k=1, use_crossvideo_positives=True),
                 "knn5_crossvideo": partial(knn, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_cos": partial(knn, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn_crossvideo_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn_crossvideo_macro_cos": partial(
+                    knn, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
                 "knn5_crossvideo_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossvideo_macro_cos": partial(
+                    knn, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
             }
             if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
             else {}
