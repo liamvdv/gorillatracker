@@ -1,35 +1,31 @@
 from __future__ import annotations
 
-import copy
-from typing import Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, Type
 
 import timm
 import torch
 import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from print_on_steroids import logger
 from timm.layers.classifier import ClassifierHead, NormMlpClassifierHead
 from torchvision import transforms
-from transformers import ResNetModel
+from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
-from gorillatracker.model.model_miewid import load_miewid_model  # type: ignore
-from gorillatracker.model.pooling_layers import FormatWrapper, GeM, GeM_adapted, GAP
+from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
 
 
-
-def get_global_pooling_layer(id: str, num_features: int, format: str = "NCHW") -> torch.nn.Module:
+def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW", "NHWC"] = "NCHW") -> torch.nn.Module:
     if id == "gem":
         return FormatWrapper(GeM(), format)
     elif id == "gem_c":
-        return FormatWrapper(GeM_adapted(p_shape=(1,num_features)), format) # TODO
+        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format)  # TODO
     elif id == "gap":
         return FormatWrapper(GAP(), format)
     else:
         return nn.Identity()
 
 
-def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p=0.0) -> torch.nn.Module:
+def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p: float = 0.0) -> torch.nn.Module:
     if id == "linear":
         return nn.Linear(feature_dim, embedding_dim)
     elif id == "mlp":
@@ -57,7 +53,9 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
     else:
         return nn.Identity()
 
- # TODO(rob2u): add freeze option
+
+# TODO(rob2u): add freeze option
+
 
 # NOTE(rob2u): We used the following models from timm:
 # efficientnetv2_rw_m — EfficientNetRW_M
@@ -70,17 +68,17 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
 # swinv2_base_window12_192.ms_in22k — SwinV2BaseWrapper
 # swinv2_large_window12to16_192to256.ms_in22k_ft_in1k — SwinV2LargeWrapper
 # inception_v3 — InceptionV3Wrapper
-class GenericTimmWrapper(nn.Module):
+class TimmWrapper(nn.Module):
     def __init__(
         self,
-        backbone_name,
+        backbone_name: str,
         embedding_size: int,
         embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
         dropout_p: float = 0.0,
         pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None,
         img_size: Optional[int] = None,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         assert pool_mode is None or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
@@ -96,7 +94,7 @@ class GenericTimmWrapper(nn.Module):
         )
         self.pool_mode = pool_mode
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model.forward_features(x)
         x = self.model.forward_head(x, pre_logits=True)
         if x.dim() == 3:
@@ -106,7 +104,7 @@ class GenericTimmWrapper(nn.Module):
         x = self.embedding_layer(x)
         return x
 
-    def reset_if_necessary(self, pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None):
+    def reset_if_necessary(self, pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None) -> None:
         if (
             hasattr(self.model, "head")
             # NOTE(rob2u): see https://github.com/huggingface/pytorch-image-models/blob/main/timm/layers/classifier.py#L73
@@ -114,33 +112,127 @@ class GenericTimmWrapper(nn.Module):
             and pool_mode is not None
         ):
             if isinstance(self.model.head, ClassifierHead):
-                self.model.head.global_pool = get_global_pooling_layer("", self.model.head.input_fmt)
+                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.model.head.input_fmt)
                 self.model.head.fc = nn.Identity()
                 self.model.head.drop = nn.Identity()
             elif isinstance(self.model.head, NormMlpClassifierHead):
                 print("Model uses NormMlpClassifierHead, for which we do not want to change the global_pooling layer.")
         elif pool_mode is not None and hasattr(self.model, "global_pool"):
             self.model.reset_classifier(0, "")
-            self.model.global_pool = get_global_pooling_layer("")
+            self.model.global_pool = get_global_pooling_layer(pool_mode, self.num_features)
         else:
             print("No pooling layer reset necessary.")
 
 
-class ModuleWrapper(BaseModule):
+class TimmEvalWrapper(nn.Module):
     def __init__(  # type: ignore
         self,
-        backbone_name: str,
-        pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None,
-        fix_img_size: Optional[int] = None,
-        **kwargs,
+        backbone_name,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self.timm_wrapper = GenericTimmWrapper(backbone_name=backbone_name, pool_mode=pool_mode, img_size=fix_img_size)
-        
-        self.set_losses(self.timm_wrapper.model, **kwargs)
+        backbone_name = backbone_name.replace("EVAL_", "")
+        self.model = timm.create_model(backbone_name, pretrained=not self.from_scratch)
+        if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
+            print("We wont use image size greater than 768!!!")
+            self.model = timm.create_model(backbone_name, pretrained=not self.from_scratch, img_size=512)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor: # TODO check for l2sp
-        x = self.backbone(x)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        return x
+
+
+class ResNet50DinoV2Wrapper(nn.Module):
+    def __init__(
+        self,
+        embedding_size: int,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        dropout_p: float = 0.0,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=2048, embedding_dim=embedding_size, dropout_p=dropout_p
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        outputs = self.model(x)
+        gap = torch.nn.AdaptiveAvgPool2d((1, 1))
+        feature_vector = gap(outputs.last_hidden_state)
+        feature_vector = torch.flatten(feature_vector, start_dim=2).squeeze(-1)
+        feature_vector = self.embedding_layer(feature_vector)
+        return feature_vector
+
+
+class Miewid_msv2(BaseModule):
+    def __init__(
+        self,
+        embedding_size: int,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        dropout_p: float = 0.0,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.model = AutoModel.from_pretrained("conservationxlabs/miewid-msv2", trust_remote_code=True)  # size: 440
+        self.model = self.model.to(self.device)
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=1280, embedding_dim=embedding_size, dropout_p=dropout_p
+        )  # TODO(rob2u): test
+
+    def get_grad_cam_layer(self) -> torch.nn.Module:
+        return self.model.blocks[-1][-1].conv_pwl
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model(x)
+        x = self.embedding_layer(x)
+        return x
+
+
+model_wrapper_registry = {
+    "timm": TimmWrapper,
+    "timm_eval": TimmEvalWrapper,
+    "resnet50_dinov2": ResNet50DinoV2Wrapper,
+    "miewid_msv2": Miewid_msv2,
+}
+
+
+class BasicModel(BaseModule):
+    def __init__(
+        self,
+        model_name_or_path: str,
+        dropout_p: float = 0.0,
+        pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None,
+        fix_img_size: Optional[int] = None,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+
+        assert (
+            len(model_name_or_path.split("/")) == 2
+        ), "model_name_or_path should be in the format '<wrapper_id/>efficientnetv2_rw_m'."
+        wrapper_cls: Optional[Type[nn.Module]] = model_wrapper_registry.get(model_name_or_path.split["/"][0], None)  # type: ignore
+        if wrapper_cls is None:
+            raise ValueError(f"Model wrapper {wrapper_cls} not found in model_wrapper_registry.")
+        backbone_name = model_name_or_path.split("/")[-1]
+
+        self.model_wrapper = wrapper_cls(
+            backbone_name=backbone_name,
+            pool_mode=pool_mode,
+            img_size=fix_img_size,
+            embedding_size=self.embedding_size,
+            embedding_id=embedding_id,
+            dropout_p=dropout_p,
+            **kwargs,
+        )
+        self.set_losses(self.model_wrapper.model, **kwargs)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # TODO check for l2sp
+        x = self.model_wrapper(x)
         return x
 
     @classmethod
@@ -151,125 +243,5 @@ class ModuleWrapper(BaseModule):
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
-            ]
-        )
-
-
-class EvaluationWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        model_name_or_path: str,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        model_name_or_path = model_name_or_path.replace("timm/", "")
-        self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch)
-        if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
-            print("We wont use image size greater than 768!!!")
-            self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)  
-
-        self.set_losses(model=self.model, **kwargs)  # NOTE: necessary for eval (sadly)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.model.forward_features(x)
-        x = self.model.forward_head(x, pre_logits=True)
-        return x
-
-
-class ResNet50DinoV2Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
-        # self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size) # TODO
-        self.last_linear = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(2048),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=2048, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        self.set_losses(self.model, **kwargs)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        outputs = self.model(x)
-        gap = torch.nn.AdaptiveAvgPool2d((1, 1))
-        feature_vector = gap(outputs.last_hidden_state)
-        feature_vector = torch.flatten(feature_vector, start_dim=2).squeeze(-1)
-        feature_vector = self.last_linear(feature_vector)
-        return feature_vector
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class MiewIdNetWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        is_from_scratch = kwargs.get("from_scratch", False)
-        use_wildme_model = kwargs.get("use_wildme_model", False)
-
-        if use_wildme_model:
-            logger.info("Using WildMe model")
-            self.model = load_miewid_model()
-            # fix model
-            for param in self.model.parameters():
-                param.requires_grad = False
-
-            # self.model.global_pool = nn.Identity()
-            # self.model.bn = nn.Identity()
-            self.classifier = torch.nn.Sequential(
-                # torch.nn.BatchNorm1d(2152),
-                torch.nn.Dropout(p=self.dropout_p),
-                torch.nn.Linear(in_features=2152, out_features=self.embedding_size),
-                torch.nn.BatchNorm1d(self.embedding_size),
-            )
-            self.set_losses(self.model, **kwargs)
-            return
-
-        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
-        in_features = self.model.classifier.in_features
-
-        self.model.global_pool = nn.Identity()  # NOTE: GeM = Generalized Mean Pooling
-        self.model.classifier = nn.Identity()
-
-        # TODO(rob2u): load wildme model weights here then initialize the classifier and get loss modes -> change the transforms accordingly (normalize, etc.)
-        self.classifier = torch.nn.Sequential(
-            GeM(),
-            torch.nn.Flatten(),
-            torch.nn.BatchNorm1d(in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        self.set_losses(self.model, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.blocks[-1][-1].conv_pwl
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.model(x)
-        x = self.classifier(x)
-        return x
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(440, scale=(0.75, 1.0)),
             ]
         )

@@ -88,6 +88,9 @@ class ModelConstructor:
             fast_dev_run=args.fast_dev_run,
             every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
             wandb_run=self.wandb_logger.experiment,
+            embedding_id=args.embedding_id,
+            pool_mode=args.pool_mode,
+            fix_img_size=args.fix_img_size,
         )
 
     def construct(

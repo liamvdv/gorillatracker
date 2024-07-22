@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 
 from simple_parsing import field, list_field
 
@@ -51,6 +51,10 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
+    embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = field(default="linear")
+    pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = field(default=None)
+    fix_img_size: Optional[int] = field(default=None)
+
     use_quantization_aware_training: bool = field(default=False)
 
     # Optimizer Arguments
