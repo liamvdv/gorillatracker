@@ -111,6 +111,7 @@ class TrainingArgs:
         "mae_mse/arcface/l2sp",
         "ntxent/l2sp",
     ] = field(default="offline")
+    loss_dist_term: Literal["cosine", "euclidean"] = field(default="euclidean")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)

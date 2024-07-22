@@ -35,7 +35,7 @@ class CombinedLoss(nn.Module):
 
     def forward(self, *args: List[Any], **kwargs: Dict[str, Any]) -> gtypes.LossPosNegDist:
         loss_arcface, _, _ = self.arcface(*args, **kwargs)
-        loss_triplet, pos_dist, neg_dist = self.triplet(*args, **kwargs, dist_calc=cosine_distance_matrix)
+        loss_triplet, pos_dist, neg_dist = self.triplet(*args, **kwargs)
         loss_triplet = torch.clamp(loss_triplet, min=0.0, max=1.0).to(loss_arcface.device)
 
         self.log_func("arcface", loss_arcface.item())
