@@ -250,6 +250,7 @@ class BaseModule(L.LightningModule):
             log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -274,6 +275,7 @@ class BaseModule(L.LightningModule):
             use_dist_term=use_dist_term,
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="val",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
         )
         self.loss_module_val.eval()  # type: ignore
 
