@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import getLogger
 from typing import Any, Callable, Literal, Optional, Type
 
 import timm
@@ -12,6 +13,8 @@ from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
+
+logger = getLogger(__name__)
 
 
 def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW", "NHWC"] = "NCHW") -> torch.nn.Module:
@@ -54,10 +57,6 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
         return nn.Identity()
 
 
-# TODO(rob2u): add freeze option
-# TODO(rob2u): switch print to logger
-
-
 # NOTE(rob2u): We used the following models from timm:
 # efficientnetv2_rw_m — EfficientNetRW_M
 # convnextv2_base — ConvNeXtV2BaseWrapper
@@ -85,7 +84,7 @@ class TimmWrapper(nn.Module):
 
         assert pool_mode == "none" or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
         if img_size is not None:
-            print("Setting img_size to", img_size)
+            logger.info("Setting img_size to", img_size)
             self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0, img_size=img_size)
         else:
             self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0)
@@ -101,7 +100,7 @@ class TimmWrapper(nn.Module):
         x = self.model.forward_features(x)
         x = self.model.forward_head(x, pre_logits=True)
         if x.dim() == 3:
-            print("Assuming VisionTransformer is used and taking the first token.")
+            logger.info("Assuming VisionTransformer is used and taking the first token.")
             x = x[:, 0, :]
 
         x = self.embedding_layer(x)
@@ -121,12 +120,14 @@ class TimmWrapper(nn.Module):
                 self.model.head.fc = nn.Identity()
                 self.model.head.drop = nn.Identity()
             elif isinstance(self.model.head, NormMlpClassifierHead):
-                print("Model uses NormMlpClassifierHead, for which we do not want to change the global_pooling layer.")
+                logger.warn(
+                    "Model uses NormMlpClassifierHead, for which we do not want to change the global_pooling layer."
+                )
         elif pool_mode is not None and hasattr(self.model, "global_pool"):
             self.model.reset_classifier(0, "")
             self.model.global_pool = get_global_pooling_layer(pool_mode, self.num_features)
         else:
-            print("No pooling layer reset necessary.")
+            logger.info("No pooling layer reset necessary.")
 
 
 class TimmEvalWrapper(nn.Module):
@@ -139,7 +140,7 @@ class TimmEvalWrapper(nn.Module):
         backbone_name = backbone_name.replace("EVAL_", "")
         self.model = timm.create_model(backbone_name, pretrained=not self.from_scratch)
         if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
-            print("We wont use image size greater than 768!!!")
+            logger.warn("We wont use image size greater than 768!!!")
             self.model = timm.create_model(backbone_name, pretrained=not self.from_scratch, img_size=512)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -188,9 +189,6 @@ class Miewid_msv2(BaseModule):
             id=embedding_id, feature_dim=1280, embedding_dim=embedding_size, dropout_p=dropout_p
         )  # TODO(rob2u): test
 
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.blocks[-1][-1].conv_pwl
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model(x)
         x = self.embedding_layer(x)
@@ -221,7 +219,7 @@ class BasicModel(BaseModule):
         assert (
             len(model_name_or_path.split("/")) == 2
         ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
-        print("Using model", model_name_or_path)
+        logger.info("Using model", model_name_or_path)
         wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
         if model_name_or_path.startswith("hf-hub"):  # Example: hf-hub:BVRA/MegaDescriptor-T-224
             backbone_name = model_name_or_path.split("/")[-1]
