@@ -12,7 +12,7 @@ from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
@@ -115,22 +115,22 @@ class BaseModule(L.LightningModule):
 
     def __init__(
         self,
-        data_module: NletDataModule,
-        from_scratch: bool,
         wandb_run: Runner,
+        data_module: NletDataModule,
         loss_mode: str,
-        weight_decay: float,
-        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"],
-        warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
-        warmup_epochs: int,
-        max_epochs: int,
-        initial_lr: float,
-        start_lr: float,
-        end_lr: float,
-        stepwise_schedule: bool,
-        lr_interval: float,
-        beta1: float,
-        beta2: float,
+        from_scratch: bool = False,
+        weight_decay: float = 0.0,
+        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"] = "cosine",
+        warmup_mode: Literal["linear", "cosine", "exponential", "constant"] = "constant",
+        warmup_epochs: int = 0,
+        max_epochs: int = 50,
+        initial_lr: float = 1e-5,
+        start_lr: float = 1e-5,
+        end_lr: float = 1e-7,
+        stepwise_schedule: bool = False,
+        lr_interval: int = 1,
+        beta1: float = 0.9,
+        beta2: float = 0.999,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         embedding_size: int = 256,
@@ -150,7 +150,7 @@ class BaseModule(L.LightningModule):
         super().__init__()
 
         if save_hyperparameters:
-            self.save_hyperparameters(ignore=["save_hyperparameters"])
+            self.save_hyperparameters(ignore=["save_hyperparameters", "data_module"])
 
         ####### Optimizer and Scheduler
         self.weight_decay = weight_decay
@@ -201,6 +201,7 @@ class BaseModule(L.LightningModule):
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]
+        self.accelerator = accelerator
 
     def set_losses(
         self,
@@ -324,6 +325,8 @@ class BaseModule(L.LightningModule):
         flat_labels_onehot = None
         if self.use_inbatch_mixup:
             flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
+
+        flat_images = flat_images.to(self.accelerator)
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
@@ -374,7 +377,7 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(flat_images)
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
-        if "softmax" not in self.loss_mode and not self.use_dist_term:
+        if "softmax" not in self.loss_mode and not self.use_dist_term and hasattr(self, "loss_module_val"):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
@@ -459,7 +462,7 @@ class BaseModule(L.LightningModule):
             )
 
         optimizer = AdamW(
-            self.parameters(),
+            self.parameters(),  # NOTE(rob2u): we want to optimize all parameters (including the loss_module ones -> arcfaces)
             lr=self.initial_lr,
             betas=(self.beta1, self.beta2),
             eps=self.epsilon,
@@ -571,6 +574,10 @@ class BaseModule(L.LightningModule):
                 ),
             }
             if self.knn_with_train
+            and "train"
+            in embeddings_table[
+                "partition"
+            ].unique()  # NOTE(rob2u): we only want to evaluate the knn with train if we have train embeddings
             else {}
         )
         metrics |= (
@@ -601,6 +608,7 @@ class BaseModule(L.LightningModule):
             if "ssl" in dataloader_id.lower()
             else metrics
         )
+        metrics = {} if "combined" in dataloader_id.lower() else metrics
 
         metrics = metrics if not self.fast_dev_run else {}
 

@@ -14,8 +14,8 @@ class TrainingArgs:
     # Device Arguments
     accelerator: Literal["cuda", "cpu", "tpu", "mps"] = field(default="cuda")
     num_devices: int = field(default=1)
-    distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default=None)
-    force_deterministic: bool = field(default=False)
+    distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default="auto")
+    force_deterministic: bool = field(default=True)
     precision: Literal[
         "32-true",
         "16-mixed",
@@ -111,6 +111,10 @@ class TrainingArgs:
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
         "ntxent",
+        "mae_mse",
+        "mae_mse/l2sp",
+        "mae_mse/arcface",
+        "mae_mse/arcface/l2sp",
         "ntxent/l2sp",
     ] = field(default="offline")
     loss_dist_term: Literal["cosine", "euclidean"] = field(default="euclidean")

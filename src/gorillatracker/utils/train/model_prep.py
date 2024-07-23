@@ -4,7 +4,7 @@ import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
@@ -39,6 +39,15 @@ class ModelConstructor:
                 self.dm.get_class_distribution("train"),
                 self.dm.get_class_distribution("val"),
                 self.dm.get_class_distribution("test"),
+            )
+        elif "mae_mse/arcface" in args.loss_mode:
+            self.dm.setup("fit")
+            self.dm.setup("test")
+
+            num_classes = (
+                self.dm.get_num_classes("train"),
+                self.dm.get_num_classes("val"),
+                self.dm.get_num_classes("test"),
             )
 
         dataset_names = self.dm.get_dataset_class_names()
