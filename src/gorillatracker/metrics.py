@@ -384,10 +384,8 @@ def knn_kfold_val(
 ) -> Dict[str, Any]:
     """Calculate knn metrics for each fold and average them to have compareable results to kfold training"""
     contrastive_sampler = dm.val[current_val_index].contrastive_sampler
-    if isinstance(contrastive_sampler, ContrastiveKFoldValSampler):
-        num_folds = contrastive_sampler.k
-    else:
-        raise TypeError("Expected a ContrastiveKFoldValSampler instance")
+    assert isinstance(contrastive_sampler, ContrastiveKFoldValSampler),"Expected a ContrastiveKFoldValSampler instance"
+    num_folds = contrastive_sampler.k
     _, labels, _, _, _ = get_partition_from_dataframe(data, partition="val")
     fold: Dict[Any, int] = {}
     for label in labels.unique():  # type: ignore
