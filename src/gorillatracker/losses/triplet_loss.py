@@ -183,14 +183,14 @@ def angular_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     return angular_distance
 
 
-def get_cross_video_mask(ids) -> torch.Tensor:
+def get_cross_video_mask(ids: gtypes.FlatNletBatchIds) -> torch.Tensor:
     """Returns a len(ids) x len(ids) x len(ids) mask where mask[i, j] is 1 if the two samples are from different videos and 0 otherwise."""
     vids = [get_individual_video_id(id) for id in ids]
-    vids_matrix = []
+    vids_matrix_list = []
     for _, vid in enumerate(vids):
-        vids_matrix.append([vid == v for v in vids])
-    
-    vids_matrix = torch.tensor(vids_matrix, dtype=torch.bool)
+        vids_matrix_list.append([vid != v for v in vids])
+
+    vids_matrix = torch.tensor(vids_matrix_list, dtype=torch.bool)
     vids_tensor = (vids_matrix.unsqueeze(2) * torch.ones((1, 1, len(ids)), dtype=torch.bool)) == 0
     return vids_tensor.to(torch.bool)
 
@@ -228,7 +228,7 @@ class TripletLossOnline(nn.Module):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        ids: torch.Tensor,
+        ids: gtypes.FlatNletBatchIds,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.

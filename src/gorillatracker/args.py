@@ -107,6 +107,7 @@ class TrainingArgs:
         "ntxent",
         "ntxent/l2sp",
     ] = field(default="offline")
+    cross_video_masking: bool = field(default=False)
     loss_dist_term: Literal["cosine", "euclidean"] = field(default="euclidean")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)

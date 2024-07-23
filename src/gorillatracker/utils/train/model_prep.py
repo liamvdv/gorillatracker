@@ -89,6 +89,7 @@ class ModelConstructor:
             every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
             wandb_run=self.wandb_logger.experiment,
             loss_dist_term=args.loss_dist_term,
+            cross_video_masking=args.cross_video_masking,
         )
 
     def construct(
