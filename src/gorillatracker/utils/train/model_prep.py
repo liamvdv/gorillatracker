@@ -59,7 +59,7 @@ class ModelConstructor:
             start_lr=args.start_lr,
             end_lr=args.end_lr,
             stepwise_schedule=args.stepwise_schedule,
-            lr_interval=args.val_check_interval,
+            lr_interval=args.lr_interval,
             margin=args.margin,
             loss_mode=args.loss_mode,
             embedding_size=args.embedding_size,
@@ -88,6 +88,11 @@ class ModelConstructor:
             fast_dev_run=args.fast_dev_run,
             every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
             wandb_run=self.wandb_logger.experiment,
+            embedding_id=args.embedding_id,
+            pool_mode=args.pool_mode,
+            fix_img_size=args.fix_img_size,
+            freeze_backbone=args.freeze_backbone,
+            loss_dist_term=args.loss_dist_term,
         )
 
     def construct(

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 
 from simple_parsing import field, list_field
 
@@ -36,7 +36,9 @@ class TrainingArgs:
     project_name: str = field(default="")
     run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
-    model_name_or_path: str = field(default="EfficientNetV2")
+    model_name_or_path: str = field(default="timm/efficientnetv2_rw_m")  # TODO
+    freeze_backbone: bool = field(default=False)
+
     use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
@@ -51,6 +53,10 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
+    embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = field(default="linear")
+    pool_mode: Literal["gem", "gap", "gem_c", "none"] = field(default="none")
+    fix_img_size: Optional[int] = field(default=None)
+
     use_quantization_aware_training: bool = field(default=False)
 
     # Optimizer Arguments
@@ -71,8 +77,11 @@ class TrainingArgs:
     start_lr: float = field(default=1e-5)
     end_lr: float = field(default=1e-5)
     stepwise_schedule: bool = field(default=False)
+    lr_interval: float = field(default=1)  # Fraction of an epoch after which learning rate is updated
 
-    save_model_to_wandb: Union[Literal["all"], bool] = field(default="all")
+    save_model_to_wandb: Union[Literal["all"], bool] = field(default=False)
+    stop_saving_metric_name: str = "cxl/val/embeddings/knn5_crossvideo/accuracy"
+    stop_saving_metric_mode: Literal["min", "max"] = "max"
 
     # NTXent Arguments
     temperature: float = field(default=0.5)
@@ -102,7 +111,9 @@ class TrainingArgs:
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
         "ntxent",
+        "ntxent/l2sp",
     ] = field(default="offline")
+    loss_dist_term: Literal["cosine", "euclidean"] = field(default="euclidean")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
@@ -168,3 +179,4 @@ class TrainingArgs:
         assert self.tff_selection != "movement" or self.movement_delta is not None, "Combination not allowed"
         if self.grad_clip <= 0:
             self.grad_clip = None
+        assert self.lr_interval <= 1, "lr_interval should be <= 1"

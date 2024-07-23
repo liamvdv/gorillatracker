@@ -13,7 +13,7 @@ project_name: "Embedding-EfficientNetRWM-CXL-OpenSet" # WandB project name
 run_name: "421-test-crossencounterknn"  # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
 
-model_name_or_path: "EfficientNet_RW_M" # Model name or path 
+model_name_or_path: "timm/efficientnetv2_rw_m" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False             # Enable fast development run

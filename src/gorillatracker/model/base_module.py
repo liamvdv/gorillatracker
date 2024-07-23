@@ -128,7 +128,7 @@ class BaseModule(L.LightningModule):
         start_lr: float,
         end_lr: float,
         stepwise_schedule: bool,
-        lr_interval: int,
+        lr_interval: float,
         beta1: float,
         beta2: float,
         epsilon: float = 1e-8,
@@ -250,6 +250,7 @@ class BaseModule(L.LightningModule):
             log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -274,6 +275,7 @@ class BaseModule(L.LightningModule):
             use_dist_term=use_dist_term,
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="val",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -423,16 +425,29 @@ class BaseModule(L.LightningModule):
         ]  # reset embeddings table
 
     def lambda_schedule(self, epoch: int) -> float:
-        return combine_schedulers(
-            self.warmup_mode,
-            self.lr_schedule,  # type: ignore
-            epoch,
-            self.initial_lr,
-            self.start_lr,
-            self.end_lr,
-            self.max_epochs,
-            self.warmup_epochs,
-        )
+        if self.stepwise_schedule:
+            # NOTE: We have (1 / lr_interval) lr epochs per epoch
+            return combine_schedulers(
+                self.warmup_mode,
+                self.lr_schedule,  # type: ignore
+                epoch,
+                self.initial_lr,
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs * int(1 / self.lr_interval),
+                self.warmup_epochs,
+            )
+        else:
+            return combine_schedulers(
+                self.warmup_mode,
+                self.lr_schedule,  # type: ignore
+                epoch,
+                self.initial_lr,
+                self.start_lr,
+                self.end_lr,
+                self.max_epochs,
+                self.warmup_epochs,
+            )
 
     def configure_optimizers(self) -> L.pytorch.utilities.types.OptimizerLRSchedulerConfig:
         logger.info(
@@ -444,7 +459,7 @@ class BaseModule(L.LightningModule):
             )
 
         optimizer = AdamW(
-            self.model.parameters(),
+            self.parameters(),
             lr=self.initial_lr,
             betas=(self.beta1, self.beta2),
             eps=self.epsilon,
@@ -456,10 +471,12 @@ class BaseModule(L.LightningModule):
                 lr_lambda=self.lambda_schedule,
             )
             if self.stepwise_schedule:
+                # NOTE: Appearently the best way to get the epoch length is to use the dataloader length https://github.com/Lightning-AI/pytorch-lightning/issues/5449
+                self.trainer.fit_loop.setup_data()
                 lr_scheduler: LRSchedulerConfigType = {
                     "scheduler": lambda_scheduler,
                     "interval": "step",
-                    "frequency": self.lr_interval,
+                    "frequency": int(self.lr_interval * len(self.trainer.train_dataloader)),  # type: ignore
                 }
             else:
                 lr_scheduler = {"scheduler": lambda_scheduler, "interval": "epoch"}
@@ -527,9 +544,13 @@ class BaseModule(L.LightningModule):
 
         metrics = {
             "knn5": partial(knn, k=5),
+            "knn5_cos": partial(knn, k=5, distance_metric="cosine"),
             "knn": partial(knn, k=1),
+            "knn_cos": partial(knn, k=1, distance_metric="cosine"),
             "knn5_macro": partial(knn, k=5, average="macro"),
+            "knn5_macro_cos": partial(knn, k=5, average="macro", distance_metric="cosine"),
             "knn_macro": partial(knn, k=1, average="macro"),
+            "knn_macro_cos": partial(knn, k=1, average="macro", distance_metric="cosine"),
             "tsne": tsne,
             # "pca": pca,
             # "fc_layer": fc_layer,
@@ -537,9 +558,17 @@ class BaseModule(L.LightningModule):
         metrics |= (
             {
                 "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
+                "knn5-with-train_cos": partial(knn, k=5, use_train_embeddings=True),
                 "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
+                "knn-with-train_cos": partial(knn, k=1, use_train_embeddings=True),
                 "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
+                "knn5-with-train_macro_cos": partial(
+                    knn, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
                 "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
+                "knn-with-train_macro_cos": partial(
+                    knn, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
             }
             if self.knn_with_train
             else {}
@@ -547,9 +576,17 @@ class BaseModule(L.LightningModule):
         metrics |= (
             {
                 "knn_crossvideo": partial(knn, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_cos": partial(knn, k=1, use_crossvideo_positives=True),
                 "knn5_crossvideo": partial(knn, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_cos": partial(knn, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn_crossvideo_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn_crossvideo_macro_cos": partial(
+                    knn, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
                 "knn5_crossvideo_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossvideo_macro_cos": partial(
+                    knn, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
             }
             if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
             else {}

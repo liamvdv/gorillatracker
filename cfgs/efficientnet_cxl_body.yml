@@ -12,7 +12,7 @@ workers: 4                      # Number of workers for data loading
 project_name: "Embedding-Efficientnet-CXLBody-OpenSet" # WandB project name
 run_name: "84-body"           # Name for this training run
 wandb_tags: ["test"]            # WandB tags for experiment tracking
-model_name_or_path: "EfficientNetV2_Large" # Model name or path 
+model_name_or_path: "timm/tf_efficientnetv2_l.in21k_ft_in1k" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False             # Enable fast development run

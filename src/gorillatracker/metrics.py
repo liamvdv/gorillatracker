@@ -190,6 +190,7 @@ def knn(
     k: int = 5,
     use_train_embeddings: bool = False,
     use_crossvideo_positives: bool = False,
+    distance_metric: Literal["euclidean", "cosine"] = "euclidean",
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -216,7 +217,20 @@ def knn(
     if num_classes < k:
         k = num_classes
 
-    distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+    distance_matrix: torch.Tensor
+    if distance_metric == "cosine":
+        distance_matrix = (
+            torch.nn.functional.cosine_similarity(
+                combined_embeddings.unsqueeze(0), combined_embeddings.unsqueeze(1), dim=-1
+            )
+            * -1.0
+            + 1.0
+        )  # range [0, 2]
+    elif distance_metric == "euclidean":
+        distance_matrix = pairwise_euclidean_distance(combined_embeddings)  # range [0, inf]
+    else:
+        raise ValueError(f"Unknown distance metric: {distance_metric}")
+
     distance_matrix.fill_diagonal_(float("inf"))
 
     distance_mask: torch.Tensor
@@ -239,6 +253,22 @@ def knn(
     classification_matrix = torch.zeros((len(combined_embeddings), num_classes))
     for i in range(num_classes):
         classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
+
+    # NOTE(rob2u): break ties by using the nearest neighbor (tie is when the the two closest neighbors have the same label)
+    for i in range(len(combined_embeddings)):
+        max_prob = torch.max(classification_matrix[i])
+        max_prob_indices = torch.where(max_prob - classification_matrix[i] < 1e-6)[0]
+
+        if len(max_prob_indices) == 1:
+            continue
+            # add 1e-6 to the closest indice of the max_prob_indices substract elsewhere (in max_prob_indices)
+
+        classification_matrix[i, max_prob_indices] += (1e-6) / len(max_prob_indices)
+        for j in range(k):
+            if closest_indices[i][j] in max_prob_indices:
+                classification_matrix[i][closest_labels[i][j].to(torch.int)] += 1e-6
+                break
+
     assert classification_matrix.shape == (len(combined_embeddings), num_classes)
 
     # Select only the validation part of the classification matrix
@@ -275,8 +305,7 @@ def knn(
 
     return {
         "accuracy": accuracy.item(),
-        "accuracy_top5": accuracy_top5.item(),
-        "auroc": auroc.item(),
+        "accuracy_top5": accuracy_top5.item() if k >= 5 else accuracy.item(),
         "f1": f1.item(),
         "precision": precision.item(),
     }
