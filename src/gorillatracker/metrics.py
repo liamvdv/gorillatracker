@@ -404,6 +404,7 @@ def knn_kfold_val(
             use_crossvideo_positives=use_crossvideo_positives,
         )
         fold_metrics.append(metrics)
+    assert len(metrics) == num_folds
     accumulated_metrics = {}
     for metrics in fold_metrics:
         for metric_name, value in metrics.items():
