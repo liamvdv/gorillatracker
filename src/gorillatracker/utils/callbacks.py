@@ -1,8 +1,8 @@
 from typing import Any, Literal
 
-from lightning import Trainer, LightningModule, Callback
 import torch
 import wandb
+from lightning import Callback, LightningModule, Trainer
 
 
 class BestMetricLogger(Callback):
