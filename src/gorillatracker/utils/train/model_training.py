@@ -19,6 +19,7 @@ from gorillatracker.args import TrainingArgs
 from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.quantization.utils import get_model_input
+from gorillatracker.utils.callbacks import BestMetricLogger
 from gorillatracker.utils.train import ModelConstructor
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
@@ -88,7 +89,6 @@ def train_and_validate_using_kfold(
 ) -> Trainer:
     # TODO(memben):!!! Fix kfold_k
 
-    dataloader_name = dm.get_dataset_class_names()[0]
     kfold_k = int(str(args.data_dir).split("-")[-1])
 
     # Inject kfold_k into the datamodule TODO(memben): is there a better way?
@@ -117,18 +117,20 @@ def train_and_validate_using_kfold(
         )
 
         checkpoint_callback = ModelCheckpoint(
-            filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
-            mode="min",
+            filename="epoch-{epoch}-" + f"{metric_name}" + "-{" + f"{metric_name}" + ":.2f}",
+            monitor=metric_name,
+            mode=args.stop_saving_metric_mode,
             auto_insert_metric_name=False,
             every_n_epochs=int(args.save_interval),
         )
+
+        max_metric_logger_callback = BestMetricLogger(metric_name=metric_name, mode=args.stop_saving_metric_mode)
 
         _, trainer = train_and_validate_model(
             args,
             dm,
             model_kfold,
-            [checkpoint_callback, *callbacks, early_stopping_callback],
+            [checkpoint_callback, max_metric_logger_callback, *callbacks, early_stopping_callback],
             wandb_logger,
         )
 

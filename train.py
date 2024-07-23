@@ -21,6 +21,7 @@ from gorillatracker.utils.train import (
     train_using_quantization_aware_training,
 )
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+from gorillatracker.utils.callbacks import BestMetricLogger
 
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
@@ -107,7 +108,7 @@ def main(args: TrainingArgs) -> None:
     lr_monitor = LearningRateMonitor(logging_interval="step" if args.stepwise_schedule else "epoch")
 
     checkpoint_callback = ModelCheckpoint(
-        filename="epoch-{epoch}-acc-{" + args.stop_saving_metric_name + ":.3f}",
+        filename="epoch-{epoch}-" + args.stop_saving_metric_name + "-{" + args.stop_saving_metric_name + ":.2f}",
         monitor=args.stop_saving_metric_name,
         mode=args.stop_saving_metric_mode,
         auto_insert_metric_name=False,
@@ -121,10 +122,13 @@ def main(args: TrainingArgs) -> None:
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
+    
+    max_metric_logger_callback = BestMetricLogger(metric_name=args.stop_saving_metric_name)
 
     callbacks = (
         [
             checkpoint_callback,  # keep this at the top
+            max_metric_logger_callback,
             lr_monitor,
             early_stopping,
         ]
