@@ -8,6 +8,7 @@ from typing import Iterator, Optional
 import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import distance
+from shapely.geometry import Polygon
 from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.models import TrackingFrameFeature
@@ -28,9 +29,9 @@ def group_by_tracking_id(frame_features: list[TrackingFrameFeature]) -> defaultd
 
 def random_sample(frame_features: list[TrackingFrameFeature], n_samples: int) -> Iterator[TrackingFrameFeature]:
     grouped = group_by_tracking_id(frame_features)
-    for features in grouped.values():
-        num_samples = min(len(features), n_samples)
-        yield from random.sample(features, num_samples)
+    for tracking in grouped.values():
+        num_samples = min(len(tracking), n_samples)
+        yield from random.sample(tracking, num_samples)
 
 
 ### EquidistantSampler ###
@@ -51,8 +52,55 @@ def tracking_equidistant_sample(features: list[TrackingFrameFeature], n_samples:
 
 def equidistant_sample(frame_features: list[TrackingFrameFeature], n_samples: int) -> Iterator[TrackingFrameFeature]:
     grouped = group_by_tracking_id(frame_features)
-    for features in grouped.values():
-        yield from tracking_equidistant_sample(features, n_samples)
+    for tracking in grouped.values():
+        yield from tracking_equidistant_sample(tracking, n_samples)
+
+
+### Movement sampler ###
+
+
+def movement_sample(
+    frame_features: list[TrackingFrameFeature], n_samples: int, movement_delta: float
+) -> Iterator[TrackingFrameFeature]:
+    assert 0 < movement_delta < 1, "Movement delta must be in the range (0, 1)"
+    grouped = group_by_tracking_id(frame_features)
+    for tracking in grouped.values():
+        yield from movement_sample_tracking(tracking, n_samples, movement_delta)
+
+
+def movement_sample_tracking(
+    frame_features: list[TrackingFrameFeature], n_samples: int, movement_delta: float
+) -> list[TrackingFrameFeature]:
+    buckets: dict[Polygon, list[TrackingFrameFeature]] = {}
+    for feature in frame_features:
+        new_bucket = movement_bucket_bbox(feature, movement_delta)
+        for existing_bucket, features in buckets.items():
+            if new_bucket.intersects(existing_bucket):
+                features.append(feature)
+                break
+        else:
+            buckets[new_bucket] = [feature]
+
+    # NOTE(memben): We want to have at least to buckets for this filter to make sense
+    if len(buckets) < 2:
+        assert buckets, "No buckets were created"
+        return []
+
+    sampled_buckets = random.sample(list(buckets.values()), min(n_samples, len(buckets)))
+    return [random.choice(bucket) for bucket in sampled_buckets]
+
+
+def movement_bucket_bbox(tff: TrackingFrameFeature, movement_delta: float) -> Polygon:
+    half_delta = movement_delta / 2
+    x, y = tff.bbox_x_center_n, tff.bbox_y_center_n
+    return Polygon(
+        [
+            (x - half_delta, y - half_delta),
+            (x + half_delta, y - half_delta),
+            (x + half_delta, y + half_delta),
+            (x - half_delta, y + half_delta),
+        ]
+    )
 
 
 ### EmbeddingDistantSampler ###

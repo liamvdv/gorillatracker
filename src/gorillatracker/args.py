@@ -153,7 +153,7 @@ class TrainingArgs:
 
     # SSL Config
     use_ssl: bool = field(default=False)
-    tff_selection: Literal["random", "equidistant", "embeddingdistant"] = field(default="equidistant")
+    tff_selection: Literal["random", "equidistant", "embeddingdistant", "movement"] = field(default="equidistant")
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
     negative_mining: Literal["random", "overlapping", "social_groups"] = field(default="random")
     n_samples: int = field(default=15)
@@ -162,6 +162,7 @@ class TrainingArgs:
     min_images_per_tracking: int = field(default=3)
     width_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
     height_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
+    movement_delta: Union[float, None] = field(default=None)
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0
@@ -179,6 +180,7 @@ class TrainingArgs:
         assert all(
             s in ["body", "face_90", "face_45", "body_with_face"] for s in self.feature_types
         ), "Invalid feature type"
+        assert self.tff_selection != "movement" or self.movement_delta is not None, "Combination not allowed"
         if self.grad_clip <= 0:
             self.grad_clip = None
         assert self.lr_interval <= 1, "lr_interval should be <= 1"

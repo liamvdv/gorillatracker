@@ -81,6 +81,7 @@ def main(args: TrainingArgs) -> None:
         width_range=args.width_range,
         height_range=args.height_range,
         split_path=args.split_path,
+        movement_delta=args.movement_delta,
     )
     if args.force_nlet_builder is not None and args.force_nlet_builder != "None":
         force_nlet_builder(args.force_nlet_builder)
