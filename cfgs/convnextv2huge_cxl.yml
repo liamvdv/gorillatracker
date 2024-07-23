@@ -14,7 +14,7 @@ workers: 16                      # Number of workers for data loading
 project_name: "Embedding-ConvNeXtV2-Huge-CXL-Open" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
 run_name: "332-use-student-teacher-distillation-and-efficient-net" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["non-kfold"]            # WandB tags for experiment tracking
-model_name_or_path: "ConvNeXtV2_Huge" # Model name or path 
+model_name_or_path: "timm/convnextv2_huge" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False             # Enable fast development run
