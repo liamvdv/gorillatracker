@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.contrastive_sampler import get_individual_video_id
 
 eps = 1e-16  # an arbitrary small value to be used for numerical stability tricks
 
@@ -182,6 +183,18 @@ def angular_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     return angular_distance
 
 
+def get_cross_video_mask(ids) -> torch.Tensor:
+    """Returns a len(ids) x len(ids) x len(ids) mask where mask[i, j] is 1 if the two samples are from different videos and 0 otherwise."""
+    vids = [get_individual_video_id(id) for id in ids]
+    vids_matrix = []
+    for _, vid in enumerate(vids):
+        vids_matrix.append([vid == v for v in vids])
+    
+    vids_matrix = torch.tensor(vids_matrix, dtype=torch.bool)
+    vids_tensor = (vids_matrix.unsqueeze(2) * torch.ones((1, 1, len(ids)), dtype=torch.bool)) == 0
+    return vids_tensor.to(torch.bool)
+
+
 class TripletLossOnline(nn.Module):
     """
     TripletLossOnline operates on Quadlets and does batch optimization.
@@ -198,10 +211,12 @@ class TripletLossOnline(nn.Module):
         margin: float = 1.0,
         mode: Literal["hard", "semi-hard", "soft"] = "semi-hard",
         dist_calc: Literal["cosine", "euclidean"] = "euclidean",
+        cross_video_masking: bool = False,
     ) -> None:
         super().__init__()
         self.margin = margin
         self.mode = mode
+        self.cross_video_masking = cross_video_masking
         if dist_calc == "cosine":
             self.dist_calc = angular_distance_matrix
         elif dist_calc == "euclidean":
@@ -213,6 +228,7 @@ class TripletLossOnline(nn.Module):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
+        ids: torch.Tensor,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.
@@ -245,6 +261,8 @@ class TripletLossOnline(nn.Module):
         # we only want to keep correct and depending on the mode the hardest or semi-hard triplets
         # therefore we create a mask that is 1 for all valid triplets and 0 for all invalid triplets
         mask = self.get_mask(distance_matrix, anchor_positive_dists, anchor_negative_dists, labels)
+        if self.cross_video_masking:
+            mask = torch.logical_and(mask, get_cross_video_mask(ids))
         mask = mask.to(triplet_loss.device)  # ensure mask is on the same device as triplet_loss
         triplet_loss *= mask
 
