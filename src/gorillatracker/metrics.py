@@ -23,7 +23,7 @@ from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import get_individual, get_individual_video_id
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -46,7 +46,7 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
 def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
     samples: list[gtypes.Nlet] = []
     for batch in dataloader:
-        ids, images, labels = batch
+        ids, images, labels = batch if len(batch) == 3 else batch[:-1]
         row_batch = zip(zip(*ids), zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))
@@ -237,6 +237,11 @@ def knn(
     classification_mask: torch.Tensor
     if use_crossvideo_positives:
         distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        if use_train_embeddings:  # add train embeddings to the distance mask (shapes would not match otherwise)
+            train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
+            distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
+            distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
+            distance_mask = distance_mask.to(torch.bool)
         distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(

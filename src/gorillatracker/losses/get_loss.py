@@ -71,7 +71,7 @@ def get_loss(
             use_class_weights=kw_args["use_class_weights"],
             purpose=kw_args["purpose"],
         )
-    elif loss_mode == "softmax/adaface":  # TODO
+    elif loss_mode == "softmax/adaface":
         loss_module = AdaFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],
@@ -86,7 +86,7 @@ def get_loss(
             purpose=kw_args["purpose"],
         )
 
-    elif loss_mode == "softmax/elasticface":  # TODO
+    elif loss_mode == "softmax/elasticface":
         loss_module = ElasticArcFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],

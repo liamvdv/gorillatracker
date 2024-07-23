@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 
 from simple_parsing import field, list_field
 
@@ -14,8 +14,8 @@ class TrainingArgs:
     # Device Arguments
     accelerator: Literal["cuda", "cpu", "tpu", "mps"] = field(default="cuda")
     num_devices: int = field(default=1)
-    distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default=None)
-    force_deterministic: bool = field(default=False)
+    distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default="auto")
+    force_deterministic: bool = field(default=True)
     precision: Literal[
         "32-true",
         "16-mixed",
@@ -36,7 +36,9 @@ class TrainingArgs:
     project_name: str = field(default="")
     run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
-    model_name_or_path: str = field(default="EfficientNetV2")
+    model_name_or_path: str = field(default="timm/efficientnetv2_rw_m")  # TODO
+    freeze_backbone: bool = field(default=False)
+
     use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
@@ -51,6 +53,10 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
+    embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = field(default="linear")
+    pool_mode: Literal["gem", "gap", "gem_c", "none"] = field(default="none")
+    fix_img_size: Optional[int] = field(default=None)
+
     use_quantization_aware_training: bool = field(default=False)
 
     # Optimizer Arguments
@@ -105,6 +111,10 @@ class TrainingArgs:
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
         "ntxent",
+        "mae_mse",
+        "mae_mse/l2sp",
+        "mae_mse/arcface",
+        "mae_mse/arcface/l2sp",
         "ntxent/l2sp",
     ] = field(default="offline")
     cross_video_masking: bool = field(default=False)

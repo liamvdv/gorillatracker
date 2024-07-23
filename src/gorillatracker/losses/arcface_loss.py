@@ -57,7 +57,9 @@ class ArcFaceLoss(torch.nn.Module):
         self.class_distribution = class_distribution
         self.use_class_weights = use_class_weights
         self.num_samples = (
-            sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0
+            (sum([class_distribution[label] for label in class_distribution.keys()]) if self.class_distribution else 0)
+            if self.use_class_weights
+            else 1
         )
         self.purpose = purpose
         self.accelerator = accelerator

@@ -1,14 +1,14 @@
 from pathlib import Path
-from typing import Literal, Optional, Type
+from typing import Literal, Optional, Type, Union
 
 import gorillatracker.type_helper as gtypes
+from gorillatracker.data.combined import CombinedDataset
 from gorillatracker.data.nlet import (
     CrossEncounterSupervisedDataset,
     CrossEncounterSupervisedKFoldDataset,
     FlatNletBuilder,
     HardCrossEncounterSupervisedDataset,
     HardCrossEncounterSupervisedKFoldDataset,
-    NletDataModule,
     NletDataset,
     SupervisedDataset,
     SupervisedKFoldDataset,
@@ -17,6 +17,7 @@ from gorillatracker.data.nlet import (
     build_quadlet,
     build_triplet,
 )
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 
@@ -38,8 +39,9 @@ KFoldCows2021DatasetId = "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
 KFoldSeaturtleDatasetId = "gorillatracker.datasets.seaturtle.KFoldSeaturtleDataset"
 KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
+CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
 
-dataset_registry: dict[str, Type[NletDataset]] = {
+dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     BristolDatasetId: SupervisedDataset,
     CXLDatasetId: SupervisedDataset,
     KFoldCXLDatasetId: SupervisedKFoldDataset,
@@ -58,6 +60,7 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
     KFoldSeaturtleDatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
+    CombinedDatasetId: CombinedDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
@@ -66,6 +69,7 @@ nlet_requirements: dict[str, FlatNletBuilder] = {
     "offline": build_triplet,
     "online": build_quadlet,
     "distillation": build_triplet,
+    "mae_mse": build_onelet,
 }
 
 
@@ -105,7 +109,7 @@ def build_data_module(
         not dataset_names or len(dataset_names) == len(additional_eval_datasets_ids) + 1
     ), "Length mismatch between dataset_names and eval datasets"
 
-    if dataset_class_id == SSLDatasetId:
+    if dataset_class_id == SSLDatasetId or dataset_class_id == CombinedDatasetId:
         assert ssl_config is not None, "ssl_config must be set for SSLDataset"
 
     dataset_class = dataset_registry[dataset_class_id]
