@@ -107,14 +107,17 @@ class NletDataModule(L.LightningDataModule):
             self, "train"
         ):  # HACK(rob2u): we enforce setup to be called (somehow it's not always called, problem in val_before_training)
             self.setup("fit")
+        # NOTE(rob2u): the type ignores are necessary because these types would be incorrect for the combined Dataset, yet we don't want to change it (cascade of changes)
         return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=self.workers)  # type: ignore
 
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
+        # NOTE(rob2u): the type ignores are necessary because these types would be incorrect for the combined Dataset, yet we don't want to change it (cascade of changes)
         return [
             DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val  # type: ignore
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
+        # NOTE(rob2u): the type ignores are necessary because these types would be incorrect for the combined Dataset, yet we don't want to change it (cascade of changes)
         return [
             DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for test in self.test  # type: ignore
         ]

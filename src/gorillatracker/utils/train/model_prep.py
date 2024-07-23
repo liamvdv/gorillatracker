@@ -25,7 +25,7 @@ class ModelConstructor:
         num_classes = None
         class_distribution = None
         # TODO(memben): this is not logical for multiple datasets
-        if "softmax" in args.loss_mode or "mae_mse/arcface" in args.loss_mode:
+        if "softmax" in args.loss_mode:
             # HACK(memben): To force load the datasets
             self.dm.setup("fit")
             self.dm.setup("test")
@@ -39,6 +39,15 @@ class ModelConstructor:
                 self.dm.get_class_distribution("train"),
                 self.dm.get_class_distribution("val"),
                 self.dm.get_class_distribution("test"),
+            )
+        elif "mae_mse/arcface" in args.loss_mode:
+            self.dm.setup("fit")
+            self.dm.setup("test")
+
+            num_classes = (
+                self.dm.get_num_classes("train"),
+                self.dm.get_num_classes("val"),
+                self.dm.get_num_classes("test"),
             )
 
         dataset_names = self.dm.get_dataset_class_names()

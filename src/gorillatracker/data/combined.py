@@ -68,7 +68,7 @@ class CombinedDataset:
         dataset2_cls: Type[NletDataset] = SupervisedDataset,
         **kwargs: Any,
     ) -> None:
-        # base_dir -> is Path1:Path2
+        """The first dataset will additionally be used for validation. base_dir format: Path1:Path2"""
         self.transform: Callable[[Image.Image], torch.Tensor] = transforms.Compose([self.get_transforms(), transform])
         self.partition = partition
         self.nlet_builder = nlet_builder
@@ -121,7 +121,7 @@ class CombinedDataset:
 
     @property
     def class_distribution(self) -> dict[gtypes.Label, int]:
-        return {}
+        raise NotImplementedError
 
     @property
     def num_classes(self) -> int:
@@ -140,7 +140,7 @@ class CombinedDataset:
 
     def _get_item(self, idx: int) -> Union[Nlet, NletWithDSID]:
         flat_nlet: Union[FlatNletWithDSID, FlatNlet] = self.nlet_builder(idx, self.contrastive_sampler)
-        if isinstance(flat_nlet[0], ContrastiveImage):
+        if self.partition in {"val", "test"}:
             return self._stack_flat_nlet(flat_nlet)  # type: ignore
         else:
             return self._stack_flat_nlet_with_dsid(flat_nlet)  # type: ignore
