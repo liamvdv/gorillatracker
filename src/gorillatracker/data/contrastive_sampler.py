@@ -131,7 +131,7 @@ class ContrastiveKFoldValSampler(ContrastiveClassSampler):
         super().__init__(classes)
         self.k = k
 
-    def getfold(self, label: Label) -> int:
+    def get_fold(self, label: Label) -> int:
         img = self.find_any_image(label)
         fold_dir = img.image_path.parent.name
         return int(fold_dir.split("-")[-1])

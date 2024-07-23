@@ -391,7 +391,7 @@ def knn_kfold_val(
     _, labels, _, _, _ = get_partition_from_dataframe(data, partition="val")
     fold: Dict[Any, int] = {}
     for label in labels.unique():  # type: ignore
-        fold[label.item()] = contrastive_sampler.getfold(label.item())
+        fold[label.item()] = contrastive_sampler.get_fold(label.item())
     fold_metrics = []
     for i in range(num_folds):
         fold_indices = [index for index, label in enumerate(labels) if fold[label.item()] == i]
