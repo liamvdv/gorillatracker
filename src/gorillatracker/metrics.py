@@ -22,7 +22,7 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import get_individual, get_individual_video_id
+from gorillatracker.data.contrastive_sampler import get_individual, get_individual_video_id, ContrastiveKFoldValSampler
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
@@ -372,6 +372,38 @@ def knn_ssl(
 
     return {"accuracy": accuracy, "accuracy_top5": top5_accuracy, "f1": f1, "precision": precision}
 
+def knn_kfold_val(
+    data: pd.DataFrame,
+    dm: NletDataModule,
+    current_val_index: int,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
+    distance_metric: Literal["euclidean", "cosine"] = "euclidean",
+    k: int = 5,
+    use_crossvideo_positives: bool = False,
+) -> Dict[str, Any]:
+    """ Calculate knn metrics for each fold and average them to have compareable results to kfold training"""
+    assert isinstance(dm.val[current_val_index].contrastive_sampler, ContrastiveKFoldValSampler)
+    num_folds = dm.val[current_val_index].contrastive_sampler.k
+    _, labels, _, _, _ = get_partition_from_dataframe(data, partition="val")
+    fold: Dict[Any, int] = {}
+    for label in labels.unique():
+        fold[label] = dm.val[current_val_index].contrastive_sampler.getfold(label.item())
+    fold_metrics = []
+    for i in range(num_folds):
+        fold_indices = [index for index, label in enumerate(labels) if fold[label] == i]
+        fold_dataframe = data.iloc[fold_indices]
+        metrics = knn(data=fold_dataframe, average=average, k=k, distance_metric=distance_metric, use_crossvideo_positives=use_crossvideo_positives)
+        fold_metrics.append(metrics)
+    accumulated_metrics = {}
+    for metrics in fold_metrics:
+        for metric_name, value in metrics.items():
+            if metric_name not in accumulated_metrics:
+                accumulated_metrics[metric_name] = value
+            else:
+                accumulated_metrics[metric_name] += value
+    averaged_metrics = {metric_name: value / num_folds for metric_name, value in accumulated_metrics.items()}
+    
+    return averaged_metrics
 
 def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings
     _, _, embeddings_in, _, labels_in = get_partition_from_dataframe(data, partition="val")

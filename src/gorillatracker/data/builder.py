@@ -12,6 +12,7 @@ from gorillatracker.data.nlet import (
     NletDataset,
     SupervisedDataset,
     SupervisedKFoldDataset,
+    ValOnlyKfoldDataset,
     build_onelet,
     build_pair,
     build_quadlet,
@@ -38,6 +39,7 @@ KFoldCows2021DatasetId = "gorillatracker.datasets.cows2021.KFoldCows2021Dataset"
 KFoldSeaturtleDatasetId = "gorillatracker.datasets.seaturtle.KFoldSeaturtleDataset"
 KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
+ValKFoldCXLDatasetId = "gorillatracker.datasets.cxl.ValKFoldCXLDataset"
 
 dataset_registry: dict[str, Type[NletDataset]] = {
     BristolDatasetId: SupervisedDataset,
@@ -58,6 +60,7 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
     KFoldSeaturtleDatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
+    ValKFoldCXLDatasetId: ValOnlyKfoldDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {

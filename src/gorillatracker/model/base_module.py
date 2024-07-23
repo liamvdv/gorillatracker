@@ -15,7 +15,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
+from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, knn_kfold_val, log_train_images_to_wandb, tsne
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
@@ -597,6 +597,32 @@ class BaseModule(L.LightningModule):
                 "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
             }
             if "ssl" in dataloader_id.lower()
+            else metrics
+        )
+        metrics = (
+            {
+                "knn5": partial(knn_kfold_val, k=5),
+                "knn5_cos": partial(knn_kfold_val, k=5, distance_metric="cosine"),
+                "knn": partial(knn_kfold_val, k=1),
+                "knn_cos": partial(knn_kfold_val, k=1, distance_metric="cosine"),
+                "knn5_macro": partial(knn_kfold_val, k=5, average="macro"),
+                "knn5_macro_cos": partial(knn_kfold_val, k=5, average="macro", distance_metric="cosine"),
+                "knn_macro": partial(knn_kfold_val, k=1, average="macro"),
+                "knn_macro_cos": partial(knn_kfold_val, k=1, average="macro", distance_metric="cosine"),
+                "knn_crossvideo": partial(knn_kfold_val, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_cos": partial(knn_kfold_val, k=1, use_crossvideo_positives=True),
+                "knn5_crossvideo": partial(knn_kfold_val, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_cos": partial(knn_kfold_val, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
+                "knn_crossvideo_macro": partial(knn_kfold_val, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn_crossvideo_macro_cos": partial(
+                    knn_kfold_val, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
+                "knn5_crossvideo_macro": partial(knn_kfold_val, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossvideo_macro_cos": partial(
+                    knn_kfold_val, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
+            }
+            if "fold" in dataloader_id.lower()
             else metrics
         )
 
