@@ -381,7 +381,7 @@ class ValOnlyKFoldDataset(SupervisedDataset):
         self, base_dir: Path, sampler_class: type = ContrastiveKFoldValSampler
     ) -> ContrastiveClassSampler:
         assert self.partition == "val", "ValOnlyKfoldDataset is only for additional validation datasets"
-        self.k = len(os.listdir(base_dir)) - 1  # subtract 1 for test
+        self.k = len(os.listdir(base_dir)) - 1  # subtract 1 (test set as its not a fold)
         dirpaths = [base_dir / Path(f"fold-{i}") for i in range(self.k)]
         self.classes = group_images_by_fold_and_label(dirpaths)
         return sampler_class(self.classes, self.k)
