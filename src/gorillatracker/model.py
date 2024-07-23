@@ -32,6 +32,7 @@ from gorillatracker.losses.get_loss import get_loss
 from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
 from gorillatracker.model_miewid import GeM, load_miewid_model  # type: ignore
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
+from gorillatracker.transform_utils import PlanckianJitter
 
 
 def warmup_lr(
@@ -223,9 +224,9 @@ class BaseModule(L.LightningModule):
         loss_mode: str,
         margin: float,
         s: float,
-        delta_t: int,
-        mem_bank_start_epoch: int,
-        lambda_membank: float,
+        # delta_t: int,
+        # mem_bank_start_epoch: int,
+        # lambda_membank: float,
         temperature: float,
         embedding_size: int,
         batch_size: int,
@@ -248,12 +249,12 @@ class BaseModule(L.LightningModule):
             margin=margin,
             embedding_size=embedding_size,
             batch_size=batch_size,
-            delta_t=delta_t,
+            # delta_t=delta_t,
             s=s,
             num_classes=num_classes[0] if num_classes is not None else None,  # TODO(memben)
             class_distribution=class_distribution[0] if class_distribution is not None else None,  # TODO(memben)
-            mem_bank_start_epoch=mem_bank_start_epoch,
-            lambda_membank=lambda_membank,
+            # mem_bank_start_epoch=mem_bank_start_epoch,
+            # lambda_membank=lambda_membank,
             temperature=temperature,
             accelerator=accelerator,
             l2_alpha=l2_alpha,
@@ -275,12 +276,12 @@ class BaseModule(L.LightningModule):
             margin=margin,
             embedding_size=embedding_size,
             batch_size=batch_size,
-            delta_t=delta_t,
+            # delta_t=delta_t,
             s=s,
             num_classes=num_classes[1] if num_classes is not None else None,  # TODO(memben)
             class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
-            mem_bank_start_epoch=mem_bank_start_epoch,
-            lambda_membank=lambda_membank,
+            # mem_bank_start_epoch=mem_bank_start_epoch,
+            # lambda_membank=lambda_membank,
             temperature=temperature,
             accelerator=accelerator,
             l2_alpha=l2_alpha,
@@ -790,23 +791,37 @@ class ConvNeXtV2HugeWrapper(BaseModule):
         self.set_losses(model=model_cpy, **kwargs)
 
 
+
+
 class VisionTransformerWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
+        self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch, img_size=224)
         # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
+        # self.model.head = torch.nn.Sequential(
+        #     torch.nn.BatchNorm1d(self.model.head.in_features),
+        #     torch.nn.Dropout(p=self.dropout_p),
+        #     torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
+        #     torch.nn.BatchNorm1d(self.embedding_size),
+        # )
+        
+        
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
+        
+        self.embedding_layer = torch.nn.Linear(1024, self.embedding_size) # NOTE(rob2u): baseline -> just fc
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if isinstance(x, list):
+            x = x[0]
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        x = self.embedding_layer(x)
+        return x
 
     def get_grad_cam_layer(self) -> torch.nn.Module:
         # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
@@ -826,10 +841,15 @@ class VisionTransformerWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                transforms_v2.ToPILImage(),
+                PlanckianJitter(),
+                transforms_v2.ToTensor(),
+                # transforms_v2.RandomPhotometricDistort(p=0.5),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
                 transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                
             ]
         )
 

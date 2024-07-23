@@ -2,14 +2,19 @@ from typing import Literal, Optional
 
 import numpy as np
 import torch
-from PIL.Image import Image
+from PIL import Image
 from torchvision.transforms.functional import pad
+from torchvision import transforms
 
 
 class SquarePad:
     def __call__(self, image: Image) -> Image:
         # calc padding
-        width, height = image.size
+        try:
+            width, height = image.size
+        except:
+            image = transforms.ToPILImage()(image)
+            width, height = image.size
         aspect_ratio = width / height
         if aspect_ratio > 1:
             padding_top = (width - height) // 2
