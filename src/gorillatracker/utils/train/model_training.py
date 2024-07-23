@@ -118,7 +118,11 @@ def train_and_validate_using_kfold(
         )
 
         checkpoint_callback = ModelCheckpoint(
-            filename="epoch-{epoch}-" + f"{metric_name}" + "-{" + f"{metric_name}" + ":.2f}",
+            filename="epoch-{epoch}-"
+            + metric_name
+            + "-{"
+            + metric_name
+            + ":.2f}",  # NOTE: epoch-{epoch}-val_loss-{val_loss:.2f} -> epoch-1-val_loss-0.12
             monitor=metric_name,
             mode=args.stop_saving_metric_mode,
             auto_insert_metric_name=False,
