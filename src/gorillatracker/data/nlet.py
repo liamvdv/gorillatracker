@@ -375,7 +375,7 @@ class SupervisedKFoldDataset(KFoldNletDataset):
         return sampler_class(self.classes)
     
     
-class ValOnlyKfoldDataset(SupervisedDataset):
+class ValOnlyKFoldDataset(SupervisedDataset):
     def create_contrastive_sampler(
         self, base_dir: Path, sampler_class: Type = ContrastiveKFoldValSampler
     ) -> ContrastiveClassSampler:

@@ -12,7 +12,7 @@ from gorillatracker.data.nlet import (
     NletDataset,
     SupervisedDataset,
     SupervisedKFoldDataset,
-    ValOnlyKfoldDataset,
+    ValOnlyKFoldDataset,
     build_onelet,
     build_pair,
     build_quadlet,
@@ -60,7 +60,7 @@ dataset_registry: dict[str, Type[NletDataset]] = {
     KFoldCows2021DatasetId: SupervisedKFoldDataset,
     KFoldSeaturtleDatasetId: SupervisedKFoldDataset,
     KFoldATRWDatasetId: SupervisedKFoldDataset,
-    ValKFoldCXLDatasetId: ValOnlyKfoldDataset,
+    ValKFoldCXLDatasetId: ValOnlyKFoldDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {

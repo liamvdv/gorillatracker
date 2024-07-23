@@ -601,25 +601,25 @@ class BaseModule(L.LightningModule):
         )
         metrics = (
             {
-                "knn5": partial(knn_kfold_val, k=5),
-                "knn5_cos": partial(knn_kfold_val, k=5, distance_metric="cosine"),
-                "knn": partial(knn_kfold_val, k=1),
-                "knn_cos": partial(knn_kfold_val, k=1, distance_metric="cosine"),
-                "knn5_macro": partial(knn_kfold_val, k=5, average="macro"),
-                "knn5_macro_cos": partial(knn_kfold_val, k=5, average="macro", distance_metric="cosine"),
-                "knn_macro": partial(knn_kfold_val, k=1, average="macro"),
-                "knn_macro_cos": partial(knn_kfold_val, k=1, average="macro", distance_metric="cosine"),
-                "knn_crossvideo": partial(knn_kfold_val, k=1, use_crossvideo_positives=True),
-                "knn_crossvideo_cos": partial(knn_kfold_val, k=1, use_crossvideo_positives=True),
-                "knn5_crossvideo": partial(knn_kfold_val, k=5, use_crossvideo_positives=True),
-                "knn5_crossvideo_cos": partial(knn_kfold_val, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
-                "knn_crossvideo_macro": partial(knn_kfold_val, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn5": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5),
+                "knn5_cos": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, distance_metric="cosine"),
+                "knn": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1),
+                "knn_cos": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, distance_metric="cosine"),
+                "knn5_macro": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, average="macro"),
+                "knn5_macro_cos": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, average="macro", distance_metric="cosine"),
+                "knn_macro": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, average="macro"),
+                "knn_macro_cos": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, average="macro", distance_metric="cosine"),
+                "knn_crossvideo": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_cos": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, use_crossvideo_positives=True),
+                "knn5_crossvideo": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_cos": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
+                "knn_crossvideo_macro": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, use_crossvideo_positives=True, average="macro"),
                 "knn_crossvideo_macro_cos": partial(
-                    knn_kfold_val, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
                 ),
-                "knn5_crossvideo_macro": partial(knn_kfold_val, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossvideo_macro": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, use_crossvideo_positives=True, average="macro"),
                 "knn5_crossvideo_macro_cos": partial(
-                    knn_kfold_val, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
                 ),
             }
             if "fold" in dataloader_id.lower()

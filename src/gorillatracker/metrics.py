@@ -387,11 +387,13 @@ def knn_kfold_val(
     _, labels, _, _, _ = get_partition_from_dataframe(data, partition="val")
     fold: Dict[Any, int] = {}
     for label in labels.unique():
-        fold[label] = dm.val[current_val_index].contrastive_sampler.getfold(label.item())
+        fold[label.item()] = dm.val[current_val_index].contrastive_sampler.getfold(label.item())
     fold_metrics = []
     for i in range(num_folds):
-        fold_indices = [index for index, label in enumerate(labels) if fold[label] == i]
+        fold_indices = [index for index, label in enumerate(labels) if fold[label.item()] == i]
         fold_dataframe = data.iloc[fold_indices]
+        en = LinearSequenceEncoder()
+        fold_dataframe.loc[:, "encoded_label"] = fold_dataframe["encoded_label"].apply(en.encode)
         metrics = knn(data=fold_dataframe, average=average, k=k, distance_metric=distance_metric, use_crossvideo_positives=use_crossvideo_positives)
         fold_metrics.append(metrics)
     accumulated_metrics = {}
