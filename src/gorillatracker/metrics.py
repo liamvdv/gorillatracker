@@ -341,30 +341,29 @@ def knn_ssl(
         subset_mask = torch.isin(labels, torch.tensor(subset_labels))
         subset_embeddings = embeddings[subset_mask]
         subset_label_values = labels[subset_mask]
-        
+
         n_samples = len(subset_embeddings)
         if n_samples <= k:
             continue
-        
+
         n_neighbors = k + 1  # We need k+1 neighbors because the first one is the sample itself
-        
+
         knn = NearestNeighbors(n_neighbors=n_neighbors, algorithm="auto").fit(subset_embeddings.numpy())
         current_label_mask = subset_label_values == label.item()
         current_label_embeddings = subset_embeddings[current_label_mask]
         _, indices = knn.kneighbors(current_label_embeddings.numpy())
-        
+
         indices = indices[:, 1:]  # Remove the first column (self)
         for idx_list in indices:
             neighbor_labels = subset_label_values[idx_list]
             most_common = torch.mode(neighbor_labels).values.item()
             true_labels.append(label.item())
             pred_labels.append(most_common)
-            pred_labels_top5.append(neighbor_labels[:min(5, len(neighbor_labels))].numpy())
-
+            pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))].numpy())
 
     if len(true_labels) == 0:
         return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}
-    
+
     true_labels_tensor = torch.tensor(true_labels)
     pred_labels_tensor = torch.tensor(pred_labels)
 

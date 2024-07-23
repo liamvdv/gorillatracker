@@ -34,8 +34,8 @@ from gorillatracker.ssl_pipeline.queries import (
 from gorillatracker.ssl_pipeline.sampler import (
     embedding_distant_sample,
     equidistant_sample,
-    random_sample,
     movement_sample,
+    random_sample,
 )
 
 
