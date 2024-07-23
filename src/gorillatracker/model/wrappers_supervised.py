@@ -234,7 +234,7 @@ class BasicModel(BaseModule):
             embedding_id=embedding_id,
             dropout_p=dropout_p,
         )
-        self.set_losses(self.model_wrapper.model, **kwargs)
+        self.set_losses(model=self.model_wrapper.model, **kwargs)
 
         if freeze_backbone:
             for param in self.model_wrapper.model.parameters():
