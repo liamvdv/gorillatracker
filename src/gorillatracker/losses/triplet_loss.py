@@ -191,8 +191,8 @@ def get_cross_video_mask(ids: gtypes.FlatNletBatchIds) -> torch.Tensor:
         vids_matrix_list.append([vid != v for v in vids])
 
     vids_matrix = torch.tensor(vids_matrix_list, dtype=torch.bool)
-    vids_tensor = (vids_matrix.unsqueeze(2) * torch.ones((1, 1, len(ids)), dtype=torch.bool)) == 0
-    return vids_tensor.to(torch.bool)
+    vids_tensor = (vids_matrix.unsqueeze(2) * torch.ones((1, 1, len(ids)), dtype=torch.bool)).to(torch.bool)
+    return vids_tensor
 
 
 class TripletLossOnline(nn.Module):
