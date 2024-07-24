@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Literal, Union
 
 import torch
 import torch.fft
@@ -19,7 +19,7 @@ class GeM(nn.Module):
     def gem(
         self, x: torch.Tensor, p: Union[float, torch.Tensor, nn.Parameter] = 3.0, eps: float = 1e-6
     ) -> torch.Tensor:
-        return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1.0 / p)
+        return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1.0 / p).flatten(1)
 
     def __repr__(self) -> str:
         return (
@@ -48,8 +48,9 @@ class GeM_adapted(nn.Module):
     def gem(
         self, x: torch.Tensor, p: Union[float, torch.Tensor, nn.Parameter] = 3.0, eps: float = 1e-6
     ) -> torch.Tensor:  # TODO(rob2u): find better way instead of multiplying by sign
+        batch_size = x.size(0)
         x_pow_mean = x.pow(p).mean((-2, -1))
-        return x_pow_mean.abs().pow(1.0 / p).view(-1) * (x_pow_mean.view(-1).sign()) ** p
+        return x_pow_mean.abs().pow(1.0 / p).view(batch_size, -1) * (x_pow_mean.view(batch_size, -1).sign()) ** p
 
     def __repr__(self) -> str:
         return (
@@ -64,13 +65,30 @@ class GeM_adapted(nn.Module):
         )
 
 
-class FourierConvolution(nn.Module):
-    def __init__(self, param_shape: tuple[int]) -> None:
+class GAP(nn.Module):
+    def __init__(self) -> None:
         super().__init__()
-        self.param_matrix = nn.Parameter(torch.randn(param_shape) + 1j * torch.randn(param_shape))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x_fft = torch.fft.rfft2(x)
-        x_fft_filtered = x_fft * self.param_matrix
-        x_ifft = torch.fft.irfft2(x_fft_filtered)
-        return x_ifft
+        return F.adaptive_avg_pool2d(x, (1, 1)).flatten(1)
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + "()"
+
+
+class FormatWrapper(nn.Module):
+    def __init__(self, pool: nn.Module, format: Literal["NCHW", "NHWC"] = "NCHW") -> None:
+        super().__init__()
+        assert format in ("NCHW", "NHWC")
+
+        self.pool = pool
+        self.format = format
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.format == "NHWC":
+            x = x.permute(0, 2, 3, 1)
+        elif self.format == "NCHW":
+            x = x
+        else:
+            raise ValueError(f"Unknown format {self.format}")
+        return self.pool(x)

@@ -11,8 +11,8 @@ workers: 16                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-DinoV2-SSL-Face"
-run_name: "498-ssl-dinov2-yellow" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+project_name: "Embedding-DinoV2-SSL-Body"
+run_name: "511-ssl-dinov2-movement" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["dinov2", "base"]            # WandB tags for experiment tracking
 model_name_or_path: "timm/vit_large_patch14_dinov2.lvd142m" # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
@@ -25,7 +25,7 @@ seed: 42                        # Random seed for reproducibility
 debug: False                    # Enable debug mode
 from_scratch: False             # Train the model from scratch
 embedding_size: 256
-dropout_p: 0.36                 # Dropout probability
+dropout_p: 0.01                 # Dropout probability
 early_stopping_patience: 10     # Early stopping patience
 
 weight_decay: 0.4              # Weight decay
@@ -40,7 +40,7 @@ path_to_pretrained_weights: "pretrained_weights/ViT_Large_DinoV2.pth"     # Path
 
 margin: 0.83                   # Margin for the contrastive loss (triplet loss)
 s: 64.0                         # Scale for the softmax losses 
-loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
+loss_mode: "offline"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl"
 
 lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
@@ -48,10 +48,11 @@ warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is per
 initial_lr: 6e-4                # Initial learning rate before warmup(must be > 0.0)
 start_lr: 2e-7                 # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-8                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+stepwise_schedule: True        # Use stepwise learning rate schedule                                                                                                                                                                                                                                                                                                                                                  
 
-batch_size: 64                # Training batch size
-grad_clip: 1.0                  # Gradient clipping value
-gradient_accumulation_steps: 1  # Gradient accumulation steps
+batch_size: 4                # Training batch size
+grad_clip: 1.0                   # Gradient clipping value
+gradient_accumulation_steps: 4  # Gradient accumulation steps
 max_epochs: 10                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
@@ -70,7 +71,13 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
 feature_types: ["face_90"]
 negative_mining: "overlapping"
-data_resize_transform: 192
+data_resize_transform: 518
+tff_selection: "movement"
+movement_delta: 0.05
+
+# dataset_names: ["ssl", "cxl"]
+# additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset]
+# additional_val_data_dirs: [/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42]
 
 dataset_names: ["ssl", "bristol", "cxl_all", "cxl"]
 additional_val_dataset_classes: [gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.cxl.CXLDataset]

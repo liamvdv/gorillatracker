@@ -26,6 +26,9 @@ class ContrastiveImage:
         return Image.open(self.image_path)
 
 
+FlatNlet = tuple[ContrastiveImage, ...]
+
+
 def group_contrastive_images(
     contrastive_images: list[ContrastiveImage],
 ) -> defaultdict[gtypes.Label, list[ContrastiveImage]]:

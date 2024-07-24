@@ -23,7 +23,7 @@ from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import ContrastiveKFoldValSampler, get_individual, get_individual_video_id
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -46,7 +46,7 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
 def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
     samples: list[gtypes.Nlet] = []
     for batch in dataloader:
-        ids, images, labels = batch
+        ids, images, labels = batch if len(batch) == 3 else batch[:-1]
         row_batch = zip(zip(*ids), zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))
@@ -237,6 +237,11 @@ def knn(
     classification_mask: torch.Tensor
     if use_crossvideo_positives:
         distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        if use_train_embeddings:  # add train embeddings to the distance mask (shapes would not match otherwise)
+            train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
+            distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
+            distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
+            distance_mask = distance_mask.to(torch.bool)
         distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
@@ -341,17 +346,28 @@ def knn_ssl(
         subset_mask = torch.isin(labels, torch.tensor(subset_labels))
         subset_embeddings = embeddings[subset_mask]
         subset_label_values = labels[subset_mask]
-        knn = NearestNeighbors(n_neighbors=max(5, k) + 1, algorithm="auto").fit(subset_embeddings.numpy())
+
+        n_samples = len(subset_embeddings)
+        if n_samples <= k:
+            continue
+
+        n_neighbors = k + 1  # We need k+1 neighbors because the first one is the sample itself
+
+        knn = NearestNeighbors(n_neighbors=n_neighbors, algorithm="auto").fit(subset_embeddings.numpy())
         current_label_mask = subset_label_values == label.item()
         current_label_embeddings = subset_embeddings[current_label_mask]
         _, indices = knn.kneighbors(current_label_embeddings.numpy())
-        indices = indices[:, 1:]
+
+        indices = indices[:, 1:]  # Remove the first column (self)
         for idx_list in indices:
             neighbor_labels = subset_label_values[idx_list]
-            most_common = torch.mode(neighbor_labels[:k]).values.item()
+            most_common = torch.mode(neighbor_labels).values.item()
             true_labels.append(label.item())
             pred_labels.append(most_common)
-            pred_labels_top5.append(neighbor_labels[:5].numpy())
+            pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))].numpy())
+
+    if len(true_labels) == 0:
+        return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}
 
     true_labels_tensor = torch.tensor(true_labels)
     pred_labels_tensor = torch.tensor(pred_labels)

@@ -21,6 +21,7 @@ from gorillatracker.utils.train import (
     train_using_quantization_aware_training,
 )
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+from gorillatracker.utils.callbacks import BestMetricLogger
 
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
@@ -80,6 +81,7 @@ def main(args: TrainingArgs) -> None:
         width_range=args.width_range,
         height_range=args.height_range,
         split_path=args.split_path,
+        movement_delta=args.movement_delta,
     )
     if args.force_nlet_builder is not None and args.force_nlet_builder != "None":
         force_nlet_builder(args.force_nlet_builder)
@@ -107,26 +109,27 @@ def main(args: TrainingArgs) -> None:
     lr_monitor = LearningRateMonitor(logging_interval="step" if args.stepwise_schedule else "epoch")
 
     checkpoint_callback = ModelCheckpoint(
-        filename="epoch-{epoch}-acc-{"
-        + str(dm.get_dataset_class_names()[0])
-        + "/val/embeddings/knn5_crossvideo/accuracy:.3f}",
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy" if not args.use_ssl else f"{dm.get_dataset_class_names()[1]}/val/embeddings/knn5_crossvideo/accuracy",
-        mode="max",
+        filename="epoch-{epoch}-" + args.stop_saving_metric_name + "-{" + args.stop_saving_metric_name + ":.2f}",
+        monitor=args.stop_saving_metric_name,
+        mode=args.stop_saving_metric_mode,
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
         save_last=True,  # also save the last checkpoint
     )
 
     early_stopping = EarlyStopping(
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/embeddings/knn5_crossvideo/accuracy" if not args.use_ssl else f"{dm.get_dataset_class_names()[1]}/val/embeddings/knn5_crossvideo/accuracy",
-        mode="max",
+        monitor=args.stop_saving_metric_name,
+        mode=args.stop_saving_metric_mode,
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
+    
+    max_metric_logger_callback = BestMetricLogger(metric_name=args.stop_saving_metric_name)
 
     callbacks = (
         [
             checkpoint_callback,  # keep this at the top
+            max_metric_logger_callback,
             lr_monitor,
             early_stopping,
         ]

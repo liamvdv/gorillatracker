@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 
 from simple_parsing import field, list_field
 
@@ -14,8 +14,8 @@ class TrainingArgs:
     # Device Arguments
     accelerator: Literal["cuda", "cpu", "tpu", "mps"] = field(default="cuda")
     num_devices: int = field(default=1)
-    distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default=None)
-    force_deterministic: bool = field(default=False)
+    distributed_strategy: Literal["ddp", "fsdp", "auto", None] = field(default="auto")
+    force_deterministic: bool = field(default=True)
     precision: Literal[
         "32-true",
         "16-mixed",
@@ -36,7 +36,9 @@ class TrainingArgs:
     project_name: str = field(default="")
     run_name: str = field(default="")
     wandb_tags: List[str] = list_field(default=["template"])
-    model_name_or_path: str = field(default="EfficientNetV2")
+    model_name_or_path: str = field(default="timm/efficientnetv2_rw_m")  # TODO
+    freeze_backbone: bool = field(default=False)
+
     use_wildme_model: bool = field(default=False)
     saved_checkpoint_path: Union[str, None] = field(default=None)
     resume: bool = field(default=False)
@@ -51,6 +53,10 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
+    embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = field(default="linear")
+    pool_mode: Literal["gem", "gap", "gem_c", "none"] = field(default="none")
+    fix_img_size: Optional[int] = field(default=None)
+
     use_quantization_aware_training: bool = field(default=False)
 
     # Optimizer Arguments
@@ -74,6 +80,8 @@ class TrainingArgs:
     lr_interval: float = field(default=1)  # Fraction of an epoch after which learning rate is updated
 
     save_model_to_wandb: Union[Literal["all"], bool] = field(default=False)
+    stop_saving_metric_name: str = "cxl/val/embeddings/knn5_crossvideo/accuracy"
+    stop_saving_metric_mode: Literal["min", "max"] = "max"
 
     # NTXent Arguments
     temperature: float = field(default=0.5)
@@ -103,8 +111,14 @@ class TrainingArgs:
         "softmax/elasticface/l2sp",
         "distillation/offline/response-based",
         "ntxent",
+        "mae_mse",
+        "mae_mse/l2sp",
+        "mae_mse/arcface",
+        "mae_mse/arcface/l2sp",
         "ntxent/l2sp",
     ] = field(default="offline")
+    cross_video_masking: bool = field(default=False)
+    loss_dist_term: Literal["cosine", "euclidean"] = field(default="euclidean")
     teacher_model_wandb_link: str = field(default="")
     kfold: bool = field(default=False)
     use_focal_loss: bool = field(default=False)
@@ -140,7 +154,7 @@ class TrainingArgs:
 
     # SSL Config
     use_ssl: bool = field(default=False)
-    tff_selection: Literal["random", "equidistant", "embeddingdistant"] = field(default="equidistant")
+    tff_selection: Literal["random", "equidistant", "embeddingdistant", "movement"] = field(default="equidistant")
     split_path: Path = field(default=Path("ERROR_PATH_NOT_SET_SEE_ARGS"))
     negative_mining: Literal["random", "overlapping", "social_groups"] = field(default="random")
     n_samples: int = field(default=15)
@@ -149,6 +163,7 @@ class TrainingArgs:
     min_images_per_tracking: int = field(default=3)
     width_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
     height_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
+    movement_delta: Union[float, None] = field(default=None)
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0
@@ -166,6 +181,7 @@ class TrainingArgs:
         assert all(
             s in ["body", "face_90", "face_45", "body_with_face"] for s in self.feature_types
         ), "Invalid feature type"
+        assert self.tff_selection != "movement" or self.movement_delta is not None, "Combination not allowed"
         if self.grad_clip <= 0:
             self.grad_clip = None
         assert self.lr_interval <= 1, "lr_interval should be <= 1"

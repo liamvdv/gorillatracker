@@ -1,43 +1,147 @@
 from __future__ import annotations
 
-import copy
-from typing import Any, Callable
+from logging import getLogger
+from typing import Any, Callable, Literal, Optional, Type
 
 import timm
 import torch
+import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
-from print_on_steroids import logger
-from torch import nn
+from timm.layers.classifier import ClassifierHead, NormMlpClassifierHead
 from torchvision import transforms
-from torchvision.models import (
-    EfficientNet_V2_L_Weights,
-    ResNet18_Weights,
-    ResNet50_Weights,
-    ResNet152_Weights,
-    efficientnet_v2_l,
-    resnet18,
-    resnet50,
-    resnet152,
-)
-from transformers import ResNetModel
+from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
-from gorillatracker.model.model_miewid import GeM, load_miewid_model  # type: ignore
+from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
+from gorillatracker.transform_utils import PlanckianJitter
+
+logger = getLogger(__name__)
 
 
-class EvaluationWrapper(BaseModule):
+def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW", "NHWC"] = "NCHW") -> torch.nn.Module:
+    if id == "gem":
+        return FormatWrapper(GeM(), format)
+    elif id == "gem_c":
+        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format)  # TODO(rob2u): test
+    elif id == "gap":
+        return FormatWrapper(GAP(), format)
+    else:
+        return nn.Identity()
+
+
+def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p: float = 0.0) -> torch.nn.Module:
+    if id == "linear":
+        return nn.Linear(feature_dim, embedding_dim)
+    elif id == "mlp":
+        return nn.Sequential(
+            nn.Linear(feature_dim, feature_dim),
+            nn.ReLU(),
+            nn.Linear(feature_dim, embedding_dim),
+        )
+    elif "linear_norm_dropout" in id:
+        return nn.Sequential(
+            nn.BatchNorm1d(feature_dim),
+            nn.Dropout(p=dropout_p),
+            nn.Linear(feature_dim, embedding_dim),
+            nn.LayerNorm(embedding_dim),
+        )
+    elif "mlp_norm_dropout" in id:
+        return nn.Sequential(
+            nn.Linear(feature_dim, feature_dim),
+            nn.ReLU(),
+            nn.BatchNorm1d(feature_dim),
+            nn.Dropout(p=dropout_p),
+            nn.Linear(feature_dim, embedding_dim),
+            nn.LayerNorm(embedding_dim),
+        )
+    else:
+        return nn.Identity()
+
+
+# NOTE(rob2u): We used the following models from timm:
+# efficientnetv2_rw_m — EfficientNetRW_M
+# convnextv2_base — ConvNeXtV2BaseWrapper
+# convnextv2_huge — ConvNeXtV2HugeWrapper
+# vit_large_patch16_224 — VisionTransformerWrapper
+# vit_large_patch14_dinov2.lvd142m — VisionTransformerDinoV2Wrapper
+# vit_base_patch16_clip_224.metaclip_2pt5b — VisionTransformerClipWrapper
+# convnext_base.clip_laion2b — ConvNextClipWrapper
+# swinv2_base_window12_192.ms_in22k — SwinV2BaseWrapper
+# swinv2_large_window12to16_192to256.ms_in22k_ft_in1k — SwinV2LargeWrapper
+# inception_v3 — InceptionV3Wrapper
+class TimmWrapper(nn.Module):
+    def __init__(
+        self,
+        backbone_name: str,
+        embedding_size: int,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        dropout_p: float = 0.0,
+        pool_mode: Literal["gem", "gap", "gem_c", "none"] = "none",
+        img_size: Optional[int] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+
+        assert pool_mode == "none" or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
+        if img_size is not None:
+            logger.info("Setting img_size to", img_size)
+            self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0, img_size=img_size)
+        else:
+            self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0)
+        self.num_features = self.model.num_features
+
+        self.reset_if_necessary(pool_mode)
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=self.num_features, embedding_dim=embedding_size, dropout_p=dropout_p
+        )
+        self.pool_mode = pool_mode
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        if x.dim() == 3:
+            logger.info("Assuming VisionTransformer is used and taking the first token.")
+            x = x[:, 0, :]
+
+        x = self.embedding_layer(x)
+        return x
+
+    def reset_if_necessary(self, pool_mode: Optional[Literal["gem", "gap", "gem_c", "none"]] = None) -> None:
+        if pool_mode == "none":
+            pool_mode = None
+        if (
+            hasattr(self.model, "head")
+            # NOTE(rob2u): see https://github.com/huggingface/pytorch-image-models/blob/main/timm/layers/classifier.py#L73
+            and hasattr(self.model.head, "global_pool")
+            and pool_mode is not None
+        ):
+            if isinstance(self.model.head, ClassifierHead):
+                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.model.head.input_fmt)
+                self.model.head.fc = nn.Identity()
+                self.model.head.drop = nn.Identity()
+            elif isinstance(self.model.head, NormMlpClassifierHead):
+                logger.warn(
+                    "Model uses NormMlpClassifierHead, for which we do not want to change the global_pooling layer."
+                )
+        elif pool_mode is not None and hasattr(self.model, "global_pool"):
+            self.model.reset_classifier(0, "")
+            self.model.global_pool = get_global_pooling_layer(pool_mode, self.num_features)
+        else:
+            logger.info("No pooling layer reset necessary.")
+
+
+class TimmEvalWrapper(nn.Module):
     def __init__(  # type: ignore
         self,
-        model_name_or_path: str,
-        **kwargs,
+        backbone_name,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        model_name_or_path = model_name_or_path.replace("timm/", "")
-        self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch)
-        # if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
-        # self.model = timm.create_model(model_name_or_path, pretrained=not self.from_scratch, img_size=512)
-
-        self.set_losses(model=self.model, **kwargs)  # NOTE: necessary for eval (sadly)
+        super().__init__()
+        self.model = timm.create_model(backbone_name, pretrained=True)
+        if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
+            logger.warn("We wont use image size greater than 768!!!")
+            self.model = timm.create_model(backbone_name, pretrained=True, img_size=512)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model.forward_features(x)
@@ -45,635 +149,109 @@ class EvaluationWrapper(BaseModule):
         return x
 
 
-class EfficientNetV2Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        is_from_scratch = kwargs.get("from_scratch", False)
-        self.model = (
-            efficientnet_v2_l()
-            if is_from_scratch
-            else efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
-        )
-        # self.model.classifier = torch.nn.Sequential(
-        #     torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
-        # )
-        self.model.classifier = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.classifier[1].in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.classifier[1].in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.classifier = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        # return self.model.blocks[-1].conv
-        return self.model.features[-1][0]  # TODO(liamvdv)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-            ]
-        )
-
-
-class EfficientNetRW_M(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        is_from_scratch = kwargs.get("from_scratch", False)
-        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
-
-        self.model.classifier = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.classifier.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.classifier.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.classifier = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.conv_head
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
-                # transforms_v2.RandomAffine(degrees=(30, 70), translate=(0.1, 0.3), scale=(0.5, 0.75)),
-                # transforms_v2.RandomPerspective(distortion_scale=0.8, p=1.0, fill=0),
-            ]
-        )
-
-
-class ConvNeXtV2BaseWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("convnextv2_base", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.stages[-1].blocks[-1].conv_dw
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-            ]
-        )
-
-
-class ConvNeXtV2HugeWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("convnextv2_huge", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-
-class VisionTransformerWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("vit_large_patch16_224", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
-        return self.model.blocks[-1].norm1
-
-    def get_grad_cam_reshape_transform(self) -> Any:
-        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-vision-transformers
-        def reshape_transform(tensor: torch.Tensor, height: int = 14, width: int = 14) -> torch.Tensor:
-            result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
-
-            result = result.transpose(2, 3).transpose(1, 2)
-            return result
-
-        return reshape_transform
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-            ]
-        )
-
-
-class VisionTransformerFrozenWrapper(VisionTransformerWrapper):
+class ResNet50DinoV2Wrapper(nn.Module):
     def __init__(
         self,
+        embedding_size: int,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        dropout_p: float = 0.0,
+        *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        self.freeze()
-        for param in self.model.head.parameters():
-            param.requires_grad = True
-
-
-class VisionTransformerDinoV2Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("vit_large_patch14_dinov2.lvd142m", pretrained=not self.from_scratch)
-        self.model.reset_classifier(self.embedding_size)
-        self.model.head = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class VisionTransformerClipWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("vit_base_patch16_clip_224.metaclip_2pt5b", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class ConvNextClipWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        model_name = "convnext_base.clip_laion2b"
-        self.model = (
-            timm.create_model(model_name, pretrained=False)
-            if kwargs.get("from_scratch", False)
-            else timm.create_model(model_name, pretrained=True)
-        )
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-        self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class ConvNextWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("convnext_base", pretrained=not self.from_scratch)
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-        self.set_losses(self.model, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class SwinV2BaseWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        swin_model = "swinv2_base_window12_192.ms_in22k"
-        self.model = (
-            timm.create_model(swin_model, pretrained=False)
-            if kwargs.get("from_scratch", False)
-            else timm.create_model(swin_model, pretrained=True)
-        )
-        # self.model.head.fc = torch.nn.Sequential(
-        #     torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-        # ) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
-        return self.model.layers[-1].blocks[-1].norm1
-
-    def get_grad_cam_reshape_transform(self) -> Any:
-        # Implementation for "swin_base_patch4_window7_224"
-        # see https://github.com/jacobgil/pytorch-grad-cam/blob/master/tutorials/vision_transformers.md#how-does-it-work-with-swin-transformers
-
-        # NOTE(liamvdv): we use this implementation for "swinv2_base_window12_192.ms_in22k"
-        # TODO(liamvdv): I'm not sure this is correct, but it seems to work...
-        def reshape_transform(tensor: torch.Tensor) -> torch.Tensor:
-            batch_size, _, _, _ = tensor.shape
-            total_elements = tensor.numel()
-            num_channels = total_elements // (batch_size * 12 * 12)
-
-            result = tensor.reshape(batch_size, num_channels, 12, 12)
-            return result
-
-        return reshape_transform
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
-            ]
-        )
-
-
-class SwinV2LargeWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        swin_model = "swinv2_large_window12to16_192to256.ms_in22k_ft_in1k"
-        self.model = (
-            timm.create_model(swin_model, pretrained=False)
-            if kwargs.get("from_scratch", False)
-            else timm.create_model(swin_model, pretrained=True)
-        )
-        # self.model.head.fc = torch.nn.Linear(
-        #     in_features=self.model.head.fc.in_features, out_features=self.embedding_size
-        # ) # TODO
-        self.model.head.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.head.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.head.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.head.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(256, scale=(0.75, 1.0)),
-            ]
-        )
-
-
-class ResNet18Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = (
-            resnet18() if kwargs.get("from_scratch", False) else resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-        )
-        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-        self.model.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        # return self.model.layer4[-1]
-        return self.model.layer4[-1].conv2
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class ResNet152Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = (
-            resnet152() if kwargs.get("from_scratch", False) else resnet152(weights=ResNet152_Weights.IMAGENET1K_V1)
-        )
-        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-        self.model.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        # return self.model.layer4[-1]
-        return self.model.layer4[-1].conv3
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class ResNet50Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.model = (
-            resnet50() if kwargs.get("from_scratch", False) else resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
-        )
-        # self.model.fc = torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size) # TODO
-        self.model.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
-
-
-class ResNet50DinoV2Wrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
-        # self.last_linear = torch.nn.Linear(in_features=2048, out_features=self.embedding_size) # TODO
-        self.last_linear = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(2048),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=2048, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=2048, embedding_dim=embedding_size, dropout_p=dropout_p
         )
-        self.set_losses(self.model, **kwargs)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         outputs = self.model(x)
         gap = torch.nn.AdaptiveAvgPool2d((1, 1))
         feature_vector = gap(outputs.last_hidden_state)
         feature_vector = torch.flatten(feature_vector, start_dim=2).squeeze(-1)
-        feature_vector = self.last_linear(feature_vector)
+        feature_vector = self.embedding_layer(feature_vector)
         return feature_vector
 
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.13)),
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-            ]
-        )
 
-
-class InceptionV3Wrapper(BaseModule):
-    def __init__(  # type: ignore
+class Miewid_msv2(nn.Module):
+    def __init__(
         self,
-        **kwargs,
+        embedding_size: int,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        dropout_p: float = 0.0,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        self.model = timm.create_model("inception_v3", pretrained=not self.from_scratch)
-
-        # self.model.reset_classifier(self.embedding_size) # TODO
-        self.model.fc = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(self.model.fc.in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=self.model.fc.in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-        model_cpy = copy.deepcopy(self.model)
-        model_cpy.fc = torch.nn.Identity()
-        self.set_losses(model=model_cpy, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.Mixed_7c.branch_pool
-
-    @classmethod
-    def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
-        return transforms.Compose(
-            [
-                transforms_v2.RandomHorizontalFlip(p=0.5),
-                transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
-            ]
-        )
-
-
-class MiewIdNetWrapper(BaseModule):
-    def __init__(  # type: ignore
-        self,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        is_from_scratch = kwargs.get("from_scratch", False)
-        use_wildme_model = kwargs.get("use_wildme_model", False)
-
-        if use_wildme_model:
-            logger.info("Using WildMe model")
-            self.model = load_miewid_model()
-            # fix model
-            for param in self.model.parameters():
-                param.requires_grad = False
-
-            # self.model.global_pool = nn.Identity()
-            # self.model.bn = nn.Identity()
-            self.classifier = torch.nn.Sequential(
-                # torch.nn.BatchNorm1d(2152),
-                torch.nn.Dropout(p=self.dropout_p),
-                torch.nn.Linear(in_features=2152, out_features=self.embedding_size),
-                torch.nn.BatchNorm1d(self.embedding_size),
-            )
-            self.set_losses(self.model, **kwargs)
-            return
-
-        self.model = timm.create_model("efficientnetv2_rw_m", pretrained=not is_from_scratch)
-        in_features = self.model.classifier.in_features
-
-        self.model.global_pool = nn.Identity()  # NOTE: GeM = Generalized Mean Pooling
-        self.model.classifier = nn.Identity()
-
-        # TODO(rob2u): load wildme model weights here then initialize the classifier and get loss modes -> change the transforms accordingly (normalize, etc.)
-        self.classifier = torch.nn.Sequential(
-            GeM(),
-            torch.nn.Flatten(),
-            torch.nn.BatchNorm1d(in_features),
-            torch.nn.Dropout(p=self.dropout_p),
-            torch.nn.Linear(in_features=in_features, out_features=self.embedding_size),
-            torch.nn.BatchNorm1d(self.embedding_size),
-        )
-
-        self.set_losses(self.model, **kwargs)
-
-    def get_grad_cam_layer(self) -> torch.nn.Module:
-        return self.model.blocks[-1][-1].conv_pwl
+        super().__init__()
+        self.model = AutoModel.from_pretrained("conservationxlabs/miewid-msv2", trust_remote_code=True)  # size: 440
+        self.model = self.model.to(self.device)
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=1280, embedding_dim=embedding_size, dropout_p=dropout_p
+        )  # TODO(rob2u): test
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model(x)
-        x = self.classifier(x)
+        x = self.embedding_layer(x)
+        return x
+
+
+model_wrapper_registry = {
+    "timm": TimmWrapper,
+    "timm_eval": TimmEvalWrapper,
+    "resnet50_dinov2": ResNet50DinoV2Wrapper,
+    "miewid_msv2": Miewid_msv2,
+}
+
+
+class BaseModuleSupervised(BaseModule):
+    def __init__(
+        self,
+        model_name_or_path: str,
+        dropout_p: float = 0.0,
+        pool_mode: Optional[Literal["gem", "gap", "gem_c"]] = None,
+        fix_img_size: Optional[int] = None,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        freeze_backbone: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+
+        assert (
+            len(model_name_or_path.split("/")) == 2
+        ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
+        logger.info("Using model", model_name_or_path)
+        wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
+        if model_name_or_path.startswith("hf-hub"):  # Example: hf-hub:BVRA/MegaDescriptor-T-224
+            backbone_name = model_name_or_path
+        else:  # Example: timm/efficientnetv2_rw_m
+            backbone_name = model_name_or_path.split("/")[-1]
+
+        self.model_wrapper = wrapper_cls(
+            backbone_name=backbone_name,
+            pool_mode=pool_mode,
+            img_size=fix_img_size,
+            embedding_size=self.embedding_size,
+            embedding_id=embedding_id,
+            dropout_p=dropout_p,
+        )
+        self.set_losses(model=self.model_wrapper.model, **kwargs)
+
+        if freeze_backbone:
+            for param in self.model_wrapper.model.parameters():
+                param.requires_grad = False
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # TODO check for l2sp
+        x = self.model_wrapper(x)
         return x
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                PlanckianJitter(),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(440, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
             ]
         )
