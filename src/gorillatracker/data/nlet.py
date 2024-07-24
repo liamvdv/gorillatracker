@@ -17,6 +17,7 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import (
     ContrastiveClassSampler,
     ContrastiveImage,
+    ContrastiveKFoldValSampler,
     ContrastiveSampler,
     FlatNlet,
     SupervisedCrossEncounterSampler,
@@ -138,6 +139,31 @@ def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveI
     return group_contrastive_images(samples)
 
 
+def group_images_by_fold_and_label(dirpaths: list[Path]) -> defaultdict[Label, list[ContrastiveImage]]:
+    """
+    Assumed directory structure:
+        dirpath/
+            <label>_<...>.png
+            or
+            <label>_<...>.jpg
+    """
+    for dirpath in dirpaths:
+        assert os.path.exists(dirpath), f"Directory {dirpath} does not exist"
+    samples = []
+    image_paths: list[Path] = []
+    for dirpath in dirpaths:
+        image_paths = image_paths + list(dirpath.glob("*.jpg"))
+        image_paths = image_paths + list(dirpath.glob("*.png"))
+    for image_path in image_paths:
+        fold = image_path.parent.name
+        if "_" in image_path.name:
+            label = fold + image_path.name.split("_")[0]
+        else:
+            label = fold + image_path.name.split("-")[0]
+        samples.append(ContrastiveImage(str(image_path), image_path, LabelEncoder.encode(label)))
+    return group_contrastive_images(samples)
+
+
 class SupervisedDataset(NletDataset):
     """
     A dataset that assumes the following directory structure:
@@ -219,6 +245,17 @@ class SupervisedKFoldDataset(KFoldNletDataset):
         else:
             raise ValueError(f"Invalid partition: {self.partition}")
         return sampler_class(self.classes)
+
+
+class ValOnlyKFoldDataset(SupervisedDataset):
+    def create_contrastive_sampler(
+        self, base_dir: Path, sampler_class: type = ContrastiveKFoldValSampler
+    ) -> ContrastiveClassSampler:
+        assert self.partition == "val", "ValOnlyKfoldDataset is only for additional validation datasets"
+        self.k = len(os.listdir(base_dir)) - 1  # subtract 1 (test set as its not a fold)
+        dirpaths = [base_dir / Path(f"fold-{i}") for i in range(self.k)]
+        self.classes = group_images_by_fold_and_label(dirpaths)
+        return sampler_class(self.classes, self.k)
 
 
 class CrossEncounterSupervisedDataset(SupervisedDataset):

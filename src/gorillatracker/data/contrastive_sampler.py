@@ -127,6 +127,19 @@ class ContrastiveClassSampler(ContrastiveSampler):
         return negative_classes
 
 
+class ContrastiveKFoldValSampler(ContrastiveClassSampler):
+    k: int
+
+    def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]], k: int) -> None:
+        super().__init__(classes)
+        self.k = k
+
+    def get_fold(self, label: Label) -> int:
+        img = self.find_any_image(label)
+        fold_dir = img.image_path.parent.name
+        return int(fold_dir.split("-")[-1])
+
+
 class SupervisedCrossEncounterSampler(ContrastiveClassSampler):
     def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]]) -> None:
         super().__init__(classes)
