@@ -589,7 +589,7 @@ class BaseModule(L.LightningModule):
                     knn_func, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
                 ),
             }
-            if self.knn_with_train and dataloader_idx == 0 and knn_func is not knn_ssl
+            if self.knn_with_train and dataloader_idx == 0 and knn_func is knn
             else {}
         )
         metrics |= (
@@ -610,6 +610,24 @@ class BaseModule(L.LightningModule):
             if ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower()) and knn_func is knn
             else {}
         )
+        metrics |= (
+            {
+                "knn_crossvideo-with-train": partial(
+                    knn_func, k=1, use_crossvideo_positives=True, use_train_embeddings=True
+                ),
+                "knn_crossvideo-with-train_cos": partial(
+                    knn_func, k=1, use_crossvideo_positives=True, use_train_embeddings=True, distance_metric="cosine"
+                ),
+                "knn5_crossvideo-with-train": partial(
+                    knn_func, k=5, use_crossvideo_positives=True, use_train_embeddings=True
+                ),
+                "knn5_crossvideo-with-train_cos": partial(
+                    knn_func, k=5, use_crossvideo_positives=True, use_train_embeddings=True, distance_metric="cosine"
+                ),
+            }
+            if self.knn_with_train and dataloader_idx == 0 and knn_func is knn and ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower())
+            else {}
+        )
         for metric_name, metric_func in metrics.items():
             if knn_func is knn_ssl:
                 metrics[metric_name] = partial(metric_func, dm=self.dm)
@@ -623,6 +641,7 @@ class BaseModule(L.LightningModule):
             }
 
         metrics = metrics if not self.fast_dev_run else {}
+        metrics = {} if "combined" in dataset_id.lower() else metrics
 
         # log to wandb
         results = evaluate_embeddings(
