@@ -541,10 +541,10 @@ class BaseModule(L.LightningModule):
             )
         knn_func = knn
         if dataset_id == "SSLDataset":
-            knn_func = knn_ssl
+            knn_func = knn_ssl  # type: ignore
         elif dataset_id == "ValKFoldCXLDataset":
-            knn_func = knn_kfold_val
-        
+            knn_func = knn_kfold_val  # type: ignore
+
         metrics = {
             "knn5": partial(knn_func, k=5),
             "knn": partial(knn_func, k=1),
@@ -609,11 +609,11 @@ class BaseModule(L.LightningModule):
             if knn_func is knn_kfold_val:
                 metrics[metric_name] = partial(metric_func, dm=self.dm, current_val_index=dataloader_idx)
         if knn_func is knn:
-            metrics |= ({
-                "tsne": tsne,
+            metrics |= {
+                "tsne": tsne,  # type: ignore
                 # "pca": pca,
                 # "fc_layer": fc_layer,
-            }) 
+            }
 
         metrics = metrics if not self.fast_dev_run else {}
 
