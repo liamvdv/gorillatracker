@@ -600,6 +600,26 @@ class BaseModule(L.LightningModule):
             if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
             else {}
         )
+
+        metrics |= (
+            {
+                "knn_crossvideo-with-train": partial(
+                    knn, k=1, use_crossvideo_positives=True, use_train_embeddings=True
+                ),
+                "knn_crossvideo-with-train_cos": partial(
+                    knn, k=1, use_crossvideo_positives=True, use_train_embeddings=True, distance_metric="cosine"
+                ),
+                "knn5_crossvideo-with-train": partial(
+                    knn, k=5, use_crossvideo_positives=True, use_train_embeddings=True
+                ),
+                "knn5_crossvideo-with-train_cos": partial(
+                    knn, k=5, use_crossvideo_positives=True, use_train_embeddings=True, distance_metric="cosine"
+                ),
+            }
+            if self.knn_with_train and ("cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower())
+            else {}
+        )
+
         metrics = (
             {
                 "knn_ssl": partial(knn_ssl, k=1, dm=self.dm),

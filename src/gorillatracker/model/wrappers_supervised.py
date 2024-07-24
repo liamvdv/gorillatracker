@@ -13,6 +13,7 @@ from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
+from gorillatracker.transform_utils import PlanckianJitter
 
 logger = getLogger(__name__)
 
@@ -136,12 +137,11 @@ class TimmEvalWrapper(nn.Module):
         backbone_name,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        backbone_name = backbone_name.replace("EVAL_", "")
-        self.model = timm.create_model(backbone_name, pretrained=not self.from_scratch)
+        super().__init__()
+        self.model = timm.create_model(backbone_name, pretrained=True)
         if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
             logger.warn("We wont use image size greater than 768!!!")
-            self.model = timm.create_model(backbone_name, pretrained=not self.from_scratch, img_size=512)
+            self.model = timm.create_model(backbone_name, pretrained=True, img_size=512)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model.forward_features(x)
@@ -158,7 +158,7 @@ class ResNet50DinoV2Wrapper(nn.Module):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.model = ResNetModel.from_pretrained("Ramos-Ramos/dino-resnet-50")
         self.embedding_layer = get_embedding_layer(
             id=embedding_id, feature_dim=2048, embedding_dim=embedding_size, dropout_p=dropout_p
@@ -173,7 +173,7 @@ class ResNet50DinoV2Wrapper(nn.Module):
         return feature_vector
 
 
-class Miewid_msv2(BaseModule):
+class Miewid_msv2(nn.Module):
     def __init__(
         self,
         embedding_size: int,
@@ -182,7 +182,7 @@ class Miewid_msv2(BaseModule):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.model = AutoModel.from_pretrained("conservationxlabs/miewid-msv2", trust_remote_code=True)  # size: 440
         self.model = self.model.to(self.device)
         self.embedding_layer = get_embedding_layer(
@@ -222,7 +222,7 @@ class BaseModuleSupervised(BaseModule):
         logger.info("Using model", model_name_or_path)
         wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
         if model_name_or_path.startswith("hf-hub"):  # Example: hf-hub:BVRA/MegaDescriptor-T-224
-            backbone_name = model_name_or_path.split("/")[-1]
+            backbone_name = model_name_or_path
         else:  # Example: timm/efficientnetv2_rw_m
             backbone_name = model_name_or_path.split("/")[-1]
 
@@ -248,6 +248,7 @@ class BaseModuleSupervised(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
+                PlanckianJitter(),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
