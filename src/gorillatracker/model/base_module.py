@@ -600,7 +600,7 @@ class BaseModule(L.LightningModule):
                     knn_func, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
                 ),
             }
-            if "cxl" in dataset_id.lower() or "bristol" in dataset_id.lower() and knn_func is knn
+            if ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower()) and knn_func is knn
             else {}
         )
         for metric_name, metric_func in metrics.items():
