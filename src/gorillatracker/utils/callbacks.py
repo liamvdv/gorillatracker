@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any, Literal
 
 import torch
@@ -27,7 +28,7 @@ class BestMetricLogger(Callback):
         if current_value is not None:
             if self.check(current_value):
                 self.best_value = current_value.clone().item()
-                self.best_metrics = metrics
+                self.best_metrics = deepcopy(metrics)
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         if self.best_metrics:
