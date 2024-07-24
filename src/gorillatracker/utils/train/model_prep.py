@@ -102,6 +102,7 @@ class ModelConstructor:
             fix_img_size=args.fix_img_size,
             freeze_backbone=args.freeze_backbone,
             loss_dist_term=args.loss_dist_term,
+            cross_video_masking=args.cross_video_masking,
         )
 
     def construct(

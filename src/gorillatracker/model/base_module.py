@@ -252,6 +252,7 @@ class BaseModule(L.LightningModule):
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
+            cross_video_masking=kwargs.get("cross_video_masking", False),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -277,6 +278,7 @@ class BaseModule(L.LightningModule):
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="val",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
+            cross_video_masking=kwargs.get("cross_video_masking", False),
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -320,7 +322,7 @@ class BaseModule(L.LightningModule):
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         _, images, _ = batch
-        _, flat_images, flat_labels = flatten_batch(batch)
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
 
         flat_labels_onehot = None
         if self.use_inbatch_mixup:
@@ -330,7 +332,7 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot, ids=flat_ids)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
@@ -378,7 +380,7 @@ class BaseModule(L.LightningModule):
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term and hasattr(self, "loss_module_val"):
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images)  # type: ignore
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images, ids=flat_ids)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
