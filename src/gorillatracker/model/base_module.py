@@ -519,8 +519,8 @@ class BaseModule(L.LightningModule):
 
     def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> Dict[str, float]:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
-        dataloader_id = self.dm.get_dataset_ids()[dataloader_idx]
-        if self.knn_with_train:
+        dataset_id = self.dm.get_dataset_ids()[dataloader_idx]
+        if self.knn_with_train and dataloader_idx == 0:
             train_embeddings, train_labels, train_ids = self._get_train_embeddings_for_knn(self.trainer)
 
             # add train embeddings to the embeddings table
@@ -539,151 +539,81 @@ class BaseModule(L.LightningModule):
                 ],
                 ignore_index=True,
             )
-
+        knn_func = knn
+        if dataset_id == "SSLDataset":
+            knn_func = knn_ssl
+        elif dataset_id == "ValKFoldCXLDataset":
+            knn_func = knn_kfold_val
+        
         metrics = {
-            "knn5": partial(knn, k=5),
-            "knn5_cos": partial(knn, k=5, distance_metric="cosine"),
-            "knn": partial(knn, k=1),
-            "knn_cos": partial(knn, k=1, distance_metric="cosine"),
-            "knn5_macro": partial(knn, k=5, average="macro"),
-            "knn5_macro_cos": partial(knn, k=5, average="macro", distance_metric="cosine"),
-            "knn_macro": partial(knn, k=1, average="macro"),
-            "knn_macro_cos": partial(knn, k=1, average="macro", distance_metric="cosine"),
-            "tsne": tsne,
-            # "pca": pca,
-            # "fc_layer": fc_layer,
+            "knn5": partial(knn_func, k=5),
+            "knn": partial(knn_func, k=1),
+            "knn5_macro": partial(knn_func, k=5, average="macro"),
+            "knn_macro": partial(knn_func, k=1, average="macro"),
         }
         metrics |= (
             {
-                "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                "knn5-with-train_cos": partial(knn, k=5, use_train_embeddings=True),
-                "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                "knn-with-train_cos": partial(knn, k=1, use_train_embeddings=True),
-                "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
-                "knn5-with-train_macro_cos": partial(
-                    knn, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"
-                ),
-                "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
-                "knn-with-train_macro_cos": partial(
-                    knn, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
-                ),
+                "knn5_cos": partial(knn_func, k=5, distance_metric="cosine"),
+                "knn_cos": partial(knn_func, k=1, distance_metric="cosine"),
+                "knn5_macro_cos": partial(knn_func, k=5, average="macro", distance_metric="cosine"),
+                "knn_macro_cos": partial(knn_func, k=1, average="macro", distance_metric="cosine"),
             }
-            if self.knn_with_train
+            if knn_func is not knn_ssl
             else {}
         )
         metrics |= (
             {
-                "knn_crossvideo": partial(knn, k=1, use_crossvideo_positives=True),
-                "knn_crossvideo_cos": partial(knn, k=1, use_crossvideo_positives=True),
-                "knn5_crossvideo": partial(knn, k=5, use_crossvideo_positives=True),
-                "knn5_crossvideo_cos": partial(knn, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
-                "knn_crossvideo_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
-                "knn_crossvideo_macro_cos": partial(
-                    knn, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
-                ),
-                "knn5_crossvideo_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
-                "knn5_crossvideo_macro_cos": partial(
-                    knn, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
-                ),
+                "knn5-with-train": partial(knn_func, k=5, use_train_embeddings=True),
+                "knn-with-train": partial(knn_func, k=1, use_train_embeddings=True),
+                "knn5-with-train_macro": partial(knn_func, k=5, use_train_embeddings=True, average="macro"),
+                "knn-with-train_macro": partial(knn_func, k=1, use_train_embeddings=True, average="macro"),
             }
-            if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
+            if self.knn_with_train and dataloader_idx == 0
             else {}
         )
-        metrics = (
+        metrics |= (
             {
-                "knn_ssl": partial(knn_ssl, k=1, dm=self.dm),
-                "knn5_ssl": partial(knn_ssl, k=5, dm=self.dm),
-                "knn_ssl_macro": partial(knn_ssl, k=1, dm=self.dm, average="macro"),
-                "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
+                "knn5-with-train_cos": partial(knn_func, k=5, use_train_embeddings=True, distance_metric="cosine"),
+                "knn-with-train_cos": partial(knn_func, k=1, use_train_embeddings=True, distance_metric="cosine"),
+                "knn5-with-train_macro_cos": partial(
+                    knn_func, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
+                "knn-with-train_macro_cos": partial(
+                    knn_func, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
             }
-            if "ssl" in dataloader_id.lower()
-            else metrics
+            if self.knn_with_train and dataloader_idx == 0 and knn_func is not knn_ssl
+            else {}
         )
-        metrics = (
+        metrics |= (
             {
-                "knn5": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5),
-                "knn5_cos": partial(
-                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, distance_metric="cosine"
-                ),
-                "knn": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1),
-                "knn_cos": partial(
-                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, distance_metric="cosine"
-                ),
-                "knn5_macro": partial(
-                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, average="macro"
-                ),
-                "knn5_macro_cos": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=5,
-                    average="macro",
-                    distance_metric="cosine",
-                ),
-                "knn_macro": partial(knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, average="macro"),
-                "knn_macro_cos": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=1,
-                    average="macro",
-                    distance_metric="cosine",
-                ),
-                "knn_crossvideo": partial(
-                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, use_crossvideo_positives=True
-                ),
-                "knn_crossvideo_cos": partial(
-                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=1, use_crossvideo_positives=True
-                ),
-                "knn5_crossvideo": partial(
-                    knn_kfold_val, dm=self.dm, current_val_index=dataloader_idx, k=5, use_crossvideo_positives=True
-                ),
-                "knn5_crossvideo_cos": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=5,
-                    use_crossvideo_positives=True,
-                    distance_metric="cosine",
-                ),
-                "knn_crossvideo_macro": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=1,
-                    use_crossvideo_positives=True,
-                    average="macro",
-                ),
+                "knn_crossvideo": partial(knn_func, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_cos": partial(knn_func, k=1, use_crossvideo_positives=True, distance_metric="cosine"),
+                "knn5_crossvideo": partial(knn_func, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_cos": partial(knn_func, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
+                "knn_crossvideo_macro": partial(knn_func, k=1, use_crossvideo_positives=True, average="macro"),
                 "knn_crossvideo_macro_cos": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=1,
-                    use_crossvideo_positives=True,
-                    average="macro",
-                    distance_metric="cosine",
+                    knn_func, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
                 ),
-                "knn5_crossvideo_macro": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=5,
-                    use_crossvideo_positives=True,
-                    average="macro",
-                ),
+                "knn5_crossvideo_macro": partial(knn_func, k=5, use_crossvideo_positives=True, average="macro"),
                 "knn5_crossvideo_macro_cos": partial(
-                    knn_kfold_val,
-                    dm=self.dm,
-                    current_val_index=dataloader_idx,
-                    k=5,
-                    use_crossvideo_positives=True,
-                    average="macro",
-                    distance_metric="cosine",
+                    knn_func, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
                 ),
             }
-            if "fold" in dataloader_id.lower()
-            else metrics
+            if "cxl" in dataset_id.lower() or "bristol" in dataset_id.lower() and knn_func is knn
+            else {}
         )
+        for metric_name, metric_func in metrics.items():
+            if knn_func is knn_ssl:
+                metrics[metric_name] = partial(metric_func, dm=self.dm)
+            if knn_func is knn_kfold_val:
+                metrics[metric_name] = partial(metric_func, dm=self.dm, current_val_index=dataloader_idx)
+        if knn_func is knn:
+            metrics |= ({
+                "tsne": tsne,
+                # "pca": pca,
+                # "fc_layer": fc_layer,
+            }) 
 
         metrics = metrics if not self.fast_dev_run else {}
 
