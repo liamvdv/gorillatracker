@@ -12,10 +12,10 @@ from print_on_steroids import logger
 from torch.optim.adamw import AdamW
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, knn_ssl, log_train_images_to_wandb, tsne
+from gorillatracker.metrics import evaluate_embeddings, knn, knn_kfold_val, knn_ssl, log_train_images_to_wandb, tsne
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
@@ -115,22 +115,22 @@ class BaseModule(L.LightningModule):
 
     def __init__(
         self,
-        data_module: NletDataModule,
-        from_scratch: bool,
         wandb_run: Runner,
+        data_module: NletDataModule,
         loss_mode: str,
-        weight_decay: float,
-        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"],
-        warmup_mode: Literal["linear", "cosine", "exponential", "constant"],
-        warmup_epochs: int,
-        max_epochs: int,
-        initial_lr: float,
-        start_lr: float,
-        end_lr: float,
-        stepwise_schedule: bool,
-        lr_interval: float,
-        beta1: float,
-        beta2: float,
+        from_scratch: bool = False,
+        weight_decay: float = 0.0,
+        lr_schedule: Literal["linear", "cosine", "exponential", "constant", "reduce_on_plateau"] = "cosine",
+        warmup_mode: Literal["linear", "cosine", "exponential", "constant"] = "constant",
+        warmup_epochs: int = 0,
+        max_epochs: int = 50,
+        initial_lr: float = 1e-5,
+        start_lr: float = 1e-5,
+        end_lr: float = 1e-7,
+        stepwise_schedule: bool = False,
+        lr_interval: int = 1,
+        beta1: float = 0.9,
+        beta2: float = 0.999,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         embedding_size: int = 256,
@@ -150,7 +150,7 @@ class BaseModule(L.LightningModule):
         super().__init__()
 
         if save_hyperparameters:
-            self.save_hyperparameters(ignore=["save_hyperparameters"])
+            self.save_hyperparameters(ignore=["save_hyperparameters", "data_module"])
 
         ####### Optimizer and Scheduler
         self.weight_decay = weight_decay
@@ -201,6 +201,7 @@ class BaseModule(L.LightningModule):
         self.embeddings_table_list = [
             pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
         ]
+        self.accelerator = accelerator
 
     def set_losses(
         self,
@@ -250,6 +251,8 @@ class BaseModule(L.LightningModule):
             log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
+            cross_video_masking=kwargs.get("cross_video_masking", False),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -274,6 +277,8 @@ class BaseModule(L.LightningModule):
             use_dist_term=use_dist_term,
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="val",
+            loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
+            cross_video_masking=kwargs.get("cross_video_masking", False),
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -317,15 +322,17 @@ class BaseModule(L.LightningModule):
 
     def training_step(self, batch: gtypes.NletBatch, batch_idx: int) -> torch.Tensor:
         _, images, _ = batch
-        _, flat_images, flat_labels = flatten_batch(batch)
+        flat_ids, flat_images, flat_labels = flatten_batch(batch)
 
         flat_labels_onehot = None
         if self.use_inbatch_mixup:
             flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
+
+        flat_images = flat_images.to(self.accelerator)
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
-        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot)  # type: ignore
+        loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot, ids=flat_ids)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
         self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
@@ -372,8 +379,8 @@ class BaseModule(L.LightningModule):
         embeddings = self.forward(flat_images)
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
-        if "softmax" not in self.loss_mode and not self.use_dist_term:
-            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images)  # type: ignore
+        if "softmax" not in self.loss_mode and not self.use_dist_term and hasattr(self, "loss_module_val"):
+            loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images, ids=flat_ids)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
@@ -457,7 +464,7 @@ class BaseModule(L.LightningModule):
             )
 
         optimizer = AdamW(
-            self.model.parameters(),
+            self.parameters(),  # NOTE(rob2u): we want to optimize all parameters (including the loss_module ones -> arcfaces)
             lr=self.initial_lr,
             betas=(self.beta1, self.beta2),
             eps=self.epsilon,
@@ -519,8 +526,8 @@ class BaseModule(L.LightningModule):
 
     def eval_embeddings_table(self, embeddings_table: pd.DataFrame, dataloader_idx: int) -> Dict[str, float]:
         dataloader_name = self.dm.get_dataset_class_names()[dataloader_idx]
-        dataloader_id = self.dm.get_dataset_ids()[dataloader_idx]
-        if self.knn_with_train:
+        dataset_id = self.dm.get_dataset_ids()[dataloader_idx]
+        if self.knn_with_train and dataloader_idx == 0:
             train_embeddings, train_labels, train_ids = self._get_train_embeddings_for_knn(self.trainer)
 
             # add train embeddings to the embeddings table
@@ -539,48 +546,105 @@ class BaseModule(L.LightningModule):
                 ],
                 ignore_index=True,
             )
+        knn_func = knn
+        if dataset_id == "SSLDataset":
+            knn_func = knn_ssl  # type: ignore
+        elif dataset_id == "ValKFoldCXLDataset":
+            knn_func = knn_kfold_val  # type: ignore
 
         metrics = {
-            "knn5": partial(knn, k=5),
-            "knn": partial(knn, k=1),
-            "knn5_macro": partial(knn, k=5, average="macro"),
-            "knn_macro": partial(knn, k=1, average="macro"),
-            "tsne": tsne,
-            # "pca": pca,
-            # "fc_layer": fc_layer,
+            "knn5": partial(knn_func, k=5),
+            "knn": partial(knn_func, k=1),
+            "knn5_macro": partial(knn_func, k=5, average="macro"),
+            "knn_macro": partial(knn_func, k=1, average="macro"),
         }
         metrics |= (
             {
-                "knn5-with-train": partial(knn, k=5, use_train_embeddings=True),
-                "knn-with-train": partial(knn, k=1, use_train_embeddings=True),
-                "knn5-with-train_macro": partial(knn, k=5, use_train_embeddings=True, average="macro"),
-                "knn-with-train_macro": partial(knn, k=1, use_train_embeddings=True, average="macro"),
+                "knn5_cos": partial(knn_func, k=5, distance_metric="cosine"),
+                "knn_cos": partial(knn_func, k=1, distance_metric="cosine"),
+                "knn5_macro_cos": partial(knn_func, k=5, average="macro", distance_metric="cosine"),
+                "knn_macro_cos": partial(knn_func, k=1, average="macro", distance_metric="cosine"),
             }
-            if self.knn_with_train
+            if knn_func is not knn_ssl
             else {}
         )
         metrics |= (
             {
-                "knn_crossvideo": partial(knn, k=1, use_crossvideo_positives=True),
-                "knn5_crossvideo": partial(knn, k=5, use_crossvideo_positives=True),
-                "knn_crossvideo_macro": partial(knn, k=1, use_crossvideo_positives=True, average="macro"),
-                "knn5_crossvideo_macro": partial(knn, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn5-with-train": partial(knn_func, k=5, use_train_embeddings=True),
+                "knn-with-train": partial(knn_func, k=1, use_train_embeddings=True),
+                "knn5-with-train_macro": partial(knn_func, k=5, use_train_embeddings=True, average="macro"),
+                "knn-with-train_macro": partial(knn_func, k=1, use_train_embeddings=True, average="macro"),
             }
-            if "cxl" in dataloader_id.lower() or "bristol" in dataloader_id.lower()
+            if self.knn_with_train and dataloader_idx == 0
             else {}
         )
-        metrics = (
+        metrics |= (
             {
-                "knn_ssl": partial(knn_ssl, k=1, dm=self.dm),
-                "knn5_ssl": partial(knn_ssl, k=5, dm=self.dm),
-                "knn_ssl_macro": partial(knn_ssl, k=1, dm=self.dm, average="macro"),
-                "knn5_ssl_macro": partial(knn_ssl, k=5, dm=self.dm, average="macro"),
+                "knn5-with-train_cos": partial(knn_func, k=5, use_train_embeddings=True, distance_metric="cosine"),
+                "knn-with-train_cos": partial(knn_func, k=1, use_train_embeddings=True, distance_metric="cosine"),
+                "knn5-with-train_macro_cos": partial(
+                    knn_func, k=5, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
+                "knn-with-train_macro_cos": partial(
+                    knn_func, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
+                ),
             }
-            if "ssl" in dataloader_id.lower()
-            else metrics
+            if self.knn_with_train and dataloader_idx == 0 and knn_func is knn
+            else {}
         )
+        metrics |= (
+            {
+                "knn_crossvideo": partial(knn_func, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_cos": partial(knn_func, k=1, use_crossvideo_positives=True, distance_metric="cosine"),
+                "knn5_crossvideo": partial(knn_func, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_cos": partial(knn_func, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
+                "knn_crossvideo_macro": partial(knn_func, k=1, use_crossvideo_positives=True, average="macro"),
+                "knn_crossvideo_macro_cos": partial(
+                    knn_func, k=1, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
+                "knn5_crossvideo_macro": partial(knn_func, k=5, use_crossvideo_positives=True, average="macro"),
+                "knn5_crossvideo_macro_cos": partial(
+                    knn_func, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
+                ),
+            }
+            if ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower()) and knn_func is knn
+            else {}
+        )
+        metrics |= (
+            {
+                "knn_crossvideo-with-train": partial(
+                    knn_func, k=1, use_crossvideo_positives=True, use_train_embeddings=True
+                ),
+                "knn_crossvideo-with-train_cos": partial(
+                    knn_func, k=1, use_crossvideo_positives=True, use_train_embeddings=True, distance_metric="cosine"
+                ),
+                "knn5_crossvideo-with-train": partial(
+                    knn_func, k=5, use_crossvideo_positives=True, use_train_embeddings=True
+                ),
+                "knn5_crossvideo-with-train_cos": partial(
+                    knn_func, k=5, use_crossvideo_positives=True, use_train_embeddings=True, distance_metric="cosine"
+                ),
+            }
+            if self.knn_with_train
+            and dataloader_idx == 0
+            and knn_func is knn
+            and ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower())
+            else {}
+        )
+        for metric_name, metric_func in metrics.items():
+            if knn_func is knn_ssl:
+                metrics[metric_name] = partial(metric_func, dm=self.dm)
+            if knn_func is knn_kfold_val:
+                metrics[metric_name] = partial(metric_func, dm=self.dm, current_val_index=dataloader_idx)
+        if knn_func is knn:
+            metrics |= {
+                "tsne": tsne,  # type: ignore
+                # "pca": pca,
+                # "fc_layer": fc_layer,
+            }
 
         metrics = metrics if not self.fast_dev_run else {}
+        metrics = {} if "combined" in dataset_id.lower() else metrics
 
         # log to wandb
         results = evaluate_embeddings(

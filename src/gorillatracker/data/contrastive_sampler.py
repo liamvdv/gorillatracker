@@ -26,6 +26,9 @@ class ContrastiveImage:
         return Image.open(self.image_path)
 
 
+FlatNlet = tuple[ContrastiveImage, ...]
+
+
 def group_contrastive_images(
     contrastive_images: list[ContrastiveImage],
 ) -> defaultdict[gtypes.Label, list[ContrastiveImage]]:
@@ -122,6 +125,19 @@ class ContrastiveClassSampler(ContrastiveSampler):
         positive_class = self.sample_to_class[sample]
         negative_classes = [c for c in self.class_labels if c != positive_class]
         return negative_classes
+
+
+class ContrastiveKFoldValSampler(ContrastiveClassSampler):
+    k: int
+
+    def __init__(self, classes: dict[gtypes.Label, list[ContrastiveImage]], k: int) -> None:
+        super().__init__(classes)
+        self.k = k
+
+    def get_fold(self, label: Label) -> int:
+        img = self.find_any_image(label)
+        fold_dir = img.image_path.parent.name
+        return int(fold_dir.split("-")[-1])
 
 
 class SupervisedCrossEncounterSampler(ContrastiveClassSampler):

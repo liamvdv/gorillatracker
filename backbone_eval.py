@@ -35,7 +35,7 @@ def read_backbones_todo_csv(file_path: str) -> list[str]:
 def get_existing_runs() -> list[str]:
     api = wandb.Api()
 
-    project_path = "gorillas/EVAL-ALL-CXL-OpenSet"
+    project_path = "gorillas/EVAL2-ALL-CXL-OpenSet"
     runs = api.runs(project_path)
     run_names = [run.name.split("-")[-1] for run in runs]  # 000-eval-<backbone_name> -> <backbone_name>
     return run_names
@@ -58,9 +58,9 @@ def get_command(backbone_name: str) -> Optional[list[str]]:
     features_ = model.forward_features(torch.randn(1, 3, data_config["input_size"][1], data_config["input_size"][2]))
     embedding_size = model.forward_head(features_, pre_logits=True).shape[1]
     input_size = data_config["input_size"][-1]
-    input_size = min(input_size, 512)  # Limit input size to 512
+    input_size = min(input_size, 768)  # Limit input size to 768
     if input_size != data_config["input_size"][-1]:
-        print(f"Warning: input size limited to 512 for {backbone_name}")
+        print(f"Warning: input size limited to 768 for {backbone_name}")
 
     return [
         "python",
@@ -70,7 +70,7 @@ def get_command(backbone_name: str) -> Optional[list[str]]:
         f"--run_name=000-eval-{backbone_name}",
         f"--embedding_size={embedding_size}",
         f"--data_resize_transform={input_size}",
-        f"--model_name_or_path={backbone_name}",
+        f"--model_name_or_path=timm_eval/{backbone_name}",
         f"--normalization_mean={list(data_config['mean'])}",
         f"--normalization_std={list(data_config['std'])}",
     ]
@@ -101,7 +101,7 @@ def run_command(backbone_name: str) -> tuple[Optional[str], Optional[str]]:
 if __name__ == "__main__":
     with open(".lock", "w") as f:
         pass
-    max_processes = 5
+    max_processes = 6
     backbone_list_all = read_backbones_todo_csv("backbone_names_all.csv")
     backbone_list_done = get_existing_runs()
     backbone_list_todo = list(set(backbone_list_all) - set(backbone_list_done))
