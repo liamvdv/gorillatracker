@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Tuple, Type, Callable
+from typing import Callable, Optional, Tuple, Type
 
 import numpy as np
 import torch.ao.quantization
@@ -149,7 +149,7 @@ def train_and_validate_using_kfold(
             model_kfold,
             [checkpoint_callback, max_metric_logger_callback, *callbacks, early_stopping_callback],
             wandb_logger,
-            checkpoint_callback=checkpoint_callback,  # type: ignore
+            checkpoint_callback=checkpoint_callback,
         )
 
     if args.kfold and not args.fast_dev_run:
