@@ -1,0 +1,107 @@
+{
+    "global": {
+        "sweep_name": "Quantization Aware Training Sweep",
+        "run_name": "443-take-baselines-for-models",
+        "wandb_tags": [
+            "sweep",
+            "qat",
+            "kd"
+        ],
+        "use_quantization_aware_training": true,
+        "max_epochs": 40,
+        "early_stopping_patience": 8,
+        "embedding_size": 256,
+        "data_resize_transform": 224,
+        "loss_mode": "distillation/offline/response-based",
+        "teacher_model_wandb_link": "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/hg1f88h9?nw=nwuserkajohpi",
+        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
+        "dataset_class": "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset",
+        "dataset_names": [
+            "cxlkfold",
+            "bristol"
+        ],
+        "additional_val_dataset_classes": [
+            "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"
+        ],
+        "additional_val_data_dirs": [
+            "gorillatracker.datasets.bristol.BristolDataset"
+        ],
+        "kfold": true,
+        "val_before_training": true,
+        "lr_schedule": "cosine",
+        "lr_interval": 1,
+        "initial_lr": 0.00001,
+        "margin": 0.5,
+        "min_confidence": 0.5,
+        "min_delta": 0.01,
+        "min_images_per_tracking": 3,
+        "workers": 16,
+        "save_model_to_wandb": false
+    },
+    "global_sweep_parameters": {
+        "weight_decay": {
+            "values": [
+                0.7,
+                0.5,
+                0.1
+            ]
+        },
+        "dropout_p": {
+            "values": [
+                0.5,
+                0.3,
+                0.1
+            ]
+        },
+        "start_lr": {
+            "values": [
+                1e-3,
+                1e-4,
+                1e-5
+            ]
+        },
+        "end_lr": {
+            "values": [
+                1e-5,
+                1e-6,
+                1e-7
+            ]
+        }
+    },
+    "experiments": [
+        {
+            "project_name": "Embedding-EfficientNetRWM-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_rw_m_cxl.yml",
+            "parameters": {
+                "batch_size": 16
+            }
+        },
+        {
+            "project_name": "Embedding-ResNet152-CXL-OpenSet",
+            "config_path": "./cfgs/resnet152_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-CXL-Open",
+            "config_path": "./cfgs/convnextv2base_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-EfficientNet-CXL-OpenSet",
+            "config_path": "./cfgs/efficientnet_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-SwinV2Large-CXL-Open",
+            "config_path": "./cfgs/swinv2_large_cxl.yml",
+            "parameters": {
+                "data_resize_transform": 256
+            }
+        },
+        {
+            "project_name": "Embedding-ConvNeXtV2-Huge-CXL-Open",
+            "config_path": "./cfgs/convnextv2huge_cxl.yml",
+            "parameters": {}
+        }
+    ]
+}

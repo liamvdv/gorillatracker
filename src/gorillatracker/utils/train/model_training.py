@@ -86,7 +86,18 @@ def train_and_validate_using_kfold(
     callbacks: list[Callback],
     wandb_logger: WandbLogger,
     wandb_logging_module: WandbLoggingModule,
-    train_and_validate_function: Callable = train_and_validate_model,
+    train_and_validate_function: Callable[
+        [
+            TrainingArgs,
+            NletDataModule,
+            BaseModule,
+            list[Callback],
+            WandbLogger,
+            Optional[str],
+            Optional[ModelCheckpoint],
+        ],
+        Tuple[BaseModule, Trainer],
+    ] = train_and_validate_model,
 ) -> Trainer:
     # TODO(memben):!!! Fix kfold_k
 
@@ -129,7 +140,7 @@ def train_and_validate_using_kfold(
             model_kfold,
             [checkpoint_callback, *callbacks, early_stopping_callback],
             wandb_logger,
-            checkpoint_callback=checkpoint_callback,
+            checkpoint_callback=checkpoint_callback,  # type: ignore
         )
 
     if args.kfold and not args.fast_dev_run:

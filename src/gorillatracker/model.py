@@ -775,7 +775,7 @@ class ConvNeXtV2HugeWrapper(BaseModule):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.model = timm.create_model("convnextv2_huge", pretrained=not self.from_scratch)
+        self.model = timm.create_model("convnextv2_huge.fcmae_ft_in1k", pretrained=not self.from_scratch)
         # self.model.reset_classifier(self.embedding_size) # TODO
         self.model.head.fc = torch.nn.Sequential(
             torch.nn.BatchNorm1d(self.model.head.fc.in_features),
