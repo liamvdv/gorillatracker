@@ -16,9 +16,10 @@ from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_qat_pt2e
 from torch.ao.quantization.quantizer.xnnpack_quantizer import XNNPACKQuantizer, get_symmetric_quantization_config
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.model import BaseModule
+from gorillatracker.data.nlet_dm import NletDataModule
+from gorillatracker.model.base_module import BaseModule
 from gorillatracker.quantization.utils import get_model_input
+from gorillatracker.utils.callbacks import BestMetricLogger
 from gorillatracker.utils.train import ModelConstructor
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
@@ -101,7 +102,6 @@ def train_and_validate_using_kfold(
 ) -> Trainer:
     # TODO(memben):!!! Fix kfold_k
 
-    dataloader_name = dm.get_dataset_class_names()[0]
     kfold_k = int(str(args.data_dir).split("-")[-1])
 
     # Inject kfold_k into the datamodule TODO(memben): is there a better way?
@@ -119,26 +119,35 @@ def train_and_validate_using_kfold(
         model_kfold = model_constructor.construct(wandb_logging_module, wandb_logger)
         model_kfold.kfold_k = val_i
 
+        metric_name = "/".join(
+            [args.stop_saving_metric_name.split("/")[0], kfold_prefix, *args.stop_saving_metric_name.split("/")[1:]]
+        )
         early_stopping_callback = EarlyStopping(
-            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
-            mode="min",
+            monitor=metric_name,
+            mode=args.stop_saving_metric_mode,
             min_delta=args.min_delta,
             patience=args.early_stopping_patience,
         )
 
         checkpoint_callback = ModelCheckpoint(
-            filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-            monitor=f"{dataloader_name}/{kfold_prefix}/val/loss",
-            mode="min",
+            filename="epoch-{epoch}-"
+            + metric_name
+            + "-{"
+            + metric_name
+            + ":.2f}",  # NOTE: epoch-{epoch}-val_loss-{val_loss:.2f} -> epoch-1-val_loss-0.12
+            monitor=metric_name,
+            mode=args.stop_saving_metric_mode,
             auto_insert_metric_name=False,
             every_n_epochs=int(args.save_interval),
         )
 
-        _, trainer = train_and_validate_function(
+        max_metric_logger_callback = BestMetricLogger(metric_name=metric_name, mode=args.stop_saving_metric_mode)
+
+        _, trainer = train_and_validate_model(
             args,
             dm,
             model_kfold,
-            [checkpoint_callback, *callbacks, early_stopping_callback],
+            [checkpoint_callback, max_metric_logger_callback, *callbacks, early_stopping_callback],
             wandb_logger,
             checkpoint_callback=checkpoint_callback,  # type: ignore
         )

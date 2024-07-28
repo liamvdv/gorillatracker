@@ -167,6 +167,7 @@ mnist/
 *MP4
 *AVI
 cropped-images/*
+cropped-images-squared/*
 /pretrained_weights/
 *.npy
 */lightning_logs/*

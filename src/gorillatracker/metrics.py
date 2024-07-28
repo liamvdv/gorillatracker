@@ -22,8 +22,8 @@ from torchmetrics.functional import pairwise_euclidean_distance
 from torchvision.transforms import ToPILImage
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import get_individual, get_individual_video_id
-from gorillatracker.data.nlet import NletDataModule
+from gorillatracker.data.contrastive_sampler import ContrastiveKFoldValSampler, get_individual, get_individual_video_id
+from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 # TODO: What is the wandb run type?
@@ -46,7 +46,7 @@ def tensor_to_image(tensor: torch.Tensor) -> PIL.Image.Image:
 def get_n_samples_from_dataloader(dataloader: Dataloader[gtypes.Nlet], n_samples: int = 1) -> list[gtypes.Nlet]:
     samples: list[gtypes.Nlet] = []
     for batch in dataloader:
-        ids, images, labels = batch
+        ids, images, labels = batch if len(batch) == 3 else batch[:-1]
         row_batch = zip(zip(*ids), zip(*images), zip(*labels))
         take_max_n = n_samples - len(samples)
         samples.extend(list(islice(row_batch, take_max_n)))
@@ -139,13 +139,17 @@ def evaluate_embeddings(
     results = {metric_name: metric(data) for metric_name, metric in metrics.items()}
 
     kfold_str_prefix = f"fold-{kfold_k}/" if kfold_k is not None else ""
+    results_parsed = {}
     for metric_name, result in results.items():
         if isinstance(result, dict):
             for key, value in result.items():
-                wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value})
+                results_parsed.update(
+                    {f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/{key}": value}
+                )
         else:
-            wandb.log({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result}, commit=True)
-    return results
+            results_parsed.update({f"{dataloader_name}/{kfold_str_prefix}{embedding_name}/{metric_name}/": result})
+
+    return results_parsed
 
 
 def _get_crossvideo_masks(
@@ -186,6 +190,7 @@ def knn(
     k: int = 5,
     use_train_embeddings: bool = False,
     use_crossvideo_positives: bool = False,
+    distance_metric: Literal["euclidean", "cosine"] = "euclidean",
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -212,13 +217,31 @@ def knn(
     if num_classes < k:
         k = num_classes
 
-    distance_matrix = pairwise_euclidean_distance(combined_embeddings)
+    distance_matrix: torch.Tensor
+    if distance_metric == "cosine":
+        distance_matrix = (
+            torch.nn.functional.cosine_similarity(
+                combined_embeddings.unsqueeze(0), combined_embeddings.unsqueeze(1), dim=-1
+            )
+            * -1.0
+            + 1.0
+        )  # range [0, 2]
+    elif distance_metric == "euclidean":
+        distance_matrix = pairwise_euclidean_distance(combined_embeddings)  # range [0, inf]
+    else:
+        raise ValueError(f"Unknown distance metric: {distance_metric}")
+
     distance_matrix.fill_diagonal_(float("inf"))
 
     distance_mask: torch.Tensor
     classification_mask: torch.Tensor
     if use_crossvideo_positives:
         distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        if use_train_embeddings:  # add train embeddings to the distance mask (shapes would not match otherwise)
+            train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
+            distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
+            distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
+            distance_mask = distance_mask.to(torch.bool)
         distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
@@ -235,6 +258,22 @@ def knn(
     classification_matrix = torch.zeros((len(combined_embeddings), num_classes))
     for i in range(num_classes):
         classification_matrix[:, i] = torch.sum(closest_labels == i, dim=1) / k
+
+    # NOTE(rob2u): break ties by using the nearest neighbor (tie is when the the two closest neighbors have the same label)
+    for i in range(len(combined_embeddings)):
+        max_prob = torch.max(classification_matrix[i])
+        max_prob_indices = torch.where(max_prob - classification_matrix[i] < 1e-6)[0]
+
+        if len(max_prob_indices) == 1:
+            continue
+            # add 1e-6 to the closest indice of the max_prob_indices substract elsewhere (in max_prob_indices)
+
+        classification_matrix[i, max_prob_indices] += (1e-6) / len(max_prob_indices)
+        for j in range(k):
+            if closest_indices[i][j] in max_prob_indices:
+                classification_matrix[i][closest_labels[i][j].to(torch.int)] += 1e-6
+                break
+
     assert classification_matrix.shape == (len(combined_embeddings), num_classes)
 
     # Select only the validation part of the classification matrix
@@ -271,8 +310,7 @@ def knn(
 
     return {
         "accuracy": accuracy.item(),
-        "accuracy_top5": accuracy_top5.item(),
-        "auroc": auroc.item(),
+        "accuracy_top5": accuracy_top5.item() if k >= 5 else accuracy.item(),
         "f1": f1.item(),
         "precision": precision.item(),
     }
@@ -308,17 +346,28 @@ def knn_ssl(
         subset_mask = torch.isin(labels, torch.tensor(subset_labels))
         subset_embeddings = embeddings[subset_mask]
         subset_label_values = labels[subset_mask]
-        knn = NearestNeighbors(n_neighbors=max(5, k) + 1, algorithm="auto").fit(subset_embeddings.numpy())
+
+        n_samples = len(subset_embeddings)
+        if n_samples <= k:
+            continue
+
+        n_neighbors = k + 1  # We need k+1 neighbors because the first one is the sample itself
+
+        knn = NearestNeighbors(n_neighbors=n_neighbors, algorithm="auto").fit(subset_embeddings.numpy())
         current_label_mask = subset_label_values == label.item()
         current_label_embeddings = subset_embeddings[current_label_mask]
         _, indices = knn.kneighbors(current_label_embeddings.numpy())
-        indices = indices[:, 1:]
+
+        indices = indices[:, 1:]  # Remove the first column (self)
         for idx_list in indices:
             neighbor_labels = subset_label_values[idx_list]
-            most_common = torch.mode(neighbor_labels[:k]).values.item()
+            most_common = torch.mode(neighbor_labels).values.item()
             true_labels.append(label.item())
             pred_labels.append(most_common)
-            pred_labels_top5.append(neighbor_labels[:5].numpy())
+            pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))].numpy())
+
+    if len(true_labels) == 0:
+        return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}
 
     true_labels_tensor = torch.tensor(true_labels)
     pred_labels_tensor = torch.tensor(pred_labels)
@@ -338,6 +387,50 @@ def knn_ssl(
     precision = precision_score(true_labels_tensor, pred_labels_tensor, average=average, zero_division=0)
 
     return {"accuracy": accuracy, "accuracy_top5": top5_accuracy, "f1": f1, "precision": precision}
+
+
+def knn_kfold_val(
+    data: pd.DataFrame,
+    dm: NletDataModule,
+    current_val_index: int,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
+    distance_metric: Literal["euclidean", "cosine"] = "euclidean",
+    k: int = 5,
+    use_crossvideo_positives: bool = False,
+) -> Dict[str, Any]:
+    """Calculate knn metrics for each fold and average them to have compareable results to kfold training"""
+    contrastive_sampler = dm.val[current_val_index].contrastive_sampler
+    assert isinstance(contrastive_sampler, ContrastiveKFoldValSampler), "Expected a ContrastiveKFoldValSampler instance"
+    num_folds = contrastive_sampler.k
+    _, labels, _, _, _ = get_partition_from_dataframe(data, partition="val")
+    fold: Dict[Any, int] = {}
+    for label in labels.unique():  # type: ignore
+        fold[label.item()] = contrastive_sampler.get_fold(label.item())
+    fold_metrics = []
+    for i in range(num_folds):
+        fold_indices = [index for index, label in enumerate(labels) if fold[label.item()] == i]
+        fold_dataframe = data.iloc[fold_indices]
+        en = LinearSequenceEncoder()
+        fold_dataframe.loc[:, "encoded_label"] = fold_dataframe["encoded_label"].apply(en.encode)
+        metrics = knn(
+            data=fold_dataframe,
+            average=average,
+            k=k,
+            distance_metric=distance_metric,
+            use_crossvideo_positives=use_crossvideo_positives,
+        )
+        fold_metrics.append(metrics)
+    assert len(fold_metrics) == num_folds
+    accumulated_metrics = {}
+    for metrics in fold_metrics:
+        for metric_name, value in metrics.items():
+            if metric_name not in accumulated_metrics:
+                accumulated_metrics[metric_name] = value
+            else:
+                accumulated_metrics[metric_name] += value
+    averaged_metrics = {metric_name: value / num_folds for metric_name, value in accumulated_metrics.items()}
+
+    return averaged_metrics
 
 
 def pca(data: pd.DataFrame, **kwargs: Any) -> wandb.Image:  # generate a 2D plot of the embeddings

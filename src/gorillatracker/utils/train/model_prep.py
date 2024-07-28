@@ -4,8 +4,8 @@ import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
-from gorillatracker.data.nlet import NletDataModule
-from gorillatracker.model import BaseModule
+from gorillatracker.data.nlet_dm import NletDataModule
+from gorillatracker.model.base_module import BaseModule
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
 
 
@@ -40,6 +40,15 @@ class ModelConstructor:
                 self.dm.get_class_distribution("val"),
                 self.dm.get_class_distribution("test"),
             )
+        elif "mae_mse/arcface" in args.loss_mode:
+            self.dm.setup("fit")
+            self.dm.setup("test")
+
+            num_classes = (
+                self.dm.get_num_classes("train"),
+                self.dm.get_num_classes("val"),
+                self.dm.get_num_classes("test"),
+            )
 
         dataset_names = self.dm.get_dataset_class_names()
 
@@ -59,16 +68,14 @@ class ModelConstructor:
             start_lr=args.start_lr,
             end_lr=args.end_lr,
             stepwise_schedule=args.stepwise_schedule,
-            lr_interval=args.val_check_interval,
+            lr_interval=args.lr_interval,
             margin=args.margin,
             loss_mode=args.loss_mode,
             embedding_size=args.embedding_size,
             batch_size=args.batch_size,
             s=args.s,
-            delta_t=args.delta_t,
-            mem_bank_start_epoch=args.mem_bank_start_epoch,
-            lambda_membank=args.lambda_membank,
             temperature=args.temperature,
+            memory_bank_size=args.memory_bank_size,
             num_classes=num_classes,
             class_distribution=class_distribution,
             dataset_names=dataset_names,
@@ -90,6 +97,12 @@ class ModelConstructor:
             fast_dev_run=args.fast_dev_run,
             every_n_val_epochs=args.embedding_save_interval,  # TODO(rob2u): rename
             wandb_run=self.wandb_logger.experiment,
+            embedding_id=args.embedding_id,
+            pool_mode=args.pool_mode,
+            fix_img_size=args.fix_img_size,
+            freeze_backbone=args.freeze_backbone,
+            loss_dist_term=args.loss_dist_term,
+            cross_video_masking=args.cross_video_masking,
         )
 
     def construct(
