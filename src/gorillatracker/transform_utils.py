@@ -108,7 +108,7 @@ class PlanckianJitter(object):
             image_np[:, :, 0] = image_np[:, :, 0] * (self.pl[idx, 0] / self.pl[idx, 1])
             image_np[:, :, 2] = image_np[:, :, 2] * (self.pl[idx, 2] / self.pl[idx, 1])
             image_np[image_np > 1] = 1
-            image = Image.fromarray(np.uint8(image_np * 255))  # type: ignore
+            image = Image.fromarray(np.uint8(image_np * 255))
         else:
             image_tensor = torch.clone(x)
             image_tensor[0, :, :] = image_tensor[0, :, :] * (self.pl[idx, 0] / self.pl[idx, 1])
