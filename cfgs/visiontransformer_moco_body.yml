@@ -25,6 +25,7 @@ seed: 42                          # Random seed for reproducibility
 debug: False                      # Enable debug mode
 from_scratch: False               # Train the model from scratch
 early_stopping_patience: 5        # Early stopping patience (number of epochs)
+stop_saving_metric_name: "cxl-all/val/embeddings/knn5_crossvideo_cos/accuracy"
 embedding_size: 256
 dropout_p: 0.12
 
