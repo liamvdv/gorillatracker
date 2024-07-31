@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import torch
 import torch.nn.functional as F
@@ -228,7 +228,7 @@ class TripletLossOnline(nn.Module):
         self,
         embeddings: torch.Tensor,
         labels: torch.Tensor,
-        ids: gtypes.FlatNletBatchIds,
+        ids: Optional[gtypes.FlatNletBatchIds] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """computes loss value.
@@ -262,7 +262,7 @@ class TripletLossOnline(nn.Module):
         # therefore we create a mask that is 1 for all valid triplets and 0 for all invalid triplets
         mask = self.get_mask(distance_matrix, anchor_positive_dists, anchor_negative_dists, labels)
         if self.cross_video_masking:
-            mask = torch.logical_and(mask, get_cross_video_mask(ids))
+            mask = torch.logical_and(mask, get_cross_video_mask(ids))  # type: ignore
         mask = mask.to(triplet_loss.device)  # ensure mask is on the same device as triplet_loss
         triplet_loss *= mask
 
