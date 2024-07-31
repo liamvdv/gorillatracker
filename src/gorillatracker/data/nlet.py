@@ -265,7 +265,7 @@ class CrossEncounterSupervisedDataset(SupervisedDataset):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
             base_dir, sampler_class=SupervisedCrossEncounterSampler
-        )
+        ) if self.partition == "train" else self.create_contrastive_sampler(base_dir)
 
 
 class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
@@ -275,7 +275,7 @@ class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
             base_dir, sampler_class=SupervisedCrossEncounterSampler
-        )
+        ) if self.partition == "train" else self.create_contrastive_sampler(base_dir)
 
 
 class HardCrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
@@ -285,7 +285,7 @@ class HardCrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
             base_dir, sampler_class=SupervisedHardCrossEncounterSampler
-        )  # TODO
+        )  if self.partition == "train" else self.create_contrastive_sampler(base_dir)
 
 
 class HardCrossEncounterSupervisedDataset(SupervisedDataset):
@@ -295,7 +295,7 @@ class HardCrossEncounterSupervisedDataset(SupervisedDataset):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
         self.contrastive_sampler = self.create_contrastive_sampler(
             base_dir, sampler_class=SupervisedHardCrossEncounterSampler
-        )
+        ) if self.partition == "train" else self.create_contrastive_sampler(base_dir)
 
 
 def build_onelet(idx: int, contrastive_sampler: ContrastiveSampler) -> tuple[ContrastiveImage]:

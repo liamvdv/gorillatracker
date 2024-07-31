@@ -43,16 +43,18 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
             nn.BatchNorm1d(feature_dim),
             nn.Dropout(p=dropout_p),
             nn.Linear(feature_dim, embedding_dim),
-            nn.LayerNorm(embedding_dim),
+            nn.BatchNorm1d(embedding_dim),
         )
     elif "mlp_norm_dropout" in id:
         return nn.Sequential(
+            nn.BatchNorm1d(feature_dim),
+            nn.Dropout(p=dropout_p),
             nn.Linear(feature_dim, feature_dim),
             nn.ReLU(),
             nn.BatchNorm1d(feature_dim),
             nn.Dropout(p=dropout_p),
             nn.Linear(feature_dim, embedding_dim),
-            nn.LayerNorm(embedding_dim),
+            nn.BatchNorm1d(embedding_dim),
         )
     else:
         return nn.Identity()
@@ -194,7 +196,6 @@ class Miewid_msv2(nn.Module):
         x = self.embedding_layer(x)
         return x
 
-
 model_wrapper_registry = {
     "timm": TimmWrapper,
     "timm_eval": TimmEvalWrapper,
@@ -252,6 +253,6 @@ class BaseModuleSupervised(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                transforms_v2.RandomResizedCrop(192, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
