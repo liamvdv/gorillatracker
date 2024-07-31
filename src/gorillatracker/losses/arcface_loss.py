@@ -47,10 +47,10 @@ class ArcFaceLoss(torch.nn.Module):
     ) -> None:
         super().__init__()
         self.s = s
-        self.angle_margin = torch.Tensor([angle_margin]).to(accelerator)
-        self.additive_margin = torch.Tensor([additive_margin]).to(accelerator)
-        self.cos_m = torch.cos(torch.Tensor([angle_margin])).to(accelerator)
-        self.sin_m = torch.sin(torch.Tensor([angle_margin])).to(accelerator)
+        self.angle_margin = torch.tensor([angle_margin]).to(accelerator)
+        self.additive_margin = torch.tensor([additive_margin]).to(accelerator)
+        self.cos_m = torch.cos(torch.tensor([angle_margin])).to(accelerator)
+        self.sin_m = torch.sin(torch.tensor([angle_margin])).to(accelerator)
         self.num_classes = num_classes
         self.embedding_size = embedding_size
         self.k_subcenters = k_subcenters
@@ -103,8 +103,8 @@ class ArcFaceLoss(torch.nn.Module):
 
         # NOTE(rob2u): necessary for range 0:n-1
         # get class frequencies
-        class_freqs = torch.ones_like(labels)
-        if self.use_class_weights:
+        class_freqs = torch.ones_like(labels, device=embeddings.device)
+        if self.use_class_weights and self.purpose == "train":
             class_freqs = torch.tensor([self.class_distribution[label.item()] for label in labels]).to(
                 embeddings.device
             )
@@ -119,6 +119,7 @@ class ArcFaceLoss(torch.nn.Module):
             torch.nn.functional.normalize(embeddings, dim=-1),
             torch.nn.functional.normalize(self.prototypes, dim=-1),
         )  # batch x num_classes x k_subcenters
+        cos_theta = cos_theta.to(embeddings.device)
 
         sine_theta = torch.sqrt(
             torch.maximum(
@@ -126,10 +127,16 @@ class ArcFaceLoss(torch.nn.Module):
                 torch.tensor([eps], device=cos_theta.device),
             )
         ).clamp(eps, 1.0 - eps)
+
+        if self.cos_m.device != embeddings.device:  # HACK
+            self.cos_m = self.cos_m.to(embeddings.device)
+            self.sin_m = self.sin_m.to(embeddings.device)
+            self.additive_margin = self.additive_margin.to(embeddings.device)
+
         phi = (
             self.cos_m.unsqueeze(1).unsqueeze(2) * cos_theta - self.sin_m.unsqueeze(1).unsqueeze(2) * sine_theta
         )  # additionstheorem cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
-        phi = phi - self.additive_margin.unsqueeze(1)
+        phi = phi - self.additive_margin.unsqueeze(0)
 
         mask = torch.zeros(
             (cos_theta.shape[0], self.num_classes, self.k_subcenters), device=cos_theta.device
@@ -142,8 +149,8 @@ class ArcFaceLoss(torch.nn.Module):
 
         assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
         loss = self.ce(output, labels) if labels_onehot is None else self.ce(output, labels_onehot)
-        if self.use_class_weights:
-            loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
+
+        loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
 
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
@@ -174,7 +181,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         **kwargs: Any,
     ) -> None:
         super().__init__(accelerator=accelerator, *args, **kwargs)  # type: ignore
-        self.margin_sigma = torch.Tensor([margin_sigma]).to(accelerator)
+        self.margin_sigma = torch.tensor([margin_sigma]).to(accelerator)
         self.is_eval = False
         self.accelerator = accelerator
 
@@ -185,14 +192,13 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         labels_onehot: Optional[torch.Tensor] = None,
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
-        angle_margin = torch.Tensor([self.angle_margin]).to(self.accelerator)
-        self.margin_sigma = torch.Tensor([self.margin_sigma]).to(self.accelerator)
+        angle_margin = torch.tensor([self.angle_margin], device=embeddings.device)
+        self.margin_sigma = torch.tensor([self.margin_sigma], device=embeddings.device)
 
         if not self.is_eval:
             angle_margin = (
-                angle_margin + torch.randn_like(labels, dtype=torch.float32).to(self.accelerator) * self.margin_sigma
-            ).to(
-                self.accelerator
+                angle_margin
+                + torch.randn_like(labels, dtype=torch.float32, device=embeddings.device) * self.margin_sigma
             )  # batch -> scale by self.margin_sigma
 
         self.cos_m = torch.cos(angle_margin)
@@ -227,10 +233,15 @@ class AdaFaceLoss(ArcFaceLoss):
         if self.norm.running_mean.device != embeddings.device:  # type: ignore
             self.norm = self.norm.to(embeddings.device)
 
+        if self.m1.device != embeddings.device:
+            self.m1 = self.m1.to(embeddings.device)
+            self.m2 = self.m2.to(embeddings.device)
+
         if not self.is_eval:
             g = (embeddings.detach() ** 2).sum(dim=1).sqrt()
             g = self.norm(g.unsqueeze(1)).squeeze(1)
             g = torch.clamp(g / self.h, -1, 1)
+            g = g.to(embeddings.device)
             g_angle = -self.m1 * g
             g_additive = self.m2 * g + self.m2
 

@@ -263,8 +263,10 @@ class CrossEncounterSupervisedDataset(SupervisedDataset):
 
     def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
-        self.contrastive_sampler = self.create_contrastive_sampler(
-            base_dir, sampler_class=SupervisedCrossEncounterSampler
+        self.contrastive_sampler = (
+            self.create_contrastive_sampler(base_dir, sampler_class=SupervisedCrossEncounterSampler)
+            if self.partition == "train"
+            else self.create_contrastive_sampler(base_dir)
         )
 
 
@@ -273,8 +275,10 @@ class CrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
 
     def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
-        self.contrastive_sampler = self.create_contrastive_sampler(
-            base_dir, sampler_class=SupervisedCrossEncounterSampler
+        self.contrastive_sampler = (
+            self.create_contrastive_sampler(base_dir, sampler_class=SupervisedCrossEncounterSampler)
+            if self.partition == "train"
+            else self.create_contrastive_sampler(base_dir)
         )
 
 
@@ -283,9 +287,11 @@ class HardCrossEncounterSupervisedKFoldDataset(SupervisedKFoldDataset):
 
     def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
-        self.contrastive_sampler = self.create_contrastive_sampler(
-            base_dir, sampler_class=SupervisedHardCrossEncounterSampler
-        )  # TODO
+        self.contrastive_sampler = (
+            self.create_contrastive_sampler(base_dir, sampler_class=SupervisedHardCrossEncounterSampler)
+            if self.partition == "train"
+            else self.create_contrastive_sampler(base_dir)
+        )
 
 
 class HardCrossEncounterSupervisedDataset(SupervisedDataset):
@@ -293,8 +299,10 @@ class HardCrossEncounterSupervisedDataset(SupervisedDataset):
 
     def __init__(self, base_dir: Path, *args: Any, **kwargs: Any):
         super().__init__(base_dir=base_dir, *args, **kwargs)  # type: ignore
-        self.contrastive_sampler = self.create_contrastive_sampler(
-            base_dir, sampler_class=SupervisedHardCrossEncounterSampler
+        self.contrastive_sampler = (
+            self.create_contrastive_sampler(base_dir, sampler_class=SupervisedHardCrossEncounterSampler)
+            if self.partition == "train"
+            else self.create_contrastive_sampler(base_dir)
         )
 
 
