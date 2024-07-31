@@ -1,0 +1,36 @@
+[
+    {
+        "project_name": "Embedding-ViTBase-CXL-OpenSet",
+        "entity": "gorillas",
+        "config_path": "./sweep_configs/vit_base_sweep.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["000-vit_base_semi-hard"]
+            },
+            "batch_size": {
+                "values": [32]
+            },
+            "start_lr": {
+                "values": [1e-5]
+            },
+            "lr_schedule": {
+                "values": ["cosine", "constant"]
+            },
+            "l2_alpha": {
+                "values": [0.01]
+            },
+            "l2_beta": {
+                "values": [0.01]
+            },
+            "margin": {
+               "values": [0.25, 0.5, 1.0]
+            },
+            "loss_mode": {
+               "values": ["online/semi-hard/l2sp", "online/soft/l2sp"]
+            },
+            "loss_dist_term": {
+               "values": ["euclidean"]
+            }
+        }
+    }
+]

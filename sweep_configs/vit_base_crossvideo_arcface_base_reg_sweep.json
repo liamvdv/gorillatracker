@@ -1,0 +1,39 @@
+[
+    {
+        "project_name": "Embedding-ViTBase-CXL-OpenSetCrossVideo",
+        "entity": "gorillas",
+        "config_path": "./sweep_configs/vit_base_crossvideo_arcface_sweep.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["000-vit_base_crossvideo_arcface"]
+            },
+            "embedding_id": {
+                "values": ["linear_norm_dropout"]
+            },
+            "dropout_p":{
+                "values": [0.0, 0.2, 0.5]
+            },
+            "batch_size": {
+                "values": [32]
+            },
+            "start_lr": {
+                "values": [1e-5]
+            },
+            "margin": {
+                "values": [0.1, 0.5, 1.0]
+            },
+            "loss_mode": {
+               "values": ["softmax/arcface/l2sp"]
+            },
+            "k_subcenters": {
+                "values": [1, 2]
+            },
+            "l2_alpha": {
+                "values": [1.0]
+            },
+            "l2_beta": {
+                "values": [1.0]
+            }
+        }
+    }
+]

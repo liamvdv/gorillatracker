@@ -117,7 +117,8 @@ def train_and_validate_using_kfold(
         )
 
         checkpoint_callback = ModelCheckpoint(
-            filename="epoch-{epoch}-"
+            filename=f"fold-{val_i}-"
+            + "epoch-{epoch}-"
             + metric_name
             + "-{"
             + metric_name

@@ -1,0 +1,52 @@
+[
+    {
+        "project_name": "Embedding-ViTBase-CXL-OpenSetCrossVideo",
+        "entity": "gorillas",
+        "config_path": "./sweep_configs/vit_base_crossvideo_sweep.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["000-vit_base_triplet"]
+            },
+            "batch_size": {
+                "values": [32]
+            },
+            "loss_dist_term": {
+                "values": ["euclidean"]
+            },
+            "start_lr": {
+                "values": [1e-5]
+            },
+            "l2_alpha": {
+                "values": [0.01]
+            },
+            "l2_beta": {
+                "values": [0.01]
+            },
+            "margin": {
+                "values": [0.25]
+            },
+            "dropout_p": {
+                "values": [0.0, 0.2, 0.4]
+            },
+            "embedding_id": {
+                "values": ["linear_norm_dropout"]
+            },
+            "loss_mode": {
+               "values": [
+                "online/semi-hard/l2sp",
+                "online/soft/l2sp"
+                ]
+            },
+            "dataset_class": {
+               "values": [
+                "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+                ]
+            },
+            "cross_video_masking": {
+                "values": [true, false]
+            }
+        }
+    }
+]
