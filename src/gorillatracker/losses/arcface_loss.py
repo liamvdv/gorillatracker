@@ -120,15 +120,15 @@ class ArcFaceLoss(torch.nn.Module):
             torch.nn.functional.normalize(self.prototypes, dim=-1),
         )  # batch x num_classes x k_subcenters
         cos_theta = cos_theta.to(embeddings.device)
-        
+
         sine_theta = torch.sqrt(
             torch.maximum(
                 1.0 - torch.pow(cos_theta, 2),
                 torch.tensor([eps], device=cos_theta.device),
             )
         ).clamp(eps, 1.0 - eps)
-        
-        if self.cos_m.device != embeddings.device: # HACK
+
+        if self.cos_m.device != embeddings.device:  # HACK
             self.cos_m = self.cos_m.to(embeddings.device)
             self.sin_m = self.sin_m.to(embeddings.device)
             self.additive_margin = self.additive_margin.to(embeddings.device)
@@ -149,7 +149,7 @@ class ArcFaceLoss(torch.nn.Module):
 
         assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
         loss = self.ce(output, labels) if labels_onehot is None else self.ce(output, labels_onehot)
-        
+
         loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
 
@@ -197,8 +197,9 @@ class ElasticArcFaceLoss(ArcFaceLoss):
 
         if not self.is_eval:
             angle_margin = (
-                angle_margin + torch.randn_like(labels, dtype=torch.float32, device=embeddings.device) * self.margin_sigma
-            ) # batch -> scale by self.margin_sigma
+                angle_margin
+                + torch.randn_like(labels, dtype=torch.float32, device=embeddings.device) * self.margin_sigma
+            )  # batch -> scale by self.margin_sigma
 
         self.cos_m = torch.cos(angle_margin)
         self.sin_m = torch.sin(angle_margin)
@@ -231,7 +232,7 @@ class AdaFaceLoss(ArcFaceLoss):
     ) -> gtypes.LossPosNegDist:
         if self.norm.running_mean.device != embeddings.device:  # type: ignore
             self.norm = self.norm.to(embeddings.device)
-            
+
         if self.m1.device != embeddings.device:
             self.m1 = self.m1.to(embeddings.device)
             self.m2 = self.m2.to(embeddings.device)

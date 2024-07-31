@@ -2,7 +2,7 @@
     {
         "project_name": "Embedding-ViTLarge-CXL-OpenSet",
         "entity": "gorillas",
-        "config_path": "./sweep_configs/vit_large_dino_quadlet.yml",
+        "config_path": "./sweep_configs/vit_large_dino.yml",
         "parameters": {
             "run_name": {
                 "values": ["000-vit_large_dinov2_triplet"]

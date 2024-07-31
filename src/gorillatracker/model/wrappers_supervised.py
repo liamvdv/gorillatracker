@@ -196,6 +196,7 @@ class Miewid_msv2(nn.Module):
         x = self.embedding_layer(x)
         return x
 
+
 model_wrapper_registry = {
     "timm": TimmWrapper,
     "timm_eval": TimmEvalWrapper,
