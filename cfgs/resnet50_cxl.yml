@@ -13,7 +13,7 @@ workers: 16                     # Number of workers for data loading
 
 project_name: "Embedding-ResNet50-CXL-OpenSet" # WandB project name
 run_name: "124-test-different-pretrainings-weights-across-backbones-clip-dino" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
-wandb_tags: ["vanilla", "v2"]            # WandB tags for experiment tracking
+wandb_tags: []            # WandB tags for experiment tracking
 model_name_or_path: "timm/resnet50.a1_in1k"  # Model name or path 
 saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
 resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
@@ -38,7 +38,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.1                       # Alpha for the l2sp loss
 l2_beta: 0.01                       # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/efficientnetv2_large.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/resnet50.pth"    # Path to the pretrained weights for the l2sp loss
 margin: 1.0     
 loss_mode: "offline/native"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" 
 

@@ -143,7 +143,7 @@ def train_and_validate_using_kfold(
 
         max_metric_logger_callback = BestMetricLogger(metric_name=metric_name, mode=args.stop_saving_metric_mode)
 
-        _, trainer = train_and_validate_model(
+        _, trainer = train_and_validate_function(
             args,
             dm,
             model_kfold,

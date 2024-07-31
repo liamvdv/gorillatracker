@@ -7,7 +7,9 @@ from typing import Any, Dict
 import pandas as pd
 import wandb
 import yaml
-from wandb import agent, sweep
+
+import subprocess
+from multiprocessing import Process
 
 
 def check_experiment_configs(configs: list[dict[str, Any]]) -> None:
@@ -16,6 +18,7 @@ def check_experiment_configs(configs: list[dict[str, Any]]) -> None:
             len(config["project_name"].split("-")) >= 4
         ), "Project name must be of the form <Function>-<Backbone>-<Dataset>-<Set-Type>"
         get_config(config["config_path"])
+        print(f"Config file {config['config_path']} is valid")
 
 
 def get_config(config_path: str) -> Dict[str, Any]:
@@ -26,12 +29,28 @@ def get_config(config_path: str) -> Dict[str, Any]:
     return config_dict
 
 
+def get_num_gpus():
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], stdout=subprocess.PIPE, check=True
+        )
+        gpus = result.stdout.decode("utf-8").strip().split("\n")
+        return len(gpus)
+    except subprocess.CalledProcessError as e:
+        print("Failed to get GPU information:", e)
+        return 0
+
+
+def run_agent_with_gpu(sweep_id, gpu_id):
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    wandb.agent(sweep_id, count=1)
+
+
 def run_experiment(
     project_name: str, config_path: str, parameters: Dict[str, Any], sweep_parameters: Dict[str, Any]
 ) -> None:
 
-    sweep_name = parameters["sweep_name"]
-    parameters.pop("sweep_name")
+    sweep_name = parameters.pop("sweep_name")
     # Construct the command with parameter overrides
     params_str = " ".join([f"--{key} {value}" for key, value in parameters.items()])
 
@@ -43,20 +62,37 @@ def run_experiment(
         sweep_config = {
             "program": "./train.py",  # Note: not the sweep file, but the training script
             "name": sweep_name,
-            "method": "bayes",  # Specify the search method (random search in this case)
+            "method": "bayes",  # Specify the search method (Bayesian optimization in this case)
             "metric": {
                 "goal": "maximize",
-                "name": "cxl_train/val/embeddings/knn5_crossvideo/accuracy",
+                "name": "aggregated/cxlkfold/val/embeddings/knn5/accuracy_max",
             },  # Specify the metric to optimize
             "parameters": sweep_parameters,
             "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path, *params_array],
         }
-        sweep_id = sweep(sweep=sweep_config, project=project_name, entity="gorillas")
+        sweep_id = wandb.sweep(sweep=sweep_config, project=project_name, entity="gorillas")
 
         sweep_path = f"gorillas/{project_name}/{sweep_id}"
         print("SWEEP_PATH=" + sweep_path)
-        agent(sweep_id, count=1)
-        save_best_run_results(sweep_path, "cxl_train/val/embeddings/knn5_crossvideo/accuracy")
+
+        num_gpus = get_num_gpus()
+        agents_per_gpu = 2  # Number of agents to run per GPU
+        processes = []
+
+        if num_gpus == 0:
+            print("No GPUs found. Exiting.")
+            return
+
+        for gpu_id in range(num_gpus):
+            for _ in range(agents_per_gpu):
+                p = Process(target=run_agent_with_gpu, args=(sweep_id, gpu_id))
+                p.start()
+                processes.append(p)
+
+        for p in processes:
+            p.join()
+
+        save_best_run_results(sweep_path, "aggregated/cxlkfold/val/embeddings/knn5/accuracy_max")
 
     else:
         command = f"python train.py {params_str} --config_path {config_path}"

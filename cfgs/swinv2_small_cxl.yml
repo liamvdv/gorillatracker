@@ -8,10 +8,10 @@ compile: False                  # Compile the model for faster execution
 workers: 8                     # Number of workers for data loading
 
 # Model and Training Arguments
-project_name: "Embedding-SwinV2Base-CXL-Open"  # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
+project_name: "Embedding-SwinV2-Small-CXL-Open"  # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
 run_name: "452-better-eval-hardpositives_noquadlets" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: []            # WandB tags for experiment tracking
-model_name_or_path: "timm/swinv2_base_window12_192.ms_in22k"  # Model name or path 
+model_name_or_path: "timm/swinv2_small_window16_256.ms_in1k"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False               # Enable fast development run
@@ -34,7 +34,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.1                       # Alpha for the l2sp loss - 0.1
 l2_beta: 0.01                       # Beta for the l2sp loss - 0.01
-path_to_pretrained_weights: "pretrained_weights/swinv2_base.pth"   # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/swinv2_small.pth"   # Path to the pretrained weights for the l2sp loss
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
@@ -80,7 +80,7 @@ dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLData
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
 
-data_resize_transform: 192
+data_resize_transform: 256
 additional_val_dataset_classes: Null
 additional_val_data_dirs: Null
 
