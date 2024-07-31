@@ -62,7 +62,7 @@ def run_experiment(
         sweep_config = {
             "program": "./train.py",  # Note: not the sweep file, but the training script
             "name": sweep_name,
-            "method": "bayes",  # Specify the search method (Bayesian optimization in this case)
+            "method": "grid",  # Specify the search method (Bayesian optimization in this case)
             "metric": {
                 "goal": "maximize",
                 "name": "aggregated/cxlkfold/val/embeddings/knn5/accuracy_max",
