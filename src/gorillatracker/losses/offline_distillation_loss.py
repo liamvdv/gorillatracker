@@ -9,11 +9,18 @@ import gorillatracker.type_helper as gtypes
 
 class OfflineResponseBasedLoss(nn.Module):
     def __init__(self, teacher_model_wandb_link: str):
-        from gorillatracker.utils.wandb_loader import get_model_for_run_url
+        from gorillatracker.utils.wandb_loader import get_model_for_run_url, load_model
+        from gorillatracker.model.wrappers_supervised import BaseModuleSupervised
 
         super().__init__()
         assert teacher_model_wandb_link != "", "Teacher model link is not provided"
-        self.teacher_model = get_model_for_run_url(teacher_model_wandb_link)
+
+        print(f"Loading teacher model from {teacher_model_wandb_link}")
+        if "http" in teacher_model_wandb_link:
+            self.teacher_model = get_model_for_run_url(teacher_model_wandb_link)
+        else:
+            self.teacher_model = load_model(BaseModuleSupervised, teacher_model_wandb_link)
+
         self.teacher_model.eval()
 
         # Set requires_grad to False for all parameters of the teacher model
@@ -21,7 +28,7 @@ class OfflineResponseBasedLoss(nn.Module):
             param.requires_grad = False
 
         self.loss = nn.MSELoss()
-        self.resize_transform = transforms.Resize((256, 256))
+        self.resize_transform = transforms.Resize((224, 224))
 
     def forward(
         self, embeddings: torch.Tensor, labels: torch.Tensor, images: torch.Tensor, **kwargs: Any

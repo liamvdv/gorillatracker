@@ -1,6 +1,6 @@
 {
     "global": {
-        "sweep_name": "Baseline Sweep",
+        "sweep_name": "Baseline QAT Sweep",
         "run_name": "443-take-baselines-for-models",
         "wandb_tags": [
             "sweep",
@@ -12,27 +12,29 @@
         "embedding_size": 256,
         "data_resize_transform": 224,
         "loss_mode": "online/soft/l2sp",
-        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square",
+        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
         "dataset_class": "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
         "dataset_names": [
-            "cxl_train",
+            "cxlkfold",
             "bristol"
         ],
         "additional_val_dataset_classes": [
-            "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"
+            "gorillatracker.datasets.bristol.BristolDataset"
         ],
         "additional_val_data_dirs": [
-            "gorillatracker.datasets.bristol.BristolDataset"
+            "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"
         ],
         "kfold": true,
         "val_before_training": true,
         "lr_schedule": "cosine",
         "workers": 16,
-        "batch_size": 8,
+        "batch_size": 24,
         "save_model_to_wandb": false,
         "end_lr": 1e-7,
         "l2_alpha": 1,
-        "l2_beta": 1
+        "l2_beta": 1,
+        "stop_saving_metric_name": "cxlkfold/val/embeddings/knn/accuracy",
+        "stop_saving_metric_mode": "max"
     },
     "global_sweep_parameters": {
         "dropout_p": {

@@ -33,6 +33,7 @@ def main(args: TrainingArgs) -> None:
     ########### CUDA checks ###########
     if args.accelerator == "cuda":
         num_available_gpus = torch.cuda.device_count()
+        torch.set_float32_matmul_precision("high")
         if num_available_gpus > args.num_devices:
             logger.warning(
                 f"Requested {args.num_devices} GPUs but {num_available_gpus} are available.",
@@ -123,7 +124,7 @@ def main(args: TrainingArgs) -> None:
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
-    
+
     max_metric_logger_callback = BestMetricLogger(metric_name=args.stop_saving_metric_name)
 
     callbacks = (

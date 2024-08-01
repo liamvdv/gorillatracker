@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Literal, Optional, Union
 
 from simple_parsing import field, list_field
+import wandb
 
 
 @dataclass(kw_only=True)

@@ -170,17 +170,17 @@ def train_using_quantization_aware_training(
     logger.info("Preperation for quantization aware training...")
     example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=100)  # type: ignore
     example_inputs = (example_inputs,)  # type: ignore
-    autograd_graph = capture_pre_autograd_graph(model.model, example_inputs)
+    autograd_graph = capture_pre_autograd_graph(model.model_wrapper, example_inputs)
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
-    model.model = prepare_qat_pt2e(autograd_graph, quantizer)
+    model.model_wrapper = prepare_qat_pt2e(autograd_graph, quantizer)
 
-    allow_exported_model_train_eval(model.model)
+    allow_exported_model_train_eval(model.model_wrapper)
 
     torch.use_deterministic_algorithms(True, warn_only=True)
     model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)
 
     logger.info("Quantizing model...")
-    quantized_model = convert_pt2e(model.model)
+    quantized_model = convert_pt2e(model.model_wrapper)
     torch.ao.quantization.move_exported_model_to_eval(quantized_model)
     logger.info("Quantization finished! Saving quantized model...")
     assert checkpoint_callback.dirpath is not None

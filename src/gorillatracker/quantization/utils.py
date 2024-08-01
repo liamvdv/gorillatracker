@@ -34,6 +34,8 @@ def get_model_input(
         nlet_builder=build_onelet,
         partition=partion,
         transform=transform,
+        val_i=0,
+        k=5,
     )
 
     if amount_of_tensors == -1:

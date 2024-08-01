@@ -2,8 +2,7 @@ import argparse
 import json
 import os
 import pathlib
-from typing import Any, Dict
-
+from typing import Any, Dict, Optional
 import pandas as pd
 import wandb
 import yaml
@@ -11,13 +10,35 @@ import yaml
 import subprocess
 from multiprocessing import Process
 
+import timm
+
+
+def get_input_size(model_name: str) -> Optional[int]:
+    try:
+        model = timm.create_model(model_name, pretrained=True)
+        model = model.eval()
+    except RuntimeError as e:
+        print(f"Error loading {model_name}: {e}")
+        return None
+
+    data_config = timm.data.resolve_model_data_config(model)
+    input_size = data_config["input_size"][-1]
+
+    return input_size
+
 
 def check_experiment_configs(configs: list[dict[str, Any]]) -> None:
     for config in configs:
         assert (
             len(config["project_name"].split("-")) >= 4
         ), "Project name must be of the form <Function>-<Backbone>-<Dataset>-<Set-Type>"
-        get_config(config["config_path"])
+        config_dict = get_config(config["config_path"])
+
+        input_size = get_input_size(config_dict["model_name_or_path"])
+        assert config_dict["data_resize_transform"] == get_input_size(
+            config_dict["model_name_or_path"]
+        ), f"Input size mismatch. Expected {input_size}, got {config_dict['data_resize_transform']}"
+
         print(f"Config file {config['config_path']} is valid")
 
 
@@ -43,7 +64,7 @@ def get_num_gpus():
 
 def run_agent_with_gpu(sweep_id, gpu_id):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-    wandb.agent(sweep_id, count=1)
+    wandb.agent(sweep_id, count=100)
 
 
 def run_experiment(
@@ -51,8 +72,20 @@ def run_experiment(
 ) -> None:
 
     sweep_name = parameters.pop("sweep_name")
+
     # Construct the command with parameter overrides
-    params_str = " ".join([f"--{key} {value}" for key, value in parameters.items()])
+    def create_params_str(parameters):
+        params_list = []
+        for key, value in parameters.items():
+            if isinstance(value, list):
+                # Convert list to space-separated string
+                value_str = " ".join(map(str, value))
+                params_list.append(f"--{key} {value_str}")
+            else:
+                params_list.append(f"--{key} {value}")
+        return " ".join(params_list)
+
+    params_str = create_params_str(parameters)
 
     print(f"Running experiment '{project_name}' with overridden parameters: {parameters}")
     print(f"Sweep parameters: {sweep_parameters}")
@@ -65,7 +98,7 @@ def run_experiment(
             "method": "grid",  # Specify the search method (Bayesian optimization in this case)
             "metric": {
                 "goal": "maximize",
-                "name": "aggregated/cxlkfold/val/embeddings/knn5/accuracy_max",
+                "name": "aggregated/cxlkfold/val/embeddings/knn/accuracy_max",
             },  # Specify the metric to optimize
             "parameters": sweep_parameters,
             "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path, *params_array],
@@ -92,7 +125,7 @@ def run_experiment(
         for p in processes:
             p.join()
 
-        save_best_run_results(sweep_path, "aggregated/cxlkfold/val/embeddings/knn5/accuracy_max")
+        save_best_run_results(sweep_path, "aggregated/cxlkfold/val/embeddings/knn/accuracy_max")
 
     else:
         command = f"python train.py {params_str} --config_path {config_path}"
