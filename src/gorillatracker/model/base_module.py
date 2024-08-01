@@ -248,7 +248,7 @@ class BaseModule(L.LightningModule):
             use_class_weights=use_class_weights,
             use_dist_term=use_dist_term,
             # log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
-            log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
+            log_func=lambda x, y: self.log(kfold_prefix + x, y),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
@@ -271,7 +271,7 @@ class BaseModule(L.LightningModule):
             use_focal_loss=use_focal_loss,
             label_smoothing=label_smoothing,
             model=model,
-            log_func=lambda x, y: self.log(f"{kfold_prefix}{x}", y),
+            log_func=lambda x, y: self.log(kfold_prefix + x, y),
             k_subcenters=1,
             use_class_weights=use_class_weights,
             use_dist_term=use_dist_term,
@@ -607,7 +607,7 @@ class BaseModule(L.LightningModule):
                     knn_func, k=5, use_crossvideo_positives=True, average="macro", distance_metric="cosine"
                 ),
             }
-            if ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower()) and knn_func is knn
+            if ("cxl" in dataset_id.lower() or "bristol" in dataset_id.lower()) and knn_func is not knn_ssl
             else {}
         )
         metrics |= (
