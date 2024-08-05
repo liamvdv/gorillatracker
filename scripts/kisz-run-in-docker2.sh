@@ -91,7 +91,7 @@ fi
 
 # --user $(id -u):$(id -g) \ # use root user instead
 
-docker run -it --ipc=host --network=host \
+docker run --rm -it --ipc=host --network=host \
     -d \
     -v "${PWD}/../gorillatracker:/workspaces/gorillatracker" \
     -w /workspaces/gorillatracker \
@@ -100,11 +100,10 @@ docker run -it --ipc=host --network=host \
     -v "${HOME}/pretrained_weights:/workspaces/gorillatracker/pretrained_weights" \
     -v "${PWD}/../.netrc:/home/gorilla/.netrc:ro" \
     -v "${PWD}/../.cache:/root/.cache" \
-    -v "/mnt/test/logs:/workspaces/gorillatracker/logs" \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
     --gpus=\"device=${gpus}\" \
-    $image /bin/bash -c "${command}"
+    $image /bin/bash
 
 # print done to console
 echo 'Done'

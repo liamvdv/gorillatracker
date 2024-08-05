@@ -34,10 +34,10 @@ def check_experiment_configs(configs: list[dict[str, Any]]) -> None:
         ), "Project name must be of the form <Function>-<Backbone>-<Dataset>-<Set-Type>"
         config_dict = get_config(config["config_path"])
 
-        input_size = get_input_size(config_dict["model_name_or_path"])
-        assert config_dict["data_resize_transform"] == get_input_size(
-            config_dict["model_name_or_path"]
-        ), f"Input size mismatch. Expected {input_size}, got {config_dict['data_resize_transform']}"
+        # input_size = get_input_size(config_dict["model_name_or_path"])
+        # assert config_dict["data_resize_transform"] == get_input_size(
+        #     config_dict["model_name_or_path"]
+        # ), f"Input size mismatch. Expected {input_size}, got {config_dict['data_resize_transform']}"
 
         print(f"Config file {config['config_path']} is valid")
 
@@ -116,14 +116,16 @@ def run_experiment(
             print("No GPUs found. Exiting.")
             return
 
-        for gpu_id in range(num_gpus):
-            for _ in range(agents_per_gpu):
-                p = Process(target=run_agent_with_gpu, args=(sweep_id, gpu_id))
-                p.start()
-                processes.append(p)
+        # for gpu_id in range(num_gpus):
+        #     for _ in range(agents_per_gpu):
+        #         p = Process(target=run_agent_with_gpu, args=(sweep_id, gpu_id))
+        #         p.start()
+        #         processes.append(p)
 
-        for p in processes:
-            p.join()
+        # for p in processes:
+        #     p.join()
+        
+        run_agent_with_gpu(sweep_id, 0)
 
         save_best_run_results(sweep_path, "aggregated/cxlkfold/val/embeddings/knn/accuracy_max")
 

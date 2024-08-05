@@ -4,6 +4,7 @@ from typing import Callable, Optional, Tuple, Type
 
 import numpy as np
 import torch.ao.quantization
+import copy
 import wandb
 from fsspec import Callback
 from lightning import Trainer
@@ -168,13 +169,15 @@ def train_using_quantization_aware_training(
     checkpoint_callback: ModelCheckpoint,
 ) -> Tuple[BaseModule, Trainer]:
     logger.info("Preperation for quantization aware training...")
-    example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=100)  # type: ignore
+    example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=dm.batch_size * 4)  # type: ignore
     example_inputs = (example_inputs,)  # type: ignore
-    autograd_graph = capture_pre_autograd_graph(model.model_wrapper, example_inputs)
+    model.model_wrapper.eval()
+    autograd_graph = capture_pre_autograd_graph(model.model_wrapper, copy.deepcopy(example_inputs))
     quantizer = XNNPACKQuantizer().set_global(get_symmetric_quantization_config())  # type: ignore
     model.model_wrapper = prepare_qat_pt2e(autograd_graph, quantizer)
 
     allow_exported_model_train_eval(model.model_wrapper)
+    model.model_wrapper.train()
 
     torch.use_deterministic_algorithms(True, warn_only=True)
     model, trainer = train_and_validate_model(args, dm, model, callbacks, wandb_logger)

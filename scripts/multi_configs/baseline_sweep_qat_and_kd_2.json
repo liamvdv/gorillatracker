@@ -1,0 +1,82 @@
+{
+    "global": {
+        "sweep_name": "Baseline QAT & KD Sweep",
+        "run_name": "443-take-baselines-for-models",
+        "wandb_tags": [
+            "sweep",
+            "qat&kd"
+        ],
+        "use_quantization_aware_training": true,
+        "max_epochs": 40,
+        "early_stopping_patience": 4,
+        "embedding_size": 256,
+        "loss_mode": "distillation/offline/response-based",
+        "teacher_model_wandb_link": "/workspaces/gorillatracker/models/vit_large_gorillas_Embedding-VitLarge-CXL-OpenSet_t6z53vr7.ckpt",
+        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
+        "dataset_class": "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
+        "dataset_names": [
+            "cxlkfold",
+            "bristol"
+        ],
+        "additional_val_dataset_classes": [
+            "gorillatracker.datasets.bristol.BristolDataset"
+        ],
+        "additional_val_data_dirs": [
+            "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered"
+        ],
+        "kfold": true,
+        "val_before_training": true,
+        "lr_schedule": "cosine",
+        "workers": 16,
+        "batch_size": 32,
+        "save_model_to_wandb": false,
+        "end_lr": 1e-7,
+        "l2_alpha": 1,
+        "l2_beta": 1,
+        "stop_saving_metric_name": "cxlkfold/val/embeddings/knn/accuracy",
+        "stop_saving_metric_mode": "max"
+    },
+    "global_sweep_parameters": {
+        "dropout_p": {
+            "values": [
+                0.5,
+                0.32,
+                0.1
+            ]
+        },
+        "start_lr": {
+            "values": [
+                1e-4,
+                1e-5,
+                1e-6
+            ]
+        }
+    },
+    "experiments": [
+        {
+            "project_name": "Embedding-ResNet-50-CXL-OpenSet",
+            "config_path": "./cfgs/resnet50_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-ResNet-152-CXL-OpenSet",
+            "config_path": "./cfgs/resnet152_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-SwinV2-Large-CXL-Open",
+            "config_path": "./cfgs/swinv2_large_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-SwinV2-Base-CXL-Open",
+            "config_path": "./cfgs/swinv2_base_cxl.yml",
+            "parameters": {}
+        },
+        {
+            "project_name": "Embedding-SwinV2-Small-CXL-Open",
+            "config_path": "./cfgs/swinv2_small_cxl.yml",
+            "parameters": {}
+        }
+    ]
+}

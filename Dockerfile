@@ -9,6 +9,7 @@
 
 # We can use the OS_PREFIX build arg to choose between ubi8 and ubuntu as base image (for amd64 processor architecture)
 ARG OS_SELECTOR=ubuntu
+ARG TARGETPLATFORM=linux/amd64
 
 # Load micromamba container to copy from later
 FROM --platform=$TARGETPLATFORM mambaorg/micromamba:1.4.2 as micromamba
@@ -21,18 +22,18 @@ FROM --platform=$TARGETPLATFORM mambaorg/micromamba:1.4.2 as micromamba
 # -----------------
 # base image for amd64
 # -----------------
-FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as amd64ubi8
-# Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
-RUN yum install -y git gcc gcc-c++ nano wget && yum clean all
-# Copy lockfile to container
-COPY environment.yml /locks/environment.yml
+# FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as amd64ubi8
+# # Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
+# RUN yum install -y git gcc gcc-c++ nano wget && yum clean all
+# # Copy lockfile to container
+# COPY environment.yml /locks/environment.yml
 
-# -----------------
-# devcontainer base image for amd64 using Ubuntu
-# SLURM + pyxis has a bug on our cluster, where the automatic activation of the conda environment fails if the base image is ubuntu
-# But Ubuntu works better for devcontainers than ubi8
-# So we use Ubuntu for devcontainers and ubi8 for actual deployment on the cluster
-# -----------------
+# # -----------------
+# # devcontainer base image for amd64 using Ubuntu
+# # SLURM + pyxis has a bug on our cluster, where the automatic activation of the conda environment fails if the base image is ubuntu
+# # But Ubuntu works better for devcontainers than ubi8
+# # So we use Ubuntu for devcontainers and ubi8 for actual deployment on the cluster
+# # -----------------
 FROM --platform=linux/amd64 nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04 as amd64ubuntu
 # Install compiler for .compile() with PyTorch 2.0 and nano for devcontainers
 RUN apt-get update && apt-get install -y git gcc wget g++ nano openssh-client && apt-get clean
@@ -42,11 +43,11 @@ COPY environment.yml /locks/environment.yml
 # -----------------
 # base image for ppc64le
 # -----------------
-FROM --platform=linux/ppc64le nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as ppc64leubi8
-# Install compiler for .compile() with PyTorch 2.0
-RUN yum install -y gcc gcc-c++ && yum clean all
-# Copy ppc64le specififc lockfile to container
-COPY ppc64le.cenvironment.yml /locks/environment.yml
+# FROM --platform=linux/ppc64le nvidia/cuda:12.2.2-cudnn8-runtime-ubi8 as ppc64leubi8
+# # Install compiler for .compile() with PyTorch 2.0
+# RUN yum install -y gcc gcc-c++ && yum clean all
+# # Copy ppc64le specififc lockfile to container
+# COPY ppc64le.cenvironment.yml /locks/environment.yml
 
 
 
@@ -71,8 +72,8 @@ USER root
 # next 3 ARG commands match the values in your image. You can get the values
 # by running: docker run --rm -it my/image id -a
 ARG MAMBA_USER=mamba
-ARG MAMBA_USER_ID=1000
-ARG MAMBA_USER_GID=1000
+ARG MAMBA_USER_ID=1001
+ARG MAMBA_USER_GID=1001
 ENV MAMBA_USER=$MAMBA_USER
 ENV MAMBA_ROOT_PREFIX="/opt/conda"
 ENV MAMBA_EXE="/bin/micromamba"
@@ -117,10 +118,10 @@ CMD ["/bin/bash"]
 # Switch to root user to grant necessary permissions
 USER root
 # Give user permission to gcc
-RUN chown $MAMBA_USER:$MAMBA_USER /usr/bin/gcc
+# RUN chown $MAMBA_USER:$MAMBA_USER /usr/bin/gcc
 # Necessary to prevent permission error when micromamba tries to install pip dependencies from lockfile
-RUN chown $MAMBA_USER:$MAMBA_USER /locks/
-RUN chown $MAMBA_USER:$MAMBA_USER /locks/environment.yml
+#RUN chown $MAMBA_USER:$MAMBA_USER /locks/
+#RUN chown $MAMBA_USER:$MAMBA_USER /locks/environment.yml
 # Provide mamba alias for micromamba
 RUN echo "alias mamba=micromamba" >> /usr/local/bin/_activate_current_env.sh
 

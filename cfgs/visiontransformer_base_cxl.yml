@@ -69,7 +69,7 @@ check_val_every_n_epoch: 5      # Check validation every n epochs
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
 
-force_nlet_builder: "quadlet"
+force_nlet_builder: None
 data_dir: "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
 dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"

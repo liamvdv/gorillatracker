@@ -1,0 +1,25 @@
+Missing KD:
+Embedding-EfficientNet-Medium-CXL-OpenSet-QAT&KD
+Embedding-EfficientNet-Small-CXL-OpenSet-QAT&KD
+Embedding-ResNet-18-CXL-OpenSet-QAT&KD
+Embedding-SwinV2-Base-CXL-Open-QAT&KD
+Embedding-SwinV2-Large-CXL-Open-QAT&KD
+Embedding-SwinV2-Small-CXL-Open-QAT&KD
+Embedding-ViT-Base-CXL-OpenSet-QAT&KD
+Embedding-ViT-Clip-CXL-OpenSet-QAT&KD
+Embedding-ViT-DinoV2-CXL-OpenSet-QAT&KD
+Embedding-ViT-Large-CXL-OpenSet-QAT&KD
+
+Missing QAT:
+Embedding-SwinV2-Base-CXL-Open-QAT
+Embedding-SwinV2-Large-CXL-Open-QAT
+Embedding-SwinV2-Small-CXL-Open-QAT
+Embedding-ViT-Base-CXL-OpenSet-QAT
+Embedding-ViT-Clip-CXL-OpenSet-QAT
+Embedding-ViT-DinoV2-CXL-OpenSet-QAT
+Embedding-ViT-Large-CXL-OpenSet-QAT
+
+Missing Baseline:
+Embedding-SwinV2-Base-CXL-Open
+Embedding-SwinV2-Large-CXL-Open
+Embedding-ViT-DinoV2-CXL-OpenSet

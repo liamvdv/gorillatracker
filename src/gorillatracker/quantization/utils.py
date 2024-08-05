@@ -13,6 +13,7 @@ def get_model_input(
     dataset_path: Path,
     partion: Literal["train", "val", "test"] = "train",
     amount_of_tensors: int = 100,
+    height: int = 224,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Get a tensor of images and a tensor of labels from a dataset.
     Args:
@@ -24,7 +25,7 @@ def get_model_input(
 
     transform = transforms.Compose(
         [
-            transforms.Resize(224),
+            transforms.Resize(height),
             transforms.Normalize([0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
@@ -34,7 +35,7 @@ def get_model_input(
         nlet_builder=build_onelet,
         partition=partion,
         transform=transform,
-        val_i=0,
+        val_i=4,
         k=5,
     )
 
@@ -47,6 +48,8 @@ def get_model_input(
         _, image, label = dataset[i]
         images.append(image[0])
         labels.append(label[0])
+
+    del dataset
 
     return torch.stack(images), torch.tensor(labels)
 

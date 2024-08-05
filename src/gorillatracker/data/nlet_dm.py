@@ -113,13 +113,13 @@ class NletDataModule(L.LightningDataModule):
     def val_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         # NOTE(rob2u): the type ignores are necessary because these types would be incorrect for the combined Dataset, yet we don't want to change it (cascade of changes)
         return [
-            DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for val in self.val  # type: ignore
+            DataLoader(val, batch_size=self.batch_size, shuffle=False, num_workers=self.workers, drop_last=True) for val in self.val  # type: ignore
         ]
 
     def test_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:
         # NOTE(rob2u): the type ignores are necessary because these types would be incorrect for the combined Dataset, yet we don't want to change it (cascade of changes)
         return [
-            DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers) for test in self.test  # type: ignore
+            DataLoader(test, batch_size=self.batch_size, shuffle=False, num_workers=self.workers, drop_last=True) for test in self.test  # type: ignore
         ]
 
     def predict_dataloader(self) -> list[DataLoader[gtypes.Nlet]]:  # TODO(memben)

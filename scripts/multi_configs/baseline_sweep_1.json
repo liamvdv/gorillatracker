@@ -10,7 +10,6 @@
         "max_epochs": 40,
         "early_stopping_patience": 4,
         "embedding_size": 256,
-        "data_resize_transform": 224,
         "loss_mode": "online/soft/l2sp",
         "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
         "dataset_class": "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
@@ -28,7 +27,7 @@
         "val_before_training": true,
         "lr_schedule": "cosine",
         "workers": 16,
-        "batch_size": 24,
+        "batch_size": 32,
         "save_model_to_wandb": false,
         "end_lr": 1e-7,
         "l2_alpha": 1,
@@ -86,41 +85,6 @@
         {
             "project_name": "Embedding-ResNet-152-CXL-OpenSet",
             "config_path": "./cfgs/resnet152_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-SwinV2-Large-CXL-Open",
-            "config_path": "./cfgs/swinv2_large_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-SwinV2-Base-CXL-Open",
-            "config_path": "./cfgs/swinv2_large_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-SwinV2-Small-CXL-Open",
-            "config_path": "./cfgs/swinv2_small_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-ViT-Large-CXL-OpenSet",
-            "config_path": "./cfgs/visiontransformer_large_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-ViT-Base-CXL-OpenSet",
-            "config_path": "./cfgs/visiontransformer_base_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-ViT-DinoV2-CXL-OpenSet",
-            "config_path": "./cfgs/visiontransformer_dinov2_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-ViT-Clip-CXL-OpenSet",
-            "config_path": "./cfgs/visiontransformer_clip_cxl.yml",
             "parameters": {}
         }
     ]

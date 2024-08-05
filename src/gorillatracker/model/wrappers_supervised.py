@@ -105,7 +105,6 @@ class TimmWrapper(nn.Module):
         if x.dim() == 3:
             logger.info("Assuming VisionTransformer is used and taking the first token.")
             x = x[:, 0, :]
-
         x = self.embedding_layer(x)
         return x
 

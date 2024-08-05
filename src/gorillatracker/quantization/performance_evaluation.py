@@ -9,6 +9,7 @@ from torch.fx import GraphModule
 
 from gorillatracker.metrics import knn
 from gorillatracker.model.base_module import BaseModule
+from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
 def size_of_model_in_mb(model: nn.Module) -> float:
@@ -33,15 +34,19 @@ def get_knn_accuracy(
     generated_image_embeddings = quantized_model(images)
     validation_labels = labels
 
-    data = pd.DataFrame(
-        {  # TODO(rob2u): IDK if this works ask kajo to test and fix together
-            "embeddings": generated_image_embeddings,
-            "labels": validation_labels,
-            "id": range(len(validation_labels)),  # HACK
-            "partition": "val",
-            "dataset": "CXL",
-        }
-    )
+    le = LinearSequenceEncoder()
+    # convert the labels tensor to a list of ints
+    encoded_labels = le.encode_list(validation_labels.tolist())
+
+    df_data = []
+    for embedding, label, id, encoded_labels in zip(
+        generated_image_embeddings, validation_labels, range(len(validation_labels)), encoded_labels
+    ):
+        df_data.append(
+            {"embedding": embedding, "label": label, "id": id, "partition": "val", "encoded_label": encoded_labels}
+        )
+
+    data = pd.DataFrame(df_data)
 
     knn_results = knn(data, k=knn_number)
     return knn_results
@@ -97,7 +102,7 @@ def evaluate_model(
             knn_number=5,
         )
         return
-
+    results[key] = dict()
     results[key]["size_of_model_in_mb"] = size_of_model_in_mb(model)
     results[key]["knn1"] = get_knn_accuracy(
         model=model,

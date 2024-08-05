@@ -512,11 +512,12 @@ class BaseModule(L.LightningModule):
         train_ids: list[gtypes.Id] = []
         for batch in self.dm.train_dataloader():
             batch_size = lazy_batch_size(batch)
+
             flat_ids, flat_images, flat_labels = flatten_batch(batch)
             anchor_labels = flat_labels[:batch_size]
-            anchor_images = flat_images[:batch_size].to(trainer.model.device)
+            anchor_images = flat_images[:64].to(trainer.model.device)
             anchor_ids = flat_ids[:batch_size]
-            embeddings = trainer.model(anchor_images)
+            embeddings = trainer.model(anchor_images)[:batch_size]
             train_embedding_batches.append(embeddings)
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
             train_ids.extend(anchor_ids)

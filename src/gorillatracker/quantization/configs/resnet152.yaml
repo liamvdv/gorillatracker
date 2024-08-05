@@ -1,0 +1,11 @@
+name: Embedding-ResNet152-CXL-OpenSet
+model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ResNet152-CXL-OpenSet/9xs7076y/checkpoints/last_model_ckpt.ckpt"
+
+save_quantized_model: False
+load_quantized_model: False
+save_model_architecture: False
+base_dir: "runs/"
+
+number_of_calibration_images: 100
+
+dataset_path: "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"

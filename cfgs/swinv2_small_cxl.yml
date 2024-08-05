@@ -74,7 +74,7 @@ check_val_every_n_epoch: 5      # Perform validation every n epochs
 # data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 # dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
 
-force_nlet_builder: "quadlet"
+force_nlet_builder: None
 data_dir: "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"
 dataset_class: "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 # dataset_class: "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset"
