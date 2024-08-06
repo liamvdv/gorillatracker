@@ -12,7 +12,7 @@ workers: 40                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ViTLarge-MoCo-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "484-larger-temperature" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "499-new-ssl-cfg" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "MoCo"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -26,6 +26,7 @@ debug: False                      # Enable debug mode
 from_scratch: False               # Train the model from scratch
 early_stopping_patience: 5        # Early stopping patience (number of epochs)
 stop_saving_metric_name: "cxl-all/val/embeddings/knn5_crossvideo_cos/accuracy"
+stop_saving_metric_mode: "max"
 embedding_size: 256
 dropout_p: 0.12
 
@@ -53,21 +54,21 @@ loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "onlin
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 8e-6                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 8e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+initial_lr: 1e-6                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-8                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
-lr_interval: 0.125
+lr_interval: 0.5
 
 batch_size: 64                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 1                  # Training goal (large number)
+max_epochs: 10                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 save_model_to_wandb: False   
 
-val_check_interval: 0.125
+val_check_interval: 0.5
 save_interval: 2                # Model checkpoint save interval as a fraction of total steps
 embedding_save_interval: 1      # Embedding save interval
 knn_with_train: False           
@@ -76,13 +77,17 @@ knn_with_train: False
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl"
-feature_types: ["face_90"]
-n_samples: 5
+feature_types: ["face_45"]
+tff_selection: "movement"
+movement_delta: 0.01
+n_samples: 10
+width_range: [100, 10000]
+height_range: [100, 10000]
 
 data_resize_transform: 224
 
-additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset]
-additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/val"]
-dataset_names: ["ssl", "cxl-all", "bristol", "cxl-val"]
+additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.ValKFoldCXLDataset]
+additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square", "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5"]
+dataset_names: ["ssl", "cxl-all", "bristol", "cxl-kfold"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images-squared/2024-04-18"
