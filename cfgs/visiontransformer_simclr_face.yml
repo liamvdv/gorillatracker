@@ -60,7 +60,7 @@ lr_interval: 0.25
 batch_size: 64                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 2                  # Training goal (large number)
+max_epochs: 1                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
