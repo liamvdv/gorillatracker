@@ -272,6 +272,7 @@ class BaseModuleSupervised(BaseModule):
             ),
         )
         self.set_losses(model=self.model_wrapper.model, **kwargs)
+        self.model_wrapper.train()
 
         if freeze_backbone:
             for param in self.model_wrapper.model.parameters():
