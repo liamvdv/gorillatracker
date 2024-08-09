@@ -555,6 +555,8 @@ class BaseModule(L.LightningModule):
         metrics = {
             "knn5": partial(knn_func, k=5),
             "knn": partial(knn_func, k=1),
+            "knn5_filter": partial(knn_func, k=5, use_filter=True),
+            "knn_filter": partial(knn_func, k=1, use_filter=True),
             "knn5_macro": partial(knn_func, k=5, average="macro"),
             "knn_macro": partial(knn_func, k=1, average="macro"),
         }
@@ -595,8 +597,10 @@ class BaseModule(L.LightningModule):
         metrics |= (
             {
                 "knn_crossvideo": partial(knn_func, k=1, use_crossvideo_positives=True),
+                "knn_crossvideo_filter": partial(knn_func, k=1, use_crossvideo_positives=True, use_filter=True),
                 "knn_crossvideo_cos": partial(knn_func, k=1, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn5_crossvideo": partial(knn_func, k=5, use_crossvideo_positives=True),
+                "knn5_crossvideo_filter": partial(knn_func, k=5, use_crossvideo_positives=True, use_filter=True),
                 "knn5_crossvideo_cos": partial(knn_func, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn_crossvideo_macro": partial(knn_func, k=1, use_crossvideo_positives=True, average="macro"),
                 "knn_crossvideo_macro_cos": partial(
