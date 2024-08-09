@@ -74,6 +74,7 @@ negative_mining: "overlapping"
 data_resize_transform: 518
 tff_selection: "movement"
 movement_delta: 0.05
+forced_train_image_count: 10000
 
 # dataset_names: ["ssl", "cxl"]
 # additional_val_dataset_classes: [gorillatracker.datasets.cxl.CXLDataset]
