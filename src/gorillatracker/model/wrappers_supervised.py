@@ -84,7 +84,7 @@ class TimmWrapper(nn.Module):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
         assert pool_mode == "none" or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
         if img_size is not None:
