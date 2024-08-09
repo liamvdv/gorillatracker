@@ -1,6 +1,5 @@
 from typing import Any, Type
 
-import torch
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from gorillatracker.args import TrainingArgs
