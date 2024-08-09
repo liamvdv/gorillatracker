@@ -82,6 +82,7 @@ def main(args: TrainingArgs) -> None:
         height_range=args.height_range,
         split_path=args.split_path,
         movement_delta=args.movement_delta,
+        forced_train_image_count=args.forced_train_image_count,
     )
     if args.force_nlet_builder is not None and args.force_nlet_builder != "None":
         force_nlet_builder(args.force_nlet_builder)
@@ -123,7 +124,7 @@ def main(args: TrainingArgs) -> None:
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
-    
+
     max_metric_logger_callback = BestMetricLogger(metric_name=args.stop_saving_metric_name)
 
     callbacks = (
