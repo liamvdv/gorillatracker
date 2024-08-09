@@ -69,9 +69,8 @@ n_samples: 6
 use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
 feature_types: ["face_90"]
-negative_mining: "random"
+negative_mining: "overlapping"
 data_resize_transform: 192
-forced_train_image_count: 1000
 
 dataset_names: ["ssl", "bristol", "cxl_all", "cxl"]
 additional_val_dataset_classes: [gorillatracker.datasets.bristol.BristolDataset, gorillatracker.datasets.cxl.CXLDataset, gorillatracker.datasets.cxl.CXLDataset]
