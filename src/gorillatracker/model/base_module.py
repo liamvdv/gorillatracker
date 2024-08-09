@@ -575,7 +575,7 @@ class BaseModule(L.LightningModule):
                 "knn5-with-train_macro": partial(knn_func, k=5, use_train_embeddings=True, average="macro"),
                 "knn-with-train_macro": partial(knn_func, k=1, use_train_embeddings=True, average="macro"),
             }
-            if self.knn_with_train and dataloader_idx == 0 and "multispecies" not in dataset_id.lower()
+            if self.knn_with_train and dataloader_idx == 0
             else {}
         )
         metrics |= (
@@ -589,7 +589,7 @@ class BaseModule(L.LightningModule):
                     knn_func, k=1, use_train_embeddings=True, average="macro", distance_metric="cosine"
                 ),
             }
-            if self.knn_with_train and dataloader_idx == 0 and knn_func is knn and "multispecies" not in dataset_id.lower()
+            if self.knn_with_train and dataloader_idx == 0 and knn_func is knn
             else {}
         )
         metrics |= (

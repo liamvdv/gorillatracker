@@ -131,5 +131,5 @@ class ModelConstructor:
                     f"The current torch version ({torch.__version__}) does not have support for compile."
                     "Please install torch >= 2.0 or disable compile."
                 )
-            model = torch.compile(model)
+            model = torch.compile(model)  # type: ignore
         return model

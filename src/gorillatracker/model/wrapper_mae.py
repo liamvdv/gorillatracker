@@ -287,11 +287,11 @@ class MaskedVisionTransformer(BaseModule):
         if self.val_img is None:
             self.val_img = batch[1][0][0].unsqueeze(0)
         output = super().validation_step(batch, batch_idx, dataloader_idx)
-        
+
         if output != torch.tensor(0.0):
             return output
         else:
-            _, flat_images_mae, _ = flatten_batch(batch)  # type: ignore
+            _, flat_images_mae, _ = flatten_batch(batch)
 
             batch_size = flat_images_mae.shape[0]
             idx_keep, idx_mask = utils.random_token_mask(
@@ -307,7 +307,7 @@ class MaskedVisionTransformer(BaseModule):
             )
 
             x_encoded = self.forward_encoder(images=flat_images_mae, idx_keep=idx_keep)
-            
+
             x_pred = self.forward_decoder(
                 x_encoded=x_encoded,
                 idx_keep=idx_keep,
@@ -322,16 +322,11 @@ class MaskedVisionTransformer(BaseModule):
             reg_term_decoder = self.l2_decoder(self.decoder) if self.l2sp else 0.0
             reg_term_encoder = self.l2sp_backbone(self.backbone.vit) if self.l2sp else 0.0
             mse_loss = self.criterion(x_pred, target)
-            total_loss = (
-                mse_loss * self.mse_factor
-                + reg_term_decoder
-                + reg_term_encoder
-            )
-            
-            self.log("val/loss", total_loss, on_epoch=True)
-            
-            return total_loss
+            total_loss = mse_loss * self.mse_factor + reg_term_decoder + reg_term_encoder
 
+            self.log("val/loss", total_loss, on_epoch=True)
+
+            return total_loss
 
     def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
         if self.val_img is not None:

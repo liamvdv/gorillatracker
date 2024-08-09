@@ -13,8 +13,8 @@ from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
-from gorillatracker.transform_utils import PlanckianJitter
 from gorillatracker.model.wrapper_mae import MaskedVisionTransformer
+from gorillatracker.transform_utils import PlanckianJitter
 
 logger = getLogger(__name__)
 
@@ -196,8 +196,8 @@ class Miewid_msv2(nn.Module):
         x = self.model(x)
         x = self.embedding_layer(x)
         return x
-    
-    
+
+
 class MAEFineTuningWrapper(nn.Module):
     def __init__(
         self,
@@ -210,8 +210,10 @@ class MAEFineTuningWrapper(nn.Module):
     ):
         super().__init__()
         mae = MaskedVisionTransformer.load_from_checkpoint(checkpoint_path, data_module=None, wandb_run=None)
-        self.model = mae.backbone.vit # NOTE(rob2u): a timm model
-        self.embedding_layer = get_embedding_layer(id=embedding_id, feature_dim=self.model.num_features, embedding_dim=embedding_size, dropout_p=dropout_p)
+        self.model = mae.backbone.vit  # NOTE(rob2u): a timm model
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=self.model.num_features, embedding_dim=embedding_size, dropout_p=dropout_p
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model.forward_features(x)
@@ -222,6 +224,7 @@ class MAEFineTuningWrapper(nn.Module):
 
         x = self.embedding_layer(x)
         return x
+
 
 model_wrapper_registry = {
     "timm": TimmWrapper,
@@ -250,7 +253,9 @@ class BaseModuleSupervised(BaseModule):
         ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
         logger.info("Using model", model_name_or_path)
         wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
-        if model_name_or_path.startswith("timm") or model_name_or_path.startswith("timm_eval"):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
+        if model_name_or_path.startswith("timm") or model_name_or_path.startswith(
+            "timm_eval"
+        ):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
             backbone_name = model_name_or_path.split("/")[-1]
         else:
             backbone_name = model_name_or_path
@@ -262,7 +267,9 @@ class BaseModuleSupervised(BaseModule):
             embedding_size=self.embedding_size,
             embedding_id=embedding_id,
             dropout_p=dropout_p,
-            checkpoint_path="/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None,
+            checkpoint_path=(
+                "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
+            ),
         )
         self.set_losses(model=self.model_wrapper.model, **kwargs)
 
