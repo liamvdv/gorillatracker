@@ -125,11 +125,4 @@ class ModelConstructor:
         else:
             model = self.model_cls(**self.model_args)
 
-        if self.args.compile:
-            if not hasattr(torch, "compile"):
-                raise RuntimeError(
-                    f"The current torch version ({torch.__version__}) does not have support for compile."
-                    "Please install torch >= 2.0 or disable compile."
-                )
-            model = torch.compile(model)
         return model
