@@ -1,9 +1,7 @@
 import logging
-import os
 import random
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from PIL import Image
 from torch import Tensor
