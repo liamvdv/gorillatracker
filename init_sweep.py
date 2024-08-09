@@ -24,7 +24,9 @@ def get_config(config_path: str) -> Dict[str, Any]:
     return config_dict
 
 
-def run_sweep(project_name: str, sweep_name: str, entity: str, config_path: str, parameters: Dict[str, Dict[str, Any]]) -> None:
+def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict[str, Dict[str, Any]], sweep_name: str = "") -> None:
+    if sweep_name == "":
+        sweep_name = project_name
     sweep_config = {
         "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": sweep_name,
