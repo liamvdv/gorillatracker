@@ -1,0 +1,70 @@
+[
+    {
+        "project_name": "Embedding-SELECTED-CXL-OpenSet",
+        "sweep_name": "vit_giant_dinov2_v2_triplet_sweep",
+        "entity": "gorillas",
+        "config_path": "./sweep_configs/base_config.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["000-vit_giant_dinov2_triplet"]
+            },
+            "model_name_or_path": {
+                "values": ["timm/vit_giant_patch14_dinov2.lvd142m"]
+            },
+            "path_to_pretrained_weights": {
+                "values": ["pretrained_weights/vit_giant_patch14_dinov2_lvd142m.pth"]
+            },
+            "batch_size": {
+                "values": [8]
+            },
+            "start_lr": {
+                "values": [1e-6]
+            },
+            "lr_schedule": {
+                "values": ["cosine"]
+            },
+            "l2_alpha": {
+                "values": [0.01]
+            },
+            "l2_beta": {
+                "values": [0.01]
+            },
+            "margin": {
+               "values": [0.5]
+            },
+            "loss_mode": {
+               "values": ["online/soft/l2sp"]
+            },
+            "embedding_id": {
+               "values": ["linear_norm_dropout"]
+            },
+            "dropout_p": {
+               "values": [0.32]
+            },
+            "dataset_class": {
+               "values": [
+                "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+                ]
+            },
+            "force_nlet_builder": {
+               "values": ["quadlet"]
+            },
+            "early_stopping_patience": {
+               "values": [2]
+            },
+            "loss_dist_term": {
+                "values": ["euclidean"]
+            },
+            "cross_video_masking": {
+                "values": [false]
+            },
+            "data_resize_transform": {
+                "values": [224]
+            },
+            "fix_img_size": {
+                "values": [224]
+            }
+        }
+    }
+]

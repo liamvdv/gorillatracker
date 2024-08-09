@@ -21,6 +21,7 @@ from gorillatracker.data.nlet import (
 from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.ssl import SSLDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
+from gorillatracker.data.multispecies import MultiSpeciesSupervisedDataset
 
 HardCrossEncounterSupervisedKFoldDatasetId = "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset"
 HardCrossEncounterSupervisedDatasetId = "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset"
@@ -42,6 +43,7 @@ KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 ValKFoldCXLDatasetId = "gorillatracker.datasets.cxl.ValKFoldCXLDataset"
 CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
+MultiSpeciesDatasetId = "gorillatracker.datasets.multispecies.MultiSpeciesDataset"
 
 dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     BristolDatasetId: SupervisedDataset,
@@ -64,6 +66,7 @@ dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     KFoldATRWDatasetId: SupervisedKFoldDataset,
     ValKFoldCXLDatasetId: ValOnlyKFoldDataset,
     CombinedDatasetId: CombinedDataset,
+    MultiSpeciesDatasetId: MultiSpeciesSupervisedDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
