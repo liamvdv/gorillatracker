@@ -11,7 +11,7 @@ workers: 40                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ViTLarge-SimCLR-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "499-l2sp-test" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "499-projection-head" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "SimCLR"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -46,7 +46,7 @@ memory_bank_size: 0
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
-loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
+loss_mode: "ntxent/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 
@@ -62,7 +62,7 @@ lr_interval: 0.5
 batch_size: 64                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 4                  # Training goal (large number)
+max_epochs: 20                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -78,7 +78,7 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl"
 feature_types: ["face_45"]
 tff_selection: "movement"
-movement_delta: 0.01
+movement_delta: 0.03
 n_samples: 10
 width_range: [100, 10000]
 height_range: [100, 10000]

@@ -12,7 +12,7 @@ workers: 40                      # Number of workers for data loading
 # Model and Training Arguments
 
 project_name: "Embedding-ViTLarge-MoCo-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "499-new-ssl-cfg" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "499-projection-head" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["test"]            # WandB tags for experiment tracking
 model_name_or_path: "MoCo"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
@@ -37,8 +37,8 @@ beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
 
 # L2SP Arguments
-l2_alpha: 0.002                       # Alpha for the l2sp loss
-l2_beta: 0.0002                      # Beta for the l2sp loss
+l2_alpha: 0.01                       # Alpha for the l2sp loss
+l2_beta: 0.01                     # Beta for the l2sp loss
 path_to_pretrained_weights: "pretrained_weights/vit_large_dinov2.pth"    # Path to the pretrained weights for the l2sp loss
 
 # NTXent Arguments
@@ -47,15 +47,15 @@ memory_bank_size: 4096
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
-loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
+loss_mode: "ntxent/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 1e-6                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 1e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+initial_lr: 5e-7                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 5e-7                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-8                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
 lr_interval: 0.5
@@ -79,7 +79,7 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl"
 feature_types: ["face_45"]
 tff_selection: "movement"
-movement_delta: 0.01
+movement_delta: 0.03
 n_samples: 10
 width_range: [100, 10000]
 height_range: [100, 10000]
