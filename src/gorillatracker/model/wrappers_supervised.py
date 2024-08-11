@@ -13,6 +13,7 @@ from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
+from gorillatracker.model.wrapper_mae import MaskedVisionTransformer
 from gorillatracker.transform_utils import PlanckianJitter
 
 logger = getLogger(__name__)
@@ -83,7 +84,7 @@ class TimmWrapper(nn.Module):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
         assert pool_mode == "none" or "vit" not in backbone_name, "pool_mode is not supported for VisionTransformer."
         if img_size is not None:
@@ -137,6 +138,7 @@ class TimmEvalWrapper(nn.Module):
     def __init__(  # type: ignore
         self,
         backbone_name,
+        *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__()
@@ -186,7 +188,6 @@ class Miewid_msv2(nn.Module):
     ) -> None:
         super().__init__()
         self.model = AutoModel.from_pretrained("conservationxlabs/miewid-msv2", trust_remote_code=True)  # size: 440
-        self.model = self.model.to(self.device)
         self.embedding_layer = get_embedding_layer(
             id=embedding_id, feature_dim=1280, embedding_dim=embedding_size, dropout_p=dropout_p
         )  # TODO(rob2u): test
@@ -197,11 +198,40 @@ class Miewid_msv2(nn.Module):
         return x
 
 
+class MAEFineTuningWrapper(nn.Module):
+    def __init__(
+        self,
+        checkpoint_path: str,
+        embedding_size: int,
+        embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = "linear",
+        dropout_p: float = 0.0,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        super().__init__()
+        mae = MaskedVisionTransformer.load_from_checkpoint(checkpoint_path, data_module=None, wandb_run=None)
+        self.model = mae.backbone.vit  # NOTE(rob2u): a timm model
+        self.embedding_layer = get_embedding_layer(
+            id=embedding_id, feature_dim=self.model.num_features, embedding_dim=embedding_size, dropout_p=dropout_p
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model.forward_features(x)
+        x = self.model.forward_head(x, pre_logits=True)
+        if x.dim() == 3:
+            logger.info("Assuming VisionTransformer is used and taking the first token.")
+            x = x[:, 0, :]
+
+        x = self.embedding_layer(x)
+        return x
+
+
 model_wrapper_registry = {
     "timm": TimmWrapper,
     "timm_eval": TimmEvalWrapper,
     "resnet50_dinov2": ResNet50DinoV2Wrapper,
     "miewid_msv2": Miewid_msv2,
+    "MAE": MAEFineTuningWrapper,
 }
 
 
@@ -219,14 +249,16 @@ class BaseModuleSupervised(BaseModule):
         super().__init__(**kwargs)
 
         assert (
-            len(model_name_or_path.split("/")) == 2
+            len(model_name_or_path.split("/")) >= 2
         ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
         logger.info("Using model", model_name_or_path)
         wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
-        if model_name_or_path.startswith("hf-hub"):  # Example: hf-hub:BVRA/MegaDescriptor-T-224
-            backbone_name = model_name_or_path
-        else:  # Example: timm/efficientnetv2_rw_m
+        if model_name_or_path.startswith("timm") or model_name_or_path.startswith(
+            "timm_eval"
+        ):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
             backbone_name = model_name_or_path.split("/")[-1]
+        else:
+            backbone_name = model_name_or_path
 
         self.model_wrapper = wrapper_cls(
             backbone_name=backbone_name,
@@ -235,8 +267,12 @@ class BaseModuleSupervised(BaseModule):
             embedding_size=self.embedding_size,
             embedding_id=embedding_id,
             dropout_p=dropout_p,
+            checkpoint_path=(
+                "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
+            ),
         )
         self.set_losses(model=self.model_wrapper.model, **kwargs)
+        self.model_wrapper.train()
 
         if freeze_backbone:
             for param in self.model_wrapper.model.parameters():

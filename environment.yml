@@ -76,6 +76,7 @@ dependencies:
       - onnx
       - tabulate
       - pyyaml
+      - wildlife-datasets
 
 
 # Non-standard section listing target platforms for conda-lock:

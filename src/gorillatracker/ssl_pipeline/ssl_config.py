@@ -50,6 +50,7 @@ class SSLConfig:
     split_path: Path
     width_range: tuple[Optional[int], Optional[int]]
     height_range: tuple[Optional[int], Optional[int]]
+    forced_train_image_count: Optional[int] = None
     movement_delta: Optional[float] = None
 
     def __post_init__(self) -> None:
@@ -66,6 +67,13 @@ class SSLConfig:
             video_ids = self._get_video_ids(partition)
             tracking_frame_features = self._sample_tracking_frame_features(video_ids, session)
             contrastive_images = self._create_contrastive_images(tracking_frame_features, base_path)
+            if self.forced_train_image_count is not None and partition == "train":
+                if len(contrastive_images) < self.forced_train_image_count:
+                    raise ValueError(
+                        f"Not enough images for training, required: {self.forced_train_image_count}, got {len(contrastive_images)}"
+                    )
+                contrastive_images = contrastive_images[: self.forced_train_image_count]
+
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:

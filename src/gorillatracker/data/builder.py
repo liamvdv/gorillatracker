@@ -3,6 +3,7 @@ from typing import Literal, Optional, Type, Union
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.combined import CombinedDataset
+from gorillatracker.data.multispecies import MultiSpeciesSupervisedDataset
 from gorillatracker.data.nlet import (
     CrossEncounterSupervisedDataset,
     CrossEncounterSupervisedKFoldDataset,
@@ -42,6 +43,7 @@ KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 ValKFoldCXLDatasetId = "gorillatracker.datasets.cxl.ValKFoldCXLDataset"
 CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
+MultiSpeciesDatasetId = "gorillatracker.datasets.multispecies.MultiSpeciesDataset"
 
 dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     BristolDatasetId: SupervisedDataset,
@@ -64,6 +66,7 @@ dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     KFoldATRWDatasetId: SupervisedKFoldDataset,
     ValKFoldCXLDatasetId: ValOnlyKFoldDataset,
     CombinedDatasetId: CombinedDataset,
+    MultiSpeciesDatasetId: MultiSpeciesSupervisedDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {

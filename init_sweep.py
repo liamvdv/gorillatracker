@@ -24,14 +24,16 @@ def get_config(config_path: str) -> Dict[str, Any]:
     return config_dict
 
 
-def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict[str, Dict[str, Any]]) -> None:
+def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict[str, Dict[str, Any]], sweep_name: str = "") -> None:
+    if sweep_name == "":
+        sweep_name = project_name
     sweep_config = {
         "program": "./train.py",  # Note: not the sweep file, but the training script
-        "name": project_name,
+        "name": sweep_name,
         "method": "grid",  # Specify the search method (random search in this case)
         "metric": {
             "goal": "maximize",
-            "name": "cxl_all/val/embeddings/knn5_crossvideo/accuracy",
+            "name": "aggregated/cxlkfold/val/embeddings/knn5/accuracy",
         },  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
