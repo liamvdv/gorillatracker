@@ -332,7 +332,12 @@ def knn_ssl(
     dm: NletDataModule,
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
+    use_filter: bool = False,
 ) -> Dict[str, Any]:
+    # TODO(memben): add use_filter option for ssl
+    if use_filter:
+        return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}
+
     # TODO: add true label
     _, labels, embeddings, _, _ = get_partition_from_dataframe(data, partition="val")
 
