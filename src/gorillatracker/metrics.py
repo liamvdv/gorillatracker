@@ -14,6 +14,7 @@ import torchmetrics as tm
 import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
+from scipy import stats
 from sklearn.manifold import TSNE
 from sklearn.metrics import accuracy_score, f1_score, precision_score
 from sklearn.neighbors import NearestNeighbors
@@ -376,6 +377,55 @@ def knn_ssl(
             true_labels.append(label.item())
             pred_labels.append(most_common)
             pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))].numpy())
+
+    if len(true_labels) == 0:
+        return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}
+
+    true_labels_tensor = torch.tensor(true_labels)
+    pred_labels_tensor = torch.tensor(pred_labels)
+
+    pred_labels_top5_nparray = np.array(pred_labels_top5)
+    pred_labels_top5_tensor = torch.tensor(pred_labels_top5_nparray)
+    top5_correct = []
+    for i, true_label in enumerate(true_labels_tensor):
+        if true_label in pred_labels_top5_tensor[i]:
+            top5_correct.append(1)
+        else:
+            top5_correct.append(0)
+    top5_accuracy = sum(top5_correct) / len(top5_correct)
+
+    accuracy = accuracy_score(true_labels_tensor, pred_labels_tensor)
+    f1 = f1_score(true_labels_tensor, pred_labels_tensor, average=average)
+    precision = precision_score(true_labels_tensor, pred_labels_tensor, average=average, zero_division=0)
+
+    return {"accuracy": accuracy, "accuracy_top5": top5_accuracy, "f1": f1, "precision": precision}
+
+
+def knn_naive(
+    data: pd.DataFrame,
+    average: Literal["micro", "macro", "weighted", "none"] = "weighted",
+    k: int = 5,
+) -> Dict[str, Any]:
+    _, _, val_embeddings, _, val_labels = get_partition_from_dataframe(data, partition="val")
+    val_embeddings = val_embeddings.numpy()
+    val_labels = val_labels.numpy()
+
+    true_labels = []
+    pred_labels = []
+    pred_labels_top5 = []
+
+    knn = NearestNeighbors(n_neighbors=k + 1, algorithm="auto").fit(val_embeddings, val_labels)
+
+    for embedding, label in zip(val_embeddings, val_labels):
+        n_neighbors = k + 1  # We need k+1 neighbors because the first one is the sample itself
+        _, indices = knn.kneighbors(embedding.reshape(1, -1), n_neighbors=n_neighbors)
+
+        idx_list = indices[0, 1:]  # Remove the first column (self)
+        neighbor_labels = val_labels[idx_list]
+        most_common = stats.mode(neighbor_labels)[0]
+        true_labels.append(label.item())
+        pred_labels.append(most_common)
+        pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))])
 
     if len(true_labels) == 0:
         return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}

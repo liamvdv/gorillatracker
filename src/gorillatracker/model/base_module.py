@@ -15,7 +15,15 @@ import gorillatracker.type_helper as gtypes
 from gorillatracker.data.nlet_dm import NletDataModule
 from gorillatracker.data.utils import flatten_batch, lazy_batch_size
 from gorillatracker.losses.get_loss import get_loss
-from gorillatracker.metrics import evaluate_embeddings, knn, knn_kfold_val, knn_ssl, log_train_images_to_wandb, tsne
+from gorillatracker.metrics import (
+    evaluate_embeddings,
+    knn,
+    knn_kfold_val,
+    knn_naive,
+    knn_ssl,
+    log_train_images_to_wandb,
+    tsne,
+)
 from gorillatracker.utils.labelencoder import LinearSequenceEncoder
 
 
@@ -652,6 +660,15 @@ class BaseModule(L.LightningModule):
 
         metrics = metrics if not self.fast_dev_run else {}
         metrics = {} if "combined" in dataset_id.lower() else metrics
+
+        metrics = (
+            {
+                "knn_naive": partial(knn_naive, k=1),
+                "knn5_naive": partial(knn_naive, k=5),
+            }
+            if "multispecies" in dataset_id.lower()
+            else metrics
+        )
 
         # log to wandb
         results = evaluate_embeddings(
