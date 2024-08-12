@@ -187,18 +187,18 @@ if __name__ == "__main__":
     DB_URI = os.environ.get("POSTGRESQL_URI")
     if DB_URI is None:
         raise ValueError("Please set the DB_URI environment variable in devcontainer.json")
-    args = SplitArgs(
+    base = SplitArgs(
         db_uri=DB_URI,
         version="2024-04-18",
-        name="SSL-Video-Split",
-        save_path="/workspaces/gorillatracker/data/splits/SSL/",
+        name="10k-SSL-Video-Split-Baseline",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
         split_by="percentage",
         train_split=90,
         val_split=5,
         test_split=5,
         hours=list(range(0, 24)),  # only videos from certain hours of the day
         video_length=(0, 1000000),  # min, max video length in seconds
-        max_train_videos=300000,  # max videos in train bucket
+        max_train_videos=10_000,  # max videos in train bucket
         max_val_videos=100,  # max videos in val bucket
         max_test_videos=1000,  # max videos in test bucket
         # starttime and endtime will be ignored if split_by is not custom
@@ -210,12 +210,277 @@ if __name__ == "__main__":
         test_endtime=dt.datetime(2030, 1, 1),
         remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
     )
-    if True:
-        args.create_split()
-        args.save_to_pickle()
-        print("Split created and saved")
-    else:
-        split_path = "data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-90-5-5_split_seed42_20240614_1235.pkl"
-        args = SplitArgs.load_pickle(split_path)
-    print(len(args.train_video_ids()), len(args.val_video_ids()), len(args.test_video_ids()))
-    print(args.train_video_ids()[:5])
+
+    base.create_split()
+    base.save_to_pickle()
+    print("Split created and saved")
+    print(len(base.train_video_ids()), len(base.val_video_ids()), len(base.test_video_ids()))
+
+    print("SPLIT BY TIME")
+
+    time_1 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-2015-2018-Year",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(0, 24)),  # only videos from certain hours of the day
+        video_length=(0, 1000000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2015, 1, 1),
+        train_endtime=dt.datetime(2018, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    time_1.create_split()
+    time_1.save_to_pickle()
+    print("Split created and saved")
+    print(len(time_1.train_video_ids()), len(time_1.val_video_ids()), len(time_1.test_video_ids()))
+
+    time_2 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-2018-2021-Year",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(0, 24)),  # only videos from certain hours of the day
+        video_length=(0, 1000000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2018, 1, 1),
+        train_endtime=dt.datetime(2021, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    time_2.create_split()
+    time_2.save_to_pickle()
+    print("Split created and saved")
+    print(len(time_2.train_video_ids()), len(time_2.val_video_ids()), len(time_2.test_video_ids()))
+
+    time_3 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-2021-2024-Year",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(0, 24)),  # only videos from certain hours of the day
+        video_length=(0, 1000000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2021, 1, 1),
+        train_endtime=dt.datetime(2024, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    time_3.create_split()
+    time_3.save_to_pickle()
+    print("Split created and saved")
+    print(len(time_3.train_video_ids()), len(time_3.val_video_ids()), len(time_3.test_video_ids()))
+
+    datetime_1 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-19-to-6-Datetime",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list([19, 20, 21, 22, 23, 24, 0, 1, 2, 3, 4, 5]),  # only videos from certain hours of the day
+        video_length=(0, 1000000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2010, 1, 1),
+        train_endtime=dt.datetime(2030, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    print("DATETIME")
+
+    datetime_1.create_split()
+    datetime_1.save_to_pickle()
+    print("Split created and saved")
+    print(len(datetime_1.train_video_ids()), len(datetime_1.val_video_ids()), len(datetime_1.test_video_ids()))
+
+    datetime_2 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-6-to-13-Datetime",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(6, 13)),  # only videos from certain hours of the day
+        video_length=(0, 1000000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2010, 1, 1),
+        train_endtime=dt.datetime(2030, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    datetime_2.create_split()
+    datetime_2.save_to_pickle()
+    print("Split created and saved")
+    print(len(datetime_2.train_video_ids()), len(datetime_2.val_video_ids()), len(datetime_2.test_video_ids()))
+
+    datetime_3 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-13-to-19-Datetime",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(13, 19)),  # only videos from certain hours of the day
+        video_length=(0, 1000000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2010, 1, 1),
+        train_endtime=dt.datetime(2030, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    datetime_3.create_split()
+    datetime_3.save_to_pickle()
+    print("Split created and saved")
+    print(len(datetime_3.train_video_ids()), len(datetime_3.val_video_ids()), len(datetime_3.test_video_ids()))
+
+    length_1 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-0-to-30-Length",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(0, 24)),  # only videos from certain hours of the day
+        video_length=(0, 30),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2010, 1, 1),
+        train_endtime=dt.datetime(2030, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    print("LENGTH")
+
+    length_1.create_split()
+    length_1.save_to_pickle()
+    print("Split created and saved")
+    print(len(length_1.train_video_ids()), len(length_1.val_video_ids()), len(length_1.test_video_ids()))
+
+    length_2 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-30-to-60-Length",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(0, 24)),  # only videos from certain hours of the day
+        video_length=(30, 60),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2010, 1, 1),
+        train_endtime=dt.datetime(2030, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    length_2.create_split()
+    length_2.save_to_pickle()
+    print("Split created and saved")
+    print(len(length_2.train_video_ids()), len(length_2.val_video_ids()), len(length_2.test_video_ids()))
+
+    length_3 = SplitArgs(
+        db_uri=DB_URI,
+        version="2024-04-18",
+        name="10k-SSL-Video-Split-60-to-MAX-Length",
+        save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
+        split_by="percentage",
+        train_split=90,
+        val_split=5,
+        test_split=5,
+        hours=list(range(0, 24)),  # only videos from certain hours of the day
+        video_length=(60, 10_000),  # min, max video length in seconds
+        max_train_videos=10_000,  # max videos in train bucket
+        max_val_videos=100,  # max videos in val bucket
+        max_test_videos=1000,  # max videos in test bucket
+        # starttime and endtime will be ignored if split_by is not custom
+        train_starttime=dt.datetime(2010, 1, 1),
+        train_endtime=dt.datetime(2030, 1, 1),
+        val_starttime=dt.datetime(2010, 1, 1),
+        val_endtime=dt.datetime(2030, 1, 1),
+        test_starttime=dt.datetime(2010, 1, 1),
+        test_endtime=dt.datetime(2030, 1, 1),
+        remove_used_videos_from_dir="/workspaces/gorillatracker/data/supervised/cxl_all/face_images",
+    )
+
+    length_3.create_split()
+    length_3.save_to_pickle()
+    print("Split created and saved")
+    print(len(length_3.train_video_ids()), len(length_3.val_video_ids()), len(length_3.test_video_ids()))
+
+    print("DONE")

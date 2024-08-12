@@ -109,6 +109,10 @@ def get_partition_from_dataframe(
     data: pd.DataFrame, partition: Literal["val", "train", "test"] = "val"
 ) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor, list[gtypes.Id], torch.Tensor]:
     partition_df = data.where(data["partition"] == partition).dropna()
+
+    if partition_df.empty:
+        return partition_df, torch.tensor([]), torch.tensor([]), [], torch.tensor([])
+
     partition_labels = torch.tensor(partition_df["label"].tolist()).long()
     partition_embeddings = np.stack(partition_df["embedding"].apply(np.array)).astype(np.float32)
     partition_embeddings = torch.tensor(partition_embeddings)

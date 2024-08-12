@@ -101,10 +101,11 @@ docker run --rm -it --ipc=host --network=host \
     -v "${PWD}/../.cache:/home/gorilla/.cache:ro" \
     -v "/mnt/vast-gorilla:/workspaces/gorillatracker/video_data:ro" \
     -v "/mnt/vast-gorilla/cropped-images:/workspaces/gorillatracker/cropped-images:ro" \
+    -v "/mnt/vast-gorilla/cropped-images-squared:/workspaces/gorillatracker/cropped-images-squared:ro" \
     --user 0:0 \
-    --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
+    --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY --env POSTGRESQL_URI=postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres \
     --gpus=\"device=${gpus}\" \
-    --name gorillatracker \
+    --name gorillatracker-ben-2 \
     $image /bin/bash -c "${command}"
 
 # print done to console

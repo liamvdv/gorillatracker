@@ -13,7 +13,8 @@ workers: 20                      # Number of workers for data loading
 project_name: "Embedding-ViTLarge-SimCLR-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
 run_name: "499-projection-head" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["test"]            # WandB tags for experiment tracking
-model_name_or_path: "SimCLR"  # Model name or path 
+fix_img_size: 224
+model_name_or_path: "timm/vit_large_patch14_dinov2.lvd142m"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False               # Enable fast development run
@@ -27,10 +28,10 @@ early_stopping_patience: 2        # Early stopping patience (number of epochs)
 stop_saving_metric_name: "cxl-all-val/val/embeddings/knn5_crossvideo_cos/accuracy"
 stop_saving_metric_mode: "max"
 embedding_size: 256
-dropout_p: 0.032
+dropout_p: 0.32
 
 # Optimizer Arguments
-weight_decay: 0.005               # Weight decay if l2sp regularisation is used this is set to 0.0
+weight_decay: 0.2              # Weight decay if l2sp regularisation is used this is set to 0.0
 beta1: 0.9                      # Adam optimizer's beta1 parameter
 beta2: 0.999                    # Adam optimizer's beta2 parameter
 epsilon: 1e-7                   # Adam optimizer's epsilon
@@ -38,28 +39,28 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.01                       # Alpha for the l2sp loss
 l2_beta: 0.01                      # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/vit_large_dinov2.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/vit_large_patch14_dinov2_lvd142m.pth"    # Path to the pretrained weights for the l2sp loss
 
 # NTXent Arguments
 temperature: 0.035
 memory_bank_size: 0
 
-margin: 1.0                         # Margin for the contrastive loss (triplet loss)
+margin: 0.5                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
-loss_mode: "ntxent/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
+loss_mode: "online/soft/l2sp" # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 
 lr_schedule: "cosine"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
 warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
-initial_lr: 5e-7                # Initial learning rate before warmup(must be > 0.0)
-start_lr: 5e-7                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+initial_lr: 1e-6                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-6                  # Learning Rate after warmup at the beginning of 'normal' scheduling
 end_lr: 1e-8                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
 lr_interval: 0.5
 
-batch_size: 64                  # Training batch size
+batch_size: 8                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
 max_epochs: 20                  # Training goal (large number)
@@ -78,6 +79,7 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl"
 feature_types: ["face_45"]
 tff_selection: "movement"
+negative_mining: "overlapping"  
 movement_delta: 0.03
 n_samples: 10
 width_range: [100, 10000]

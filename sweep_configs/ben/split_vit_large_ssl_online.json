@@ -1,0 +1,20 @@
+[
+    {
+        "project_name": "Embedding-ViTLarge-SSL-Split",
+        "entity": "gorillas",
+        "config_path": "/workspaces/gorillatracker/cfgs/visiontransformer_online_face.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["000-vit_large_ssl_online"]
+            },
+            "split_path": {
+                "values": [
+                                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-30-to-60-Length_2024-04-18_percentage-90-5-5_split_20240809_1536.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-0-to-30-Length_2024-04-18_percentage-90-5-5_split_20240809_1535.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-13-to-19-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1533.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-6-to-13-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1531.pkl"
+                ]
+            }
+        }
+    }
+]

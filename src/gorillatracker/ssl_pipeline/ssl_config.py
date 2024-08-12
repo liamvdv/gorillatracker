@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import List, Literal, Optional, Sequence
 
@@ -38,6 +39,8 @@ from gorillatracker.ssl_pipeline.sampler import (
     random_sample,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(kw_only=True)
 class SSLConfig:
@@ -69,9 +72,12 @@ class SSLConfig:
             contrastive_images = self._create_contrastive_images(tracking_frame_features, base_path)
             if self.forced_train_image_count is not None and partition == "train":
                 if len(contrastive_images) < self.forced_train_image_count:
-                    raise ValueError(
+                    logger.warning(
                         f"Not enough images for training, required: {self.forced_train_image_count}, got {len(contrastive_images)}"
                     )
+                    # raise ValueError(
+                    #     f"Not enough images for training, required: {self.forced_train_image_count}, got {len(contrastive_images)}"
+                    # )
                 contrastive_images = contrastive_images[: self.forced_train_image_count]
 
             return self._create_contrastive_sampler(contrastive_images, video_ids, session)
