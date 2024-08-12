@@ -164,6 +164,7 @@ class TrainingArgs:
     width_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
     height_range: tuple[Union[int, None], Union[int, None]] = field(default=(None, None))
     movement_delta: Union[float, None] = field(default=None)
+    forced_train_image_count: Union[int, None] = field(default=None)
 
     def __post_init__(self) -> None:
         assert self.num_devices > 0

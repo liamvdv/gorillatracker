@@ -172,3 +172,4 @@ cropped-images-squared/*
 *.npy
 */lightning_logs/*
 plots/
+/roberts_besenkammer

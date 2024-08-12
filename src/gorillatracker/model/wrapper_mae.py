@@ -38,11 +38,7 @@ class MaskedVisionTransformer(BaseModule):
         super().__init__(**kwargs)
 
         self.val_img: Union[None, torch.Tensor] = None
-        self.encoder_skip_connection = False
-
-        if self.encoder_skip_connection:
-            self.factor_skip_connection = nn.Parameter(torch.tensor(0.0))
-            self.factor_skip_connection.requires_grad = True
+        self.use_positives = True
 
         decoder_dim = 512  # decoder_width, default
         decoder_depth = 4  # default
@@ -51,7 +47,6 @@ class MaskedVisionTransformer(BaseModule):
         proj_drop_rate = 0.0  # default
         attn_drop_rate = 0.0  # default
         mask_ratio = 0.75  # default: 0.75
-
         vit = timm.create_model(
             "timm/vit_large_patch16_224.mae",
             pretrained=True,
@@ -77,7 +72,7 @@ class MaskedVisionTransformer(BaseModule):
         self.decoder = MAEDecoderTIMM(
             num_patches=vit.patch_embed.num_patches,
             patch_size=self.patch_size,
-            embed_dim=vit.embed_dim,
+            embed_dim=vit.embed_dim,  # usually vit.embed_dim TODO(rob2u) add linear projection to make shapes fit
             decoder_embed_dim=decoder_dim,
             decoder_depth=decoder_depth,
             decoder_num_heads=decoder_num_heads,
@@ -85,6 +80,9 @@ class MaskedVisionTransformer(BaseModule):
             proj_drop_rate=proj_drop_rate,
             attn_drop_rate=attn_drop_rate,
         )
+        if self.use_positives:
+            self.patch_projection = nn.Linear(self.patch_size**2 * 3, vit.embed_dim)
+
         print(self.loss_mode)
         self.l2sp = False
         loss_mode = self.loss_mode
@@ -175,6 +173,10 @@ class MaskedVisionTransformer(BaseModule):
         else:
             _, flat_images_mae, _ = flatten_batch(batch)  # type: ignore
 
+        if self.use_positives:
+            flat_images_mae_positive = flat_images_mae[len(flat_images_mae) // 2 :]
+            flat_images_mae = flat_images_mae[: len(flat_images_mae) // 2]
+
         batch_size = flat_images_mae.shape[0]
         idx_keep, idx_mask = utils.random_token_mask(
             size=(batch_size, self.sequence_length),
@@ -190,25 +192,28 @@ class MaskedVisionTransformer(BaseModule):
 
         x_encoded = self.forward_encoder(images=flat_images_mae, idx_keep=idx_keep)
 
-        if self.encoder_skip_connection:
-            images_encoded = self.backbone.images_to_tokens(flat_images_mae)
-            images_encoded = self.backbone.add_prefix_tokens(images_encoded)
-            images_encoded = utils.mask_at_index(images_encoded, idx_mask, self.backbone.mask_token)
-            images_encoded = self.backbone.add_pos_embed(images_encoded)
-            images_encoded = utils.get_at_index(images_encoded, idx_keep)
-            images_encoded = self.backbone.vit.norm_pre(images_encoded)
-            x_encoded = x_encoded + images_encoded * self.factor_skip_connection
+        if self.use_positives:
+            cls_token = x_encoded[:, 0]
+            patches_pos = utils.patchify(flat_images_mae_positive, self.patch_size)
+            batch_size, num_patches, patch_size = patches_pos.shape
+
+            patches_pos = patches_pos.view(-1, patch_size)
+            patches_pos = self.patch_projection(patches_pos)
+            patches_pos = patches_pos.view(batch_size, num_patches, -1)
+
+            seq_pos = torch.cat([cls_token.unsqueeze(1), patches_pos], dim=1)
+            x_encoded = utils.get_at_index(seq_pos, idx_keep).to(self.accelerator)
+
+        # get image patches for masked tokens
+        patches = utils.patchify(flat_images_mae, self.patch_size)
+        # must adjust idx_mask for missing class token
+        target = utils.get_at_index(patches, idx_mask - 1).to(self.accelerator)
 
         x_pred = self.forward_decoder(
             x_encoded=x_encoded,
             idx_keep=idx_keep,
             idx_mask=idx_mask,
         )
-
-        # get image patches for masked tokens
-        patches = utils.patchify(flat_images_mae, self.patch_size)
-        # must adjust idx_mask for missing class token
-        target = utils.get_at_index(patches, idx_mask - 1).to(self.accelerator)
 
         reg_term_decoder = self.l2_decoder(self.decoder) if self.l2sp else 0.0
         reg_term_encoder = self.l2sp_backbone(self.backbone.vit) if self.l2sp else 0.0
@@ -245,6 +250,19 @@ class MaskedVisionTransformer(BaseModule):
                 idx_mask.to(self.accelerator),
             )
             x_encoded = self.forward_encoder(images=original_img, idx_keep=idx_keep)
+
+            if self.use_positives:
+                cls_token = x_encoded[:, 0]
+                patches_pos = utils.patchify(original_img, self.patch_size)
+                batch_size, num_patches, patch_size = patches_pos.shape
+                patches_pos = patches_pos.view(-1, patch_size)
+
+                patches_pos = self.patch_projection(patches_pos)
+                patches_pos = patches_pos.view(batch_size, num_patches, -1)
+
+                patches_pos = torch.cat([cls_token.unsqueeze(1), patches_pos], dim=1)
+                x_encoded = utils.get_at_index(patches_pos, idx_keep).to(self.accelerator)
+
             x_pred = self.forward_decoder(x_encoded=x_encoded, idx_keep=idx_keep, idx_mask=idx_mask)
 
             # get image patches for masked tokens
@@ -284,9 +302,59 @@ class MaskedVisionTransformer(BaseModule):
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> torch.Tensor:
+
+        if self.use_positives:
+            ids, images, labels = batch
+            ids, images, labels = (
+                (ids[0],),
+                (images[0],),
+                (labels[0],),
+            )
+            batch = (ids, images, labels)
+
         if self.val_img is None:
             self.val_img = batch[1][0][0].unsqueeze(0)
-        return super().validation_step(batch, batch_idx, dataloader_idx)
+        output = super().validation_step(batch, batch_idx, dataloader_idx)
+
+        if output != torch.tensor(0.0):
+            return output
+        else:
+            _, flat_images_mae, _ = flatten_batch(batch)
+
+            batch_size = flat_images_mae.shape[0]
+            idx_keep, idx_mask = utils.random_token_mask(
+                size=(batch_size, self.sequence_length),
+                mask_ratio=self.mask_ratio,
+                device=flat_images_mae.device,
+            )
+
+            flat_images_mae, idx_keep, idx_mask = (
+                flat_images_mae.to(self.accelerator),
+                idx_keep.to(self.accelerator),
+                idx_mask.to(self.accelerator),
+            )
+
+            x_encoded = self.forward_encoder(images=flat_images_mae, idx_keep=idx_keep)
+
+            x_pred = self.forward_decoder(
+                x_encoded=x_encoded,
+                idx_keep=idx_keep,
+                idx_mask=idx_mask,
+            )
+
+            # get image patches for masked tokens
+            patches = utils.patchify(flat_images_mae, self.patch_size)
+            # must adjust idx_mask for missing class token
+            target = utils.get_at_index(patches, idx_mask - 1).to(self.accelerator)
+
+            reg_term_decoder = self.l2_decoder(self.decoder) if self.l2sp else 0.0
+            reg_term_encoder = self.l2sp_backbone(self.backbone.vit) if self.l2sp else 0.0
+            mse_loss = self.criterion(x_pred, target)
+            total_loss = mse_loss * self.mse_factor + reg_term_decoder + reg_term_encoder
+
+            self.log("val/loss", total_loss, on_epoch=True)
+
+            return total_loss
 
     def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
         if self.val_img is not None:
@@ -303,6 +371,19 @@ class MaskedVisionTransformer(BaseModule):
                 idx_mask.to(self.accelerator),
             )
             x_encoded = self.forward_encoder(images=original_img, idx_keep=idx_keep)
+
+            if self.use_positives:
+                cls_token = x_encoded[:, 0]
+                patches_pos = utils.patchify(original_img, self.patch_size)
+                batch_size, num_patches, patch_size = patches_pos.shape
+                patches_pos = patches_pos.view(-1, patch_size)
+
+                patches_pos = self.patch_projection(patches_pos)
+                patches_pos = patches_pos.view(batch_size, num_patches, -1)
+
+                patches_pos = torch.cat([cls_token.unsqueeze(1), patches_pos], dim=1)
+                x_encoded = utils.get_at_index(patches_pos, idx_keep).to(self.accelerator)
+
             x_pred = self.forward_decoder(x_encoded=x_encoded, idx_keep=idx_keep, idx_mask=idx_mask)
 
             # get image patches for masked tokens

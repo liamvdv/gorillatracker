@@ -3,6 +3,7 @@ from typing import Literal, Optional, Type, Union
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.combined import CombinedDataset
+from gorillatracker.data.multispecies import MultiSpeciesSupervisedDataset
 from gorillatracker.data.nlet import (
     CrossEncounterSupervisedDataset,
     CrossEncounterSupervisedKFoldDataset,
@@ -42,6 +43,7 @@ KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 ValKFoldCXLDatasetId = "gorillatracker.datasets.cxl.ValKFoldCXLDataset"
 CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
+MultiSpeciesDatasetId = "gorillatracker.datasets.multispecies.MultiSpeciesDataset"
 
 dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     BristolDatasetId: SupervisedDataset,
@@ -64,6 +66,7 @@ dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     KFoldATRWDatasetId: SupervisedKFoldDataset,
     ValKFoldCXLDatasetId: ValOnlyKFoldDataset,
     CombinedDatasetId: CombinedDataset,
+    MultiSpeciesDatasetId: MultiSpeciesSupervisedDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {
@@ -78,12 +81,19 @@ nlet_requirements: dict[str, FlatNletBuilder] = {
 
 def force_nlet_builder(builder_identifier: Literal["onelet", "pair", "triplet", "quadlet"]) -> None:
     if builder_identifier:
+        builder_func = {
+            "onelet": build_onelet,
+            "pair": build_pair,
+            "triplet": build_triplet,
+            "quadlet": build_quadlet,
+        }[builder_identifier]
         global nlet_requirements
         nlet_requirements = {
-            "softmax": build_onelet if builder_identifier == "onelet" else build_triplet,
-            "ntxent": build_pair if builder_identifier == "pair" else build_pair,
-            "offline": build_triplet if builder_identifier == "triplet" else build_quadlet,
-            "online": build_quadlet if builder_identifier == "quadlet" else build_onelet,
+            "softmax": builder_func,
+            "ntxent": builder_func,
+            "offline": builder_func,
+            "online": builder_func,
+            "mae_mse": builder_func,
         }
 
 

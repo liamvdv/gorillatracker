@@ -191,6 +191,7 @@ def knn(
     use_train_embeddings: bool = False,
     use_crossvideo_positives: bool = False,
     distance_metric: Literal["euclidean", "cosine"] = "euclidean",
+    use_filter: bool = False,
 ) -> Dict[str, Any]:
     """
     Algorithmic Description:
@@ -208,6 +209,19 @@ def knn(
     train_labels, train_embeddings = torch.Tensor([]), torch.Tensor([])
     if use_train_embeddings:
         _, _, train_embeddings, _, train_labels = get_partition_from_dataframe(data, partition="train")
+
+    # NOTE(rob2u): k // 2 + 1 for majority +1 because one is classified
+    min_amount = k // 2 + 2 if use_filter else 0
+    val_labels_unique, val_labels_counts = torch.unique(val_labels, return_counts=True)
+
+    classification_mask = torch.zeros(len(val_labels)).to(
+        torch.bool
+    )  # NOTE(rob2u): mask to filter for classification metric calculation
+    classification_mask.fill_(True)
+
+    for label, count in zip(val_labels_unique, val_labels_counts):
+        if count < min_amount:
+            classification_mask[val_labels == label] = False
 
     combined_embeddings = torch.cat([train_embeddings, val_embeddings], dim=0)
     combined_labels = torch.cat([train_labels, val_labels], dim=0)
@@ -233,10 +247,10 @@ def knn(
 
     distance_matrix.fill_diagonal_(float("inf"))
 
-    distance_mask: torch.Tensor
-    classification_mask: torch.Tensor
+    distance_mask: torch.Tensor  # NOTE(rob2u): mask to filter for distance calculation
     if use_crossvideo_positives:
-        distance_mask, classification_mask = _get_crossvideo_masks(val_labels, val_ids)
+        distance_mask, classification_mask_cv = _get_crossvideo_masks(val_labels, val_ids)
+        classification_mask = classification_mask & classification_mask_cv
         if use_train_embeddings:  # add train embeddings to the distance mask (shapes would not match otherwise)
             train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
             distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
@@ -279,11 +293,8 @@ def knn(
     # Select only the validation part of the classification matrix
     val_classification_matrix = classification_matrix[-len(val_embeddings) :]
 
-    if use_crossvideo_positives:  # remove all with only one individual_video_id
-        val_classification_matrix = val_classification_matrix[classification_mask]
-        val_labels = val_labels[classification_mask]
-
-    # assert val_classification_matrix.shape == (len(val_embeddings), num_classes)
+    val_classification_matrix = val_classification_matrix[classification_mask]
+    val_labels = val_labels[classification_mask]
 
     accuracy = tm.functional.accuracy(
         val_classification_matrix, val_labels, task="multiclass", num_classes=num_classes, average=average
