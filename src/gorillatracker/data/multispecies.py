@@ -1,6 +1,7 @@
 import logging
 import random
 from pathlib import Path
+from typing import Any, Literal
 
 import pandas as pd
 from PIL import Image
@@ -9,28 +10,41 @@ from wildlife_datasets import datasets, loader
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.contrastive_sampler import ContrastiveImage, ContrastiveSampler, FlatNlet
-from gorillatracker.data.nlet import NletDataset
+from gorillatracker.data.nlet import NletDataset, group_images_by_label
 from gorillatracker.type_helper import Id, Label, Nlet
 from gorillatracker.utils.labelencoder import LabelEncoder
 
 logger = logging.getLogger(__name__)
 
 
-def get_ds_dfs() -> pd.DataFrame:
+def get_ds_dfs(train_factor: float = 0.7, val_factor: float = 0.15, test_factor: float = 0.15) -> pd.DataFrame:
+    rng = random.Random(42)
     dfs = []
 
-    for ds_cls in datasets.names_small:
+    for ds_cls in datasets.names_all:
         name = str(ds_cls).split(".")[-1][:-2]
         if name.endswith("v2"):
             name = name[:-2]
 
         if name in {
+            "AAUZebraFish",
             "GreenSeaTurtles",
-            "StripeSpotter",
-            "PolarBearVidID",
-            "AerialCattle2017",
-            "FriesianCattle2015",
-            "FriesianCattle2017",
+            "Drosophila",
+            "SMALST",
+            "AerialCattle2017",  # DATA off (too big here -> prob video processing needed)
+            "PolarBearVidID",  # DATA off
+            "SealIDSegmented",  # no segmentation
+            "BirdIndividualID",  # License: None
+            "BirdIndividualIDSegmented",  # License: None
+            "Giraffes",  # License: None
+            "IPanda50",  # License: None
+            "NyalaData",  # License: None
+            # check for license problems
+            # "HumpbackWhaleID" # not in paper, fine license
+            # "HappyWhale" # not in paper, fine license
+            # "LionData" # not in paper, not found online? (license?)
+            # "MacaqueFaces" # not in paper, fine license -> CC BY 4.0
+            "NOAARightWhale",  # not in paper, license raises questions
         }:
             continue
         print(f"Loading {name}")
@@ -42,40 +56,52 @@ def get_ds_dfs() -> pd.DataFrame:
         columns = ["identity", "path", "bbox"] if "bbox" in d.df.columns else ["identity", "path"]
         df = d.df.loc[:, columns]
         df.drop(df[df["identity"] == d.unknown_name].index, inplace=True)
+        to_drop = df["identity"].value_counts()[df["identity"].value_counts() < 2].index
+        df.drop(df[df["identity"].isin(to_drop)].index, inplace=True)
         df["origin"] = name
+        df["identity"] = df["identity"].apply(lambda x: f"{name}_{x}")
         df["path"] = name + "/" + df["path"]
         df["label"] = LabelEncoder().encode_list(df["identity"].values.tolist())
 
         dfs.append(df)
-        print(len(df))
-
     combined_df = pd.concat(dfs)
     combined_df.reset_index(drop=False, inplace=True)
+
+    # perform train-val-test split
+    train_individuals = []
+    val_individuals = []
+    test_individuals = []
+    for name in combined_df["origin"].unique():
+        df = combined_df[combined_df["origin"] == name]
+        individuals = df["label"].unique().tolist()
+        rng.shuffle(individuals)
+
+        # split into train-val-test
+        train_individuals += individuals[: int(train_factor * len(individuals))]
+        val_individuals += individuals[
+            int(train_factor * len(individuals)) : int((train_factor + val_factor) * len(individuals))
+        ]
+        test_individuals += individuals[int((train_factor + val_factor) * len(individuals)) :]
+
+    combined_df["split"] = "train"
+    combined_df.loc[combined_df["label"].isin(val_individuals), "split"] = "val"
+    combined_df.loc[combined_df["label"].isin(test_individuals), "split"] = "test"
 
     return combined_df
 
 
-# base_path = "/workspaces/gorillatracker/data/WildlifeReID-10k/data"
-# ds = get_ds_dfs()
-# for row in ds.iterrows():
-#     if not os.path.exists(f"{base_path}/{row[1]['path']}"):
-#         print(row[1]["path"])
-
-# print(ds["identity"].nunique())
-# print(len(ds))
-# print(ds["label"].nunique())
-
-
 class MultiSpeciesContrastiveSampler(ContrastiveSampler):
-    def __init__(self, base_dir: Path) -> None:
+    def __init__(self, base_dir: Path, partition: Literal["train", "val", "test"] = "train") -> None:
         self.base_dir = base_dir
         self.ds = get_ds_dfs()
+        self.ds = self.ds[self.ds["split"] == partition]
+        self.ds.reset_index(drop=False, inplace=True)
 
     def __getitem__(self, idx: int) -> ContrastiveImage:
         img = ContrastiveImage(
             id=str(idx),
-            image_path=self.base_dir / self.ds.loc[idx, "path"],
-            class_label=self.ds.loc[idx, "label"],
+            image_path=self.base_dir / self.ds.iloc[idx]["path"],
+            class_label=self.ds.iloc[idx]["label"],
         )
         return img
 
@@ -96,7 +122,8 @@ class MultiSpeciesContrastiveSampler(ContrastiveSampler):
         positive_indices = self.ds[self.ds["label"] == positive_class].index
         positive_indices = positive_indices[positive_indices != sample.id]
         positive_index = random.choice(positive_indices)
-        sample_row = self.ds.loc[positive_index]
+        sample_row = self.ds.iloc[positive_index]
+
         sample = ContrastiveImage(
             id=str(positive_index),
             image_path=self.base_dir / sample_row["path"],
@@ -109,13 +136,14 @@ class MultiSpeciesContrastiveSampler(ContrastiveSampler):
     def negative(self, sample: ContrastiveImage) -> ContrastiveImage:
         """Different class is sampled uniformly at random and a random sample from that class is returned"""
         # filter for the same origin -> species
-        sample_origin = self.ds.loc[int(sample.id), "origin"]
+        sample_origin = self.ds.iloc[int(sample.id)]["origin"]
         same_ds = self.ds[self.ds["origin"] == sample_origin]
         same_ds = same_ds[same_ds["label"] != sample.class_label]
         negative_class = random.choice(same_ds["label"].unique())
         negative_indices = same_ds[same_ds["label"] == negative_class].index
         negative_index = random.choice(negative_indices)
-        sample_row = same_ds.loc[negative_index]
+        sample_row = self.ds.iloc[negative_index]
+
         sample = ContrastiveImage(
             id=str(negative_index),
             image_path=self.base_dir / sample_row["path"],
@@ -141,6 +169,39 @@ class MultiSpeciesSupervisedDataset(NletDataset):
     Each file is prefixed with the class label, e.g. "label1_1.jpg"
     """
 
+    def __init__(self, use_gorillas: bool = True, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if use_gorillas:
+            path = (
+                Path("/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/")
+                / self.partition
+            )
+
+            classes = group_images_by_label(path)
+            # convert into dataframe with: path, label, origin, split, identity
+            labels = []
+            identities = []
+            paths = []
+            for _, contrastive_imgs in classes.items():
+                paths += [img.image_path for img in contrastive_imgs]
+                labels += [img.class_label for img in contrastive_imgs]
+                identities += [img.id for img in contrastive_imgs]
+
+            gorilla_df = pd.DataFrame(
+                {
+                    "path": paths,
+                    "label": labels,
+                    "identity": identities,
+                    "origin": "gorillas",
+                    "split": self.partition,
+                    "bbox": None,
+                }
+            )
+            gorilla_df.reset_index(drop=False, inplace=True)
+
+            self.contrastive_sampler.ds = pd.concat([self.contrastive_sampler.ds, gorilla_df]) # type: ignore
+            self.contrastive_sampler.ds = self.contrastive_sampler.ds.reset_index(drop=True) # type: ignore
+
     def _get_item(self, idx: Label) -> tuple[tuple[Id, ...], tuple[Tensor, ...], tuple[Label, ...]]:
         return super()._get_item(idx)
 
@@ -163,7 +224,7 @@ class MultiSpeciesSupervisedDataset(NletDataset):
                 test/
                     ...
         """
-        return MultiSpeciesContrastiveSampler(base_dir)
+        return MultiSpeciesContrastiveSampler(base_dir, partition=self.partition)
 
     def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
         ids = tuple(str(img.image_path) for img in flat_nlet)
@@ -175,9 +236,9 @@ class MultiSpeciesSupervisedDataset(NletDataset):
     def _crop_if_necessary(self, img: ContrastiveImage) -> Image.Image:
         pilimg = Image.open(img.image_path)
         if "bbox" in self.contrastive_sampler.ds.columns and isinstance(  # type: ignore
-            self.contrastive_sampler.ds.loc[int(img.id), "bbox"], list  # type: ignore
+            self.contrastive_sampler.ds.iloc[int(img.id)]["bbox"], list  # type: ignore
         ):
-            bbox = self.contrastive_sampler.ds.loc[int(img.id), "bbox"]  # type: ignore
+            bbox = self.contrastive_sampler.ds.iloc[int(img.id)]["bbox"]  # type: ignore
             x, y, w, h = bbox
             bbox = (x, y, x + w, y + h)
             pilimg = pilimg.crop(bbox)  # type: ignore
