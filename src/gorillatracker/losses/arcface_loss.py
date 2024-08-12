@@ -36,7 +36,7 @@ class ArcFaceLoss(torch.nn.Module):
         s: float = 64.0,
         angle_margin: float = 0.5,
         additive_margin: float = 0.0,
-        accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cpu",
+        accelerator: Literal["cuda", "cpu", "tpu", "mps"] = "cuda",
         k_subcenters: int = 2,
         use_focal_loss: bool = False,
         label_smoothing: float = 0.0,
@@ -47,10 +47,10 @@ class ArcFaceLoss(torch.nn.Module):
     ) -> None:
         super().__init__()
         self.s = s
-        self.angle_margin = torch.tensor([angle_margin]).to(accelerator)
-        self.additive_margin = torch.tensor([additive_margin]).to(accelerator)
-        self.cos_m = torch.cos(torch.tensor([angle_margin])).to(accelerator)
-        self.sin_m = torch.sin(torch.tensor([angle_margin])).to(accelerator)
+        self.angle_margin = torch.tensor([angle_margin], device=accelerator)
+        self.additive_margin = torch.tensor([additive_margin], device=accelerator)
+        self.cos_m = torch.cos(torch.tensor([angle_margin], device=accelerator))
+        self.sin_m = torch.sin(torch.tensor([angle_margin], device=accelerator))
         self.num_classes = num_classes
         self.embedding_size = embedding_size
         self.k_subcenters = k_subcenters
@@ -89,6 +89,23 @@ class ArcFaceLoss(torch.nn.Module):
 
         self.le = LinearSequenceEncoder()  # NOTE: new instance (range 0:num_classes-1)
 
+    def move_to(self, device: torch.device) -> None:
+        self.angle_margin = torch.tensor([self.angle_margin.item()], device=device)
+        self.additive_margin = torch.tensor([self.additive_margin.item()], device=device)
+        self.cos_m = torch.tensor([self.cos_m.item()], device=device)
+        self.sin_m = torch.tensor([self.sin_m.item()], device=device)
+        k_subcenters, num_classes, embedding_size = self.prototypes.shape
+        self.prototypes = torch.nn.Parameter(
+            torch.zeros(
+                (k_subcenters, num_classes, embedding_size),
+                device=device,
+                dtype=torch.float32,
+            ),
+            requires_grad=True,
+        )
+        tmp_rng = torch.Generator(device=device)
+        torch.nn.init.xavier_uniform_(self.prototypes, generator=tmp_rng)
+
     def forward(
         self,
         embeddings: torch.Tensor,
@@ -97,41 +114,32 @@ class ArcFaceLoss(torch.nn.Module):
         **kwargs: Any,
     ) -> gtypes.LossPosNegDist:
         """Forward pass of the ArcFace loss function"""
-        embeddings = embeddings.to(self.accelerator)
-        assert self.prototypes.device == embeddings.device, "Prototypes and embeddings must be on the same device"
-        assert not any(torch.flatten(torch.isnan(embeddings))), "NaNs in embeddings"
 
         # NOTE(rob2u): necessary for range 0:n-1
         # get class frequencies
-        class_freqs = torch.ones_like(labels, device=embeddings.device)
         if self.use_class_weights and self.purpose == "train":
-            class_freqs = torch.tensor([self.class_distribution[label.item()] for label in labels]).to(
-                embeddings.device
+            class_freqs = torch.tensor(
+                [self.class_distribution[label.item()] for label in labels], device=embeddings.device
             )
             class_freqs = class_freqs.float() / self.num_samples
             class_freqs = class_freqs.clamp(eps, 1.0)
 
         labels_transformed: List[int] = self.le.encode_list(labels.tolist())
-        labels = torch.tensor(labels_transformed).to(embeddings.device)
+        labels = torch.tensor(labels_transformed, device=embeddings.device).long()
 
         cos_theta = torch.einsum(
             "bj,knj->bnk",
             torch.nn.functional.normalize(embeddings, dim=-1),
             torch.nn.functional.normalize(self.prototypes, dim=-1),
         )  # batch x num_classes x k_subcenters
-        cos_theta = cos_theta.to(embeddings.device)
+        cos_theta = cos_theta.type_as(embeddings)
 
         sine_theta = torch.sqrt(
             torch.maximum(
                 1.0 - torch.pow(cos_theta, 2),
-                torch.tensor([eps], device=cos_theta.device),
+                torch.tensor([eps]).type_as(embeddings),
             )
         ).clamp(eps, 1.0 - eps)
-
-        if self.cos_m.device != embeddings.device:  # HACK
-            self.cos_m = self.cos_m.to(embeddings.device)
-            self.sin_m = self.sin_m.to(embeddings.device)
-            self.additive_margin = self.additive_margin.to(embeddings.device)
 
         phi = (
             self.cos_m.unsqueeze(1).unsqueeze(2) * cos_theta - self.sin_m.unsqueeze(1).unsqueeze(2) * sine_theta
@@ -141,16 +149,17 @@ class ArcFaceLoss(torch.nn.Module):
         mask = torch.zeros(
             (cos_theta.shape[0], self.num_classes, self.k_subcenters), device=cos_theta.device
         )  # batch x num_classes x k_subcenters
-        mask.scatter_(1, labels.view(1, -1, 1).long(), 1)
+        mask.scatter_(1, labels.view(1, -1, 1), 1)
 
         output = (mask * phi) + ((1.0 - mask) * cos_theta)  # NOTE: the margin is only added to the correct class
         output *= self.s
         output = torch.mean(output, dim=2)  # batch x num_classes
 
-        assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
+        # assert not any(torch.flatten(torch.isnan(output))), "NaNs in output"
         loss = self.ce(output, labels) if labels_onehot is None else self.ce(output, labels_onehot)
 
-        loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
+        if self.use_class_weights:
+            loss = loss * (1 / class_freqs)  # NOTE: class_freqs is a tensor of class frequencies
         loss = torch.mean(loss)
 
         assert not any(torch.flatten(torch.isnan(loss))), "NaNs in loss"
@@ -166,10 +175,7 @@ class ArcFaceLoss(torch.nn.Module):
 
         weights = weights.unsqueeze(0)
 
-        if torch.cuda.is_available() and self.prototypes.device != weights.device:
-            weights = weights.cuda()
-
-        self.prototypes = weights
+        self.prototypes = weights.type_as(self.prototypes)
 
 
 class ElasticArcFaceLoss(ArcFaceLoss):
@@ -181,7 +187,7 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         **kwargs: Any,
     ) -> None:
         super().__init__(accelerator=accelerator, *args, **kwargs)  # type: ignore
-        self.margin_sigma = torch.tensor([margin_sigma]).to(accelerator)
+        self.margin_sigma = torch.tensor([margin_sigma], device=accelerator)
         self.is_eval = False
         self.accelerator = accelerator
 
@@ -214,14 +220,14 @@ class ElasticArcFaceLoss(ArcFaceLoss):
         return super().eval()
 
 
-class AdaFaceLoss(ArcFaceLoss):
+class AdaFaceLoss(ArcFaceLoss):  # NOTE(rob2u): currently not multi-gpu compatible
     def __init__(self, momentum: float = 0.01, h: float = 0.33, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.is_eval = False
         self.h = h
         self.m1 = self.angle_margin
         self.m2 = self.additive_margin
-        self.norm = torch.nn.BatchNorm1d(1, affine=False, momentum=momentum).to(kwargs.get("accelerator", "cpu"))
+        self.norm = torch.nn.BatchNorm1d(1, affine=False, momentum=momentum, device=kwargs.get("accelerator", "cuda"))
 
     def forward(
         self,
@@ -233,15 +239,10 @@ class AdaFaceLoss(ArcFaceLoss):
         if self.norm.running_mean.device != embeddings.device:  # type: ignore
             self.norm = self.norm.to(embeddings.device)
 
-        if self.m1.device != embeddings.device:
-            self.m1 = self.m1.to(embeddings.device)
-            self.m2 = self.m2.to(embeddings.device)
-
         if not self.is_eval:
             g = (embeddings.detach() ** 2).sum(dim=1).sqrt()
             g = self.norm(g.unsqueeze(1)).squeeze(1)
             g = torch.clamp(g / self.h, -1, 1)
-            g = g.to(embeddings.device)
             g_angle = -self.m1 * g
             g_additive = self.m2 * g + self.m2
 

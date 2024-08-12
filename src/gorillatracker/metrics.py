@@ -181,7 +181,7 @@ def _get_crossvideo_masks(
         ):
             classification_mask[i] = True
 
-    return distance_mask.to(torch.bool), classification_mask.to(torch.bool)
+    return distance_mask.bool(), classification_mask.bool()
 
 
 def knn(
@@ -214,9 +214,9 @@ def knn(
     min_amount = k // 2 + 2 if use_filter else 0
     val_labels_unique, val_labels_counts = torch.unique(val_labels, return_counts=True)
 
-    classification_mask = torch.zeros(len(val_labels)).to(
-        torch.bool
-    )  # NOTE(rob2u): mask to filter for classification metric calculation
+    classification_mask = torch.zeros(
+        len(val_labels)
+    ).bool()  # NOTE(rob2u): mask to filter for classification metric calculation
     classification_mask.fill_(True)
 
     for label, count in zip(val_labels_unique, val_labels_counts):
@@ -255,7 +255,7 @@ def knn(
             train_distance_mask = torch.ones((len(train_labels), len(train_labels) + len(val_labels)))
             distance_mask = torch.cat([torch.ones((len(val_labels), len(train_labels))), distance_mask], dim=1)
             distance_mask = torch.cat([train_distance_mask, distance_mask], dim=0)
-            distance_mask = distance_mask.to(torch.bool)
+            distance_mask = distance_mask.bool()
         distance_matrix[~distance_mask] = float("inf")
 
     _, closest_indices = torch.topk(
@@ -285,7 +285,7 @@ def knn(
         classification_matrix[i, max_prob_indices] += (1e-6) / len(max_prob_indices)
         for j in range(k):
             if closest_indices[i][j] in max_prob_indices:
-                classification_matrix[i][closest_labels[i][j].to(torch.int)] += 1e-6
+                classification_matrix[i][closest_labels[i][j].int()] += 1e-6
                 break
 
     assert classification_matrix.shape == (len(combined_embeddings), num_classes)

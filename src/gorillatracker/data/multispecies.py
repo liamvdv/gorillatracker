@@ -199,8 +199,8 @@ class MultiSpeciesSupervisedDataset(NletDataset):
             )
             gorilla_df.reset_index(drop=False, inplace=True)
 
-            self.contrastive_sampler.ds = pd.concat([self.contrastive_sampler.ds, gorilla_df]) # type: ignore
-            self.contrastive_sampler.ds = self.contrastive_sampler.ds.reset_index(drop=True) # type: ignore
+            self.contrastive_sampler.ds = pd.concat([self.contrastive_sampler.ds, gorilla_df])  # type: ignore
+            self.contrastive_sampler.ds = self.contrastive_sampler.ds.reset_index(drop=True)  # type: ignore
 
     def _get_item(self, idx: Label) -> tuple[tuple[Id, ...], tuple[Tensor, ...], tuple[Label, ...]]:
         return super()._get_item(idx)
@@ -254,7 +254,4 @@ class MultiSpeciesSupervisedDataset(NletDataset):
         return pilimg
 
     def __len__(self) -> Label:
-        if self.partition == "val":
-            return min(100, len(self.contrastive_sampler.ds))  # type: ignore
-        else:
-            return len(self.contrastive_sampler.ds)  # type: ignore
+        return len(self.contrastive_sampler.ds)  # type: ignore

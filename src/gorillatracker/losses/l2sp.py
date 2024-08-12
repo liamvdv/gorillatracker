@@ -30,7 +30,7 @@ class L2SPRegularization_Wrapper(nn.Module):
         standard_loss, anchor_positive_dist_mean, anchor_negative_dist_mean = self.loss(*args, **kwargs)
         l2sp_loss = self.l2sp_loss(self.model)
         if isinstance(l2sp_loss, torch.Tensor):
-            self.log("l2_sp", l2sp_loss.item())
+            self.log("l2_sp", l2sp_loss)  # type: ignore
         else:
             self.log("l2_sp", l2sp_loss)
         return standard_loss + l2sp_loss, anchor_positive_dist_mean, anchor_negative_dist_mean

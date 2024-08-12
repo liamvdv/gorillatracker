@@ -30,7 +30,7 @@ def get_triplet_mask(labels: torch.Tensor) -> torch.Tensor:
     # shape: (batch_size, batch_size)
 
     batch_size = labels.size()[0]
-    indices_equal = torch.eye(batch_size, dtype=torch.bool)
+    indices_equal = torch.eye(batch_size, dtype=torch.bool, device=labels.device)
     indices_not_equal = torch.logical_not(indices_equal)
     # shape: (batch_size, batch_size, 1)
     i_not_equal_j = indices_not_equal.unsqueeze(2).repeat(1, 1, batch_size)
@@ -48,7 +48,6 @@ def get_triplet_mask(labels: torch.Tensor) -> torch.Tensor:
 
     # shape: (batch_size, batch_size)
     labels_equal = labels.unsqueeze(0) == labels.unsqueeze(1)
-    labels_equal = labels_equal.to(distinct_indices.device)
     # shape: (batch_size, batch_size, 1)
     i_equal_j = labels_equal.unsqueeze(2).repeat(1, 1, batch_size)
     # shape: (batch_size, 1, batch_size)
@@ -112,13 +111,12 @@ def get_semi_hard_mask(
     # filter out all where the distance to a negative is smaller than the max distance to a positive
     device = distance_matrix.device
     tensor_labels = labels.detach().clone()
-    tensor_labels = tensor_labels.to(device)
     batch_size = tensor_labels.size()[0]
     indices_equal = torch.eye(batch_size, dtype=torch.bool, device=device)
     indices_not_equal = torch.logical_not(
         indices_equal,
     )
-    labels_equal = (tensor_labels.unsqueeze(0) == tensor_labels.unsqueeze(1)).to(device)
+    labels_equal = tensor_labels.unsqueeze(0) == tensor_labels.unsqueeze(1)
     labels_not_equal = torch.logical_not(labels_equal)
     distance_matrix_pos = distance_matrix * torch.logical_and(labels_equal, indices_not_equal).float()
     distance_matrix_neg = distance_matrix * torch.logical_and(labels_not_equal, indices_not_equal).float()
@@ -132,7 +130,6 @@ def get_semi_hard_mask(
     # now only the triplets where dist_pos < dist_neg are left
     mask = get_triplet_mask(labels)
     semi_hard_mask = torch.logical_and(distance_difference < margin, distance_difference > 0.0)
-    semi_hard_mask = semi_hard_mask.to(mask.device)
 
     return torch.logical_and(mask, semi_hard_mask)
 
@@ -183,15 +180,26 @@ def angular_distance_matrix(embeddings: torch.Tensor) -> torch.Tensor:
     return angular_distance
 
 
-def get_cross_video_mask(ids: gtypes.FlatNletBatchIds) -> torch.Tensor:
+def get_cross_video_mask(ids: gtypes.FlatNletBatchIds, device: torch.device) -> torch.Tensor:
     """Returns a len(ids) x len(ids) x len(ids) mask where mask[i, j] is 1 if the two samples are from different videos and 0 otherwise."""
     vids = [get_individual_video_id(id) for id in ids]
     vids_matrix_list = []
     for _, vid in enumerate(vids):
         vids_matrix_list.append([vid != v for v in vids])
 
-    vids_matrix = torch.tensor(vids_matrix_list, dtype=torch.bool)
-    vids_tensor = (vids_matrix.unsqueeze(2) * torch.ones((1, 1, len(ids)), dtype=torch.bool)).to(torch.bool)
+    vids_matrix = torch.tensor(vids_matrix_list, dtype=torch.bool, device=device)
+    vids_tensor = (
+        vids_matrix.unsqueeze(2)
+        * torch.ones(
+            (
+                1,
+                1,
+                len(ids),
+            ),
+            dtype=torch.bool,
+            device=device,
+        )
+    ).bool()
     return vids_tensor
 
 
@@ -262,8 +270,7 @@ class TripletLossOnline(nn.Module):
         # therefore we create a mask that is 1 for all valid triplets and 0 for all invalid triplets
         mask = self.get_mask(distance_matrix, anchor_positive_dists, anchor_negative_dists, labels)
         if self.cross_video_masking:
-            mask = torch.logical_and(mask, get_cross_video_mask(ids))  # type: ignore
-        mask = mask.to(triplet_loss.device)  # ensure mask is on the same device as triplet_loss
+            mask = torch.logical_and(mask, get_cross_video_mask(ids, mask.device))  # type: ignore
         triplet_loss *= mask
 
         triplet_loss = F.relu(triplet_loss)
@@ -306,9 +313,9 @@ class TripletLossOnline(nn.Module):
             _, pos_max_indices = torch.max(masked_anchor_positive_dists, dim=1)
             # print(pos_max_indices)
 
-            hard_mask = torch.zeros(len(labels), len(labels), len(labels))
-            hard_mask[torch.arange(len(labels)), pos_max_indices, neg_min_indices] = 1
-            hard_mask = hard_mask.to(mask.device)
+            hard_mask = torch.zeros(len(labels), len(labels), len(labels), device=mask.device)
+            hard_mask[torch.arange(len(labels), device=mask.device), pos_max_indices, neg_min_indices] = 1
+            hard_mask = hard_mask
             # combine with base mask
             mask = torch.logical_and(mask, hard_mask)
 
@@ -317,7 +324,6 @@ class TripletLossOnline(nn.Module):
         ):  # select the negatives with a bigger distance than the positive but a difference smaller than the margin
             semi_hard_mask = get_semi_hard_mask(labels, distance_matrix, self.margin)
             # combine with base mask
-            semi_hard_mask = semi_hard_mask.to(mask.device)
             mask = torch.logical_and(mask, semi_hard_mask)
 
         return mask.float()

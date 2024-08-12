@@ -64,7 +64,7 @@ class NletDataModule(L.LightningDataModule):
         assert stage in {"fit", "validate", "test", "predict"}
         if stage == "fit":
             self.train = self.dataset_class(
-                self.data_dir,
+                base_dir=self.data_dir,
                 nlet_builder=self.nlet_builder,
                 partition="train",
                 transform=transforms.Compose([self.training_transforms, self.model_transforms]),
@@ -86,7 +86,7 @@ class NletDataModule(L.LightningDataModule):
         if stage == "test":
             self.test = [
                 dataset_class(
-                    data_dir,
+                    base_dir=data_dir,
                     nlet_builder=self.nlet_builder,
                     partition="test",
                     transform=self.model_transforms,

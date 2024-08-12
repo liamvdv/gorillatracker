@@ -98,7 +98,9 @@ def in_batch_mixup(data: torch.Tensor, targets: torch.Tensor, alpha: float = 0.2
     data2 = data[indices]
     targets2 = targets[indices]
 
-    lam = torch.FloatTensor([np.random.beta(alpha, alpha)]).to(data.device)  # f(x; a,b) = const * x^(a-1) * (1-x)^(b-1)
+    lam = torch.tensor(
+        [np.random.beta(alpha, alpha)], device=data.device
+    ).float()  # f(x; a,b) = const * x^(a-1) * (1-x)^(b-1)
     data = data * lam + data2 * (1 - lam)
     targets = targets * lam + targets2 * (1 - lam)
 
@@ -248,7 +250,7 @@ class BaseModule(L.LightningModule):
             use_class_weights=use_class_weights,
             use_dist_term=use_dist_term,
             # log_func=lambda x, y: self.log("train/"+ x, y, on_epoch=True),
-            log_func=lambda x, y: self.log(kfold_prefix + x, y),
+            log_func=lambda x, y: self.log(kfold_prefix + x, y, sync_dist=True),
             teacher_model_wandb_link=kwargs.get("teacher_model_wandb_link", ""),
             purpose="train",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
@@ -264,14 +266,14 @@ class BaseModule(L.LightningModule):
             class_distribution=class_distribution[1] if class_distribution is not None else None,  # TODO(memben)
             temperature=temperature,
             memory_bank_size=memory_bank_size,
-            accelerator=accelerator,
+            accelerator="cpu",
             l2_alpha=l2_alpha,
             l2_beta=l2_beta,
             path_to_pretrained_weights=path_to_pretrained_weights,
             use_focal_loss=use_focal_loss,
             label_smoothing=label_smoothing,
             model=model,
-            log_func=lambda x, y: self.log(kfold_prefix + x, y),
+            log_func=lambda x, y: self.log(kfold_prefix + x, y.to(self.device), sync_dist=True),  # type: ignore
             k_subcenters=1,
             use_class_weights=use_class_weights,
             use_dist_term=use_dist_term,
@@ -303,7 +305,7 @@ class BaseModule(L.LightningModule):
             num_classes = self.loss_module_train.num_classes  # type: ignore
             flat_labels = self.loss_module_train.le.encode_list(flat_labels.tolist())  # type: ignore
 
-        flat_labels = torch.tensor(flat_labels).to(flat_images.device)
+        flat_labels = torch.tensor(flat_labels, device=flat_images.device)
         flat_labels_onehot = torch.nn.functional.one_hot(flat_labels, num_classes).float()
         flat_images, flat_labels_onehot = in_batch_mixup(flat_images, flat_labels_onehot)
 
@@ -328,17 +330,16 @@ class BaseModule(L.LightningModule):
         if self.use_inbatch_mixup:
             flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
 
-        flat_images = flat_images.to(self.accelerator)
         embeddings = self.forward(flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot, ids=flat_ids)  # type: ignore
 
         log_str_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
-        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
-        self.log(f"{log_str_prefix}train/loss", loss, on_step=True, prog_bar=True, sync_dist=True)
-        self.log(f"{log_str_prefix}train/positive_distance", pos_dist, on_step=True)
-        self.log(f"{log_str_prefix}train/negative_distance", neg_dist, on_step=True)
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist.to(self.device), on_step=True)
+        self.log(f"{log_str_prefix}train/loss", loss.to(self.device), on_step=True, prog_bar=True, sync_dist=True)
+        self.log(f"{log_str_prefix}train/positive_distance", pos_dist.to(self.device), on_step=True)
+        self.log(f"{log_str_prefix}train/negative_distance", neg_dist.to(self.device), on_step=True)
         return loss
 
     def add_validation_embeddings(
@@ -384,24 +385,26 @@ class BaseModule(L.LightningModule):
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/loss",
-                loss,
-                sync_dist=True,
+                loss.to(self.device),
                 prog_bar=True,
                 add_dataloader_idx=False,
+                sync_dist=True,
             )
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/positive_distance",
-                pos_dist,
+                pos_dist.to(self.device),
                 add_dataloader_idx=False,
+                sync_dist=True,
             )
             self.log(
                 f"{dataloader_name}/{kfold_prefix}val/negative_distance",
-                neg_dist,
+                neg_dist.to(self.device),
                 add_dataloader_idx=False,
+                sync_dist=True,
             )
             return loss
         else:
-            return torch.tensor(0.0)  # TODO(memben): ???
+            return torch.tensor(0.0, device=embeddings.device)  # TODO(memben): ???
 
     def on_validation_epoch_end(self, dataloader_idx: int = 0) -> None:
         # TODO(rob2u): this fails, IDK why gradient calc is activated, params are not frozen
@@ -420,7 +423,7 @@ class BaseModule(L.LightningModule):
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
             for key, val in self.eval_embeddings_table(embeddings_table, dataloader_idx).items():
                 if not isinstance(val, wandb.Image):
-                    self.log(key, val, on_epoch=True)
+                    self.log(key, torch.tensor([val], device=self.device), on_epoch=True, sync_dist=True)
                 else:
                     self.wandb_run.log({key: val})
 
@@ -675,7 +678,7 @@ class BaseModule(L.LightningModule):
             assert len(table) > 0, f"Empty table for dataloader {i}"
 
             # get weights for all classes by averaging over all embeddings
-            class_weights = torch.zeros(num_classes, self.embedding_size).to(self.device)
+            class_weights = torch.zeros(num_classes, self.embedding_size, device=self.device)
             lse = LinearSequenceEncoder()
             table["label"] = table["label"].apply(lse.encode)
 
@@ -700,7 +703,7 @@ class BaseModule(L.LightningModule):
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
             assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss, sync_dist=True)
+            self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss.to(self.device), on_epoch=True, sync_dist=True)
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -712,3 +715,10 @@ class BaseModule(L.LightningModule):
         raise NotImplementedError(
             "This method was deprecated! Use arg.use_normalization and args.data_resize_transform instead!"
         )
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        # Initialize your tensors on the correct device here
+        if "softmax" in self.loss_mode and "l2sp" in self.loss_mode and stage == "fit":
+            self.loss_module_train.loss.move_to(self.device)  # type: ignore
+        elif "softmax" in self.loss_mode and "l2sp" not in self.loss_mode and stage == "fit":
+            self.loss_module_train.move_to(self.device)  # type: ignore
