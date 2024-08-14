@@ -102,6 +102,7 @@ class ModelConstructor:
             freeze_backbone=args.freeze_backbone,
             loss_dist_term=args.loss_dist_term,
             cross_video_masking=args.cross_video_masking,
+            multi_gpu_training=args.multi_gpu_training,
         )
 
     def construct(

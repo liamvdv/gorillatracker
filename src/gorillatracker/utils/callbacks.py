@@ -31,6 +31,9 @@ class BestMetricLogger(Callback):
                 self.best_metrics = deepcopy(metrics)
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        if trainer.global_rank != 0:
+            return
+
         if self.best_metrics:
             wandb.log({f"{self.metric_name}_{self.mode}": self.best_value})
             for key, value in self.best_metrics.items():

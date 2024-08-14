@@ -59,33 +59,41 @@ def train_and_validate_model(
     ########### Start val & train loop ###########
     if args.val_before_training and not args.resume:
         # TODO: we could use a new trainer with Trainer(devices=1, num_nodes=1) to prevent samples from possibly getting replicated with DistributedSampler here.
-        logger.info("Validation before training...")
-        trainer_val = Trainer(
-            num_sanity_val_steps=0,
-            max_epochs=args.max_epochs,
-            val_check_interval=args.val_check_interval,
-            check_val_every_n_epoch=args.check_val_every_n_epoch,
-            devices=1,
-            accelerator=args.accelerator,
-            strategy="auto",
-            logger=wandb_logger,
-            deterministic=(
-                args.force_deterministic
-                if args.force_deterministic and not args.use_quantization_aware_training
-                else False
-            ),
-            callbacks=callbacks,
-            precision=args.precision,  # type: ignore
-            gradient_clip_val=args.grad_clip,
-            log_every_n_steps=24,
-            fast_dev_run=args.fast_dev_run,
-            profiler=args.profiler,
-            inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-            plugins=args.plugins,  # type: ignore
-        )
-        wandb.init()
-        wandb.log({"trainer/global_step": 0})  # HACK: to make sure the global_step is logged before the validation
-        trainer_val.validate(model, dm)
+        if args.multi_gpu_training and trainer.global_rank == 0:
+            logger.info("Validation before training...")
+            trainer_val = Trainer(
+                num_sanity_val_steps=0,
+                max_epochs=args.max_epochs,
+                val_check_interval=args.val_check_interval,
+                check_val_every_n_epoch=args.check_val_every_n_epoch,
+                devices=1,
+                accelerator=args.accelerator,
+                strategy="auto",
+                logger=wandb_logger,
+                deterministic=(
+                    args.force_deterministic
+                    if args.force_deterministic and not args.use_quantization_aware_training
+                    else False
+                ),
+                callbacks=callbacks,
+                precision=args.precision,  # type: ignore
+                gradient_clip_val=args.grad_clip,
+                log_every_n_steps=24,
+                fast_dev_run=args.fast_dev_run,
+                profiler=args.profiler,
+                inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+                plugins=args.plugins,  # type: ignore
+            )
+            wandb.log({"trainer/global_step": 0})  # HACK: to make sure the global_step is logged before the validation
+            model.multi_gpu_training = False
+            if trainer.global_rank == 0:
+                trainer_val.validate(model, dm)
+            model.multi_gpu_training = True
+        elif trainer.global_rank == 0:
+            logger.info("Validation before training...")
+            wandb.log({"trainer/global_step": 0})  # HACK: to make sure the global_step is logged before the validation
+            trainer.validate(model, dm)
+
         if args.only_val:
             return model, trainer
     logger.info("Starting training...")
@@ -95,6 +103,35 @@ def train_and_validate_model(
         logger.warning("Detected keyboard interrupt, trying to save latest checkpoint...")
     else:
         logger.success("Fit complete")
+
+    if args.multi_gpu_training:
+        model.multi_gpu_training = False
+        if trainer.global_rank == 0:
+            logger.info("Validation after training...")
+            trainer_val = Trainer(
+                num_sanity_val_steps=0,
+                max_epochs=args.max_epochs,
+                val_check_interval=args.val_check_interval,
+                check_val_every_n_epoch=args.check_val_every_n_epoch,
+                devices=1,
+                accelerator=args.accelerator,
+                strategy="auto",
+                logger=wandb_logger,
+                deterministic=(
+                    args.force_deterministic
+                    if args.force_deterministic and not args.use_quantization_aware_training
+                    else False
+                ),
+                callbacks=callbacks,
+                precision=args.precision,  # type: ignore
+                gradient_clip_val=args.grad_clip,
+                log_every_n_steps=24,
+                fast_dev_run=args.fast_dev_run,
+                profiler=args.profiler,
+                inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+                plugins=args.plugins,  # type: ignore
+            )
+            trainer_val.validate(model, dm)
 
     ########### Save checkpoint ###########
 

@@ -11,6 +11,7 @@ import seaborn as sns
 import sklearn
 import torch
 import torchmetrics as tm
+import tqdm
 import wandb
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -405,6 +406,7 @@ def knn_naive(
     data: pd.DataFrame,
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
+    batch_size: int = 128,  # Added batch_size parameter
 ) -> Dict[str, Any]:
     _, _, val_embeddings, _, val_labels = get_partition_from_dataframe(data, partition="val")
     val_embeddings = val_embeddings.numpy()
@@ -416,16 +418,21 @@ def knn_naive(
 
     knn = NearestNeighbors(n_neighbors=k + 1, algorithm="auto").fit(val_embeddings, val_labels)
 
-    for embedding, label in zip(val_embeddings, val_labels):
-        n_neighbors = k + 1  # We need k+1 neighbors because the first one is the sample itself
-        _, indices = knn.kneighbors(embedding.reshape(1, -1), n_neighbors=n_neighbors)
+    num_batches = int(np.ceil(len(val_embeddings) / batch_size))
 
-        idx_list = indices[0, 1:]  # Remove the first column (self)
-        neighbor_labels = val_labels[idx_list]
-        most_common = stats.mode(neighbor_labels)[0]
-        true_labels.append(label.item())
-        pred_labels.append(most_common)
-        pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))])
+    for i in tqdm.tqdm(range(num_batches)):
+        batch_embeddings = val_embeddings[i * batch_size : (i + 1) * batch_size]
+        batch_labels = val_labels[i * batch_size : (i + 1) * batch_size]
+
+        _, indices = knn.kneighbors(batch_embeddings, n_neighbors=k + 1)
+
+        for j in range(len(batch_embeddings)):
+            idx_list = indices[j, 1:]  # Remove the first column (self)
+            neighbor_labels = val_labels[idx_list]
+            most_common = stats.mode(neighbor_labels)[0]
+            true_labels.append(batch_labels[j].item())
+            pred_labels.append(most_common)
+            pred_labels_top5.append(neighbor_labels[: min(5, len(neighbor_labels))])
 
     if len(true_labels) == 0:
         return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}

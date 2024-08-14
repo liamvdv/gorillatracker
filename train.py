@@ -27,6 +27,7 @@ warnings.filterwarnings("ignore", ".*was configured so validation will run at th
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
 warnings.filterwarnings("ignore", ".* does not have many workers.*")
 warnings.filterwarnings("ignore", ".*No positive samples in targets.*")
+warnings.filterwarnings("ignore", ".*hen logging on epoch level in distributed setting to accumulate the metric acro.*")
 
 
 def main(args: TrainingArgs) -> None:

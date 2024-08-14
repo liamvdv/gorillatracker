@@ -155,6 +155,7 @@ class BaseModule(L.LightningModule):
         use_quantization_aware_training: bool = False,
         every_n_val_epochs: int = 1,
         fast_dev_run: bool = False,
+        multi_gpu_training: bool = False,
         **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
@@ -181,6 +182,8 @@ class BaseModule(L.LightningModule):
         self.from_scratch = from_scratch
         self.embedding_size = embedding_size
         self.dropout_p = dropout_p
+
+        self.multi_gpu_training = multi_gpu_training
 
         ####### Losses
         assert "softmax" in loss_mode or not use_inbatch_mixup, "In-batch mixup is only supported for softmax losses."
@@ -386,8 +389,17 @@ class BaseModule(L.LightningModule):
         anchor_ids = list(flat_ids[:batch_size])
 
         embeddings = self.forward(flat_images)
+        if (
+            self.multi_gpu_training and dataloader_idx == 0
+        ):  # NOTE(rob2u): we only want to save the embeddings of the first dataloader in multi-gpu training
+            self.add_validation_embeddings(
+                anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx
+            )
+        elif not self.multi_gpu_training:
+            self.add_validation_embeddings(
+                anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx
+            )
 
-        self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term and hasattr(self, "loss_module_val"):
             loss, pos_dist, neg_dist = self.loss_module_val(embeddings=embeddings, labels=flat_labels, images=flat_images, ids=flat_ids)  # type: ignore
             kfold_prefix = f"fold-{self.kfold_k}/" if self.kfold_k is not None else ""
@@ -427,13 +439,77 @@ class BaseModule(L.LightningModule):
 
         embeddings_table_list = self.embeddings_table_list
 
+        if self.multi_gpu_training:
+            gathered_embeddings_table_list = []
+            for table in embeddings_table_list:
+                labels, embeddings, ids, partitions, datasets = (
+                    table["label"],
+                    table["embedding"],
+                    table["id"],
+                    table["partition"],
+                    table["dataset"],
+                )
+
+                labels = torch.tensor([int(x) for x in labels.tolist()], device=self.device)
+                if len(embeddings) > 0:
+                    embeddings = np.stack(embeddings, axis=0)
+                embeddings = torch.tensor(embeddings, device=self.device)
+                _, partitions, datasets = ids.tolist(), partitions.tolist(), datasets.tolist()
+
+                labels_all = self.all_gather(
+                    labels
+                )  # NOTE(rob2u): shape: world_size x n (world_size is the number of GPUs)
+
+                if embeddings.shape[0] == 0:
+                    embeddings_all = torch.zeros(0, self.embedding_size, device=self.device)
+                embeddings_all = self.all_gather(embeddings)  # type: ignore
+                print(f"Rank {self.trainer.global_rank} finished gathering validation data.")
+
+                if self.global_rank != 0:
+                    # clear the table where the embeddings are stored
+                    self.embeddings_table_list = [
+                        pd.DataFrame(columns=self.embeddings_table_columns) for _ in range(len(self.dataset_names))
+                    ]
+                    break
+
+                labels_all = torch.cat(
+                    [torch.tensor(tensor_list, device=self.device) for tensor_list in labels_all.tolist()], dim=0  # type: ignore
+                )
+
+                embeddings_all = torch.cat(
+                    [torch.tensor(tensor_list, device=self.device) for tensor_list in embeddings_all.tolist()],
+                    dim=0,
+                )
+
+                table_all = pd.DataFrame(
+                    {
+                        "label": [int(x) for x in labels_all],
+                        "embedding": [embedding.cpu().numpy() for embedding in embeddings_all],
+                        "id": [str(i) for i in range(len(labels_all))],  # HACK
+                        "partition": ["val"] * len(labels_all),
+                        "dataset": ["multigpu"] * len(labels_all),
+                    }
+                )
+                gathered_embeddings_table_list.append(table_all)
+
+                if self.multi_gpu_training:
+                    break
+            embeddings_table_list = gathered_embeddings_table_list
+
+        print(f"Rank {self.trainer.global_rank} finished validation.")
+
+        if self.trainer.global_rank != 0:
+            return
+
         assert self.trainer.max_epochs is not None
         for dataloader_idx, embeddings_table in enumerate(embeddings_table_list):
             for key, val in self.eval_embeddings_table(embeddings_table, dataloader_idx).items():
                 if not isinstance(val, wandb.Image):
-                    self.log(key, torch.tensor([val], device=self.device), on_epoch=True, sync_dist=True)
+                    self.log(key, torch.tensor([val], device=self.device), on_epoch=True)
                 else:
                     self.wandb_run.log({key: val})
+            if self.multi_gpu_training:
+                break
 
         # clear the table where the embeddings are stored
         self.embeddings_table_list = [
@@ -682,6 +758,9 @@ class BaseModule(L.LightningModule):
 
     def validation_loss_softmax(self, dataloader_name: str, kfold_prefix: str) -> None:
         for i, table in enumerate(self.embeddings_table_list):
+            if len(table) == 0:
+                continue
+
             logger.info(f"Calculating loss for all embeddings from dataloader {i}: {len(table)}")
 
             # get weights for all classes by averaging over all embeddings
@@ -720,7 +799,10 @@ class BaseModule(L.LightningModule):
                 losses.append(loss)
             loss = torch.tensor(losses).mean()
             assert not torch.isnan(loss).any(), f"Loss is NaN: {losses}"
-            self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss.to(self.device), on_epoch=True, sync_dist=True)
+            self.log(f"{dataloader_name}/{kfold_prefix}val/loss", loss.to(self.device), on_epoch=True)
+
+            if self.multi_gpu_training:
+                break
 
     @classmethod
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:

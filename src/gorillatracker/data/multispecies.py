@@ -47,7 +47,6 @@ def get_ds_dfs(train_factor: float = 0.7, val_factor: float = 0.15, test_factor:
             "NOAARightWhale",  # not in paper, license raises questions
         }:
             continue
-        print(f"Loading {name}")
         d = loader.load_dataset(
             ds_cls,
             "/workspaces/gorillatracker/data/WildlifeReID-10k/data",
@@ -254,4 +253,4 @@ class MultiSpeciesSupervisedDataset(NletDataset):
         return pilimg
 
     def __len__(self) -> Label:
-        return len(self.contrastive_sampler.ds)  # type: ignore
+        return len(self.contrastive_sampler)
