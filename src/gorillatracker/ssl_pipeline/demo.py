@@ -18,7 +18,12 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from gorillatracker.ssl_pipeline.dataset import GorillaDatasetGPUServer2, GorillaDatasetKISZ, SSLDataset
+from gorillatracker.ssl_pipeline.dataset import (
+    GorillaDatasetBerlin,
+    GorillaDatasetGPUServer2,
+    GorillaDatasetKISZ,
+    SSLDataset,
+)
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskType, Video
@@ -145,6 +150,20 @@ def kisz_demo() -> None:
     dataset.post_setup()
 
 
+def berlin_demo() -> None:
+    version = "2024-08-15"
+    logging.basicConfig(level=logging.INFO)
+    dataset = GorillaDatasetBerlin()
+    visualize_pipeline(
+        dataset,
+        version,
+        Path("/workspaces/gorillatracker/video_data/zoo_berlin/visualized"),
+        n_videos=1,
+        max_worker_per_gpu=1,
+        gpu_ids=[0],
+    )
+
+
 def kisz_visualize_video(video_id: int) -> None:
     logging.basicConfig(level=logging.INFO)
     dataset = GorillaDatasetKISZ()
@@ -152,4 +171,7 @@ def kisz_visualize_video(video_id: int) -> None:
 
 
 if __name__ == "__main__":
-    kisz_demo()
+    berlin_demo()
+    # # kisz_demo()
+    # dataset = GorillaDatasetBerlin()
+    # models.Base.metadata.create_all(dataset.engine)
