@@ -560,8 +560,20 @@ class BaseModule(L.LightningModule):
         }
         metrics |= (
             {
-                "knn5_filter": partial(knn_func, k=5, use_filter=True),
                 "knn_filter": partial(knn_func, k=1, use_filter=True),
+                "knn5_filter": partial(knn_func, k=5, use_filter=True),
+                "knn_macro_filter": partial(knn_func, k=1, average="macro", use_filter=True),
+                "knn5_macro_filter": partial(knn_func, k=5, average="macro", use_filter=True),
+                "knn_with_train_filter": partial(knn_func, k=1, use_train_embeddings=True, use_filter=True),
+                "knn5_with_train_filter": partial(knn_func, k=5, use_train_embeddings=True, use_filter=True),
+                
+                "knn_filter_cos": partial(knn_func, k=1, use_filter=True, distance_metric="cosine"),
+                "knn5_filter_cos": partial(knn_func, k=5, use_filter=True, distance_metric="cosine"),
+                "knn_macro_filter_cos": partial(knn_func, k=1, average="macro", use_filter=True, distance_metric="cosine"),
+                "knn5_macro_filter_cos": partial(knn_func, k=5, average="macro", use_filter=True, distance_metric="cosine"),
+                "knn_with_train_filter_cos": partial(knn_func, k=1, use_train_embeddings=True, use_filter=True, distance_metric="cosine"),
+                "knn5_with_train_filter_cos": partial(knn_func, k=5, use_train_embeddings=True, use_filter=True, distance_metric="cosine"),       
+                
                 "knn5_cos": partial(knn_func, k=5, distance_metric="cosine"),
                 "knn_cos": partial(knn_func, k=1, distance_metric="cosine"),
                 "knn5_macro_cos": partial(knn_func, k=5, average="macro", distance_metric="cosine"),
@@ -598,9 +610,7 @@ class BaseModule(L.LightningModule):
             {
                 "knn_crossvideo": partial(knn_func, k=1, use_crossvideo_positives=True),
                 "knn_crossvideo_cos": partial(knn_func, k=1, use_crossvideo_positives=True, distance_metric="cosine"),
-                "knn_crossvideo_filter": partial(knn_func, k=1, use_crossvideo_positives=True, use_filter=True),
                 "knn5_crossvideo": partial(knn_func, k=5, use_crossvideo_positives=True),
-                "knn5_crossvideo_filter": partial(knn_func, k=5, use_crossvideo_positives=True, use_filter=True),
                 "knn5_crossvideo_cos": partial(knn_func, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn_crossvideo_macro": partial(knn_func, k=1, use_crossvideo_positives=True, average="macro"),
                 "knn_crossvideo_macro_cos": partial(
