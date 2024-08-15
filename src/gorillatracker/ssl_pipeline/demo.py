@@ -24,7 +24,6 @@ from gorillatracker.ssl_pipeline.dataset import (
     GorillaDatasetKISZ,
     SSLDataset,
 )
-
 from gorillatracker.ssl_pipeline.feature_mapper import multiprocess_correlate, one_to_one_correlator
 from gorillatracker.ssl_pipeline.helpers import remove_processed_videos
 from gorillatracker.ssl_pipeline.models import Task, TaskType, Video
