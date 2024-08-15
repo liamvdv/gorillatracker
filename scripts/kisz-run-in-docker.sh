@@ -105,7 +105,6 @@ docker run --rm -it --ipc=host --network=host \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY --env POSTGRESQL_URI=postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres \
     --gpus=\"device=${gpus}\" \
-    --name gorillatracker-ben-2 \
     $image /bin/bash -c "${command}"
 
 # print done to console

@@ -9,17 +9,17 @@
             },
             "split_path": {
                 "values": [
-                "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-Baseline_2024-04-18_percentage-90-5-5_split_20240809_1523.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-0-to-30-Length_2024-04-18_percentage-90-5-5_split_20240809_1535.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-13-to-19-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1533.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-2015-2018-Year_2024-04-18_percentage-90-5-5_split_20240809_1524.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-2018-2021-Year_2024-04-18_percentage-90-5-5_split_20240809_1526.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-2021-2024-Year_2024-04-18_percentage-90-5-5_split_20240809_1528.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-30-to-60-Length_2024-04-18_percentage-90-5-5_split_20240809_1536.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-6-to-13-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1531.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/1650-SSL-Video-Split-19-to-6-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1530.pkl",
-                "/workspaces/gorillatracker/data/splits/SSL/sweep/2320k-SSL-Video-Split-60-to-MAX-Length_2024-04-18_percentage-90-5-5_split_20240809_1538.pkl"
+                    "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-Baseline_2024-04-18_percentage-90-5-5_split_20240809_1523.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-0-to-30-Length_2024-04-18_percentage-90-5-5_split_20240809_1535.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-13-to-19-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1533.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-2015-2018-Year_2024-04-18_percentage-90-5-5_split_20240809_1524.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-2018-2021-Year_2024-04-18_percentage-90-5-5_split_20240809_1526.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-2021-2024-Year_2024-04-18_percentage-90-5-5_split_20240809_1528.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-30-to-60-Length_2024-04-18_percentage-90-5-5_split_20240809_1536.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/10k-SSL-Video-Split-6-to-13-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1531.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/1650-SSL-Video-Split-19-to-6-Datetime_2024-04-18_percentage-90-5-5_split_20240809_1530.pkl",
+                    "/workspaces/gorillatracker/data/splits/SSL/sweep/2320k-SSL-Video-Split-60-to-MAX-Length_2024-04-18_percentage-90-5-5_split_20240809_1538.pkl"
                 ]
             }
         }
