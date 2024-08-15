@@ -94,12 +94,12 @@ additional_val_dataset_classes: [
         gorillatracker.datasets.cxl.ValKFoldCXLDataset
                           ]
 additional_val_data_dirs: [
-        "/workspaces/gorillatracker/data/supervised/splits/cxl_bodies_openset_square_val_50_test_50/val", 
-        "/workspaces/gorillatracker/data/supervised/splits/cxl_bodies_openset_square_val_50_test_50/test", 
-        "/workspaces/gorillatracker/data/supervised/cxl_all/body_images_square", 
-        "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", 
-        "/workspaces/gorillatracker/data/supervised/splits/cxl_bodies_openset_seed42_square_kfold-5"
+        "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_val_50_test_50/val", 
+        "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_val_50_test_50/test", 
+        "/workspaces/gorillatracker/data/supervised/cxl_all/face_images", 
+        "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_filtered", 
+        "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_kfold-5"
                           ]
 dataset_names: ["ssl", "cxl-all-val", "cxl-all-test", "cxl-all", "bristol", "cxl-kfold"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
-data_dir: "/workspaces/gorillatracker/cropped-images-squared/2024-04-18"
+data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
