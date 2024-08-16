@@ -144,6 +144,7 @@ class L2_SP(nn.Module):
         ), "Weights should be in pretrained_weights/ to not litter your project folder, (add to devcontainer.json)"
 
         if not os.path.exists(path_to_pretrained_weights):
+            os.makedirs(os.path.dirname(path_to_pretrained_weights), exist_ok=True)
             model_copy = deepcopy(model)
             for k in list(model_copy.__dict__.keys()):
                 if k != "model" and not k.startswith("_"):

@@ -66,11 +66,17 @@ class MoCoWrapper(BaseModule):
         )
         self.model.reset_classifier(self.embedding_size)
         in_features = self.model.head.in_features
+        # self.model.head = nn.Sequential(
+        #     nn.BatchNorm1d(in_features),
+        #     nn.Dropout(p=self.dropout_p),
+        #     nn.Linear(in_features, in_features),
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(in_features),
+        #     nn.Dropout(p=self.dropout_p),
+        #     nn.Linear(in_features, self.embedding_size),
+        #     nn.BatchNorm1d(self.embedding_size),
+        # )
         self.model.head = nn.Sequential(
-            nn.BatchNorm1d(in_features),
-            nn.Dropout(p=self.dropout_p),
-            nn.Linear(in_features, in_features),
-            nn.ReLU(),
             nn.BatchNorm1d(in_features),
             nn.Dropout(p=self.dropout_p),
             nn.Linear(in_features, self.embedding_size),

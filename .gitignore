@@ -173,3 +173,5 @@ cropped-images-squared/*
 */lightning_logs/*
 plots/
 /roberts_besenkammer
+**/lightning_logs
+**/*.pkl
