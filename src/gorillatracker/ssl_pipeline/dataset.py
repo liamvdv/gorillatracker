@@ -194,6 +194,49 @@ class GorillaDataset(SSLDataset):
         video.tasks.extend(tasks_to_add)
 
 
+class GorillaDatasetBerlin(GorillaDataset):
+    DB_URI: str = os.environ.get("POSTGRESQL_URI") or "sqlite:///:memory:"
+    VIDEO_DIR = "/workspaces/gorillatracker/video_data/zoo_berlin/raw_collection_cleaned"
+
+    def __init__(self, db_uri: str = DB_URI) -> None:
+        assert os.environ.get(
+            "POSTGRESQL_URI"
+        ), "POSTGRESQL_URI environment variable not set, remove assertion if desired"
+        super().__init__(db_uri)
+
+        self._yolo_body_kwargs = {
+            **self._yolo_base_kwargs,
+            "iou": 0.2,
+            "conf": 0.3,
+        }
+
+    @property
+    def tracker_config(self) -> Path:
+        return Path("cfgs/tracker/botsort_berlin.yml")
+
+    # NOTE(memben): there is only one social group in the Berlin dataset
+    @classmethod
+    def get_social_group(cls, video: Video) -> Optional[str]:
+        return None
+
+    def find_camera(self, path: Path) -> str:
+        parts = path.parts
+        # NOTE(memben): our data being inconsitent zoo1, zoo_1 etc.
+        matches = [part for part in parts if re.match(r"zoo.*\d+", part)]
+        if len(matches) == 1:
+            return matches[0]
+        else:
+            return "Unknown"
+
+    def metadata_extractor(self, video_path: Path) -> VideoMetadata:
+        camera_name = self.find_camera(video_path)
+        return VideoMetadata(camera_name, None)
+
+    def setup_camera_locations(self) -> None:
+        # NOTE(memben): Berlin dataset does not have camera locations
+        return None
+
+
 class GorillaDatasetKISZ(GorillaDataset):
     DB_URI: str = os.environ.get("POSTGRESQL_URI") or "sqlite:///:memory:"
 
