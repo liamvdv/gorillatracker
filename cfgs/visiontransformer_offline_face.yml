@@ -77,7 +77,7 @@ save_model_to_wandb: False
 # wandb_tags: ["research-template"] # WandB tags for experiment tracking
 use_ssl: True
 # split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-woCXL_10k-100-1000_split_20240716_1032.pkl"
-split_path: "/workspaces/gorillatracker/data/splits/SSL/sweep/30k-SSL-Video-Split-1_2024-04-18_percentage-95-5-0_split_20240812_2337.pkl"
+split_path: "/workspaces/gorillatracker/data/splits/SSL/sweep/20k-SSL-Video-Split_2024-04-18_percentage-95-5-0_split_20240816_0850.pkl"
 feature_types: ["face_45"]
 tff_selection: "movement"
 negative_mining: "overlapping"  

@@ -190,16 +190,16 @@ if __name__ == "__main__":
     base = SplitArgs(
         db_uri=DB_URI,
         version="2024-04-18",
-        name="30k-SSL-Video-Split-2",
+        name="20k-SSL-Video-Split",
         save_path="/workspaces/gorillatracker/data/splits/SSL/sweep",
         split_by="percentage",
         train_split=95,
         val_split=5,
         test_split=0,
         hours=list(range(6, 19)),  # only videos from certain hours of the day
-        video_length=(31, 1000000),  # min, max video length in seconds
-        max_train_videos=30_000,  # max videos in train bucket
-        max_val_videos=100,  # max videos in val bucket
+        video_length=(20, 1000000),  # min, max video length in seconds
+        max_train_videos=20_000,  # max videos in train bucket
+        max_val_videos=50,  # max videos in val bucket
         max_test_videos=1000,  # max videos in test bucket
         # starttime and endtime will be ignored if split_by is not custom
         train_starttime=dt.datetime(2010, 1, 1),
