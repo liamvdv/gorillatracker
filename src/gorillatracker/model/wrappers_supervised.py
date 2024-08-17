@@ -138,11 +138,16 @@ class TimmEvalWrapper(nn.Module):
     def __init__(  # type: ignore
         self,
         backbone_name,
+        img_size: Optional[int] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__()
-        self.model = timm.create_model(backbone_name, pretrained=True)
+        if img_size is not None:
+            logger.info("Setting img_size to", img_size)
+            self.model = timm.create_model(backbone_name, pretrained=True, img_size=img_size)
+        else:
+            self.model = timm.create_model(backbone_name, pretrained=True)
         if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
             logger.warn("We wont use image size greater than 768!!!")
             self.model = timm.create_model(backbone_name, pretrained=True, img_size=512)
