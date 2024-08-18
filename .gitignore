@@ -175,3 +175,7 @@ plots/
 /roberts_besenkammer
 **/lightning_logs
 **/*.pkl
+**/data/TransformedMNIST
+notebooks/**/*.png
+notebooks/**/*.jpg
+notebooks/**/*.jpeg
