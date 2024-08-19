@@ -49,68 +49,101 @@ def compute_iqr_centroids(df):
 
 
 def analyse_embedding_space(df) -> dict:
-    centroid_df = compute_centroids(df)
+    """Looks more difficult than is. It just needs to handle unclassified points (label -1) and only 0/1 cluster"""
+    all_embeddings = np.array(df["embedding"].tolist())
+    labels = df["label"].values
 
-    for label in centroid_df["label"]:
-        centroid = centroid_df[centroid_df["label"] == label]["centroid"].values[0]
-        embeddings = df[df["label"] == label]["embedding"].tolist()
-        distances = cdist(embeddings, [centroid])
-        min_distance = np.min(distances)
-        max_distance = np.max(distances)
-        avg_distance = np.mean(distances)
-        centroid_df.loc[centroid_df["label"] == label, "min_distance"] = min_distance
-        centroid_df.loc[centroid_df["label"] == label, "max_distance"] = max_distance
-        centroid_df.loc[centroid_df["label"] == label, "avg_distance"] = avg_distance
+    # Separate clustered and unclustered points
+    clustered_mask = labels >= 0
+    clustered_embeddings = all_embeddings[clustered_mask]
+    clustered_labels = labels[clustered_mask]
 
-    all_embeddings = df["embedding"].tolist()
+    # Calculate the proportion of unclustered points
+    total_points = len(labels)
+    unclustered_points = np.sum(labels == -1)
+    unclustered_ratio = unclustered_points / total_points if total_points > 0 else None
+
     all_dist = cdist(all_embeddings, all_embeddings)
-
-    # Create a mask to exclude the diagonal (self-distances)
     mask = ~np.eye(all_dist.shape[0], dtype=bool)
 
-    all_centroid_dist = cdist(centroid_df["centroid"].tolist(), centroid_df["centroid"].tolist())
-    centroid_mask = ~np.eye(all_centroid_dist.shape[0], dtype=bool)
-
-    # Convert embeddings to a numpy array for sklearn functions
-    embeddings_array = np.array(all_embeddings)
-    labels_array = df["label"].values
-
-    # Calinski-Harabasz Index
-    ch_index = calinski_harabasz_score(embeddings_array, labels_array)
-
-    # Within-cluster Sum of Squares (WCSS)
-    wcss = sum(centroid_df["avg_distance"] ** 2 * centroid_df["label"].map(df["label"].value_counts()))
-
-    # Silhouette Coefficient
-    silhouette_avg = silhouette_score(embeddings_array, labels_array)
-
-    # Davies-Bouldin Index
-    db_index = davies_bouldin_score(embeddings_array, labels_array)
-
-    # Dunn Index
-    min_inter_cluster_distance = np.min(all_centroid_dist[centroid_mask])
-    max_intra_cluster_distance = centroid_df["max_distance"].max()
-    dunn_index = min_inter_cluster_distance / max_intra_cluster_distance
-
     metrics = {
-        "global_max_dist": np.max(all_dist[mask]),
-        "global_min_dist": np.min(all_dist[mask]),
-        "global_avg_dist": np.mean(all_dist[mask]),
-        "global_std_dist": np.std(all_dist[mask]),
-        "intra_min_dist": centroid_df["min_distance"].min(),
-        "intra_max_dist": centroid_df["max_distance"].max(),
-        "intra_avg_dist": centroid_df["avg_distance"].mean(),
-        "intra_std_dist": centroid_df["avg_distance"].std(),
-        "inter_min_dist": np.min(all_centroid_dist[centroid_mask]),
-        "inter_max_dist": np.max(all_centroid_dist[centroid_mask]),
-        "inter_avg_dist": np.mean(all_centroid_dist[centroid_mask]),
-        "inter_std_dist": np.std(all_centroid_dist[centroid_mask]),
-        "calinski_harabasz_index": ch_index,
-        "wcss": wcss,
-        "silhouette_coefficient": silhouette_avg,
-        "davies_bouldin_index": db_index,
-        "dunn_index": dunn_index,
+        "unclustered_ratio": unclustered_ratio,
+        "global_max_dist": np.max(all_dist[mask]) if len(all_embeddings) > 1 else None,
+        "global_min_dist": np.min(all_dist[mask]) if len(all_embeddings) > 1 else None,
+        "global_avg_dist": np.mean(all_dist[mask]) if len(all_embeddings) > 1 else None,
+        "global_std_dist": np.std(all_dist[mask]) if len(all_embeddings) > 1 else None,
+        "intra_min_dist": None,
+        "intra_max_dist": None,
+        "intra_avg_dist": None,
+        "intra_std_dist": None,
+        "inter_min_dist": None,
+        "inter_max_dist": None,
+        "inter_avg_dist": None,
+        "inter_std_dist": None,
+        "calinski_harabasz_index": None,
+        "wcss": None,
+        "silhouette_coefficient": None,
+        "davies_bouldin_index": None,
+        "dunn_index": None,
     }
+
+    # If there are no clustered points or only one point, return metrics with default None values
+    if len(clustered_embeddings) <= 1:
+        return metrics
+
+    # Compute intra-cluster metrics
+    unique_labels = np.unique(clustered_labels)
+    intra_distances = []
+    centroids = []
+
+    for label in unique_labels:
+        cluster_points = clustered_embeddings[clustered_labels == label]
+        centroid = np.mean(cluster_points, axis=0)
+        centroids.append(centroid)
+        distances = cdist(cluster_points, [centroid]).flatten()
+        intra_distances.extend(distances)
+
+    intra_distances = np.array(intra_distances)
+
+    metrics.update(
+        {
+            "intra_min_dist": np.min(intra_distances),
+            "intra_max_dist": np.max(intra_distances),
+            "intra_avg_dist": np.mean(intra_distances),
+            "intra_std_dist": np.std(intra_distances),
+            "wcss": np.sum(intra_distances**2),  # Within-cluster Sum of Squares
+        }
+    )
+
+    # Compute metrics that require at least two clusters
+    if len(unique_labels) > 1:
+        metrics.update(
+            {
+                "calinski_harabasz_index": calinski_harabasz_score(clustered_embeddings, clustered_labels),
+                "silhouette_coefficient": silhouette_score(clustered_embeddings, clustered_labels),
+                "davies_bouldin_index": davies_bouldin_score(clustered_embeddings, clustered_labels),
+            }
+        )
+
+        # Compute inter-cluster metrics
+        centroids = np.array(centroids)
+        inter_distances = cdist(centroids, centroids)
+        inter_mask = ~np.eye(inter_distances.shape[0], dtype=bool)
+
+        metrics.update(
+            {
+                "inter_min_dist": np.min(inter_distances[inter_mask]),
+                "inter_max_dist": np.max(inter_distances[inter_mask]),
+                "inter_avg_dist": np.mean(inter_distances[inter_mask]),
+                "inter_std_dist": np.std(inter_distances[inter_mask]),
+                "dunn_index": (
+                    np.min(inter_distances[inter_mask]) / np.max(intra_distances)
+                    if np.max(intra_distances) > 0
+                    else None
+                ),
+            }
+        )
+
     return metrics
 
 
