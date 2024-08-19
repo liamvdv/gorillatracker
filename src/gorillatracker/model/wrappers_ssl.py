@@ -3,6 +3,7 @@ from typing import Callable
 
 import timm
 import torch
+import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 from lightly.loss import NegativeCosineSimilarity
 from lightly.models.modules.heads import BYOLProjectionHead, MoCoProjectionHead, SimCLRProjectionHead
@@ -26,7 +27,13 @@ class SimCLRWrapper(BaseModule):
         )
         self.model.reset_classifier(self.embedding_size)
         in_features = self.model.head.in_features
-        self.model.head = SimCLRProjectionHead(in_features, in_features, self.embedding_size)
+        projection_head = nn.Sequential(
+            nn.BatchNorm1d(in_features),
+            nn.Dropout(p=self.dropout_p),
+            nn.Linear(in_features, self.embedding_size),
+            nn.BatchNorm1d(self.embedding_size),
+        )
+        self.model.head = projection_head
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
@@ -35,10 +42,7 @@ class SimCLRWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms_v2.ToPILImage(),
                 PlanckianJitter(),
-                transforms_v2.ToTensor(),
-                # transforms_v2.RandomPhotometricDistort(p=0.5),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
@@ -47,7 +51,6 @@ class SimCLRWrapper(BaseModule):
         )
 
 
-# TODO: MoCoWrapper is not fully tested yet.
 class MoCoWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -59,7 +62,13 @@ class MoCoWrapper(BaseModule):
         )
         self.model.reset_classifier(self.embedding_size)
         in_features = self.model.head.in_features
-        self.model.head = MoCoProjectionHead(in_features, in_features, self.embedding_size)
+        projection_head = nn.Sequential(
+            nn.BatchNorm1d(in_features),
+            nn.Dropout(p=self.dropout_p),
+            nn.Linear(in_features, self.embedding_size),
+            nn.BatchNorm1d(self.embedding_size),
+        )
+        self.model.head = projection_head
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
@@ -94,10 +103,7 @@ class MoCoWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms_v2.ToPILImage(),
                 PlanckianJitter(),
-                transforms_v2.ToTensor(),
-                # transforms_v2.RandomPhotometricDistort(p=0.5),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
@@ -163,10 +169,7 @@ class BYOLWrapper(BaseModule):
     def get_training_transforms(cls) -> Callable[[torch.Tensor], torch.Tensor]:
         return transforms.Compose(
             [
-                transforms_v2.ToPILImage(),
                 PlanckianJitter(),
-                transforms_v2.ToTensor(),
-                # transforms_v2.RandomPhotometricDistort(p=0.5),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
