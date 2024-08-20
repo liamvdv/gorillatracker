@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
 def main(args) -> None:  # type: ignore
     base_dir = args.base_dir + "/" + args.name
     # 1. Quantization
-    calibration_input_embeddings, _ = get_model_input(
+    _, calibration_input_embeddings, _ = get_model_input(
         CrossEncounterSupervisedKFoldDataset,
         dataset_path=args.dataset_path,
         partion="train",
@@ -71,12 +71,16 @@ def main(args) -> None:  # type: ignore
         else load_model(BaseModuleSupervised, args.model_wandb_url)
     )
     if args.load_quantized_model:
-        quantized_model_state_dict = torch.load("quantized_model_weights.pth")
+        quantized_model_state_dict = torch.load(
+            pathlib.Path(args.model_wandb_url).parent / "quantized_model_weights.pth"
+        )
         quantized_model: Union[GraphModule, BaseModule] = model
         quantized_model.load_state_dict(quantized_model_state_dict)
         quantized_model.eval()
     else:
-        quantized_model, quantizer = quantization_functions.pt2e_quantization(model, calibration_input_embeddings)
+        quantized_model, quantizer = quantization_functions.pt2e_quantization_xnnpack(
+            model, calibration_input_embeddings
+        )
 
     if args.save_quantized_model:
         exported_model = torch.export.export(quantized_model, (calibration_input_embeddings[0].unsqueeze(0),))
@@ -89,27 +93,37 @@ def main(args) -> None:  # type: ignore
     print_on_steroids("Quantization done", level="success")
 
     # 2. Performance evaluation
-    validations_input_embeddings, validation_labels = get_model_input(
-        CrossEncounterSupervisedKFoldDataset,
-        dataset_path=args.dataset_path,
-        partion="val",
-        amount_of_tensors=-1,
-        height=args.input_height,
-    )
-
+    model.eval()
+    model = model.to("cuda")
     results: Dict[str, Any] = dict()
-
-    # evaluate_model(model, "fp32", results, validations_input_embeddings, validation_labels)
-    evaluate_model(quantized_model, "quantized", results, validations_input_embeddings, validation_labels)
+    for fold in range(5):
+        print_on_steroids(f"Fold {fold}", level="info")
+        # evaluate_model(model, "fp32", results, validations_input_embeddings, validation_labels)
+        validation_ids, validations_input_embeddings, validation_labels = get_model_input(
+            CrossEncounterSupervisedKFoldDataset,
+            dataset_path=args.dataset_path,
+            partion="val",
+            amount_of_tensors=-1,
+            height=args.input_height,
+            fold=fold,
+        )
+        evaluate_model(
+            quantized_model,
+            f"quantized-fold-{fold}",
+            results,
+            validations_input_embeddings,
+            validation_labels,
+            validation_ids,
+        )
 
     print_on_steroids("Model evaluation done", level="success")
 
     # # 3. Export to TF Lite
-    tf_model = convert_model_to_tflite(
-        quantized_model, calibration_input_embeddings[0], os.path.join(base_dir, "quantized_model.tflite")
-    )
+    # tf_model = convert_model_to_tflite(
+    #     quantized_model, calibration_input_embeddings[0], os.path.join(base_dir, "quantized_model.tflite"), quantizer
+    # )
 
-    evaluate_model(tf_model, "tflite", results, validations_input_embeddings, validation_labels)
+    # evaluate_model(tf_model, "tflite", results, validations_input_embeddings, validation_labels)
 
     pathlib.Path(base_dir).mkdir(parents=True, exist_ok=True)
     pd.DataFrame(results).to_json(os.path.join(base_dir, "results.json"))

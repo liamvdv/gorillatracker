@@ -1,4 +1,4 @@
-name: Embedding-ResNet18-CXL-OpenSet
+name: Embedding-ResNet-18-CXL-OpenSet
 model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ResNet18-CXL-OpenSet/jakb10np/checkpoints/last_model_ckpt.ckpt"
 
 save_quantized_model: False

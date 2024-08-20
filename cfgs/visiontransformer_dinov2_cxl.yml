@@ -11,7 +11,7 @@ workers: 4                      # Number of workers for data loading
 
 # Model and Training Arguments
 
-project_name: "Embedding-ViT-CXL-OpenSet"
+project_name: "Embedding-ViT-DinoV2-CXL-OpenSet"
 run_name: "124-test-different-pretrainings-weights-across-backbones-clip-dino" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["dinov2", "base"]            # WandB tags for experiment tracking
 model_name_or_path: "timm/vit_large_patch14_dinov2.lvd142m" # Model name or path 
@@ -67,7 +67,8 @@ embedding_save_interval: 2      # Embedding save interval
 
 data_dir: "/workspaces/gorillatracker/data/splits/ground_truth-cxl-face_images-openset-reid-val-0-test-0-mintraincount-3-seed-42-train-50-val-25-test-25"
 dataset_class: "gorillatracker.datasets.cxl.CXLDataset"
-data_resize_transform: 518
+data_resize_transform: 224
+fix_img_size: 224
 
 additional_val_dataset_classes: Null
 additional_val_data_dirs: Null

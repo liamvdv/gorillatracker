@@ -169,7 +169,7 @@ def train_using_quantization_aware_training(
     checkpoint_callback: ModelCheckpoint,
 ) -> Tuple[BaseModule, Trainer]:
     logger.info("Preperation for quantization aware training...")
-    example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=dm.batch_size * 4)  # type: ignore
+    _, example_inputs, _ = get_model_input(dm.dataset_class, args.data_dir, amount_of_tensors=dm.batch_size * 4, height=args.data_resize_transform)  # type: ignore
     example_inputs = (example_inputs,)  # type: ignore
     model.model_wrapper.eval()
     autograd_graph = capture_pre_autograd_graph(model.model_wrapper, copy.deepcopy(example_inputs))

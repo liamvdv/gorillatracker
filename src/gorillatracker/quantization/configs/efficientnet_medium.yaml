@@ -1,5 +1,5 @@
-name: Embedding-EfficientNet-Large-CXL-OpenSet
-model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-EfficientNet-Large-CXL-OpenSet/   /checkpoints/last_model_ckpt.ckpt"
+name: Embedding-EfficientNet-Medium-CXL-OpenSet
+model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-EfficientNet-Medium-CXL-OpenSet/62nf304n/checkpoints/last_model_ckpt.ckpt"
 
 save_quantized_model: False
 load_quantized_model: False

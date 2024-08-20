@@ -14,6 +14,7 @@ def get_model_input(
     partion: Literal["train", "val", "test"] = "train",
     amount_of_tensors: int = 100,
     height: int = 224,
+    fold: int = 0,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Get a tensor of images and a tensor of labels from a dataset.
     Args:
@@ -35,7 +36,7 @@ def get_model_input(
         nlet_builder=build_onelet,
         partition=partion,
         transform=transform,
-        val_i=4,
+        val_i=fold,
         k=5,
     )
 
@@ -44,14 +45,16 @@ def get_model_input(
 
     images = []
     labels = []
+    ids = []
     for i in range(amount_of_tensors):
-        _, image, label = dataset[i]
+        batch_ids, image, label = dataset[i]
+        ids.append(batch_ids[0])
         images.append(image[0])
         labels.append(label[0])
 
     del dataset
 
-    return torch.stack(images), torch.tensor(labels)
+    return ids, torch.stack(images), torch.tensor(labels)
 
 
 def log_model_to_file(model: nn.Module, file_name: str = "model.txt") -> None:

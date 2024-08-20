@@ -8,7 +8,7 @@
         ],
         "use_quantization_aware_training": true,
         "max_epochs": 40,
-        "early_stopping_patience": 4,
+        "early_stopping_patience": 8,
         "embedding_size": 256,
         "loss_mode": "distillation/offline/response-based",
         "teacher_model_wandb_link": "/workspaces/gorillatracker/models/vit_large_gorillas_Embedding-VitLarge-CXL-OpenSet_t6z53vr7.ckpt",
@@ -28,7 +28,7 @@
         "val_before_training": true,
         "lr_schedule": "cosine",
         "workers": 16,
-        "batch_size": 16,
+        "batch_size": 32,
         "save_model_to_wandb": false,
         "end_lr": 1e-7,
         "l2_alpha": 1,
@@ -61,26 +61,6 @@
         {
             "project_name": "Embedding-EfficientNet-Medium-CXL-OpenSet",
             "config_path": "./cfgs/efficientnet_medium_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-EfficientNet-Small-CXL-OpenSet",
-            "config_path": "./cfgs/efficientnet_small_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-SwinV2-Large-CXL-Open",
-            "config_path": "./cfgs/swinv2_large_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-SwinV2-Base-CXL-Open",
-            "config_path": "./cfgs/swinv2_base_cxl.yml",
-            "parameters": {}
-        },
-        {
-            "project_name": "Embedding-SwinV2-Small-CXL-Open",
-            "config_path": "./cfgs/swinv2_small_cxl.yml",
             "parameters": {}
         }
     ]

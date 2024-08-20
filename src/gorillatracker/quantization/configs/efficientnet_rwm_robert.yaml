@@ -1,8 +1,8 @@
-name: Embedding-ViT-DinoV2-CXL-OpenSet
-model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ViT-DinoV2-CXL-OpenSet/   /checkpoints/last_model_ckpt.ckpt"
+name: Embedding-EfficientNetRWM-CXL-OpenSet-Ro
+model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-EfficientNetRWM-CXL-OpenSet/1kzz6rc4/checkpoints/last_model_ckpt.ckpt"
 
 save_quantized_model: False
-load_quantized_model: False
+load_quantized_model: True
 save_model_architecture: False
 base_dir: "runs/"
 

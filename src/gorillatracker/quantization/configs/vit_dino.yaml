@@ -1,5 +1,5 @@
-name: Embedding-ViT-Large-CXL-OpenSet
-model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ViT-Large-CXL-OpenSet/   /checkpoints/last_model_ckpt.ckpt"
+name: Embedding-ViT-DinoV2-CXL-OpenSet
+model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ViT-CXL-OpenSet/hgkshz36/checkpoints/last_model_ckpt.ckpt"
 
 save_quantized_model: False
 load_quantized_model: False

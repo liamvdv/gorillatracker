@@ -1,5 +1,5 @@
-name: Embedding-ResNet-152-CXL-OpenSet
-model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ResNet152-CXL-OpenSet/9xs7076y/checkpoints/last_model_ckpt.ckpt"
+name: Embedding-ViT-Clip-CXL-OpenSet
+model_wandb_url: "/workspaces/gorillatracker/trained_models/Embedding-ViT-CXL-OpenSet/s65h9321/checkpoints/last_model_ckpt.ckpt"
 
 save_quantized_model: False
 load_quantized_model: False

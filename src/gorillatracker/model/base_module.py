@@ -328,8 +328,8 @@ class BaseModule(L.LightningModule):
         if self.use_inbatch_mixup:
             flat_images, flat_labels_onehot = self.perform_mixup(flat_images, flat_labels)
 
-        flat_images = flat_images.to(self.accelerator)
-        embeddings = self.forward(flat_images)
+        # flat_images = flat_images.to(self.accelerator)
+        embeddings = self.process_images_in_batches(self, flat_images)
 
         assert not torch.isnan(embeddings).any(), f"Embeddings are NaN: {embeddings}"
         loss, pos_dist, neg_dist = self.loss_module_train(embeddings=embeddings, labels=flat_labels, images=flat_images, labels_onehot=flat_labels_onehot, ids=flat_ids)  # type: ignore
@@ -368,6 +368,30 @@ class BaseModule(L.LightningModule):
         )
         # NOTE(rob2u): will get flushed by W&B Callback on val epoch end.
 
+    @staticmethod
+    def process_images_in_batches(model, images, batch_size=64, device=None):
+        generated_image_embeddings = []
+
+        for i in range(0, len(images), batch_size):
+            batch = images[i : i + batch_size]
+
+            # If the batch is smaller than batch_size, pad it with dummy images
+            if len(batch) < batch_size:
+                dummy_images = torch.zeros_like(batch[0]).unsqueeze(0).repeat(batch_size - len(batch), 1, 1, 1)
+                batch = torch.cat([batch, dummy_images], dim=0)
+
+            if device is not None:
+                batch = batch.to(device)
+
+            batch_embeddings = model.forward(batch)
+
+            if i + batch_size > len(images):
+                batch_embeddings = batch_embeddings[: len(images) - i]
+
+            generated_image_embeddings.append(batch_embeddings)
+
+        return torch.cat(generated_image_embeddings)
+
     def validation_step(self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         dataloader_name = self.dataset_names[dataloader_idx]
 
@@ -376,7 +400,7 @@ class BaseModule(L.LightningModule):
         flat_ids, flat_images, flat_labels = flatten_batch(batch)
         anchor_ids = list(flat_ids[:batch_size])
 
-        embeddings = self.forward(flat_images)
+        embeddings = self.process_images_in_batches(self, flat_images)
 
         self.add_validation_embeddings(anchor_ids, embeddings[:batch_size], flat_labels[:batch_size], dataloader_idx)
         if "softmax" not in self.loss_mode and not self.use_dist_term and hasattr(self, "loss_module_val"):
@@ -515,9 +539,9 @@ class BaseModule(L.LightningModule):
 
             flat_ids, flat_images, flat_labels = flatten_batch(batch)
             anchor_labels = flat_labels[:batch_size]
-            anchor_images = flat_images[:64].to(trainer.model.device)
             anchor_ids = flat_ids[:batch_size]
-            embeddings = trainer.model(anchor_images)[:batch_size]
+            anchor_images = flat_images[:batch_size].to(trainer.model.device)
+            embeddings = self.process_images_in_batches(trainer.model, anchor_images)
             train_embedding_batches.append(embeddings)
             train_labels = torch.cat([train_labels, anchor_labels], dim=0)
             train_ids.extend(anchor_ids)

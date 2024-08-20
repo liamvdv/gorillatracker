@@ -8,7 +8,7 @@
         ],
         "use_quantization_aware_training": false,
         "max_epochs": 40,
-        "early_stopping_patience": 4,
+        "early_stopping_patience": 8,
         "embedding_size": 256,
         "loss_mode": "online/soft/l2sp",
         "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
