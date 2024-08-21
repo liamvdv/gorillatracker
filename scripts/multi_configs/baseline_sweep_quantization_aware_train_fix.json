@@ -10,7 +10,7 @@
         "max_epochs": 40,
         "early_stopping_patience": 8,
         "embedding_size": 256,
-        "loss_mode": "online/soft/l2sp",
+        "loss_mode": "online/soft",
         "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
         "dataset_class": "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
         "dataset_names": [
@@ -52,11 +52,6 @@
         }
     },
     "experiments": [
-        {
-            "project_name": "Embedding-EfficientNet-Large-CXL-OpenSet",
-            "config_path": "./cfgs/efficientnet_large_cxl.yml",
-            "parameters": {}
-        },
         {
             "project_name": "Embedding-EfficientNet-Medium-CXL-OpenSet",
             "config_path": "./cfgs/efficientnet_medium_cxl.yml",
