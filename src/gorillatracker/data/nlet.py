@@ -50,7 +50,7 @@ class NletDataset(Dataset[Nlet], ABC):
         self.partition = partition
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
-        self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(), transform])
+        self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(partition, kwargs["aug_num_ops"], kwargs["aug_magnitude"]), transform])
 
     def __len__(self) -> int:
         return len(self.contrastive_sampler)
@@ -91,13 +91,30 @@ class NletDataset(Dataset[Nlet], ABC):
         return ids, values, labels
 
     @classmethod
-    def get_transforms(cls) -> gtypes.Transform:
-        return transforms.Compose(
-            [
-                SquarePad(),
-                transforms.ToTensor(),
-            ]
-        )
+    def get_transforms(cls, partition: str = "train", num_ops: int = 2, magnitude: int = 9) -> gtypes.Transform:
+        if partition != "train":
+            return transforms.Compose(
+                [
+                    SquarePad(),
+                    transforms.ToTensor(),
+                ]
+            )
+        elif num_ops == 0:
+            return transforms.Compose(
+                [
+                    SquarePad(),
+                    transforms.ToTensor(),
+                ]
+            )
+        else:
+            return transforms.Compose(
+                [
+                    SquarePad(),
+                    transforms.RandAugment(num_ops=num_ops, magnitude=magnitude),
+                    transforms.ToTensor(),
+                ]
+            )
+        
 
 
 class KFoldNletDataset(NletDataset):
@@ -114,7 +131,7 @@ class KFoldNletDataset(NletDataset):
         assert val_i < k, "val_i must be less than k"
         self.k = k
         self.val_i = val_i
-        super().__init__(base_dir, nlet_builder, partition, transform)
+        super().__init__(base_dir, nlet_builder, partition, transform, **kwargs)
 
 
 def group_images_by_label(dirpath: Path) -> defaultdict[Label, list[ContrastiveImage]]:

@@ -253,6 +253,8 @@ class BaseModule(L.LightningModule):
             purpose="train",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
             cross_video_masking=kwargs.get("cross_video_masking", False),
+            margin_std = kwargs.get("margin_std", 0.05),
+            additive_margin = kwargs.get("additive_margin", 0.0),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -279,6 +281,8 @@ class BaseModule(L.LightningModule):
             purpose="val",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
             cross_video_masking=kwargs.get("cross_video_masking", False),
+            margin_std = kwargs.get("margin_std", 0.05),
+            additive_margin = kwargs.get("additive_margin", 0.0),
         )
         self.loss_module_val.eval()  # type: ignore
 

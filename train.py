@@ -99,6 +99,8 @@ def main(args: TrainingArgs) -> None:
         additional_eval_data_dirs=[Path(d) for d in args.additional_val_data_dirs],
         dataset_names=args.dataset_names,
         ssl_config=ssl_config,
+        aug_num_ops=args.aug_num_ops,
+        aug_magnitude=args.aug_magnitude,
     )
 
     ################# Construct model ##############

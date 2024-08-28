@@ -102,6 +102,8 @@ class ModelConstructor:
             freeze_backbone=args.freeze_backbone,
             loss_dist_term=args.loss_dist_term,
             cross_video_masking=args.cross_video_masking,
+            additive_margin=args.additive_margin,
+            margin_std=args.margin_std,
         )
 
     def construct(

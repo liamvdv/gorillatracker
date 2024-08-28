@@ -109,6 +109,8 @@ def build_data_module(
     additional_eval_data_dirs: list[Path] = [],
     dataset_names: list[str] = [],
     ssl_config: Optional[SSLConfig] = None,
+    aug_num_ops: int = 2,
+    aug_magnitude: int = 5,
 ) -> NletDataModule:
     assert dataset_class_id in dataset_registry, f"Dataset class {dataset_class_id} not found in registry"
     assert all(
@@ -147,4 +149,6 @@ def build_data_module(
         dataset_names=dataset_names,
         eval_data_dirs=additional_eval_data_dirs,
         ssl_config=ssl_config,
+        aug_num_ops=aug_num_ops,
+        aug_magnitude=aug_magnitude,
     )

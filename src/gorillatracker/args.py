@@ -53,9 +53,14 @@ class TrainingArgs:
     min_delta: float = field(default=0.01)
     embedding_size: int = 256
     dropout_p: float = field(default=0.0)
-    embedding_id: Literal["linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout"] = field(default="linear")
+    embedding_id: Literal[
+        "linear", "mlp", "linear_norm_dropout", "mlp_norm_dropout", "linear_single_norm_dropout", "none"
+    ] = field(default="linear")
     pool_mode: Literal["gem", "gap", "gem_c", "none"] = field(default="none")
     fix_img_size: Optional[int] = field(default=None)
+    
+    aug_num_ops: int = field(default=2)
+    aug_magnitude: int = field(default=5)
 
     use_quantization_aware_training: bool = field(default=False)
 
@@ -92,6 +97,9 @@ class TrainingArgs:
     s: float = field(default=64.0)
 
     margin: float = field(default=0.5)
+    additive_margin: float = field(default=0.0)
+    margin_std: float = field(default=0.05)
+    
     loss_mode: Literal[
         "offline",
         "offline/native",

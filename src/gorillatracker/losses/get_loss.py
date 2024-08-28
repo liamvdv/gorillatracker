@@ -61,6 +61,7 @@ def get_loss(
         loss_module = ArcFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],
+            additive_margin=kw_args["additive_margin"],
             num_classes=kw_args["num_classes"],
             class_distribution=kw_args["class_distribution"],
             s=kw_args["s"],
@@ -75,6 +76,7 @@ def get_loss(
         loss_module = AdaFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],
+            additive_margin=kw_args["additive_margin"],
             num_classes=kw_args["num_classes"],
             class_distribution=kw_args["class_distribution"],
             s=kw_args["s"],
@@ -90,10 +92,11 @@ def get_loss(
         loss_module = ElasticArcFaceLoss(
             embedding_size=kw_args["embedding_size"],
             angle_margin=kw_args["margin"],
+            additive_margin=kw_args["additive_margin"],
             num_classes=kw_args["num_classes"],
             class_distribution=kw_args["class_distribution"],
             s=kw_args["s"],
-            margin_sigma=0.078,
+            margin_sigma=kw_args["margin_std"],
             accelerator=kw_args["accelerator"],
             k_subcenters=kw_args["k_subcenters"],
             use_focal_loss=kw_args["use_focal_loss"],

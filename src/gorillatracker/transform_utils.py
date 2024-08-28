@@ -9,6 +9,7 @@ from torchvision.transforms.functional import pad
 class SquarePad:
     def __call__(self, image: Image.Image) -> Image.Image:
         # calc padding
+        image = image.convert("RGB")
         width, height = image.size
         aspect_ratio = width / height
         if aspect_ratio > 1:
