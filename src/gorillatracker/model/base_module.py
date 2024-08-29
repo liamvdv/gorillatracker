@@ -266,6 +266,8 @@ class BaseModule(L.LightningModule):
             purpose="train",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
             cross_video_masking=kwargs.get("cross_video_masking", False),
+            margin_std = kwargs.get("margin_std", 0.05),
+            additive_margin = kwargs.get("additive_margin", 0.0),
         )
         self.loss_module_val = get_loss(
             loss_mode,
@@ -292,6 +294,8 @@ class BaseModule(L.LightningModule):
             purpose="val",
             loss_dist_term=kwargs.get("loss_dist_term", "euclidean"),
             cross_video_masking=kwargs.get("cross_video_masking", False),
+            margin_std = kwargs.get("margin_std", 0.05),
+            additive_margin = kwargs.get("additive_margin", 0.0),
         )
         self.loss_module_val.eval()  # type: ignore
 
@@ -642,13 +646,23 @@ class BaseModule(L.LightningModule):
         metrics = {
             "knn5": partial(knn_func, k=5),
             "knn": partial(knn_func, k=1),
-            "knn5_filter": partial(knn_func, k=5, use_filter=True),
-            "knn_filter": partial(knn_func, k=1, use_filter=True),
             "knn5_macro": partial(knn_func, k=5, average="macro"),
             "knn_macro": partial(knn_func, k=1, average="macro"),
         }
         metrics |= (
             {
+                "knn_filter": partial(knn_func, k=1, use_filter=True),
+                "knn5_filter": partial(knn_func, k=5, use_filter=True),
+                "knn_macro_filter": partial(knn_func, k=1, average="macro", use_filter=True),
+                "knn5_macro_filter": partial(knn_func, k=5, average="macro", use_filter=True),
+                "knn_filter_cos": partial(knn_func, k=1, use_filter=True, distance_metric="cosine"),
+                "knn5_filter_cos": partial(knn_func, k=5, use_filter=True, distance_metric="cosine"),
+                "knn_macro_filter_cos": partial(
+                    knn_func, k=1, average="macro", use_filter=True, distance_metric="cosine"
+                ),
+                "knn5_macro_filter_cos": partial(
+                    knn_func, k=5, average="macro", use_filter=True, distance_metric="cosine"
+                ),
                 "knn5_cos": partial(knn_func, k=5, distance_metric="cosine"),
                 "knn_cos": partial(knn_func, k=1, distance_metric="cosine"),
                 "knn5_macro_cos": partial(knn_func, k=5, average="macro", distance_metric="cosine"),
@@ -684,10 +698,8 @@ class BaseModule(L.LightningModule):
         metrics |= (
             {
                 "knn_crossvideo": partial(knn_func, k=1, use_crossvideo_positives=True),
-                "knn_crossvideo_filter": partial(knn_func, k=1, use_crossvideo_positives=True, use_filter=True),
                 "knn_crossvideo_cos": partial(knn_func, k=1, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn5_crossvideo": partial(knn_func, k=5, use_crossvideo_positives=True),
-                "knn5_crossvideo_filter": partial(knn_func, k=5, use_crossvideo_positives=True, use_filter=True),
                 "knn5_crossvideo_cos": partial(knn_func, k=5, use_crossvideo_positives=True, distance_metric="cosine"),
                 "knn_crossvideo_macro": partial(knn_func, k=1, use_crossvideo_positives=True, average="macro"),
                 "knn_crossvideo_macro_cos": partial(

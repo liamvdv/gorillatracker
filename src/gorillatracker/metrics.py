@@ -334,7 +334,12 @@ def knn_ssl(
     dm: NletDataModule,
     average: Literal["micro", "macro", "weighted", "none"] = "weighted",
     k: int = 5,
+    use_filter: bool = False,
 ) -> Dict[str, Any]:
+    # TODO(memben): add use_filter option for ssl
+    if use_filter:
+        return {"accuracy": -1, "accuracy_top5": -1, "f1": -1, "precision": -1}
+
     # TODO: add true label
     _, labels, embeddings, _, _ = get_partition_from_dataframe(data, partition="val")
 
@@ -465,6 +470,7 @@ def knn_kfold_val(
     distance_metric: Literal["euclidean", "cosine"] = "euclidean",
     k: int = 5,
     use_crossvideo_positives: bool = False,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Calculate knn metrics for each fold and average them to have compareable results to kfold training"""
     contrastive_sampler = dm.val[current_val_index].contrastive_sampler
@@ -486,6 +492,7 @@ def knn_kfold_val(
             k=k,
             distance_metric=distance_metric,
             use_crossvideo_positives=use_crossvideo_positives,
+            **kwargs,
         )
         fold_metrics.append(metrics)
     assert len(fold_metrics) == num_folds

@@ -23,7 +23,7 @@ def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW",
     if id == "gem":
         return FormatWrapper(GeM(), format)
     elif id == "gem_c":
-        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format)  # TODO(rob2u): test
+        return FormatWrapper(GeM_adapted(p_shape=(1, num_features, 1, 1)), format)  # TODO(rob2u): test
     elif id == "gap":
         return FormatWrapper(GAP(), format)
     else:
@@ -45,6 +45,12 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
             nn.Dropout(p=dropout_p),
             nn.Linear(feature_dim, embedding_dim),
             nn.BatchNorm1d(embedding_dim),
+        )
+    elif "linear_single_norm_dropout" in id:
+        return nn.Sequential(
+            nn.BatchNorm1d(feature_dim),
+            nn.Dropout(p=dropout_p),
+            nn.Linear(feature_dim, embedding_dim),
         )
     elif "mlp_norm_dropout" in id:
         return nn.Sequential(
@@ -93,6 +99,7 @@ class TimmWrapper(nn.Module):
         else:
             self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0)
         self.num_features = self.model.num_features
+        print("num_features", self.num_features)
 
         self.reset_if_necessary(pool_mode)
         self.embedding_layer = get_embedding_layer(
@@ -120,7 +127,7 @@ class TimmWrapper(nn.Module):
             and pool_mode is not None
         ):
             if isinstance(self.model.head, ClassifierHead):
-                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.model.head.input_fmt)
+                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.num_features, self.model.head.input_fmt)
                 self.model.head.fc = nn.Identity()
                 self.model.head.drop = nn.Identity()
             elif isinstance(self.model.head, NormMlpClassifierHead):
@@ -138,11 +145,16 @@ class TimmEvalWrapper(nn.Module):
     def __init__(  # type: ignore
         self,
         backbone_name,
+        img_size: Optional[int] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__()
-        self.model = timm.create_model(backbone_name, pretrained=True)
+        if img_size is not None:
+            logger.info("Setting img_size to", img_size)
+            self.model = timm.create_model(backbone_name, pretrained=True, img_size=img_size)
+        else:
+            self.model = timm.create_model(backbone_name, pretrained=True)
         if timm.data.resolve_model_data_config(self.model)["input_size"][-1] > 768:
             logger.warn("We wont use image size greater than 768!!!")
             self.model = timm.create_model(backbone_name, pretrained=True, img_size=512)
@@ -289,7 +301,7 @@ class BaseModuleSupervised(BaseModule):
                 PlanckianJitter(),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                # transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                # transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )

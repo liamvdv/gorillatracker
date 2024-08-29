@@ -6,13 +6,13 @@ workers: 64                      # Number of workers for data loading
 
 # Model and Training Arguments
 project_name: "Embedding-ViTBase-MAE-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
-run_name: "000-vitbase_pretrained_size150" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+run_name: "000-vitlarge_size150_positives_fullimageencoding_noencmask" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 model_name_or_path: "MaskedVisionTransformer"  # Model name or path 
 fast_dev_run: False               # Enable fast development run
-early_stopping_patience: 5        # Early stopping patience (number of eval iterations)
-stop_saving_metric_name: "cxl-all/val/embeddings/knn5/accuracy"
+early_stopping_patience: 10        # Early stopping patience (number of eval iterations)
+stop_saving_metric_name: "cxl-all/val/embeddings/knn5_filter/accuracy"
 stop_saving_metric_mode: "max"
-embedding_size: 768
+embedding_size: 1024
 
 # Optimizer Arguments
 # weight_decay: 0.2               # Weight decay if l2sp regularisation is used this is set to 0.0
@@ -23,7 +23,7 @@ epsilon: 1e-7                   # Adam optimizer's epsilon
 # L2SP Arguments
 l2_alpha: 0.001                       # Alpha for the l2sp loss
 l2_beta: 0.0005                     # Beta for the l2sp loss
-path_to_pretrained_weights: "pretrained_weights/vit_base_mae.pth"    # Path to the pretrained weights for the l2sp loss
+path_to_pretrained_weights: "pretrained_weights/vit_large_patch16_224_mae.pth"    # Path to the pretrained weights for the l2sp loss
 
 loss_mode: "mae_mse/l2sp"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface"
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
@@ -33,14 +33,14 @@ warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "expo
 warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
 initial_lr: 1e-4                # Initial learning rate before warmup(must be > 0.0)
 start_lr: 1e-4                  # Learning Rate after warmup at the beginning of 'normal' scheduling
-end_lr: 1e-6                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+end_lr: 1e-5                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
 stepwise_schedule: True
 
 
-batch_size: 1024                  # Training batch size
+batch_size: 256                  # Training batch size
 grad_clip: 1.0                  # Gradient clipping value
 gradient_accumulation_steps: 1  # Gradient accumulation steps
-max_epochs: 500                  # Training goal (large number)
+max_epochs: 200                  # Training goal (large number)
 val_before_training: True       # Perform validation before training
 only_val: False                 # Perform only validation
 
@@ -56,10 +56,12 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-50k_2024-04-18_percentage-90-5-5_split_20240620_1520.pkl"
 # split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split-240k_2024-04-18_custom_split_20240708_1016.pkl"
 # split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
-feature_types: ["face_90"]
-n_samples: 5
-width_range: [150, null]  
-height_range: [150, null]
+feature_types: ["face_45"]
+tff_selection: "equidistant"
+# movement_delta: 0.03
+n_samples: 10
+width_range: [150, 10000]
+height_range: [150, 10000]
 
 data_resize_transform: 224
 
@@ -68,6 +70,7 @@ additional_val_data_dirs: ["/workspaces/gorillatracker/data/supervised/cxl_all/f
 dataset_names: ["ssl", "cxl-all", "bristol", "cxl-val"]
 dataset_class: "gorillatracker.datasets.ssl.SSLDataset"
 data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18"
+force_nlet_builder: "pair"
 
 # dataset_class: "gorillatracker.datasets.combined.CombinedDataset"
 # data_dir: "/workspaces/gorillatracker/cropped-images/2024-04-18:/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/train"

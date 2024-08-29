@@ -81,12 +81,19 @@ nlet_requirements: dict[str, FlatNletBuilder] = {
 
 def force_nlet_builder(builder_identifier: Literal["onelet", "pair", "triplet", "quadlet"]) -> None:
     if builder_identifier:
+        builder_func = {
+            "onelet": build_onelet,
+            "pair": build_pair,
+            "triplet": build_triplet,
+            "quadlet": build_quadlet,
+        }[builder_identifier]
         global nlet_requirements
         nlet_requirements = {
-            "softmax": build_onelet if builder_identifier == "onelet" else build_triplet,
-            "ntxent": build_pair if builder_identifier == "pair" else build_pair,
-            "offline": build_triplet if builder_identifier == "triplet" else build_quadlet,
-            "online": build_quadlet if builder_identifier == "quadlet" else build_onelet,
+            "softmax": builder_func,
+            "ntxent": builder_func,
+            "offline": builder_func,
+            "online": builder_func,
+            "mae_mse": builder_func,
         }
 
 
@@ -102,6 +109,8 @@ def build_data_module(
     additional_eval_data_dirs: list[Path] = [],
     dataset_names: list[str] = [],
     ssl_config: Optional[SSLConfig] = None,
+    aug_num_ops: int = 2,
+    aug_magnitude: int = 5,
 ) -> NletDataModule:
     assert dataset_class_id in dataset_registry, f"Dataset class {dataset_class_id} not found in registry"
     assert all(
@@ -140,4 +149,6 @@ def build_data_module(
         dataset_names=dataset_names,
         eval_data_dirs=additional_eval_data_dirs,
         ssl_config=ssl_config,
+        aug_num_ops=aug_num_ops,
+        aug_magnitude=aug_magnitude,
     )
