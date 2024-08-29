@@ -3,7 +3,16 @@ from typing import Literal, Optional, Type, Union
 
 import gorillatracker.type_helper as gtypes
 from gorillatracker.data.combined import CombinedDataset
-from gorillatracker.data.multispecies import MultiSpeciesSupervisedDataset
+from gorillatracker.data.multispecies import (
+    Chimpanzee_only,
+    CombinedMultiSpeciesSupervisedDataset,
+    GorillasPrimatesLFWSupervisedDataset,
+    GorillasPrimatesSupervisedDataset,
+    LFW_only,
+    Macaques_only,
+    MultiSpeciesSupervisedDataset,
+    PrimatesLFWSupervisedDataset,
+)
 from gorillatracker.data.nlet import (
     CrossEncounterSupervisedDataset,
     CrossEncounterSupervisedKFoldDataset,
@@ -43,7 +52,16 @@ KFoldATRWDatasetId = "gorillatracker.datasets.atrw.KFoldATRWDataset"
 SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 ValKFoldCXLDatasetId = "gorillatracker.datasets.cxl.ValKFoldCXLDataset"
 CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
+
 MultiSpeciesDatasetId = "gorillatracker.datasets.multispecies.MultiSpeciesDataset"
+GorillasPrimatesSupervisedDatasetId = "gorillatracker.datasets.multispecies.GorillasPrimatesSupervisedDataset"
+GorillasPrimatesLFWSupervisedDatasetId = "gorillatracker.datasets.multispecies.GorillasPrimatesLFWSupervisedDataset"
+PrimatesLFWSupervisedDatasetId = "gorillatracker.datasets.multispecies.PrimatesLFWSupervisedDataset"
+LFW_onlyId = "gorillatracker.datasets.multispecies.LFW_only"
+Macaques_onlyId = "gorillatracker.datasets.multispecies.Macaques_only"
+Chimpanzee_onlyId = "gorillatracker.datasets.multispecies.Chimpanzee_only"
+CombinedMultiSpeciesSupervisedDatasetId = "gorillatracker.datasets.multispecies.CombinedMultiSpeciesSupervisedDataset"
+
 
 dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     BristolDatasetId: SupervisedDataset,
@@ -67,6 +85,13 @@ dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
     ValKFoldCXLDatasetId: ValOnlyKFoldDataset,
     CombinedDatasetId: CombinedDataset,
     MultiSpeciesDatasetId: MultiSpeciesSupervisedDataset,
+    GorillasPrimatesSupervisedDatasetId: GorillasPrimatesSupervisedDataset,
+    GorillasPrimatesLFWSupervisedDatasetId: GorillasPrimatesLFWSupervisedDataset,
+    PrimatesLFWSupervisedDatasetId: PrimatesLFWSupervisedDataset,
+    LFW_onlyId: LFW_only,
+    Macaques_onlyId: Macaques_only,
+    Chimpanzee_onlyId: Chimpanzee_only,
+    CombinedMultiSpeciesSupervisedDatasetId: CombinedMultiSpeciesSupervisedDataset,
 }
 
 nlet_requirements: dict[str, FlatNletBuilder] = {

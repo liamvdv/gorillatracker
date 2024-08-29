@@ -1,10 +1,14 @@
 import logging
+import os
 import random
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import pandas as pd
+import torchvision.transforms as transforms
 from PIL import Image
+from sklearn.datasets import fetch_lfw_people
 from torch import Tensor
 from wildlife_datasets import datasets, loader
 
@@ -17,11 +21,15 @@ from gorillatracker.utils.labelencoder import LabelEncoder
 logger = logging.getLogger(__name__)
 
 
-def get_ds_dfs(train_factor: float = 0.7, val_factor: float = 0.15, test_factor: float = 0.15) -> pd.DataFrame:
+def get_ds_dfs(
+    use_primates: bool = True, train_factor: float = 0.7, val_factor: float = 0.15, test_factor: float = 0.15
+) -> pd.DataFrame:
     rng = random.Random(42)
     dfs = []
 
-    for ds_cls in datasets.names_all:
+    dataset_names = datasets.names_primates if use_primates else datasets.names_all
+
+    for ds_cls in dataset_names:
         name = str(ds_cls).split(".")[-1][:-2]
         if name.endswith("v2"):
             name = name[:-2]
@@ -90,9 +98,11 @@ def get_ds_dfs(train_factor: float = 0.7, val_factor: float = 0.15, test_factor:
 
 
 class MultiSpeciesContrastiveSampler(ContrastiveSampler):
-    def __init__(self, base_dir: Path, partition: Literal["train", "val", "test"] = "train") -> None:
+    def __init__(
+        self, base_dir: Path, partition: Literal["train", "val", "test"] = "train", use_primates: bool = True
+    ) -> None:
         self.base_dir = base_dir
-        self.ds = get_ds_dfs()
+        self.ds = get_ds_dfs(use_primates=use_primates)
         self.ds = self.ds[self.ds["split"] == partition]
         self.ds.reset_index(drop=False, inplace=True)
 
@@ -168,7 +178,10 @@ class MultiSpeciesSupervisedDataset(NletDataset):
     Each file is prefixed with the class label, e.g. "label1_1.jpg"
     """
 
-    def __init__(self, use_gorillas: bool = True, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, use_gorillas: bool = False, use_lfw: bool = False, use_primates: bool = False, *args: Any, **kwargs: Any
+    ) -> None:
+        self.use_primates = use_primates
         super().__init__(*args, **kwargs)
         if use_gorillas:
             path = (
@@ -201,6 +214,65 @@ class MultiSpeciesSupervisedDataset(NletDataset):
             self.contrastive_sampler.ds = pd.concat([self.contrastive_sampler.ds, gorilla_df])  # type: ignore
             self.contrastive_sampler.ds = self.contrastive_sampler.ds.reset_index(drop=True)  # type: ignore
 
+        if use_lfw:
+            lfw_people = fetch_lfw_people(resize=1.0, color=True)
+            self.lfw_images = lfw_people.images
+            self.lfw_targets = lfw_people.target
+            self.lfw_target_names = lfw_people.target_names
+            self.lfw_topil = transforms.ToPILImage()
+
+            # perform train-val-test split
+            individuals = np.unique(self.lfw_targets)
+
+            # only keep individuals with >=3 images
+            individuals = [ind for ind in individuals if np.sum(self.lfw_targets == ind) >= 3]
+
+            rng = random.Random(42)
+            rng.shuffle(individuals)
+
+            # filter for 'partition' individuals
+            if self.partition == "train":
+                individuals = individuals[: int(0.7 * len(individuals))]
+            elif self.partition == "val":
+                individuals = individuals[int(0.7 * len(individuals)) : int(0.85 * len(individuals))]
+            else:
+                individuals = individuals[int(0.85 * len(individuals)) :]
+
+            indices = [idx for idx, target in enumerate(self.lfw_targets) if target in individuals]
+            self.lfw_images = self.lfw_images[indices]
+            self.lfw_targets = self.lfw_targets[indices]
+            self.lfw_target_names = self.lfw_target_names[self.lfw_targets]
+
+            os.makedirs(f"/workspaces/gorillatracker/data/LabeledFacesInTheWild/{self.partition}", exist_ok=True)
+
+            for idx, img in enumerate(self.lfw_images):
+                pil_img = self.lfw_topil(img)
+                (
+                    pil_img.save(f"/workspaces/gorillatracker/data/LabeledFacesInTheWild/{self.partition}/{idx}.jpg")
+                    if not Path(
+                        f"/workspaces/gorillatracker/data/LabeledFacesInTheWild/{self.partition}/{idx}.jpg"
+                    ).exists()
+                    else None
+                )
+
+            lfw_df = pd.DataFrame(
+                {
+                    "path": [
+                        f"/workspaces/gorillatracker/data/LabeledFacesInTheWild/{self.partition}/{idx}.jpg"
+                        for idx in range(len(self.lfw_images))
+                    ],
+                    "label": self.lfw_targets,
+                    "identity": self.lfw_target_names,
+                    "origin": "lfw",
+                    "split": self.partition,
+                    "bbox": None,
+                }
+            )
+
+            self.contrastive_sampler.ds = pd.concat([self.contrastive_sampler.ds, lfw_df])  # type: ignore
+
+            # TODO: add dataset versions for separate metric eval.
+
     def _get_item(self, idx: Label) -> tuple[tuple[Id, ...], tuple[Tensor, ...], tuple[Label, ...]]:
         return super()._get_item(idx)
 
@@ -223,7 +295,7 @@ class MultiSpeciesSupervisedDataset(NletDataset):
                 test/
                     ...
         """
-        return MultiSpeciesContrastiveSampler(base_dir, partition=self.partition)
+        return MultiSpeciesContrastiveSampler(base_dir, partition=self.partition, use_primates=self.use_primates)
 
     def _stack_flat_nlet(self, flat_nlet: FlatNlet) -> Nlet:
         ids = tuple(str(img.image_path) for img in flat_nlet)
@@ -254,3 +326,49 @@ class MultiSpeciesSupervisedDataset(NletDataset):
 
     def __len__(self) -> Label:
         return len(self.contrastive_sampler)
+
+
+class GorillasPrimatesSupervisedDataset(MultiSpeciesSupervisedDataset):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=True, use_lfw=False, use_primates=True, *args, **kwargs)
+
+
+class GorillasPrimatesLFWSupervisedDataset(MultiSpeciesSupervisedDataset):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=True, use_lfw=True, use_primates=True, *args, **kwargs)
+
+
+class PrimatesLFWSupervisedDataset(MultiSpeciesSupervisedDataset):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=False, use_lfw=True, use_primates=True, *args, **kwargs)
+
+
+class CombinedMultiSpeciesSupervisedDataset(MultiSpeciesSupervisedDataset):
+    """Everything combined"""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=True, use_lfw=True, use_primates=False, *args, **kwargs)
+
+
+class LFW_only(MultiSpeciesSupervisedDataset):  # TODO
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=True, use_lfw=True, use_primates=False, *args, **kwargs)
+        self.contrastive_sampler.ds = self.contrastive_sampler.ds[self.contrastive_sampler.ds["origin"] == "lfw"].copy()
+
+
+class Macaques_only(MultiSpeciesSupervisedDataset):  # TODO
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=False, use_lfw=False, use_primates=True, *args, **kwargs)
+
+        self.contrastive_sampler.ds = self.contrastive_sampler.ds[
+            self.contrastive_sampler.ds["origin"] == "MacaqueFaces"
+        ].copy()
+
+
+class Chimpanzee_only(MultiSpeciesSupervisedDataset):  # TODO
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=False, use_lfw=False, use_primates=True, *args, **kwargs)
+
+        self.contrastive_sampler.ds = self.contrastive_sampler.ds[
+            self.contrastive_sampler.ds["origin"] == "CTai" | self.contrastive_sampler.ds["origin"] == "CZoo"
+        ].copy()

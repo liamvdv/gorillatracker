@@ -50,7 +50,9 @@ class NletDataset(Dataset[Nlet], ABC):
         self.partition = partition
         self.contrastive_sampler = self.create_contrastive_sampler(base_dir)
         self.nlet_builder = nlet_builder
-        self.transform: Callable[[Image], torch.Tensor] = transforms.Compose([self.get_transforms(partition, kwargs["aug_num_ops"], kwargs["aug_magnitude"]), transform])
+        self.transform: Callable[[Image], torch.Tensor] = transforms.Compose(
+            [self.get_transforms(partition, kwargs["aug_num_ops"], kwargs["aug_magnitude"]), transform]
+        )
 
     def __len__(self) -> int:
         return len(self.contrastive_sampler)
@@ -114,7 +116,6 @@ class NletDataset(Dataset[Nlet], ABC):
                     transforms.ToTensor(),
                 ]
             )
-        
 
 
 class KFoldNletDataset(NletDataset):

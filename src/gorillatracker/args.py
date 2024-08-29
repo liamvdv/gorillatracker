@@ -58,7 +58,7 @@ class TrainingArgs:
     ] = field(default="linear")
     pool_mode: Literal["gem", "gap", "gem_c", "none"] = field(default="none")
     fix_img_size: Optional[int] = field(default=None)
-    
+
     aug_num_ops: int = field(default=2)
     aug_magnitude: int = field(default=5)
 
@@ -99,7 +99,7 @@ class TrainingArgs:
     margin: float = field(default=0.5)
     additive_margin: float = field(default=0.0)
     margin_std: float = field(default=0.05)
-    
+
     loss_mode: Literal[
         "offline",
         "offline/native",
