@@ -185,7 +185,7 @@ class MultiSpeciesSupervisedDataset(NletDataset):
         super().__init__(*args, **kwargs)
         if use_gorillas:
             path = (
-                Path("/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square/")
+                Path("/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square/")
                 / self.partition
             )
 
@@ -271,8 +271,6 @@ class MultiSpeciesSupervisedDataset(NletDataset):
 
             self.contrastive_sampler.ds = pd.concat([self.contrastive_sampler.ds, lfw_df])  # type: ignore
 
-            # TODO: add dataset versions for separate metric eval.
-
     def _get_item(self, idx: Label) -> tuple[tuple[Id, ...], tuple[Tensor, ...], tuple[Label, ...]]:
         return super()._get_item(idx)
 
@@ -350,25 +348,28 @@ class CombinedMultiSpeciesSupervisedDataset(MultiSpeciesSupervisedDataset):
         super().__init__(use_gorillas=True, use_lfw=True, use_primates=False, *args, **kwargs)
 
 
-class LFW_only(MultiSpeciesSupervisedDataset):  # TODO
+class LFW_only(MultiSpeciesSupervisedDataset):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(use_gorillas=True, use_lfw=True, use_primates=False, *args, **kwargs)
         self.contrastive_sampler.ds = self.contrastive_sampler.ds[self.contrastive_sampler.ds["origin"] == "lfw"].copy()
+        self.contrastive_sampler.ds.reset_index(drop=True, inplace=True)
 
 
-class Macaques_only(MultiSpeciesSupervisedDataset):  # TODO
+class Macaques_only(MultiSpeciesSupervisedDataset):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(use_gorillas=False, use_lfw=False, use_primates=True, *args, **kwargs)
 
         self.contrastive_sampler.ds = self.contrastive_sampler.ds[
             self.contrastive_sampler.ds["origin"] == "MacaqueFaces"
         ].copy()
+        self.contrastive_sampler.ds.reset_index(drop=True, inplace=True)
 
 
-class Chimpanzee_only(MultiSpeciesSupervisedDataset):  # TODO
+class Chimpanzee_only(MultiSpeciesSupervisedDataset):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(use_gorillas=False, use_lfw=False, use_primates=True, *args, **kwargs)
 
         self.contrastive_sampler.ds = self.contrastive_sampler.ds[
-            self.contrastive_sampler.ds["origin"] == "CTai" | self.contrastive_sampler.ds["origin"] == "CZoo"
+            (self.contrastive_sampler.ds["origin"] == "CTai") | (self.contrastive_sampler.ds["origin"] == "CZoo")
         ].copy()
+        self.contrastive_sampler.ds.reset_index(drop=True, inplace=True)

@@ -748,16 +748,27 @@ class BaseModule(L.LightningModule):
 
         metrics = metrics if not self.fast_dev_run else {}
         metrics = {} if "combined" in dataset_id.lower() else metrics
-
+        
+        metrics = (
+            {
+                "knn_filter": partial(knn, k=1, use_filter=True),
+                "knn5_filter": partial(knn, k=5, use_filter=True),
+                "knn_macro_filter": partial(knn, k=1, average="macro", use_filter=True),
+                "knn5_macro_filter": partial(knn, k=5, average="macro", use_filter=True),
+            }
+            if "multispecies" in dataset_id.lower()
+            else metrics
+        )
+        
         metrics = (
             {
                 "knn_naive": partial(knn_naive, k=1),
                 "knn5_naive": partial(knn_naive, k=5),
             }
-            if "multispecies" in dataset_id.lower()
+            if "multispeciesdataset" in dataset_id.lower()
             else metrics
         )
-
+        
         # log to wandb
         results = evaluate_embeddings(
             data=embeddings_table,

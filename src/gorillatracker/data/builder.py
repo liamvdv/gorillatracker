@@ -53,14 +53,14 @@ SSLDatasetId = "gorillatracker.datasets.ssl.SSLDataset"
 ValKFoldCXLDatasetId = "gorillatracker.datasets.cxl.ValKFoldCXLDataset"
 CombinedDatasetId = "gorillatracker.datasets.combined.CombinedDataset"
 
-MultiSpeciesDatasetId = "gorillatracker.datasets.multispecies.MultiSpeciesDataset"
-GorillasPrimatesSupervisedDatasetId = "gorillatracker.datasets.multispecies.GorillasPrimatesSupervisedDataset"
-GorillasPrimatesLFWSupervisedDatasetId = "gorillatracker.datasets.multispecies.GorillasPrimatesLFWSupervisedDataset"
-PrimatesLFWSupervisedDatasetId = "gorillatracker.datasets.multispecies.PrimatesLFWSupervisedDataset"
-LFW_onlyId = "gorillatracker.datasets.multispecies.LFW_only"
-Macaques_onlyId = "gorillatracker.datasets.multispecies.Macaques_only"
-Chimpanzee_onlyId = "gorillatracker.datasets.multispecies.Chimpanzee_only"
-CombinedMultiSpeciesSupervisedDatasetId = "gorillatracker.datasets.multispecies.CombinedMultiSpeciesSupervisedDataset"
+MultiSpeciesDatasetId = "gorillatracker.datasets.multispecies.MultiSpeciesDataset_multispecies"
+GorillasPrimatesSupervisedDatasetId = "gorillatracker.datasets.multispecies.GorillasPrimatesSupervisedDataset_multispecies"
+GorillasPrimatesLFWSupervisedDatasetId = "gorillatracker.datasets.multispecies.GorillasPrimatesLFWSupervisedDataset_multispecies"
+PrimatesLFWSupervisedDatasetId = "gorillatracker.datasets.multispecies.PrimatesLFWSupervisedDataset_multispecies"
+LFW_onlyId = "gorillatracker.datasets.multispecies.LFW_only_multispecies"
+Macaques_onlyId = "gorillatracker.datasets.multispecies.Macaques_only_multispecies"
+Chimpanzee_onlyId = "gorillatracker.datasets.multispecies.Chimpanzee_only_multispecies"
+CombinedMultiSpeciesSupervisedDatasetId = "gorillatracker.datasets.multispecies.CombinedMultiSpeciesSupervisedDataset_multispecies"
 
 
 dataset_registry: dict[str, Union[Type[NletDataset], Type[CombinedDataset]]] = {
