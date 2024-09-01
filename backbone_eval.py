@@ -35,7 +35,7 @@ def read_backbones_todo_csv(file_path: str) -> list[str]:
 def get_existing_runs() -> list[str]:
     api = wandb.Api()
 
-    project_path = "gorillas/EVAL2-ALL-CXL-OpenSet"
+    project_path = "gorillas/EVAL3-ALL-CXL-OpenSet"
     runs = api.runs(project_path)
     run_names = [run.name.split("-")[-1] for run in runs]  # 000-eval-<backbone_name> -> <backbone_name>
     return run_names
@@ -65,7 +65,7 @@ def get_command(backbone_name: str) -> Optional[list[str]]:
     return [
         "python",
         "train.py",
-        "--config_path=cfgs/visiontransformer_cxl.yml",
+        "--config_path=cfgs/backbone_eval.yml",
         "--only_val=True",
         f"--run_name=000-eval-{backbone_name}",
         f"--embedding_size={embedding_size}",
