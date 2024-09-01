@@ -4,18 +4,20 @@
         "run_name": "443-take-baselines-for-models",
         "wandb_tags": [
             "sweep",
-            "quantization_aware_training"
+            "qat",
+            "kd"
         ],
         "use_quantization_aware_training": true,
         "max_epochs": 40,
         "early_stopping_patience": 8,
         "embedding_size": 256,
         "data_resize_transform": 224,
-        "loss_mode": "softmax/arcface",
-        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square",
-        "dataset_class": "gorillatracker.datasets.cxl.HardCrossEncounterCXLDataset",
+        "loss_mode": "distillation/offline/response-based",
+        "teacher_model_wandb_link": "https://wandb.ai/gorillas/Embedding-SwinV2Large-CXL-Open/runs/hg1f88h9?nw=nwuserkajohpi",
+        "data_dir": "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5",
+        "dataset_class": "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset",
         "dataset_names": [
-            "cxl_train",
+            "cxlkfold",
             "bristol"
         ],
         "additional_val_dataset_classes": [
@@ -24,9 +26,15 @@
         "additional_val_data_dirs": [
             "gorillatracker.datasets.bristol.BristolDataset"
         ],
-        "kfold": false,
+        "kfold": true,
         "val_before_training": true,
         "lr_schedule": "cosine",
+        "lr_interval": 1,
+        "initial_lr": 0.00001,
+        "margin": 0.5,
+        "min_confidence": 0.5,
+        "min_delta": 0.01,
+        "min_images_per_tracking": 3,
         "workers": 16,
         "save_model_to_wandb": false
     },

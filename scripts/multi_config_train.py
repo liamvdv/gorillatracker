@@ -46,7 +46,7 @@ def run_experiment(
             "method": "bayes",  # Specify the search method (random search in this case)
             "metric": {
                 "goal": "maximize",
-                "name": "CXLDataset/val/embeddings/knn/accuracy",
+                "name": "cxl_train/val/embeddings/knn5_crossvideo/accuracy",
             },  # Specify the metric to optimize
             "parameters": sweep_parameters,
             "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path, *params_array],
@@ -56,7 +56,7 @@ def run_experiment(
         sweep_path = f"gorillas/{project_name}/{sweep_id}"
         print("SWEEP_PATH=" + sweep_path)
         agent(sweep_id, count=1)
-        save_best_run_results(sweep_path, "CXLDataset/val/embeddings/knn/accuracy")
+        save_best_run_results(sweep_path, "cxl_train/val/embeddings/knn5_crossvideo/accuracy")
 
     else:
         command = f"python train.py {params_str} --config_path {config_path}"
