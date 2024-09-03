@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -8,7 +8,7 @@ from torchvision import transforms
 
 
 class SquarePad:
-    def __call__(self, image: Image) -> Image:
+    def __call__(self, image: Image.Image) -> Image.Image:
         # calc padding
         try:
             width, height = image.size
@@ -32,13 +32,13 @@ class SquarePad:
 """Copied from: https://github.com/TheZino/PlanckianJitter/blob/main/planckianTransforms.py"""
 
 
-class PlanckianJitter:
+class PlanckianJitter(object):
     """Ramdomly jitter the image illuminant along the planckian locus"""
 
     def __init__(self, mode: Literal["blackbody", "CIED"] = "blackbody", idx: Optional[int] = None) -> None:
-        self.mode = mode
         self.idx = idx
-        if self.mode == "blackbody":
+        self.mode = mode
+        if mode == "blackbody":
             self.pl = np.array(
                 [
                     [0.6743, 0.4029, 0.0013],
@@ -68,7 +68,7 @@ class PlanckianJitter:
                     [0.3503, 0.4653, 0.6933],
                 ]
             )
-        elif self.mode == "CIED":
+        elif mode == "CIED":
             self.pl = np.array(
                 [
                     [0.5829, 0.4421, 0.2288],
@@ -99,24 +99,29 @@ class PlanckianJitter:
         else:
             raise ValueError('Mode "' + mode + '" not supported. Please choose between "blackbody" or "CIED".')
 
-    def __call__(self, x: Image) -> Image:
-
-        image = np.array(x.copy())
-        image = image / 255
-
+    def __call__(self, x: Union[Image.Image, torch.Tensor]) -> Union[Image.Image, torch.Tensor]:
+        idx: int
         if self.idx is not None:
             idx = self.idx
         else:
             idx = int(torch.randint(0, self.pl.shape[0], (1,)).item())
-        # idx = np.random.randint(0, self.pl.shape[0])
 
-        image[:, :, 0] = image[:, :, 0] * (self.pl[idx, 0] / self.pl[idx, 1])
-        image[:, :, 2] = image[:, :, 2] * (self.pl[idx, 2] / self.pl[idx, 1])
-        image[image > 1] = 1
+        image: Union[Image.Image, torch.Tensor]
+        if isinstance(x, Image.Image):
+            image_np = np.array(x.copy())
+            image_np = image_np / 255
+            image_np[:, :, 0] = image_np[:, :, 0] * (self.pl[idx, 0] / self.pl[idx, 1])
+            image_np[:, :, 2] = image_np[:, :, 2] * (self.pl[idx, 2] / self.pl[idx, 1])
+            image_np[image_np > 1] = 1
+            image = Image.fromarray(np.uint8(image_np * 255))
+        else:
+            image_tensor = torch.clone(x)
+            image_tensor[0, :, :] = image_tensor[0, :, :] * (self.pl[idx, 0] / self.pl[idx, 1])
+            image_tensor[2, :, :] = image_tensor[2, :, :] * (self.pl[idx, 2] / self.pl[idx, 1])
+            image_tensor[image_tensor > 1] = 1
+            image = image_tensor
 
-        image_pil: Image = Image.fromarray(np.uint8(image * 255))  # type: ignore
-
-        return image_pil
+        return image
 
     def __repr__(self) -> str:
         if self.idx is not None:

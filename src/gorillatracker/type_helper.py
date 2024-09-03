@@ -18,7 +18,6 @@ NletLabel = Tuple[Label, ...]  # e.g (anchor_label, positive_label, negative_lab
 NletValue = Tuple[torch.Tensor, ...]  # e.g (anchor_image, positive_image, negative_image)
 Nlet = Tuple[NletId, NletValue, NletLabel]
 
-
 # NOTE(memben): Concrete type hints are all wrong
 BatchId = Tuple[Id, ...]
 BatchLabel = Tuple[Label, ...]
@@ -51,7 +50,6 @@ BatchNletDataLoader = DataLoader[NletBatch]
 
 
 MergedLabels = Union[BatchLabel, torch.Tensor]
-
 
 Transform = Callable[[PILImage], torch.Tensor]
 TensorTransform = Callable[[torch.Tensor], torch.Tensor]

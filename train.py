@@ -12,7 +12,7 @@ from torchvision.transforms import Compose, Normalize, Resize
 
 from gorillatracker.args import TrainingArgs
 from gorillatracker.data.builder import build_data_module, force_nlet_builder
-from gorillatracker.model import get_model_cls
+from gorillatracker.model.get_model_cls import get_model_cls
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 from gorillatracker.utils.train import (
     ModelConstructor,
@@ -21,6 +21,7 @@ from gorillatracker.utils.train import (
     train_using_quantization_aware_training,
 )
 from gorillatracker.utils.wandb_logger import WandbLoggingModule
+from gorillatracker.utils.callbacks import BestMetricLogger
 
 warnings.filterwarnings("ignore", ".*was configured so validation will run at the end of the training epoch.*")
 warnings.filterwarnings("ignore", ".*Applied workaround for CuDNN issue.*")
@@ -67,7 +68,7 @@ def main(args: TrainingArgs) -> None:
     if args.data_resize_transform:
         resize_transform = Resize((args.data_resize_transform, args.data_resize_transform))
     if args.use_normalization:
-        normalize_transform = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        normalize_transform = Normalize(eval(args.normalization_mean), eval(args.normalization_std))
     model_transforms = Compose([resize_transform, normalize_transform])
 
     ssl_config = SSLConfig(
@@ -80,6 +81,8 @@ def main(args: TrainingArgs) -> None:
         width_range=args.width_range,
         height_range=args.height_range,
         split_path=args.split_path,
+        movement_delta=args.movement_delta,
+        forced_train_image_count=args.forced_train_image_count,
     )
     if args.force_nlet_builder is not None and args.force_nlet_builder != "None":
         force_nlet_builder(args.force_nlet_builder)
@@ -104,26 +107,30 @@ def main(args: TrainingArgs) -> None:
         model = model_constructor.construct(wandb_logging_module, wandb_logger)
 
     #################### Trainer #################
-    lr_monitor = LearningRateMonitor(logging_interval="epoch")
+    lr_monitor = LearningRateMonitor(logging_interval="step" if args.stepwise_schedule else "epoch")
 
     checkpoint_callback = ModelCheckpoint(
-        filename="snap-{epoch}-samples-loss-{val/loss:.2f}",
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
-        mode="min",
+        filename="epoch-{epoch}-" + args.stop_saving_metric_name + "-{" + args.stop_saving_metric_name + ":.2f}",
+        monitor=args.stop_saving_metric_name,
+        mode=args.stop_saving_metric_mode,
         auto_insert_metric_name=False,
         every_n_epochs=int(args.save_interval),
+        save_last=True,  # also save the last checkpoint
     )
 
     early_stopping = EarlyStopping(
-        monitor=f"{dm.get_dataset_class_names()[0]}/val/loss",
-        mode="min",
+        monitor=args.stop_saving_metric_name,
+        mode=args.stop_saving_metric_mode,
         min_delta=args.min_delta,
         patience=args.early_stopping_patience,
     )
 
+    max_metric_logger_callback = BestMetricLogger(metric_name=args.stop_saving_metric_name)
+
     callbacks = (
         [
             checkpoint_callback,  # keep this at the top
+            max_metric_logger_callback,
             lr_monitor,
             early_stopping,
         ]

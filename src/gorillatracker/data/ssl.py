@@ -8,8 +8,8 @@ from PIL.Image import Image
 from torchvision import transforms
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.data.contrastive_sampler import ContrastiveSampler
-from gorillatracker.data.nlet import FlatNlet, NletDataset
+from gorillatracker.data.contrastive_sampler import ContrastiveSampler, FlatNlet
+from gorillatracker.data.nlet import NletDataset
 from gorillatracker.ssl_pipeline.ssl_config import SSLConfig
 
 

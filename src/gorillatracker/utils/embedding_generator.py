@@ -5,7 +5,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.model import BaseModule
+from gorillatracker.model.base_module import BaseModule
 
 def generate_embeddings(
     model: BaseModule, dataloader: DataLoader[gtypes.Nlet]

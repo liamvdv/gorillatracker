@@ -14,7 +14,7 @@ workers: 40                      # Number of workers for data loading
 project_name: "Embedding-SwinV2-SimCLR-Face" # WandB project name form: <Function>-<Backbone>-<Dataset>-<Set-Type> eg. Embedding-ResNet50-CXL-Open
 run_name: "478-test-temperature" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
 wandb_tags: ["baseline"]            # WandB tags for experiment tracking
-model_name_or_path: "SwinV2Base"  # Model name or path 
+model_name_or_path: "timm/swinv2_base_window12_192.ms_in22k"  # Model name or path 
 saved_checkpoint_path: Null       # Path to a saved model checkpoint (if resuming)
 resume: False                     # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
 fast_dev_run: False               # Enable fast development run
@@ -44,10 +44,7 @@ temperature: 0.05
 
 margin: 1.0                         # Margin for the contrastive loss (triplet loss)
 s: 64.0                             # Scale for the softmax losses 
-delta_t: 50                         # Delta t for the vpl loss
-mem_bank_start_epoch: 10            # Epoch to start using the memory bank
-lambda_membank: 0.5                 # Lambda for the memory bank loss
-loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" and "softmax/vpl". 
+loss_mode: "ntxent"         # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" . 
                                     # Each loss is availible with l2sp regularisation just add /l2sp to the loss mode
 
 
@@ -78,7 +75,6 @@ use_ssl: True
 split_path: "/workspaces/gorillatracker/data/splits/SSL/SSL-10k-100-1000_2024-04-18_percentage-90-5-5_split_20240619_0955.pkl"
 feature_types: ["face_90"]
 n_samples: 5
-negative_mining: "overlapping"
 
 data_resize_transform: 192
 

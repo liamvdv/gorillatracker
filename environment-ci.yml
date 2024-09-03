@@ -15,6 +15,7 @@ dependencies:
   # CUDA only on linux and windows
   - wandb
   - lightning
+  - lightly
   - torchvision
   - transformers
   - faiss-cpu
@@ -65,6 +66,7 @@ dependencies:
       - grad-cam
       - typer
       - opencv-contrib-python
+      - wildlife-datasets
 
 
 # Non-standard section listing target platforms for conda-lock:

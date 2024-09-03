@@ -1,0 +1,62 @@
+[
+    {
+        "project_name": "Embedding-ViTBase-CXL-OpenSetCrossVideo",
+        "entity": "gorillas",
+        "config_path": "./sweep_configs/vit_base_crossvideo_arcface_sweep.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["000-vit_base_crossvideo_arcface"]
+            },
+            "embedding_id": {
+                "values": ["linear_norm_dropout"]
+            },
+            "k_subcenters": {
+                "values": [1]
+            },
+            "l2_alpha": {
+                "values": [1.0]
+            },
+            "l2_beta": {
+                "values": [1.0]
+            },
+            "dropout_p":{
+                "values": [0.0]
+            },
+            "batch_size": {
+                "values": [32]
+            },
+            "start_lr": {
+                "values": [1e-5]
+            },
+            "margin": {
+                "values": [0.5]
+            },
+            "loss_mode": {
+               "values": [
+                "softmax/arcface/l2sp",
+                "softmax/elasticface/l2sp",
+                "softmax/adaface/l2sp"
+                ]
+            },
+            "use_focal_loss": {
+                "values": [true, false]
+            },
+            "label_smoothing": {
+                "values": [0.0, 0.1]
+            },
+            "use_class_weights": {
+                "values": [true, false]
+            },
+            "force_nlet_builder": {
+                "values": ["quadlet"]
+            },
+            "dataset_class": {
+               "values": [
+                "gorillatracker.datasets.kfold_cxl.CrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.HardCrossEncounterKFoldCXLDataset",
+                "gorillatracker.datasets.kfold_cxl.KFoldCXLDataset"
+                ]
+            }
+        }
+    }
+]
