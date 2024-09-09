@@ -5,32 +5,35 @@ from PIL import Image
 from torch.utils.data import DataLoader
 
 import gorillatracker.type_helper as gtypes
-from gorillatracker.model.base_module import BaseModule
 
 def generate_embeddings(
-    model: BaseModule, dataloader: DataLoader[gtypes.Nlet]
+    model, dataloader: DataLoader[gtypes.Nlet]
 ) -> tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]:
     model.eval()
     model.freeze()
     trainer = Trainer()
     batched_predictions = trainer.predict(model, dataloader)
+
     ids, embeddings, labels = zip(*batched_predictions)
-    print(len(ids[0][0]))
+    print(len(ids))
     print(embeddings[0].shape)
-    print(len(labels[0][0]))
     flat_ids = [id for sublist in ids for id in sublist[0]]
+    # flat_ids = [id for sublist in ids for id in sublist]
     print(flat_ids)
     # flat_ids = list(sum(flat_ids, ()))
     concatenated_embeddings = torch.cat(embeddings)
     flat_labels = [label for sublist in labels for label in sublist[0]]
-    # labels = tuple(lst[0] for lst in labels)
+    # labels = tuple(lst[0].item() for lst in labels)
     print(flat_labels)
     # concatenated_labels = torch.cat(labels)
+    # print(labels)
     print(len(flat_ids), len(concatenated_embeddings), len(flat_labels))
     return flat_ids, concatenated_embeddings, flat_labels
+    # print(len(flat_ids), len(concatenated_embeddings), len(labels))
+    # return flat_ids, concatenated_embeddings, labels
 
 def generate_ssl_embeddings(
-    model: BaseModule, dataloader: DataLoader[gtypes.Nlet]
+    model, dataloader: DataLoader[gtypes.Nlet]
 ) -> tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]:
     model.eval()
     model.freeze()

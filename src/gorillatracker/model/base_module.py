@@ -313,7 +313,7 @@ class BaseModule(L.LightningModule):
         self, batch: gtypes.NletBatch, batch_idx: int, dataloader_idx: int = 0
     ) -> tuple[list[gtypes.Id], torch.Tensor, torch.Tensor]:
         batch_size = lazy_batch_size(batch)
-        flat_ids, flat_images, flat_labels = flatten_batch(batch)
+        flat_ids, flat_images, flat_labels = batch
         anchor_ids = list(flat_ids[:batch_size])
         anchor_images = flat_images[:batch_size]
         anchor_labels = flat_labels[:batch_size]

@@ -4,9 +4,6 @@ from urllib.parse import urlparse
 import wandb
 from wandb.apis.public.runs import Run
 
-from gorillatracker.model.base_module import BaseModule
-from gorillatracker.model.get_model_cls import get_model_cls
-
 
 def parse_wandb_url(url: str) -> tuple[str, str, str]:
     assert url.startswith("https://wandb.ai/")
@@ -35,17 +32,17 @@ def get_latest_model_checkpoint(run: Run) -> wandb.Artifact:
     return max(models, key=lambda a: a.created_at)
 
 
-def load_model(model_cls: Type[BaseModule], model_path: str) -> BaseModule:
+def load_model(model_cls, model_path: str):
     print(model_cls)
     print(model_path)
     model = model_cls.load_from_checkpoint(model_path, data_module=None, wandb_run=None)
     return model
 
 
-def get_model_for_run_url(run_url: str) -> BaseModule:
-    run = get_run(run_url)
-    model_cls = get_model_cls(run.config["model_name_or_path"])
-    artifact = get_latest_model_checkpoint(run)
-    artifact_dir = artifact.download()
-    model = artifact_dir + "/model.ckpt"
-    return load_model(model_cls, model)
+# def get_model_for_run_url(run_url: str):
+#     run = get_run(run_url)
+#     model_cls = get_model_cls(run.config["model_name_or_path"])
+#     artifact = get_latest_model_checkpoint(run)
+#     artifact_dir = artifact.download()
+#     model = artifact_dir + "/model.ckpt"
+#     return load_model(model_cls, model)

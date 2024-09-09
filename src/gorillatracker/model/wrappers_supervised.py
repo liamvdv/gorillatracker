@@ -23,7 +23,7 @@ def get_global_pooling_layer(id: str, num_features: int, format: Literal["NCHW",
     if id == "gem":
         return FormatWrapper(GeM(), format)
     elif id == "gem_c":
-        return FormatWrapper(GeM_adapted(p_shape=(num_features)), format)  # TODO(rob2u): test
+        return FormatWrapper(GeM_adapted(p_shape=(1, num_features, 1, 1)), format)  # TODO(rob2u): test
     elif id == "gap":
         return FormatWrapper(GAP(), format)
     else:
@@ -45,6 +45,12 @@ def get_embedding_layer(id: str, feature_dim: int, embedding_dim: int, dropout_p
             nn.Dropout(p=dropout_p),
             nn.Linear(feature_dim, embedding_dim),
             nn.BatchNorm1d(embedding_dim),
+        )
+    elif "linear_single_norm_dropout" in id:
+        return nn.Sequential(
+            nn.BatchNorm1d(feature_dim),
+            nn.Dropout(p=dropout_p),
+            nn.Linear(feature_dim, embedding_dim),
         )
     elif "mlp_norm_dropout" in id:
         return nn.Sequential(
@@ -93,6 +99,7 @@ class TimmWrapper(nn.Module):
         else:
             self.model = timm.create_model(backbone_name, pretrained=True, drop_rate=0.0)
         self.num_features = self.model.num_features
+        print("num_features", self.num_features)
 
         self.reset_if_necessary(pool_mode)
         self.embedding_layer = get_embedding_layer(
@@ -101,12 +108,13 @@ class TimmWrapper(nn.Module):
         self.pool_mode = pool_mode
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if isinstance(x, list):
+            x = x[0]
         x = self.model.forward_features(x)
         x = self.model.forward_head(x, pre_logits=True)
         if x.dim() == 3:
             logger.info("Assuming VisionTransformer is used and taking the first token.")
             x = x[:, 0, :]
-
         x = self.embedding_layer(x)
         return x
 
@@ -120,7 +128,7 @@ class TimmWrapper(nn.Module):
             and pool_mode is not None
         ):
             if isinstance(self.model.head, ClassifierHead):
-                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.model.head.input_fmt)
+                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.num_features, self.model.head.input_fmt)
                 self.model.head.fc = nn.Identity()
                 self.model.head.drop = nn.Identity()
             elif isinstance(self.model.head, NormMlpClassifierHead):
@@ -257,25 +265,34 @@ class BaseModuleSupervised(BaseModule):
             len(model_name_or_path.split("/")) >= 2
         ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
         logger.info("Using model", model_name_or_path)
-        wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
-        if model_name_or_path.startswith("timm") or model_name_or_path.startswith(
-            "timm_eval"
-        ):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
-            backbone_name = model_name_or_path.split("/")[-1]
-        else:
-            backbone_name = model_name_or_path
+        
+        print("model_name_or_path", model_name_or_path)
+        
+        if not model_name_or_path.startswith("FineTuning"):
+            wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
+            if model_name_or_path.startswith("timm") or model_name_or_path.startswith(
+                "timm_eval"
+            ):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
+                backbone_name = "/".join(model_name_or_path.split("/")[1:])
+            else:
+                backbone_name = model_name_or_path
 
-        self.model_wrapper = wrapper_cls(
-            backbone_name=backbone_name,
-            pool_mode=pool_mode,
-            img_size=fix_img_size,
-            embedding_size=self.embedding_size,
-            embedding_id=embedding_id,
-            dropout_p=dropout_p,
-            checkpoint_path=(
-                "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
-            ),
-        )
+            self.model_wrapper = wrapper_cls(
+                backbone_name=backbone_name,
+                pool_mode=pool_mode,
+                img_size=fix_img_size,
+                embedding_size=self.embedding_size,
+                embedding_id=embedding_id,
+                dropout_p=dropout_p,
+                checkpoint_path=(
+                    "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
+                ),
+            )
+        else:
+            checkpoint_path = "/".join(model_name_or_path.split("/")[1:])
+            lighting_wrapper = BaseModuleSupervised.load_from_checkpoint(checkpoint_path, data_module=None, wandb_run=None) 
+            self.model_wrapper = lighting_wrapper.model_wrapper
+        
         self.set_losses(model=self.model_wrapper.model, **kwargs)
         self.model_wrapper.train()
 
@@ -294,7 +311,7 @@ class BaseModuleSupervised(BaseModule):
                 PlanckianJitter(),
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
-                transforms_v2.RandomRotation(60, fill=0),
-                # transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                # transforms_v2.RandomRotation(60, fill=0),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )
