@@ -1,17 +1,17 @@
 [
     {
-        "project_name": "Embedding-EfficientNetRWM-MoCo-Face",
+        "project_name": "Embedding-VitLarge-SimCLR-Body-Sweep",
         "entity": "gorillas",
-        "config_path": "./cfgs/visiontransformer_moco_face.yml",
+        "config_path": "./cfgs/visiontransformer_simclr_body.yml",
         "parameters": {
             "start_lr": {
               "distribution": "log_normal",
-              "mu": -13.1224,
+              "mu": -14.2227,
               "sigma": 0.75
             },
             "temperature": {
               "distribution": "log_normal",
-              "mu": -2.9957,
+              "mu": -3.2189,
               "sigma": 0.5
             },
             "dropout_p": {
@@ -30,12 +30,12 @@
             "l2_alpha": {
               "distribution": "log_normal",
               "mu": -4.605,
-              "sigma": 0.2
+              "sigma": 0.5
             },
             "l2_beta": {
               "distribution": "log_normal",
               "mu": -4.605,
-              "sigma": 0.2
+              "sigma": 0.5
             }
         }
     }

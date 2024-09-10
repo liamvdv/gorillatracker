@@ -1,8 +1,8 @@
 [
     {
-        "project_name": "Embedding-EfficientNetRWM-MoCo-Face",
+        "project_name": "Embedding-VitLarge-MoCo-Body-Sweep",
         "entity": "gorillas",
-        "config_path": "./cfgs/visiontransformer_moco_face.yml",
+        "config_path": "./cfgs/visiontransformer_moco_body.yml",
         "parameters": {
             "start_lr": {
               "distribution": "log_normal",

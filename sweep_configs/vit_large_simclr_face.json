@@ -6,13 +6,13 @@
         "parameters": {
             "start_lr": {
               "distribution": "log_normal",
-              "mu": -14.5087,
-              "sigma": 0.5
+              "mu": -14.2227,
+              "sigma": 0.75
             },
             "temperature": {
               "distribution": "log_normal",
-              "mu": -3.357,
-              "sigma": 0.2
+              "mu": -3.2189,
+              "sigma": 0.5
             },
             "dropout_p": {
               "distribution": "uniform",
@@ -30,12 +30,12 @@
             "l2_alpha": {
               "distribution": "log_normal",
               "mu": -4.605,
-              "sigma": 0.2
+              "sigma": 0.5
             },
             "l2_beta": {
               "distribution": "log_normal",
               "mu": -4.605,
-              "sigma": 0.2
+              "sigma": 0.5
             }
         }
     }

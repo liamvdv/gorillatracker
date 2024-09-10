@@ -1,18 +1,18 @@
 [
     {
-        "project_name": "Embedding-EfficientNetRWM-MoCo-Face",
+        "project_name": "Embedding-VitLarge-SSL-Body-Sweep",
         "entity": "gorillas",
-        "config_path": "./cfgs/visiontransformer_moco_face.yml",
+        "config_path": "./cfgs/visiontransformer_triplet_offline_body.yml",
         "parameters": {
             "start_lr": {
               "distribution": "log_normal",
-              "mu": -13.1224,
+              "mu": -13.8155,
               "sigma": 0.75
             },
-            "temperature": {
-              "distribution": "log_normal",
-              "mu": -2.9957,
-              "sigma": 0.5
+            "margin": {
+              "distribution": "uniform",
+              "min": 0.5,
+              "max": 1.5
             },
             "dropout_p": {
               "distribution": "uniform",
@@ -20,7 +20,7 @@
               "max": 0.25
             },
             "loss_mode": {
-              "values": ["ntxent", "ntxent/l2sp"]
+              "values": ["offline/native", "offline/native/l2sp"]
             },
             "weight_decay": {
               "distribution": "log_normal",
@@ -30,12 +30,12 @@
             "l2_alpha": {
               "distribution": "log_normal",
               "mu": -4.605,
-              "sigma": 0.2
+              "sigma": 0.5
             },
             "l2_beta": {
               "distribution": "log_normal",
               "mu": -4.605,
-              "sigma": 0.2
+              "sigma": 0.5
             }
         }
     }
