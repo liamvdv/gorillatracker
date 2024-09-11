@@ -38,7 +38,7 @@ class MaskedVisionTransformer(BaseModule):
         super().__init__(**kwargs)
 
         self.val_img: Union[None, torch.Tensor] = None
-        self.use_positives = True
+        self.use_positives = False
 
         decoder_dim = 512  # decoder_width, default
         decoder_depth = 4  # default
@@ -102,8 +102,7 @@ class MaskedVisionTransformer(BaseModule):
             self.l2sp_backbone = L2_SP(
                 self.backbone.vit,
                 kwargs["path_to_pretrained_weights"],
-                # kwargs["l2_alpha"],
-                0.0,
+                kwargs["l2_alpha"],
                 kwargs["l2_beta"],
             )
 

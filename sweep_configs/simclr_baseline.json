@@ -1,0 +1,33 @@
+[
+    {
+        "project_name": "Embedding-VitLarge-SimCLR-Face-Sweep",
+        "entity": "gorillas",
+        "config_path": "./cfgs/visiontransformer_simclr_face.yml",
+        "parameters": {
+            "dropout_p": {
+                "max": 0.5,
+                "min": 0.0,
+                "distribution": "uniform"
+            },
+            "weight_decay": {
+                "mu": -1.5,
+                "sigma": 1,
+                "distribution": "log_normal"
+            },
+            "start_lr": {
+                "mu": -11.0,
+                "sigma": 1.0,
+                "distribution": "log_normal"
+            },
+            "temperature": {
+                "mu": -2.5,
+                "sigma": 1.0,
+                "distribution": "log_normal"
+            },
+            "batch_size": {
+                "values": [16, 32, 64],
+                "distribution": "categorical"
+            }
+        }
+    }
+]

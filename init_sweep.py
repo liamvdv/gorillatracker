@@ -30,10 +30,10 @@ def run_sweep(project_name: str, entity: str, config_path: str, parameters: Dict
     sweep_config = {
         "program": "./train.py",  # Note: not the sweep file, but the training script
         "name": sweep_name,
-        "method": "grid",  # Specify the search method (random search in this case)
+        "method": "bayes",  # Specify the search method (random search in this case)
         "metric": {
             "goal": "maximize",
-            "name": "aggregated/cxlkfold/val/embeddings/knn5/accuracy",
+            "name": "cxl-all/val/embeddings/knn_crossvideo_cos/accuracy_max",
         },  # Specify the metric to optimize
         "parameters": parameters,
         "command": ["${interpreter}", "${program}", "${args}", "--config_path", config_path],
