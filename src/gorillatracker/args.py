@@ -155,9 +155,9 @@ class TrainingArgs:
     # Config and Data Arguments
     dataset_class: str = field(default="gorillatracker.datasets.mnist.MNISTDataset")
     data_dir: Path = field(default=Path("./mnist"))
-    additional_val_dataset_classes: list[str] = field(default_factory=lambda: [])
-    additional_val_data_dirs: list[str] = field(default_factory=lambda: [])
-    dataset_names: list[str] = field(default_factory=lambda: [])
+    additional_val_dataset_classes: Union[list[str], str] = field(default_factory=list)
+    additional_val_data_dirs: Union[list[str], str] = field(default_factory=list)
+    dataset_names: Union[list[str], str] = field(default_factory=list)
     data_resize_transform: Union[int, None] = field(default=None)
 
     # SSL Config
@@ -195,3 +195,10 @@ class TrainingArgs:
         if self.grad_clip <= 0:
             self.grad_clip = None
         assert self.lr_interval <= 1, "lr_interval should be <= 1"
+
+        if isinstance(self.additional_val_data_dirs, str):
+            self.additional_val_data_dirs = eval(self.additional_val_data_dirs)
+        if isinstance(self.additional_val_dataset_classes, str):
+            self.additional_val_dataset_classes = eval(self.additional_val_dataset_classes)
+        if isinstance(self.dataset_names, str):
+            self.dataset_names = eval(self.dataset_names)

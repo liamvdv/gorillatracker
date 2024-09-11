@@ -50,7 +50,6 @@ class GeM_adapted(nn.Module):
     ) -> torch.Tensor:  # TODO(rob2u): find better way instead of multiplying by sign
         return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1.0 / p).view(x.size(0), -1)
 
-
     def __repr__(self) -> str:
         return (
             self.__class__.__name__

@@ -127,7 +127,9 @@ class TimmWrapper(nn.Module):
             and pool_mode is not None
         ):
             if isinstance(self.model.head, ClassifierHead):
-                self.model.head.global_pool = get_global_pooling_layer(pool_mode, self.num_features, self.model.head.input_fmt)
+                self.model.head.global_pool = get_global_pooling_layer(
+                    pool_mode, self.num_features, self.model.head.input_fmt
+                )
                 self.model.head.fc = nn.Identity()
                 self.model.head.drop = nn.Identity()
             elif isinstance(self.model.head, NormMlpClassifierHead):
@@ -264,25 +266,36 @@ class BaseModuleSupervised(BaseModule):
             len(model_name_or_path.split("/")) >= 2
         ), "model_name_or_path should be in the format '[<wrapper_id>/]<model_id>'."
         logger.info("Using model", model_name_or_path)
-        wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
-        if model_name_or_path.startswith("timm") or model_name_or_path.startswith(
-            "timm_eval"
-        ):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
-            backbone_name = model_name_or_path.split("/")[-1]
-        else:
-            backbone_name = model_name_or_path
 
-        self.model_wrapper = wrapper_cls(
-            backbone_name=backbone_name,
-            pool_mode=pool_mode,
-            img_size=fix_img_size,
-            embedding_size=self.embedding_size,
-            embedding_id=embedding_id,
-            dropout_p=dropout_p,
-            checkpoint_path=(
-                "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
-            ),
-        )
+        print("model_name_or_path", model_name_or_path)
+
+        if not model_name_or_path.startswith("FineTuning"):
+            wrapper_cls: Type[nn.Module] = model_wrapper_registry.get(model_name_or_path.split("/")[0], TimmWrapper)
+            if model_name_or_path.startswith("timm") or model_name_or_path.startswith(
+                "timm_eval"
+            ):  # Example: hf-hub:BVRA/MegaDescriptor-T-224  # Example: timm/efficientnetv2_rw_m
+                backbone_name = "/".join(model_name_or_path.split("/")[1:])
+            else:
+                backbone_name = model_name_or_path
+
+            self.model_wrapper = wrapper_cls(
+                backbone_name=backbone_name,
+                pool_mode=pool_mode,
+                img_size=fix_img_size,
+                embedding_size=self.embedding_size,
+                embedding_id=embedding_id,
+                dropout_p=dropout_p,
+                checkpoint_path=(
+                    "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
+                ),
+            )
+        else:
+            checkpoint_path = "/".join(model_name_or_path.split("/")[1:])
+            lighting_wrapper = BaseModuleSupervised.load_from_checkpoint(
+                checkpoint_path, data_module=None, wandb_run=None
+            )
+            self.model_wrapper = lighting_wrapper.model_wrapper
+
         self.set_losses(model=self.model_wrapper.model, **kwargs)
         self.model_wrapper.train()
 

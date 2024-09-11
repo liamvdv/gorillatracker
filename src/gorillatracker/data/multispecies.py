@@ -47,6 +47,7 @@ def get_ds_dfs(
             "Giraffes",  # License: None
             "IPanda50",  # License: None
             "NyalaData",  # License: None
+            "LionData",  # License: None
             # check for license problems
             # "HumpbackWhaleID" # not in paper, fine license
             # "HappyWhale" # not in paper, fine license
@@ -185,7 +186,7 @@ class MultiSpeciesSupervisedDataset(NletDataset):
         super().__init__(*args, **kwargs)
         if use_gorillas:
             path = (
-                Path("/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square/")
+                Path("/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_reproducekfold/")
                 / self.partition
             )
 
@@ -326,6 +327,21 @@ class MultiSpeciesSupervisedDataset(NletDataset):
         return len(self.contrastive_sampler)
 
 
+class MultiSpeciesLFWSupervisedDataset(MultiSpeciesSupervisedDataset):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=False, use_lfw=True, use_primates=False, *args, **kwargs)
+
+
+class GorillasLFWSupervisedDataset(MultiSpeciesSupervisedDataset):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=True, use_lfw=True, use_primates=False, *args, **kwargs)
+
+        self.contrastive_sampler.ds = self.contrastive_sampler.ds[
+            (self.contrastive_sampler.ds["origin"] == "gorillas") | (self.contrastive_sampler.ds["origin"] == "lfw")
+        ].copy()
+        self.contrastive_sampler.ds.reset_index(drop=True, inplace=True)
+
+
 class GorillasPrimatesSupervisedDataset(MultiSpeciesSupervisedDataset):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(use_gorillas=True, use_lfw=False, use_primates=True, *args, **kwargs)
@@ -339,6 +355,11 @@ class GorillasPrimatesLFWSupervisedDataset(MultiSpeciesSupervisedDataset):
 class PrimatesLFWSupervisedDataset(MultiSpeciesSupervisedDataset):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(use_gorillas=False, use_lfw=True, use_primates=True, *args, **kwargs)
+
+
+class Primates_only(MultiSpeciesSupervisedDataset):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(use_gorillas=False, use_lfw=False, use_primates=True, *args, **kwargs)
 
 
 class CombinedMultiSpeciesSupervisedDataset(MultiSpeciesSupervisedDataset):
