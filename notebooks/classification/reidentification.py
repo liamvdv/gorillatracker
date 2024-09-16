@@ -80,7 +80,7 @@ def split(
     assert (
         len(df["dataset"].unique()) == 1 and len(df["model"].unique()) == 1
     ), "Dataframe should contain only one dataset and model combination"
-    MIN_SAMPLES_REMAINING = 1
+    MIN_SAMPLES_REMAINING = 1 # TODO(liamvdv): 2
     rng = np.random.default_rng(seed)
 
     splits = []

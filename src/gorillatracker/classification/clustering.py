@@ -12,6 +12,8 @@ from sklearn.metrics import (
     precision_score,
     v_measure_score,
     fowlkes_mallows_score,
+    homogeneity_score,
+    completeness_score,
 )
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
@@ -47,6 +49,8 @@ def calculate_metrics(embeddings: np.ndarray, labels: np.ndarray, true_labels: n
     # Homogeneity ensures that each cluster contains only members of a single class, while completeness ensures that all members of a given class are assigned to the same cluster.
     # Range: V-Measure ranges from 0 to 1, where 1 indicates perfect homogeneity and completeness.
     v_measure = v_measure_score(true_labels, labels)
+    homogeneity = homogeneity_score(true_labels, labels)
+    completeness = completeness_score(true_labels, labels)
 
     # Add Fowlkes-Mallows Index
     # The Fowlkes-Mallows index is the geometric mean of the pairwise precision and recall.
@@ -58,6 +62,8 @@ def calculate_metrics(embeddings: np.ndarray, labels: np.ndarray, true_labels: n
             "weighted_f1_score": f1,
             "weighted_precision": precision,
             "adjusted_rand_score": ars,
+            "homogeneity_score": homogeneity,
+            "completeness_score": completeness,
             "v_measure_score": v_measure,
             "fowlkes_mallows_score": fmi,
         }
@@ -379,7 +385,7 @@ def upto_max_label_count(df: pd.DataFrame, max: int, seed: int = 42) -> pd.DataF
 
 
 # %%
-MERGED_DF = pd.read_pickle("merged.pkl")
+MERGED_DF = pd.read_pickle("/workspaces/gorillatracker/notebooks/classification/merged.pkl")
 # %% [markdown]
 # # Sweep
 
@@ -559,8 +565,8 @@ spac = [
     for model in models
     for ds in ["SPAC", "SPAC+min3", "SPAC+min3+max10"]
     for config in [
-        (ds, model, "KMeans", param_grid({"n_clusters": range(2, 181, speed(1, 5, 20))})),
-        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(2, 181, speed(1, 5, 20))})),
+        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 181, speed(1, 5, 20))})),
+        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 181, speed(1, 5, 20))})),
         (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [2]})),
         # ("SPAC", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("SPAC", "ViT-Finetuned", "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
@@ -575,9 +581,9 @@ bristol = [
     for model in models
     for ds in ["Bristol", "Bristol+min25+max25"]
     for config in [
-        (ds, model, "KMeans", param_grid({"n_clusters": range(2, 40, 1)})),
-        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(2, 40, 1)})),
-        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [2, 5, 10, 20]})),
+        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 40, 1)})),
+        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 40, 1)})),
+        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3, 5, 10, 20]})),
         # ("Bristol", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("Bristol", model, "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
         # ("Bristol", model, "SpectralClustering", flatten_grid({"n_clusters": range(2, 181, 5), "affinity": ["rbf", "nearest_neighbors"]})),
