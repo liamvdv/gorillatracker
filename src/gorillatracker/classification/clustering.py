@@ -531,7 +531,7 @@ synthetic = [
         "Synthetic 200c 10n",
         "Synthetic",
         "HDBSCAN",
-        param_grid({"min_cluster_size": range(2, 21), "min_samples": [2]}),
+        param_grid({"min_cluster_size": range(5, 21)}),
     ),
     (
         "Synthetic 200c 10n",
@@ -545,7 +545,7 @@ synthetic = [
         "Synthetic 20c 20n",
         "Synthetic",
         "HDBSCAN",
-        param_grid({"min_cluster_size": range(2, 10), "min_samples": [2]}),
+        param_grid({"min_cluster_size": range(5, 10), "min_samples": [5]}),
     ),
     (
         "Synthetic 20c 20n",
@@ -567,7 +567,7 @@ spac = [
     for config in [
         (ds, model, "KMeans", param_grid({"n_clusters": range(3, 181, speed(1, 5, 20))})),
         (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 181, speed(1, 5, 20))})),
-        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [2]})),
+        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3]})),
         # ("SPAC", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("SPAC", "ViT-Finetuned", "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
         # ("SPAC", "ViT-Finetuned", "SpectralClustering", flatten_grid({"n_clusters": range(2, 181, 5), "affinity": ["rbf", "nearest_neighbors"]})),
