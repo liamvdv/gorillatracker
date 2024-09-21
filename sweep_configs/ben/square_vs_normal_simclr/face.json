@@ -1,0 +1,15 @@
+[
+    {
+        "project_name": "Embedding-ViTLarge-SSL-NormalVSSquare",
+        "entity": "gorillas",
+        "config_path": "/workspaces/gorillatracker/cfgs/visiontransformer_simclr_face_n.yml",
+        "parameters": {
+            "run_name": {
+                "values": ["sweep-simclr-face"]
+            },
+            "feature_types": {
+                "values": ["face_45", "face_90"]
+            }
+        }
+    }
+]

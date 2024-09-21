@@ -76,8 +76,7 @@ def visualize_pipeline(
         preprocessed_videos = list(load_preprocessed_videos(session, version))
         video_paths = remove_processed_videos(video_paths, preprocessed_videos)
 
-    random.seed(42)  # For reproducibility
-    videos_to_track = random.sample(video_paths, n_videos)
+    videos_to_track = video_paths
     max_workers = len(gpu_ids) * max_worker_per_gpu
 
     def visualize_hook(video: Video) -> None:
@@ -159,7 +158,7 @@ def berlin_demo() -> None:
         version,
         Path("/workspaces/gorillatracker/video_data/zoo_berlin/visualized"),
         n_videos=10_000,
-        max_worker_per_gpu=20,
+        max_worker_per_gpu=10,
         gpu_ids=[0],
     )
 
