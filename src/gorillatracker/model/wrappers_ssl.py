@@ -27,16 +27,13 @@ class SimCLRWrapper(BaseModule):
         )
         self.model.reset_classifier(self.embedding_size)
         in_features = self.model.head.in_features
-        self.model.head = nn.Sequential(
-            nn.BatchNorm1d(in_features),
-            nn.Dropout(p=self.dropout_p),
-            nn.Linear(in_features, in_features),
-            nn.ReLU(),
+        projection_head = nn.Sequential(
             nn.BatchNorm1d(in_features),
             nn.Dropout(p=self.dropout_p),
             nn.Linear(in_features, self.embedding_size),
             nn.BatchNorm1d(self.embedding_size),
         )
+        self.model.head = projection_head
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)
@@ -54,7 +51,6 @@ class SimCLRWrapper(BaseModule):
         )
 
 
-# TODO: MoCoWrapper is not fully tested yet.
 class MoCoWrapper(BaseModule):
     def __init__(  # type: ignore
         self,
@@ -66,22 +62,13 @@ class MoCoWrapper(BaseModule):
         )
         self.model.reset_classifier(self.embedding_size)
         in_features = self.model.head.in_features
-        # self.model.head = nn.Sequential(
-        #     nn.BatchNorm1d(in_features),
-        #     nn.Dropout(p=self.dropout_p),
-        #     nn.Linear(in_features, in_features),
-        #     nn.ReLU(),
-        #     nn.BatchNorm1d(in_features),
-        #     nn.Dropout(p=self.dropout_p),
-        #     nn.Linear(in_features, self.embedding_size),
-        #     nn.BatchNorm1d(self.embedding_size),
-        # )
-        self.model.head = nn.Sequential(
+        projection_head = nn.Sequential(
             nn.BatchNorm1d(in_features),
             nn.Dropout(p=self.dropout_p),
             nn.Linear(in_features, self.embedding_size),
             nn.BatchNorm1d(self.embedding_size),
         )
+        self.model.head = projection_head
         model_cpy = copy.deepcopy(self.model)
         model_cpy.head = torch.nn.Identity()
         self.set_losses(model=model_cpy, **kwargs)

@@ -2,13 +2,14 @@ from typing import Type
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.wrapper_mae import MaskedVisionTransformer
-from gorillatracker.model.wrappers_ssl import MoCoWrapper, SimCLRWrapper
+from gorillatracker.model.wrappers_ssl import MoCoWrapper, SimCLRWrapper, BYOLWrapper
 from gorillatracker.model.wrappers_supervised import BaseModuleSupervised
 
 # NOTE(liamvdv): Register custom model backbones here.
 custom_model_cls = {
     "SimCLR": SimCLRWrapper,
     "MoCo": MoCoWrapper,
+    "BYOL": BYOLWrapper,
     "MaskedVisionTransformer": MaskedVisionTransformer,
 }
 

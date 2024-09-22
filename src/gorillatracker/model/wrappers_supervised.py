@@ -13,6 +13,7 @@ from transformers import AutoModel, ResNetModel
 
 from gorillatracker.model.base_module import BaseModule
 from gorillatracker.model.pooling_layers import GAP, FormatWrapper, GeM, GeM_adapted
+from gorillatracker.model.wrappers_ssl import MoCoWrapper, SimCLRWrapper
 from gorillatracker.model.wrapper_mae import MaskedVisionTransformer
 from gorillatracker.transform_utils import PlanckianJitter
 
@@ -201,6 +202,37 @@ class Miewid_msv2(nn.Module):
         x = self.model(x)
         x = self.embedding_layer(x)
         return x
+    
+    
+class SimCLRFinetuning(nn.Module):
+    def __init__(
+        self,
+        checkpoint_path: str,
+        **kwargs,
+    ) -> None:
+        super().__init__()
+
+        checkpoint = SimCLRWrapper.load_from_checkpoint(checkpoint_path=checkpoint_path, data_module=None, wandb_run=None)
+        self.model = checkpoint.model
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model(x)
+        return x
+    
+class MoCoFinetuning(nn.Module):
+    def __init__(
+        self,
+        checkpoint_path: str,
+        **kwargs,
+    ) -> None:
+        super().__init__()
+
+        checkpoint = MoCoWrapper.load_from_checkpoint(checkpoint_path=checkpoint_path, data_module=None, wandb_run=None)
+        self.model = checkpoint.model
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.model(x)
+        return x
 
 
 class MAEFineTuningWrapper(nn.Module):
@@ -236,6 +268,8 @@ model_wrapper_registry = {
     "timm_eval": TimmEvalWrapper,
     "resnet50_dinov2": ResNet50DinoV2Wrapper,
     "miewid_msv2": Miewid_msv2,
+    "simclr": SimCLRFinetuning,
+    "moco": MoCoFinetuning,
     "MAE": MAEFineTuningWrapper,
 }
 
@@ -273,7 +307,7 @@ class BaseModuleSupervised(BaseModule):
             embedding_id=embedding_id,
             dropout_p=dropout_p,
             checkpoint_path=(
-                "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("MAE") else None
+                "/".join(model_name_or_path.split("/")[1:]) if model_name_or_path.startswith("moco") or model_name_or_path.startswith("simclr") else None
             ),
         )
         self.set_losses(model=self.model_wrapper.model, **kwargs)
@@ -295,6 +329,6 @@ class BaseModuleSupervised(BaseModule):
                 transforms_v2.RandomHorizontalFlip(p=0.5),
                 transforms_v2.RandomErasing(p=0.5, value=0, scale=(0.02, 0.13)),
                 transforms_v2.RandomRotation(60, fill=0),
-                # transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
+                transforms_v2.RandomResizedCrop(224, scale=(0.75, 1.0)),
             ]
         )

@@ -1,0 +1,42 @@
+[
+    {
+        "project_name": "Embedding-VitLarge-SSL-Body-Sweep",
+        "entity": "gorillas",
+        "config_path": "./cfgs/visiontransformer_triplet_online_body.yml",
+        "parameters": {
+            "start_lr": {
+              "distribution": "log_normal",
+              "mu": -14.1722,
+              "sigma": 1
+            },
+            "margin": {
+              "distribution": "uniform",
+              "min": 0.5,
+              "max": 1.5
+            },
+            "dropout_p": {
+              "distribution": "uniform",
+              "min": 0.0,
+              "max": 0.25
+            },
+            "loss_mode": {
+              "values": ["online/soft", "online/soft/l2sp"]
+            },
+            "weight_decay": {
+              "distribution": "log_normal",
+              "mu": -2.996,
+              "sigma": 0.5
+            },
+            "l2_alpha": {
+              "distribution": "log_normal",
+              "mu": -4.605,
+              "sigma": 0.5
+            },
+            "l2_beta": {
+              "distribution": "log_normal",
+              "mu": -4.605,
+              "sigma": 0.5
+            }
+        }
+    }
+]

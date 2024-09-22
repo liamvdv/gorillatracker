@@ -172,7 +172,7 @@ def compute_split(samples: int, train: int, val: int, test: int, kfold: bool) ->
 
 # You must ensure this is set to True when pushed. Do not keep a TEST = False
 # version on main.
-TEST = True
+TEST = False
 
 
 def copy(src: Path, dst: Path) -> None:
@@ -400,6 +400,7 @@ def generate_kfold_split(
     k: int = 5,
 ) -> Path:
     name = f"{str(dataset_dir).replace('/', '-')}-kfold-actual_{mode}-seed-{seed}-trainval-{trainval}-test-{test}-k-{k}"
+    name = "cxl_bodies_openset_square_val_50_test_50"
     output_dir = output_dir / name
 
     images = read_ground_truth(dataset_dir)
@@ -532,13 +533,13 @@ def merge_dataset_splits(ds1: str, ds2: str) -> None:
 
 if __name__ == "__main__":
     dir = generate_kfold_split(
-        dataset_dir=Path("/workspaces/gorillatracker/data/ground_truth/cxl_all/face_images"),
-        output_dir=Path("/workspaces/gorillatracker/data/splits"),
+        dataset_dir=Path("/workspaces/gorillatracker/data/supervised/cxl_all/body_images"),
+        output_dir=Path("/workspaces/gorillatracker/data/supervised/splits"),
         mode="openset",
         seed=42,
-        trainval=80,
-        test=20,
-        k=5,
+        trainval=75,
+        test=25,
+        k=3,
     )
     print(dir)
 

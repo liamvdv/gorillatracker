@@ -1,0 +1,42 @@
+[
+    {
+        "project_name": "Embedding-EfficientNetRWM-MoCo-Face",
+        "entity": "gorillas",
+        "config_path": "./cfgs/efficientnet_rw_m_moco.yml",
+        "parameters": {
+            "start_lr": {
+              "distribution": "log_normal",
+              "mu": -11.5129,
+              "sigma": 1.5
+            },
+            "temperature": {
+              "distribution": "log_normal",
+              "mu": -2.9957,
+              "sigma": 1
+            },
+            "dropout_p": {
+              "distribution": "uniform",
+              "min": 0.0,
+              "max": 0.25
+            },
+            "loss_mode": {
+              "values": ["ntxent", "ntxent/l2sp"]
+            },
+            "weight_decay": {
+              "distribution": "log_normal",
+              "mu": -2.996,
+              "sigma": 0.5
+            },
+            "l2_alpha": {
+              "distribution": "log_normal",
+              "mu": -4.605,
+              "sigma": 0.2
+            },
+            "l2_beta": {
+              "distribution": "log_normal",
+              "mu": -4.605,
+              "sigma": 0.2
+            }
+        }
+    }
+]

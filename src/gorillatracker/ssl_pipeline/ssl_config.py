@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
+import pickle
 from typing import List, Literal, Optional, Sequence
 
 from sqlalchemy import Select, create_engine
@@ -55,17 +57,33 @@ class SSLConfig:
 
     def __post_init__(self) -> None:
         assert self.tff_selection != "movement" or self.movement_delta is not None, "Combination not allowed"
+    
+    def generate_cache_key(self):
+        key_data = (self.tff_selection, self.negative_mining, self.n_samples, 
+                    tuple(self.feature_types), self.min_confidence, 
+                    self.min_images_per_tracking, str(self.split_path), 
+                    self.width_range, self.height_range, 
+                    self.forced_train_image_count, self.movement_delta)
+        key_bytes = pickle.dumps(key_data)
+        return hashlib.md5(key_bytes).hexdigest()
 
     def get_contrastive_sampler(
         self,
         base_path: Path,
         partition: Literal["train", "val", "test"],
     ) -> ContrastiveSampler:
-        engine = create_engine(GorillaDatasetKISZ.DB_URI, echo=False)
+        # Check if we have a cached sampler
+        cache_key = self.generate_cache_key()
+        cached_sampler = self._load_cache(cache_key) if partition == "train" else None
+        if cached_sampler is not None:
+            print(f"Loaded cached sampler for key: {cache_key}")
+            return cached_sampler
+        
+        engine = create_engine("postgresql+psycopg2://postgres:HyfCW95WnwmXmnQpBmiw@10.149.20.40:5432/postgres", echo=False)
 
         with Session(engine) as session:
             video_ids = self._get_video_ids(partition)
-            tracking_frame_features = self._sample_tracking_frame_features(video_ids, session)
+            tracking_frame_features = self._sample_tracking_frame_features(video_ids, session, partition)
             contrastive_images = self._create_contrastive_images(tracking_frame_features, base_path)
             if self.forced_train_image_count is not None and partition == "train":
                 if len(contrastive_images) < self.forced_train_image_count:
@@ -74,7 +92,9 @@ class SSLConfig:
                     )
                 contrastive_images = contrastive_images[: self.forced_train_image_count]
 
-            return self._create_contrastive_sampler(contrastive_images, video_ids, session)
+            sampler = self._create_contrastive_sampler(contrastive_images, video_ids, session)
+            self._save_cache(cache_key, sampler) if partition == "train" else None
+            return sampler
 
     def _get_video_ids(self, partition: Literal["train", "val", "test"]) -> List[int]:
         split = SplitArgs.load_pickle(str(self.split_path))
@@ -125,7 +145,7 @@ class SSLConfig:
         )
         return query
 
-    def _sample_tracking_frame_features(self, video_ids: list[int], session: Session) -> list[TrackingFrameFeature]:
+    def _sample_tracking_frame_features(self, video_ids: list[int], session: Session, partition: str) -> list[TrackingFrameFeature]:
         BATCH_SIZE = 200
         num_batches = len(video_ids) // BATCH_SIZE
         tffs: list[TrackingFrameFeature] = []
@@ -135,6 +155,9 @@ class SSLConfig:
             batch_video_ids = video_ids[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
             batch_tffs = session.execute(self._build_query(batch_video_ids)).scalars().all()
             tffs += batch_tffs
+        
+        if partition == "val":
+            return list(equidistant_sample(tffs, self.n_samples))
 
         if self.tff_selection == "random":
             return list(random_sample(tffs, self.n_samples))
@@ -203,31 +226,44 @@ class SSLConfig:
         self._merge_same_class_vertices(third_layer)
         third_layer.prune_cliques_without_neighbors()
         return CliqueGraphSampler(third_layer)
+    
+    def _load_cache(self, cache_key):
+        cache_file = Path(f"cache_ssl_config/{cache_key}.pkl")
+        if cache_file.exists():
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
+        return None
+
+    def _save_cache(self, cache_key, obj):
+        cache_file = Path(f"cache_ssl_config/{cache_key}.pkl")
+        with open(cache_file, "wb") as f:
+            pickle.dump(obj, f)
 
 
 if __name__ == "__main__":
     ssl_config = SSLConfig(
-        tff_selection="equidistant",
-        negative_mining="random",
-        n_samples=15,
-        feature_types=["body_with_face"],
+        tff_selection="movement",
+        movement_delta=0.03,
+        negative_mining="overlapping",
+        n_samples=10,
+        feature_types=["face_45"],
         min_confidence=0.5,
-        min_images_per_tracking=10,
-        width_range=(None, None),
-        height_range=(None, None),
+        min_images_per_tracking=3,
+        width_range=(100, 10000),
+        height_range=(100, 10000),
         split_path=Path(
-            "/workspaces/gorillatracker/data/splits/SSL/SSL-Video-Split_2024-04-18_percentage-80-10-10_split.pkl"
+            "/workspaces/gorillatracker/data/splits/SSL/sweep/30k-SSL-Video-Split-1_2024-04-18_percentage-95-5-0_split_20240812_2337.pkl"
         ),
     )
     import time
 
     before = time.time()
-    contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images/2024-04-18"), "train")
+    contrastive_sampler = ssl_config.get_contrastive_sampler(Path("cropped-images-squared/2024-04-18"), "train")
     after = time.time()
     print(f"Time: {after - before}")
     print(len(contrastive_sampler))
-    for i in range(10):
-        contrastive_image = contrastive_sampler[i * 10]
-        print(contrastive_image)
-        print(contrastive_sampler.positive(contrastive_image))
-        print(contrastive_sampler.negative(contrastive_image))
+    # for i in range(10):
+    #     contrastive_image = contrastive_sampler[i * 10]
+    #     print(contrastive_image)
+    #     print(contrastive_sampler.positive(contrastive_image))
+    #     print(contrastive_sampler.negative(contrastive_image))

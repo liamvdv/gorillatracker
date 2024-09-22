@@ -3,6 +3,7 @@ from typing import Callable, Sequence
 
 from sqlalchemy import ColumnElement, Select, alias, func, select
 from sqlalchemy.orm import Session, aliased
+from tqdm import tqdm
 
 from gorillatracker.ssl_pipeline.models import Camera, Tracking, TrackingFrameFeature, Video, VideoFeature
 
@@ -154,7 +155,7 @@ def fetch_negative_tuples(
 ) -> Sequence[tuple[int, int]]:
     num_batches = len(video_ids) // batch_size
     negative_tuples = []
-    for i in range(num_batches + 1):
+    for i in tqdm(range(num_batches + 1), desc="Fetching Negative Tuples", total=num_batches + 1, unit="batch"):
         batch_video_ids = video_ids[i * batch_size : (i + 1) * batch_size]
         stmt = query_builder(batch_video_ids)
         result = session.execute(stmt).all()
@@ -168,11 +169,14 @@ if __name__ == "__main__":
     from sqlalchemy import create_engine
 
     from gorillatracker.ssl_pipeline.dataset import GorillaDatasetKISZ
+    from gorillatracker.ssl_pipeline.dataset_splitter import SplitArgs
+    
+    split = SplitArgs.load_pickle("/workspaces/gorillatracker/data/splits/SSL/SSL-50k-woCXL_50k-100-1k_split_20240716_1041.pkl")
+    video_ids = split.train_video_ids()
 
     engine = create_engine(GorillaDatasetKISZ.DB_URI)
-    video_ids = list(range(1, 10000))
     with Session(engine) as session:
         start = time.time()
-        video_negatives = find_social_group_negatives(session, video_ids)
+        video_negatives = find_overlapping_trackings(session, video_ids)
         end = time.time()
         print(f"Found {len(video_negatives)} video negatives in {end - start:.2f} seconds")
