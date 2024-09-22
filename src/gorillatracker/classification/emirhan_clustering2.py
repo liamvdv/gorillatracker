@@ -1,26 +1,35 @@
 # %%
 from gorillatracker.classification.metrics import analyse_embedding_space
 import pandas as pd
-import numpy as np
+import dill
 
-base = "/workspaces/gorillatracker"
-ids = np.load(f"{base}/vit_ids.npy")
-embeddings = np.load(f"{base}/vit_embeddings.npy")
-labels = np.load(f"{base}/vit_labels.npy")
+print("Running")
+base = "/workspaces/gorillatracker/emirhan"
 
-# Create a DataFrame
-df = pd.DataFrame({"id": list(ids), "embedding": list(embeddings), "label": labels})
+# fp = f"{base}/gorillatracker/notebooks/ssl_embeddings.pkl"
+fp = f"{base}/gorillatracker/ssl_embeddings_new.pkl"
+
+with open(fp, "rb") as dill_file:
+    df = dill.load(dill_file)
 
 # %%
+import numpy as np
+
+df["id"] = df["id"].apply(lambda x: int(x.item()))
+df["embedding"] = df["embedding"].apply(np.array) # [t.item() for t in x]
+df["label"] = df["label"].apply(lambda x: x.item()) # np.array([t.item() for t in x])
+
 print(df.head())
 print(df["id"].count())
 print(df["id"].nunique())
+print(df["label_string"].nunique())
 print(df["label"].nunique())
 
 # %%
 # Group by label and calculate the mean of the embeddings
 centroid_df = df.groupby("label")["embedding"].apply(lambda x: list(pd.DataFrame(x.tolist()).mean())).reset_index()
 centroid_df.columns = ["tracklet_id", "embedding"]
+print(centroid_df.head())
 
 # %%
 import numpy as np
@@ -53,7 +62,8 @@ def generate_results_df(df, k_values):
 
 
 count = centroid_df.shape[0]
-results_df = generate_results_df(centroid_df, range(1, count, count // 10))
+step = count // 16
+results_df = generate_results_df(centroid_df, range(1, count, step))
 
 # Print the results
 print(results_df.head())
@@ -79,8 +89,8 @@ visualize_alg_metrics(results_df, dataset, model, algorithm, formatted_names)
 
 # %%
 k = results_df["k"].iloc[results_df["silhouette_coefficient"].idxmax()]
-sweep = range(max(1, k - 1000), min(k + 1000, count), 100)
-results_df = generate_results_df(centroid_df, sweep)
+k_values = range(min(1, k - step), k + step, min(1, step // 10))
+results_df = generate_results_df(centroid_df, k_values)
 dataset = "ssl_embeddings_tracklet_centroids"
 model = "A"
 algorithm = "KMeans"
@@ -92,7 +102,7 @@ results_df["algorithm_params"] = results_df["k"].apply(lambda x: {"n_clusters": 
 results_df["n_true_clusters"] = 0
 
 visualize_alg_metrics(results_df, dataset, model, algorithm, formatted_names)
-results_df.to_pickle("emirhan_metrics_df_finegrained.pkl")
+results_df.to_pickle("emirhan_metrics_df_finegrained71k.pkl")
 
 # %%
 k = results_df["k"].iloc[results_df["silhouette_coefficient"].idxmax()]
@@ -102,10 +112,15 @@ cluster_labels = kmeans.fit_predict(embeddings)
 
 final_df = centroid_df.copy()
 final_df["label"] = cluster_labels
-final_df.to_pickle("emirhan_clustered_df.pkl")
+final_df.to_pickle("emirhan_clustered_df71k.pkl")
 print(final_df.head())
 
 # %%
-# import os
+import shutil
 
-# os.rename("emirhan_clustered_df.pkl", f"{base}/gorillatracker/complete_19_09_2024_clustered_df.pkl")
+
+# os.rename("emirhan_clustered_df.pkl", f"{base}/gorillatracker/complete_18_09_2024_clustered_df.pkl")
+shutil.copy(
+    "emirhan_clustered_df71k.pkl",
+    "/workspaces/gorillatracker/emirhan/gorillatracker/complete_19_09_2024_clustered_df71k.pkl",
+)

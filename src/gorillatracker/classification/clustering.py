@@ -98,7 +98,11 @@ import math
 import pandas as pd
 
 
-def visualize_alg_metrics(result_df, dataset, model, algorithm, formatted_names):
+import matplotlib.pyplot as plt
+import math
+
+
+def visualize_alg_metrics(result_df, dataset, model, algorithm, formatted_names, image_path=None):
     """
     Create a grid of charts where every metric is shown for the specified dataset, model, and algorithm.
     The x-axis values are determined based on the algorithm used.
@@ -110,9 +114,10 @@ def visualize_alg_metrics(result_df, dataset, model, algorithm, formatted_names)
     model (str): The model to filter by
     algorithm (str): The algorithm to filter by
     formatted_names (dict): Dictionary mapping metric names to formatted display names
+    image_path (str, optional): If provided, save the plot to this path instead of displaying it
 
     Returns:
-    None (displays the plot)
+    None (displays the plot or saves it to a file)
     """
     # Filter the DataFrame
     filtered_df = result_df[
@@ -190,7 +195,16 @@ def visualize_alg_metrics(result_df, dataset, model, algorithm, formatted_names)
     plt.tight_layout()
     plt.subplots_adjust(top=0.93)  # Adjust top padding
 
-    plt.show()
+    if image_path:
+        # Save the plot as a PNG file
+        plt.savefig(image_path, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to {image_path}")
+    else:
+        # Display the plot
+        plt.show()
+
+    # Close the figure to free up memory
+    plt.close(fig)
 
 
 def batch_visualize_alg_metrics(result_df, dataset, models, algorithms, formatted_names):
@@ -559,7 +573,7 @@ synthetic = [
 configs.extend(synthetic)
 
 # Add SPAC dataset configurations
-models = ["ViT-Finetuned", "ViT-Pretrained", "EfN-Pretrained"]  # TODO(liamvdv): + ["EfN-Finetuned"]
+models = ["ViT-Finetuned", "ViT-Pretrained", "EfN-Pretrained", "EfN-Finetuned"]
 spac = [
     config
     for model in models
