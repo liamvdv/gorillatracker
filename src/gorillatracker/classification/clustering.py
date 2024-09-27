@@ -485,11 +485,7 @@ def sweep_clustering_algorithms(df, configs, cache_dir=None):
 
         embeddings = np.stack(subset["embedding"].to_numpy())
         true_labels = subset["label"].to_numpy()
-
-        # Scale the embeddings
-        scaler = StandardScaler()
-        scaled_embeddings = scaler.fit_transform(embeddings)
-
+        
         for params in param_combinations:
             cache_key = get_cache_key(dataset, model, algorithm, params)
             cache_file = os.path.join(cache_dir or "", f"{cache_key}.pkl")
@@ -513,9 +509,9 @@ def sweep_clustering_algorithms(df, configs, cache_dir=None):
                 else:
                     raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-                labels = clusterer.fit_predict(scaled_embeddings)
+                labels = clusterer.fit_predict(embeddings)
 
-                metric = calculate_metrics(scaled_embeddings, labels, true_labels)
+                metric = calculate_metrics(embeddings, labels, true_labels)
                 metric.update(
                     {
                         "dataset": dataset,
@@ -579,8 +575,9 @@ spac = [
     for model in models
     for ds in ["SPAC", "SPAC+min3", "SPAC+min3+max10"]
     for config in [
-        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 181, speed(1, 5, 20))})),
-        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 181, speed(1, 5, 20))})),
+        # TODO(liamvdv): consider using 800 instead of 700 for the max value.
+        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 300, speed(1, 5, 20))})),
+        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 300, speed(1, 5, 20))})),
         (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3]})),
         # ("SPAC", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("SPAC", "ViT-Finetuned", "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
@@ -595,9 +592,9 @@ bristol = [
     for model in models
     for ds in ["Bristol", "Bristol+min25+max25"]
     for config in [
-        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 40, 1)})),
-        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 40, 1)})),
-        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3, 5, 10, 20]})),
+        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 80, 1)})),
+        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 80, 1)})),
+        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3, 5, 10, 20, 25]})),
         # ("Bristol", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("Bristol", model, "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
         # ("Bristol", model, "SpectralClustering", flatten_grid({"n_clusters": range(2, 181, 5), "affinity": ["rbf", "nearest_neighbors"]})),

@@ -1,8 +1,17 @@
-# %%
-# %%
+import os
+import pickle
 import pandas as pd
 import numpy as np
 from collections import defaultdict
+from typing import List, Optional, Tuple, Dict
+from sklearn.calibration import LabelEncoder
+from sklearn.metrics import accuracy_score, f1_score
+import math
+from sklearn.neighbors import NearestNeighbors
+import matplotlib.pyplot as plt
+import warnings
+from tqdm import tqdm
+from gorillatracker.classification.metrics import analyse_embedding_space
 
 
 def generate_folds(df, k=5, seed=42):
@@ -51,13 +60,6 @@ def generate_folds(df, k=5, seed=42):
     return df_with_folds
 
 
-# %%
-# %%
-import pandas as pd
-import numpy as np
-from typing import List, Tuple
-
-
 def split(
     df: pd.DataFrame, k: int = 5, construction_method: str = "equal_classes", seed: int = 42
 ) -> List[Tuple[pd.DataFrame, pd.DataFrame]]:
@@ -80,62 +82,51 @@ def split(
     assert (
         len(df["dataset"].unique()) == 1 and len(df["model"].unique()) == 1
     ), "Dataframe should contain only one dataset and model combination"
-    MIN_SAMPLES_REMAINING = 1 # TODO(liamvdv): 2
+    MIN_SAMPLES_REMAINING = 2  # for knn5 vote to win (2,1,1,1 nn scenario)
     rng = np.random.default_rng(seed)
 
     splits = []
     for i in range(k):
         test_df = df[df["fold"] == i].copy()
-        test_df["is_new"] = True
         train_df = df[df["fold"] != i].copy()
+        test_df["is_new"] = True
         train_df["is_new"] = False
 
         if construction_method == "equal_classes":
-            """
-            Choose a random number of labels from train_df to move to test_df.
-            Sample upto max_samples from each label. Skip if the label has less than min_samples.
-            """
-            n = int(np.mean([train_df[train_df["fold"] == j]["label"].nunique() for j in range(k) if j != i]))
-            min_samples, max_samples = 1, 3
+            # Create a mask of non-sampleable images
+            non_sampleable_mask = pd.Series(False, index=train_df.index)
+            for label in train_df["label"].unique():
+                label_indices = train_df[train_df["label"] == label].index
+                if len(label_indices) <= MIN_SAMPLES_REMAINING:
+                    non_sampleable_mask[label_indices] = True
+                else:
+                    keep_indices = rng.choice(label_indices, size=MIN_SAMPLES_REMAINING, replace=False)
+                    non_sampleable_mask[keep_indices] = True
 
-            train_labels = train_df["label"].unique()
-            labels_to_move = rng.choice(train_labels, size=min(n, len(train_labels)), replace=False)
+            # Calculate the number of samples to move
+            n_samples_to_move = len(test_df)
 
-            for label in labels_to_move:
-                train_label_group = train_df[train_df["label"] == label]
-                n_samples = len(train_label_group)
-                if n_samples < min_samples + MIN_SAMPLES_REMAINING:
-                    print(
-                        f"WARNING: Cannot move samples from train_df to test_df because label '{label}' has too few samples (total {n_samples} < {min_samples} + {MIN_SAMPLES_REMAINING})."
-                    )
-                    continue
-                n_samples_to_move = min(max_samples, n_samples - MIN_SAMPLES_REMAINING)
-                samples_to_move = train_label_group.sample(n=n_samples_to_move, random_state=rng)
-                train_df = train_df.drop(samples_to_move.index)
-                test_df = pd.concat([test_df, samples_to_move], ignore_index=True)
+            # Sample from the sampleable images
+            sampleable_df = train_df[~non_sampleable_mask]
+            if len(sampleable_df) < n_samples_to_move:
+                n_samples_to_move = len(sampleable_df)
+
+            samples_to_move = sampleable_df.sample(n=n_samples_to_move, random_state=rng)
+
+            # Move the samples
+            train_df = train_df.drop(samples_to_move.index)
+            test_df = pd.concat([test_df, samples_to_move], ignore_index=True)
 
         elif construction_method == "equal_images":
-            """
-            Choose a random number of images from train_df to move to test_df.
-            Ensure that at least one image from each label remains in train_df.
-            """
             n_images_to_move = len(test_df)
-            train_labels = train_df["label"].unique()
+            sampleable_df = train_df.groupby("label").filter(lambda x: len(x) > MIN_SAMPLES_REMAINING)
 
-            # Randomly sample images from train_df
-            samples_to_move = train_df.sample(n=n_images_to_move, random_state=rng)
+            if len(sampleable_df) < n_images_to_move:
+                n_images_to_move = len(sampleable_df)
 
-            # Ensure at least one image from each label remains in train_df
-            for label in train_labels:
-                label_samples = samples_to_move[samples_to_move["label"] == label]
-                if len(label_samples) == len(train_df[train_df["label"] == label]):
-                    # If all samples of a label are selected to move, keep one in train_df
-                    sample_to_keep = label_samples.sample(n=1, random_state=rng)
-                    samples_to_move = samples_to_move.drop(sample_to_keep.index)
+            samples_to_move = sampleable_df.sample(n=n_images_to_move, random_state=rng)
 
-            # Move selected samples from train_df to test_df
             train_df = train_df.drop(samples_to_move.index)
-            samples_to_move["is_new"] = True
             test_df = pd.concat([test_df, samples_to_move], ignore_index=True)
 
         else:
@@ -144,11 +135,6 @@ def split(
         splits.append((train_df, test_df))
 
     return splits
-
-
-# %%
-import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
 
 
 def compute_metrics(y_true, y_pred, unique_labels):
@@ -181,8 +167,6 @@ def compute_metrics(y_true, y_pred, unique_labels):
     # Create binary labels for new vs. known classification
     y_true_binary = (y_true == -1).astype(int)
     y_pred_binary = (y_pred == -1).astype(int)
-
-    # Compute metrics for binary classification (new vs. known)
     binary_accuracy = accuracy_score(y_true_binary, y_pred_binary)
     binary_f1 = f1_score(y_true_binary, y_pred_binary)
 
@@ -191,13 +175,31 @@ def compute_metrics(y_true, y_pred, unique_labels):
     mask_pred = y_pred != -1
     mask = mask_true & mask_pred
 
+    # NOTE(liamvdv): sometimes -1 is not allowed as a label. The behaviour of sklearn does
+    # not appear to be consistent on this.
+    multiclass = np.unique(np.concatenate([unique_labels, [-1], y_true, y_pred]))
+    le = LabelEncoder()
+    le.fit(multiclass)
+    y_true_encoded = le.transform(y_true)
+    y_pred_encoded = le.transform(y_pred)
+
     # TODO(liamvdv): reconsider if this is the behaviour we want when no match is found. i.d.R. we want NOT to pick this as max, thus assign low precision.
-    only_known_accuracy = accuracy_score(y_true[mask], y_pred[mask]) if y_true[mask].size > 0 else 0
+    only_known_accuracy = (
+        accuracy_score(y_true_encoded[mask], y_pred_encoded[mask]) if y_true_encoded[mask].size > 0 else 0
+    )
 
     # we will not add the '-1' new class to the labels; this f1 is only about the known classes
-    # we want to exclude the 'new' class from the f1 calculation via labels= (note we are not using the mask here)
+    # we want to exclude the 'new' class from the f1 calculation via labels= (note we are NOT using the mask here)
     # this will give us the f1 score over the known classes only [zero_division=1 is used to allow labels to be missing]
-    only_known_f1 = f1_score(y_true, y_pred, labels=unique_labels, average="macro", zero_division=1)
+    only_known_f1 = (
+        f1_score(y_true_encoded, y_pred_encoded, labels=le.transform(unique_labels), average="macro", zero_division=1)
+        if not np.all(y_pred == -1)
+        else 0
+    )
+
+    multiclass_accuracy = accuracy_score(y_true_encoded, y_pred_encoded)
+    multiclass_f1 = f1_score(y_true_encoded, y_pred_encoded, average="macro")
+    multiclass_f1_weighted = f1_score(y_true_encoded, y_pred_encoded, average="weighted")
 
     # Create a dictionary to store the metrics
     metrics = {
@@ -211,22 +213,64 @@ def compute_metrics(y_true, y_pred, unique_labels):
         "only_known_f1": only_known_f1,
         # normal multiclass over n+1 classes
         # threshold graph: should start at
-        "multiclass_accuracy": accuracy_score(y_true, y_pred),
-        "multiclass_f1": f1_score(y_true, y_pred, average="macro"),
-        "multiclass_f1_weighted": f1_score(y_true, y_pred, average="weighted"),
+        "multiclass_accuracy": multiclass_accuracy,
+        "multiclass_f1": multiclass_f1,
+        "multiclass_f1_weighted": multiclass_f1_weighted,
     }
 
     return metrics
 
 
-# %%
-import math
-import numpy as np
-import pandas as pd
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import StandardScaler
-from typing import List, Dict
-from scipy.spatial.distance import cdist
+class EmbeddingCentroidCalculator:
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def _filter_outliers_iqr(self, data, q1=25, q3=75, iqr_factor=1.5):
+        Q1 = np.percentile(data, q1, axis=0)
+        Q3 = np.percentile(data, q3, axis=0)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - iqr_factor * IQR
+        upper_bound = Q3 + iqr_factor * IQR
+        mask = np.all((data >= lower_bound) & (data <= upper_bound), axis=1)
+        return data[mask]
+
+    def _calculate_centroid(self, group, use_iqr=False):
+        embeddings = np.stack(group["embedding"].values)
+
+        if use_iqr:
+            embeddings = self._filter_outliers_iqr(embeddings)
+        centroid = np.mean(embeddings, axis=0) if embeddings.size > 0 else np.zeros(group["embedding"].iloc[0].shape)
+        return pd.Series({"label": group.name, "embedding": centroid})
+
+    def calculate_centroids(self, use_iqr=False):
+        return (
+            self.dataset.groupby("label").apply(lambda x: self._calculate_centroid(x, use_iqr)).reset_index(drop=True)
+        )
+
+
+class ThresholdedNearestCentroid:
+    def __init__(self, threshold, n_neighbors=1):
+        self.threshold = threshold
+        self.n_neighbors = n_neighbors
+        self.nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric="euclidean")
+        self.centroids = None
+        self.labels = None
+
+    def fit(self, centroids_df):
+        self.centroids = np.vstack(centroids_df["embedding"].values)
+        self.labels = centroids_df["label"].values
+        self.nbrs.fit(self.centroids)
+        return self
+
+    def predict(self, query_embeddings):
+        distances, indices = self.nbrs.kneighbors(query_embeddings)
+
+        nearest_distances = distances[:, 0]
+        predictions = self.labels[indices[:, 0]]
+
+        predictions[nearest_distances > self.threshold] = -1
+
+        return predictions
 
 
 def knn_openset_recognition(
@@ -234,7 +278,7 @@ def knn_openset_recognition(
     queryset: pd.DataFrame,
     thresholds: List[float],
     method: str = "knn1",
-    snapshot: List[float] = None,
+    snapshot: Optional[List[float]] = None,
 ) -> Dict[float, Dict[str, float]]:
     """
     Perform KNN + threshold grid search for open-set recognition with centroid caching.
@@ -255,29 +299,20 @@ def knn_openset_recognition(
     X_query = np.stack(queryset["embedding"].values)
     y_query = queryset["label"].values
 
-    # Standardize the features
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_query_scaled = scaler.transform(X_query)
+    # DO NOT USE STANDARD SCALER: In represenation learning, we do not scale the embeddings (their distance is important)
+    # Instead, we use the raw embeddings. If you were to scale them, we would also need to scale the threshold.
+    # scaler = StandardScaler()
 
     # Fit the NearestNeighbors model
-    nbrs = NearestNeighbors(n_neighbors=5).fit(X_train_scaled)
+    nbrs = NearestNeighbors(n_neighbors=5).fit(X_train)
 
     # Find the nearest neighbors for queryset
-    distances, indices = nbrs.kneighbors(X_query_scaled)
+    distances, indices = nbrs.kneighbors(X_query)
 
-    # Cache for centroids
-    centroid_cache = {}
+    centroider = EmbeddingCentroidCalculator(dataset)
 
-    def get_centroids(method):
-        if method not in centroid_cache:
-            if method == "knn1centroid":
-                centroid_cache[method] = dataset.groupby("label").apply(calculate_centroid, include_groups=False)
-            elif method == "knn1centroid_iqr":
-                centroid_cache[method] = dataset.groupby("label").apply(
-                    calculate_centroid_with_iqr, include_groups=False
-                )
-        return centroid_cache[method]
+    knn1centroids = centroider.calculate_centroids(use_iqr=False)
+    knn1centroids_iqr = centroider.calculate_centroids(use_iqr=True)
 
     results = {}
     for t in thresholds:
@@ -288,8 +323,9 @@ def knn_openset_recognition(
         elif method == "knn5distance":
             predictions = knn_distance(dataset, indices, distances, t)
         elif method in ["knn1centroid", "knn1centroid_iqr"]:
-            centroids = get_centroids(method)
-            predictions = knn1centroid_generic(dataset, indices, distances, t, centroids)
+            predictions = knn1centroid_generic(
+                X_query, t, knn1centroids if method == "knn1centroid" else knn1centroids_iqr
+            )
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -302,52 +338,10 @@ def knn_openset_recognition(
     return results
 
 
-def calculate_centroid(group):
-    """Calculate the centroid of a group of embeddings."""
-    embeddings = np.vstack(group["embedding"].values)
-    return np.mean(embeddings, axis=0) if embeddings.size > 0 else np.zeros(embeddings.shape[1])
-
-
-def calculate_centroid_with_iqr(group):
-    """Calculate the centroid of a group of embeddings with IQR-based outlier filtering."""
-    embeddings = filter_outliers_iqr(pd.DataFrame(np.vstack(group["embedding"]))).values
-    return np.mean(embeddings, axis=0) if embeddings.size > 0 else np.zeros(group["embedding"].iloc[0].shape)
-
-
-def filter_outliers_iqr(group):
-    """Filter outliers using the Interquartile Range method."""
-    Q1 = group.quantile(0.25)
-    Q3 = group.quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return group[(group >= lower_bound) & (group <= upper_bound)]
-
-
-def knn1centroid_generic(dataset, indices, distances, threshold, centroids):
-    """
-    Perform 1-NN classification using pre-computed centroids of each class.
-
-    Args:
-    dataset (pd.DataFrame): Training dataset with 'label' and 'embedding' columns
-    indices (np.array): Indices of nearest neighbors for each query point
-    distances (np.array): Distances to nearest neighbors for each query point
-    threshold (float): Distance threshold for classification
-    centroids (pd.Series): Pre-computed centroids for each class
-
-    Returns:
-    np.array: Predicted labels
-    """
-    query_embeddings = np.vstack(dataset.iloc[indices[:, 0]]["embedding"].values)
-    centroid_distances = cdist(query_embeddings, np.vstack(centroids.values))
-
-    nearest_centroid_indices = np.argmin(centroid_distances, axis=1)
-    nearest_centroid_distances = np.min(centroid_distances, axis=1)
-
-    predictions = np.array(centroids.index[nearest_centroid_indices])
-    predictions[nearest_centroid_distances > threshold] = -1
-
-    return predictions
+def knn1centroid_generic(query_embeddings, threshold, centroids):
+    predictor = ThresholdedNearestCentroid(threshold=threshold, n_neighbors=1)
+    predictor.fit(centroids)
+    return predictor.predict(query_embeddings)
 
 
 def knn1(dataset, indices, distances, threshold):
@@ -368,21 +362,41 @@ def knnK(dataset, indices, distances, threshold):
 
 
 def knn_distance(dataset, indices, distances, threshold):
-    """note: k is implicitly set to indices.shape[1]"""
-    predictions = []
-    for idx, dist in zip(indices, distances):
-        if dist[0] > threshold:
-            predictions.append(-1)
-        else:
-            weights = 1 / (1 + dist)
-            labels = dataset.iloc[idx]["label"]
-            df = pd.DataFrame({"label": labels, "weight": weights})
-            weighted_votes = df.groupby("label")["weight"].sum()
-            predictions.append(weighted_votes.idxmax())
-    return np.array(predictions)
+    """
+    note: k is implicitly set to indices.shape[1] (5)
+    also note that class imbalance is represented in the summed distance, i.e. far away classes with high density will have a high vote.
+    """
+    predictions = np.empty(len(indices), dtype=object)
+    labels = dataset["label"].values
+
+    for i, (idx, dist) in enumerate(zip(indices, distances)):
+        weights = 1 / (1 + dist)
+        unique_labels, label_indices = np.unique(labels[idx], return_inverse=True)
+
+        class_votes = np.bincount(label_indices, weights=weights)
+        predicted_label_index = np.argmax(class_votes)
+        predicted_label = unique_labels[predicted_label_index]
+
+        avg_distance = (
+            np.sum(dist[label_indices == predicted_label_index] * weights[label_indices == predicted_label_index])
+            / class_votes[predicted_label_index]
+        )
+
+        predictions[i] = predicted_label if avg_distance <= threshold else -1
+
+    assert len(predictions) == len(indices)
+    return predictions
 
 
-# %%
+def make_pickleable(d):
+    if isinstance(d, (dict, defaultdict)):
+        return {k: make_pickleable(v) for k, v in d.items()}
+    elif isinstance(d, list):
+        return [make_pickleable(v) for v in d]
+    else:
+        return d
+
+
 def run_knn_openset_recognition_cv(
     thresholds: List[float],
     df: pd.DataFrame,
@@ -430,71 +444,7 @@ def run_knn_openset_recognition_cv(
                 cv_results[t]["count_queryset_images_total"].append(images_total)
                 cv_results[t]["count_queryset_classes_total"].append(classes_total)
 
-    return cv_results
-
-
-edf = EXT_MERGED_DF
-
-# Filter and prepare the data
-df = edf[(edf["dataset"] == "SPAC+min3+max10") & (edf["model"] == "ViT-Finetuned")].reset_index(drop=True)
-analysis = analyse_embedding_space(df)
-max_distance = analysis["global_max_dist"]
-min_distance = analysis["global_min_dist"]
-# Set up parameters
-thresholds = np.linspace(0, max_distance + 10, 30)
-method = "knn1"
-cv_results = run_knn_openset_recognition_cv(thresholds, df, method=method, construction_method="equal_classes")
-
-
-# %%
-# %%
-def test(true, pred):
-    results = compute_metrics(true, pred, unique_labels)
-    for metric, value in results.items():
-        print(f"{metric}: {value}")
-
-
-# Define our known class labels
-unique_labels = [0, 1, 2]
-
-print("Perfect classification")
-y_true = np.array([0, 1, 2, -1])
-y_pred = np.array([0, 1, 2, -1])
-test(y_true, y_pred)
-
-print("\nLabel in Unique not in True nor Pred")
-# tricWarning: F-score is ill-defined and being set to 0.0 in labels with no true nor predicted samples. Use `zero_division` parameter to control this behavior. _warn_prf(average, modifier, f"{metric.capitalize()} is", len(result))
-y_true = np.array([0, 1, 1, -1])
-y_pred = np.array([0, 1, 1, -1])
-test(y_true, y_pred)
-
-print("\nMisclassify a known class as new class")
-y_true = np.array([0, 1, 2, -1, -1])
-y_pred = np.array([0, 1, 1, -1, 1])
-test(y_true, y_pred)
-
-print("\n+Misclassify a known class as a different known")
-y_true = np.array([0, 1, 2, -1])
-y_pred = np.array([0, 1, 1, -1])
-test(y_true, y_pred)
-
-
-print("\n+asdfasdf")
-y_true = np.array([0, 1, 2, 2])
-y_pred = np.array([0, 1, 1, -1])
-test(y_true, y_pred)
-
-print("\n+Only New")
-y_true = np.array([0, 1, 2, -1])
-y_pred = np.array([-1, -1, -1, -1])
-test(y_true, y_pred)
-
-# %%
-# %%
-import matplotlib.pyplot as plt
-import numpy as np
-from typing import Dict, List
-import math
+    return make_pickleable(cv_results)
 
 
 def visualize_metrics(cv_results: Dict[float, Dict[str, List[float]]], thresholds: List[float]):
@@ -590,49 +540,6 @@ def visualize_metrics(cv_results: Dict[float, Dict[str, List[float]]], threshold
     plt.show()
 
 
-visualize_metrics(cv_results, thresholds)
-
-# %% [markdown]
-#  ## Metrics
-#
-#  -1 for new class.
-#
-#  The threshold will make the new class at first be assigned to too many samples, later at too little (as threshold grows larger that max-cross-point distance)
-#
-#
-#
-#  multiclass_* look at all classes (including 'new')
-#
-#  multiclass_accuracy - how often are our predictions correct (compare for same value in true|pred columns)
-#
-#  multiclass_f1 - is macro weighted: all classes have same importance.
-#
-#  multiclass_f1_weighted - is weighted by sample count At the start we should see only -1 in resultset, i.e. strong class imbalance.
-#
-#
-#
-#  only_known_* looks
-#
-#
-#
-#
-#
-#  new_* looks at '-1' vs rest. It binarizes both columns to 0/1 [actually 1, -1] and then checks for equality.
-#
-#  new_precision will start at % of non-new images (they are classified wrong, as all have 'new' label).
-#
-#
-#
-#
-#
-#  => Precision is screwed towards the number of samples. E. g. 50% new / 50% known will place starting precision at 0.5; it will then grow to an optimum.
-
-# %%
-# %%
-import numpy as np
-from typing import Dict, List
-
-
 def get_optimal_threshold(
     cv_results: Dict[float, Dict[str, List[float]]], metric: str = "multiclass_f1", stability_weight: float = 0.2
 ) -> float:
@@ -674,20 +581,7 @@ def get_optimal_threshold(
     return optimal_threshold
 
 
-optimal_threshold_multiclass = get_optimal_threshold(cv_results, metric="multiclass_f1")
-
-# %%
-# %%
-import warnings
-from tqdm import tqdm
-from gorillatracker.classification.clustering import MERGED_DF, EXT_MERGED_DF
-from gorillatracker.classification.metrics import analyse_embedding_space
-
 warnings.filterwarnings("error", category=RuntimeWarning, message="invalid value encountered in scalar divide")
-
-labelling_methods = ["knn1", "knn5", "knn5distance", "knn1centroid", "knn1centroid_iqr"]
-
-construction_methods = {"equal_classes": print, "equal_images": print}
 
 
 def thresholds_selector(df, n_measures=50):
@@ -698,12 +592,27 @@ def thresholds_selector(df, n_measures=50):
     return thresholds
 
 
-def sweep_configs(dataframe, configs, resolution=50):
-    """make the sweep faster but also less accurate by choosing lower grid search resolution"""
+def sweep_configs(dataframe, configs, resolution=50, cache_dir=None):
+    """
+    Make the sweep faster but also less accurate by choosing lower grid search resolution.
+    Now includes caching at the config level, with resolution as part of the cache key.
+    """
     print(f"Running {len(configs)} configurations at resolution {resolution}...")
     results = {}
 
-    for dataset, model, labelling_method, construction_method in tqdm(configs):
+    for config in tqdm(configs):
+        dataset, model, labelling_method, construction_method = config
+
+        # Create a unique cache file name for this configuration, including resolution
+        cache_file = f"{dataset}_{model}_{labelling_method}_{construction_method}_res{resolution}.pkl"
+
+        if cache_dir and os.path.exists(os.path.join(cache_dir, cache_file)):
+            # Load cached results if they exist
+            with open(os.path.join(cache_dir, cache_file), "rb") as f:
+                results[config] = pickle.load(f)
+            print(f"Loaded cached results for {config} at resolution {resolution}")
+            continue
+
         print(
             f"Started sweep for dataset '{dataset}', model '{model}', "
             f"labelling method '{labelling_method}', and selector method '{construction_method}'"
@@ -715,8 +624,10 @@ def sweep_configs(dataframe, configs, resolution=50):
         if df.empty:
             print(f"No data found for dataset '{dataset}' and model '{model}'. Skipping...")
             continue
+
         # Generate thresholds
         thresholds = thresholds_selector(df, n_measures=resolution)
+
         # Run cross-validation
         cv_results = run_knn_openset_recognition_cv(
             thresholds=thresholds,
@@ -731,11 +642,18 @@ def sweep_configs(dataframe, configs, resolution=50):
         optimal_threshold = get_optimal_threshold(cv_results, metric="multiclass_f1")
 
         # Store results
-        results[(dataset, model, labelling_method, construction_method)] = {
+        results[config] = {
             "cv_results": cv_results,
             "optimal_threshold": optimal_threshold,
             "thresholds": thresholds,
+            "resolution": resolution,  # Include resolution in the results
         }
+
+        # Cache the results if a cache directory is provided
+        if cache_dir:
+            os.makedirs(cache_dir, exist_ok=True)
+            with open(os.path.join(cache_dir, cache_file), "wb") as f:
+                pickle.dump(results[config], f)
 
         print(
             f"Completed sweep for dataset '{dataset}', model '{model}', "
@@ -743,32 +661,6 @@ def sweep_configs(dataframe, configs, resolution=50):
         )
 
     return results
-
-
-labelling_methods = ["knn1", "knn5", "knn5distance", "knn1centroid", "knn1centroid_iqr"]
-construction_methods = ["equal_classes", "equal_images"]
-df = EXT_MERGED_DF
-configs = [
-    (dataset, model, labelling_method, construction_method)
-    for (dataset, model), _ in df.groupby(["dataset", "model"])
-    for labelling_method in labelling_methods
-    for construction_method in construction_methods
-]
-print("Total configurations:", len(configs))
-partial = [c for c in configs if c[0] == "SPAC+min3+max10" and c[1] == "ViT-Finetuned"]
-print("Partial configurations:", len(partial))
-# results = sweep_configs(df, configs, resolution=30)
-results = sweep_configs(df, partial, resolution=30)
-
-# %%
-import matplotlib.pyplot as plt
-import numpy as np
-from typing import Dict, List, Tuple
-import math
-import matplotlib.pyplot as plt
-import numpy as np
-import math
-from typing import Dict, List, Tuple
 
 
 def batch_visualize_metrics(results: Dict[Tuple, Dict], configs: List[Tuple]):
@@ -882,4 +774,14 @@ def batch_visualize_metrics(results: Dict[Tuple, Dict], configs: List[Tuple]):
     plt.show()
 
 
-batch_visualize_metrics(results, partial)
+labelling_methods = ["knn1", "knn5", "knn5distance", "knn1centroid", "knn1centroid_iqr"]
+construction_methods = ["equal_classes", "equal_images"]
+from gorillatracker.classification.clustering import EXT_MERGED_DF
+
+df = EXT_MERGED_DF
+configs = [
+    (dataset, model, labelling_method, construction_method)
+    for (dataset, model), _ in df.groupby(["dataset", "model"])
+    for labelling_method in labelling_methods
+    for construction_method in construction_methods
+]

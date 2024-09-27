@@ -8,19 +8,20 @@ import dill
 import os
 import matplotlib.pyplot as plt
 import time
+import sys
 
 from sklearn.metrics import silhouette_samples
 from scipy.spatial.distance import pdist, squareform
 
 RUNPREFIX = "with-sklearn"
 
-BASE_PATH = "/workspaces/gorillatracker/emirhan"
-BASE_DIR = "emirhan_checkpoints/"
-CHECKPOINT_DIR = f"{BASE_DIR}/{RUNPREFIX}"
+BASE_PATH = "/workspaces/gorillatracker/emirhan/gorillatracker"
+BASE_DIR = "emirhan_checkpoints"
+CHECKPOINT_DIR = f"{BASE_PATH}/{BASE_DIR}/{RUNPREFIX}"
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
 
-def get_centroids(file_path, cache=f"{CHECKPOINT_DIR}/centroids.pkl"):
+def get_centroids(file_path, cache=f"{CHECKPOINT_DIR}/{sys.argv[1]}/centroids.pkl"):
     print("Loading and preprocessing data...")
     if os.path.exists(cache):
         print("Loading centroids from checkpoint...")
@@ -43,6 +44,8 @@ def get_centroids(file_path, cache=f"{CHECKPOINT_DIR}/centroids.pkl"):
     centroid_df = df.groupby("label")["embedding"].apply(lambda x: list(pd.DataFrame(x.tolist()).mean())).reset_index()
     centroid_df.columns = ["tracklet_id", "embedding"]
 
+    if not os.path.exists(os.path.dirname(cache)):
+        os.makedirs(os.path.dirname(cache))
     centroid_df.to_pickle(cache)
     print(f"Centroids saved to {cache}")
 
@@ -64,7 +67,7 @@ def sklearn_kmeans_clustering(embeddings, k):
 
 
 def calculate_squareform_distances(embeddings):
-    cache_file = f"{CHECKPOINT_DIR}/squareform_distances.npy"
+    cache_file = f"{CHECKPOINT_DIR}/{sys.argv[1]}/squareform_distances.npy"
     if os.path.exists(cache_file):
         print("Loading cached squareform distances...")
         return np.load(cache_file)
@@ -72,6 +75,8 @@ def calculate_squareform_distances(embeddings):
     print("Calculating squareform distances...")
     start = time.time()
     distances = squareform(pdist(embeddings))
+    if not os.path.exists(os.path.dirname(cache_file)):
+        os.makedirs(os.path.dirname(cache_file))
     np.save(cache_file, distances)
     print(f"Squareform distance calculation time: {time.time() - start:.2f} seconds")
     return distances
@@ -148,7 +153,8 @@ def visualize_silhouette_score(results, title, path: Optional[str] = None):
 
 def main():
     # Load and preprocess data
-    centroid_df = get_centroids(f"{BASE_PATH}/gorillatracker/notebooks/ssl_embeddings_new_filtered.pkl")
+    print(sys.argv[1])
+    centroid_df = get_centroids(f"{BASE_PATH}/{sys.argv[1]}")
 
     embeddings = np.array(centroid_df["embedding"].tolist()).astype("float32")
     distances = calculate_squareform_distances(embeddings)
@@ -170,13 +176,15 @@ def main():
     final_df["label"] = final_labels
 
     # Save results
-    final_df.to_pickle(f"{CHECKPOINT_DIR}/final_clustered_df_ternary.pkl")
+    if not os.path.exists(f"{CHECKPOINT_DIR}/{sys.argv[1]}"):
+        os.makedirs(f"{CHECKPOINT_DIR}/{sys.argv[1]}")
+    final_df.to_pickle(f"{CHECKPOINT_DIR}/{sys.argv[1]}/final_clustered_df_ternary.pkl")
     print("Final results saved.")
 
     # Visualize results
     # Note: This visualization will only show the points that were evaluated during the ternary search
     visualize_silhouette_score(
-        evaluate_k_history, "Ternary Search Clustering", path=f"{CHECKPOINT_DIR}/ternary_search_silhouette_plot.png"
+        evaluate_k_history, "Ternary Search Clustering", path=f"{CHECKPOINT_DIR}/{sys.argv[1]}/ternary_search_silhouette_plot.png"
     )
 
 
