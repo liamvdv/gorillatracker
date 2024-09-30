@@ -23,11 +23,11 @@ from scipy.optimize import linear_sum_assignment
 import matplotlib.colors as mcolors
 
 
-def calculate_metrics(embeddings: np.ndarray, labels: np.ndarray, true_labels: np.ndarray) -> dict:
+def calculate_metrics(embeddings: np.ndarray, labels: np.ndarray, true_labels: np.ndarray, metric="euclidean") -> dict:
     """wraps analyse_embedding_space and adds class-weighted F1 score and precision"""
     assert len(labels) == len(true_labels) == len(embeddings)
     df = pd.DataFrame({"embedding": embeddings.tolist(), "label": labels.tolist()})
-    metrics = analyse_embedding_space(df)
+    metrics = analyse_embedding_space(df, metric="euclidean")
 
     # "label matching problem" in clustering evaluation
     matched_labels = match_labels(true_labels, labels)
@@ -485,7 +485,7 @@ def sweep_clustering_algorithms(df, configs, cache_dir=None):
 
         embeddings = np.stack(subset["embedding"].to_numpy())
         true_labels = subset["label"].to_numpy()
-        
+
         for params in param_combinations:
             cache_key = get_cache_key(dataset, model, algorithm, params)
             cache_file = os.path.join(cache_dir or "", f"{cache_key}.pkl")
@@ -566,7 +566,7 @@ synthetic = [
     # ("Synthetic 200c 10n", "Synthetic", "GaussianMixture", flatten_grid({"n_components": range(2, 401, 20), "covariance_type": ["full", "tied", "diag", "spherical"]})),
     # ("Synthetic 200c 10n", "Synthetic", "SpectralClustering" ,flatten_grid( {"n_clusters": range(2, 401, 20), "affinity": ["rbf", "nearest_neighbors"]}))
 ]
-configs.extend(synthetic)
+# configs.extend(synthetic)
 
 # Add SPAC dataset configurations
 models = ["ViT-Finetuned", "ViT-Pretrained", "EfN-Pretrained", "EfN-Finetuned"]
@@ -576,9 +576,9 @@ spac = [
     for ds in ["SPAC", "SPAC+min3", "SPAC+min3+max10"]
     for config in [
         # TODO(liamvdv): consider using 800 instead of 700 for the max value.
-        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 300, speed(1, 5, 20))})),
-        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 300, speed(1, 5, 20))})),
-        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3]})),
+        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 720, speed(1, 5, 20))})),
+        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 720, speed(1, 5, 20))})),
+        (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3, 5, 10, 20, 25]})),
         # ("SPAC", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("SPAC", "ViT-Finetuned", "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
         # ("SPAC", "ViT-Finetuned", "SpectralClustering", flatten_grid({"n_clusters": range(2, 181, 5), "affinity": ["rbf", "nearest_neighbors"]})),
@@ -590,10 +590,15 @@ configs.extend(spac)
 bristol = [
     config
     for model in models
-    for ds in ["Bristol", "Bristol+min25+max25"]
+    for ds, n_samples in [("Bristol", 372), ("Bristol+min25+max25", 175)]
     for config in [
-        (ds, model, "KMeans", param_grid({"n_clusters": range(3, 80, 1)})),
-        (ds, model, "AgglomerativeClustering", param_grid({"n_clusters": range(3, 80, 1)})),
+        (ds, model, "KMeans", param_grid({"n_clusters": [*range(3, 80, 1), *range(80, n_samples, 5)]})),
+        (
+            ds,
+            model,
+            "AgglomerativeClustering",
+            param_grid({"n_clusters": [*range(3, 80, 1), *range(80, n_samples, 5)]}),
+        ),
         (ds, model, "HDBSCAN", param_grid({"min_cluster_size": [3, 5, 10, 20, 25]})),
         # ("Bristol", model, "DBSCAN", param_grid({"eps": [0.1, 0.5, 1.0], "min_samples": [2, 4, 8]})),
         # ("Bristol", model, "GaussianMixture", flatten_grid({"n_components": range(2, 181, 5), "covariance_type": ["full", "tied", "diag", "spherical"]})),
@@ -601,10 +606,3 @@ bristol = [
     ]
 ]
 configs.extend(bristol)
-
-
-if __name__ == "__main__":
-    print("Number of configurations:", len(configs))
-    print("Number of algorithm configurations:", sum(len(params) for _, _, _, params in configs))
-    results_df = sweep_clustering_algorithms(EXT_MERGED_DF, configs)
-    results_df.to_pickle("results.pkl")

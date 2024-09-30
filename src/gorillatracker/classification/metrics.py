@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.metrics import calinski_harabasz_score, silhouette_score, davies_bouldin_score
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def compute_centroids(df):
@@ -48,8 +49,20 @@ def compute_iqr_centroids(df):
     return iqr_centroid_df
 
 
-def analyse_embedding_space(df) -> dict:
-    """Looks more difficult than is. It just needs to handle unclassified points (label -1) and only 0/1 cluster"""
+def analyse_embedding_space(df, metric="euclidean") -> dict:
+    """
+    Analyzes the embedding space of the given dataframe.
+
+    Args:
+    df (pd.DataFrame): Dataframe containing 'embedding' and 'label' columns.
+    metric (str): Distance metric to use. Either 'euclidean' or 'cosine'. Default is 'euclidean'.
+
+    Returns:
+    dict: A dictionary containing various metrics about the embedding space.
+    """
+    if metric not in ["euclidean", "cosine"]:
+        raise ValueError("Metric must be either 'euclidean' or 'cosine'")
+
     all_embeddings = np.array(df["embedding"].tolist())
     labels = df["label"].values
 
@@ -63,7 +76,12 @@ def analyse_embedding_space(df) -> dict:
     unclustered_points = np.sum(labels == -1)
     unclustered_ratio = unclustered_points / total_points if total_points > 0 else None
 
-    all_dist = cdist(all_embeddings, all_embeddings)
+    # Calculate distances
+    if metric == "euclidean":
+        all_dist = cdist(all_embeddings, all_embeddings)
+    else:  # cosine
+        all_dist = 1 - cosine_similarity(all_embeddings)
+
     mask = ~np.eye(all_dist.shape[0], dtype=bool)
 
     metrics = {
@@ -100,7 +118,10 @@ def analyse_embedding_space(df) -> dict:
         cluster_points = clustered_embeddings[clustered_labels == label]
         centroid = np.mean(cluster_points, axis=0)
         centroids.append(centroid)
-        distances = cdist(cluster_points, [centroid]).flatten()
+        if metric == "euclidean":
+            distances = cdist(cluster_points, [centroid]).flatten()
+        else:  # cosine
+            distances = 1 - cosine_similarity(cluster_points, [centroid]).flatten()
         intra_distances.extend(distances)
 
     intra_distances = np.array(intra_distances)
@@ -120,14 +141,17 @@ def analyse_embedding_space(df) -> dict:
         metrics.update(
             {
                 "calinski_harabasz_index": calinski_harabasz_score(clustered_embeddings, clustered_labels),
-                "silhouette_coefficient": silhouette_score(clustered_embeddings, clustered_labels),
+                "silhouette_coefficient": silhouette_score(clustered_embeddings, clustered_labels, metric=metric),
                 "davies_bouldin_index": davies_bouldin_score(clustered_embeddings, clustered_labels),
             }
         )
 
         # Compute inter-cluster metrics
         centroids = np.array(centroids)
-        inter_distances = cdist(centroids, centroids)
+        if metric == "euclidean":
+            inter_distances = cdist(centroids, centroids)
+        else:  # cosine
+            inter_distances = 1 - cosine_similarity(centroids)
         inter_mask = ~np.eye(inter_distances.shape[0], dtype=bool)
 
         metrics.update(

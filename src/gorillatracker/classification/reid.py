@@ -222,8 +222,9 @@ def compute_metrics(y_true, y_pred, unique_labels):
 
 
 class EmbeddingCentroidCalculator:
-    def __init__(self, dataset):
+    def __init__(self, dataset, metric="euclidean"):
         self.dataset = dataset
+        self.metric = metric
 
     def _filter_outliers_iqr(self, data, q1=25, q3=75, iqr_factor=1.5):
         Q1 = np.percentile(data, q1, axis=0)
@@ -236,10 +237,13 @@ class EmbeddingCentroidCalculator:
 
     def _calculate_centroid(self, group, use_iqr=False):
         embeddings = np.stack(group["embedding"].values)
-
         if use_iqr:
             embeddings = self._filter_outliers_iqr(embeddings)
         centroid = np.mean(embeddings, axis=0) if embeddings.size > 0 else np.zeros(group["embedding"].iloc[0].shape)
+        if self.metric == "cosine" and embeddings.size > 0:
+            # Normalize the centroid for cosine similarity (norm([0, ..., 0]) = 0; div by zero)
+            centroid = centroid / np.linalg.norm(centroid)
+
         return pd.Series({"label": group.name, "embedding": centroid})
 
     def calculate_centroids(self, use_iqr=False):
@@ -249,10 +253,11 @@ class EmbeddingCentroidCalculator:
 
 
 class ThresholdedNearestCentroid:
-    def __init__(self, threshold, n_neighbors=1):
+    def __init__(self, threshold, n_neighbors=1, metric="euclidean"):
         self.threshold = threshold
         self.n_neighbors = n_neighbors
-        self.nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric="euclidean")
+        self.metric = metric
+        self.nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric=metric)
         self.centroids = None
         self.labels = None
 
@@ -265,10 +270,16 @@ class ThresholdedNearestCentroid:
     def predict(self, query_embeddings):
         distances, indices = self.nbrs.kneighbors(query_embeddings)
 
-        nearest_distances = distances[:, 0]
-        predictions = self.labels[indices[:, 0]]
-
-        predictions[nearest_distances > self.threshold] = -1
+        if self.metric == "cosine":
+            # Convert cosine distance to cosine similarity
+            similarities = 1 - distances
+            nearest_values = similarities[:, 0]
+            predictions = self.labels[indices[:, 0]]
+            predictions[nearest_values < self.threshold] = -1
+        else:  # euclidean
+            nearest_distances = distances[:, 0]
+            predictions = self.labels[indices[:, 0]]
+            predictions[nearest_distances > self.threshold] = -1
 
         return predictions
 
@@ -278,38 +289,36 @@ def knn_openset_recognition(
     queryset: pd.DataFrame,
     thresholds: List[float],
     method: str = "knn1",
+    metric: str = "euclidean",
     snapshot: Optional[List[float]] = None,
 ) -> Dict[float, Dict[str, float]]:
-    """
-    Perform KNN + threshold grid search for open-set recognition with centroid caching.
-
-    Args:
-    dataset (pd.DataFrame): Training dataset with 'label' and 'embedding' columns
-    queryset (pd.DataFrame): Query dataset with 'label' and 'embedding' columns
-    thresholds (List[float]): List of thresholds to search
-    method (str): Method to use for classification ('knn1', 'knn5', 'knn1centroid', 'knn1centroid_iqr')
-    snapshot (List[float]): List of thresholds to store results for.
-
-    Returns:
-    Dict[float, Dict[str, float]]: Results for each threshold
-    """
     # Prepare the data
     X_train = np.stack(dataset["embedding"].values)
     y_train = dataset["label"].values
     X_query = np.stack(queryset["embedding"].values)
     y_query = queryset["label"].values
 
-    # DO NOT USE STANDARD SCALER: In represenation learning, we do not scale the embeddings (their distance is important)
-    # Instead, we use the raw embeddings. If you were to scale them, we would also need to scale the threshold.
-    # scaler = StandardScaler()
+    if metric == "cosine":
+        # Normalize embeddings for cosine similarity
+        X_train = X_train / np.linalg.norm(X_train, axis=1, keepdims=True)
+        X_query = X_query / np.linalg.norm(X_query, axis=1, keepdims=True)
 
     # Fit the NearestNeighbors model
-    nbrs = NearestNeighbors(n_neighbors=5).fit(X_train)
+    # NOTE(liamvdv): metric='minkowski' p=2 is equivalent to euclidean distance
+    nbrs = NearestNeighbors(n_neighbors=5, metric="minkowski" if metric == "euclidean" else metric).fit(X_train)
 
     # Find the nearest neighbors for queryset
     distances, indices = nbrs.kneighbors(X_query)
 
-    centroider = EmbeddingCentroidCalculator(dataset)
+    if metric == "cosine":
+        # Convert distances to similarities for cosine
+        similarities = 1 - distances
+    elif metric == "euclidean":
+        similarities = distances  # For euclidean, we'll just use the distances
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
+
+    centroider = EmbeddingCentroidCalculator(dataset, metric=metric)
 
     knn1centroids = centroider.calculate_centroids(use_iqr=False)
     knn1centroids_iqr = centroider.calculate_centroids(use_iqr=True)
@@ -317,14 +326,14 @@ def knn_openset_recognition(
     results = {}
     for t in thresholds:
         if method == "knn1":
-            predictions = knn1(dataset, indices, distances, t)
+            predictions = knn1(dataset, indices, similarities, t, metric)
         elif method == "knn5":
-            predictions = knnK(dataset, indices, distances, t)
+            predictions = knnK(dataset, indices, similarities, t, metric)
         elif method == "knn5distance":
-            predictions = knn_distance(dataset, indices, distances, t)
+            predictions = knn_distance_or_similarity(dataset, indices, similarities, t, metric)
         elif method in ["knn1centroid", "knn1centroid_iqr"]:
             predictions = knn1centroid_generic(
-                X_query, t, knn1centroids if method == "knn1centroid" else knn1centroids_iqr
+                X_query, t, knn1centroids if method == "knn1centroid" else knn1centroids_iqr, metric
             )
         else:
             raise ValueError(f"Unknown method: {method}")
@@ -338,21 +347,17 @@ def knn_openset_recognition(
     return results
 
 
-def knn1centroid_generic(query_embeddings, threshold, centroids):
-    predictor = ThresholdedNearestCentroid(threshold=threshold, n_neighbors=1)
-    predictor.fit(centroids)
-    return predictor.predict(query_embeddings)
+def knn1(dataset, indices, similarities, threshold, metric):
+    return knnK(dataset, indices[:, :1], similarities[:, :1], threshold, metric)
 
 
-def knn1(dataset, indices, distances, threshold):
-    return knnK(dataset, indices[:, :1], distances[:, :1], threshold)
-
-
-def knnK(dataset, indices, distances, threshold):
-    """note: k is implicitly set to indices.shape[1]"""
+def knnK(dataset, indices, similarities, threshold, metric):
     predictions = []
-    for idx, dist in zip(indices, distances):
-        valid = dataset.iloc[idx][dist <= threshold]
+    for idx, sim in zip(indices, similarities):
+        if metric == "cosine":
+            valid = dataset.iloc[idx][sim >= threshold]
+        else:  # euclidean
+            valid = dataset.iloc[idx][sim <= threshold]
         if not valid.empty:
             prediction = valid["label"].mode()[0]
         else:
@@ -361,31 +366,58 @@ def knnK(dataset, indices, distances, threshold):
     return np.array(predictions)
 
 
-def knn_distance(dataset, indices, distances, threshold):
-    """
-    note: k is implicitly set to indices.shape[1] (5)
-    also note that class imbalance is represented in the summed distance, i.e. far away classes with high density will have a high vote.
-    """
+def knn_distance_or_similarity(dataset, indices, similarities, threshold, metric):
     predictions = np.empty(len(indices), dtype=object)
     labels = dataset["label"].values
 
-    for i, (idx, dist) in enumerate(zip(indices, distances)):
-        weights = 1 / (1 + dist)
+    for i, (idx, sim) in enumerate(zip(indices, similarities)):
+        if metric == "cosine":
+            # For cosine, higher similarity is better
+            weights = sim
+        else:  # euclidean
+            # For Euclidean, smaller distance is better
+            weights = 1 / (1 + sim)
+
         unique_labels, label_indices = np.unique(labels[idx], return_inverse=True)
 
         class_votes = np.bincount(label_indices, weights=weights)
         predicted_label_index = np.argmax(class_votes)
         predicted_label = unique_labels[predicted_label_index]
 
-        avg_distance = (
-            np.sum(dist[label_indices == predicted_label_index] * weights[label_indices == predicted_label_index])
+        avg_value = (
+            np.sum(sim[label_indices == predicted_label_index] * weights[label_indices == predicted_label_index])
             / class_votes[predicted_label_index]
         )
 
-        predictions[i] = predicted_label if avg_distance <= threshold else -1
+        if metric == "cosine":
+            # For cosine, lower similarity (closer to -1) means more uncertainty
+            predictions[i] = predicted_label if avg_value > threshold else -1
+        else:  # euclidean
+            # For Euclidean, higher distance means more uncertainty
+            predictions[i] = predicted_label if avg_value <= threshold else -1
 
     assert len(predictions) == len(indices)
     return predictions
+
+
+def knn1centroid_generic(query_embeddings, threshold, centroids, metric):
+    predictor = ThresholdedNearestCentroid(threshold=threshold, n_neighbors=1, metric=metric)
+    predictor.fit(centroids)
+    return predictor.predict(query_embeddings)
+
+
+def thresholds_selector(df, n_measures=50, metric="euclidean"):
+    analysis = analyse_embedding_space(df)
+    if metric == "cosine":
+        max_value = 1  # Cosine similarity ranges from -1 to 1
+        min_value = -1
+    elif metric == "euclidean":
+        max_value = analysis["global_max_dist"]
+        min_value = analysis["global_min_dist"]
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
+    thresholds = np.linspace(min_value, max_value, n_measures)
+    return thresholds
 
 
 def make_pickleable(d):
@@ -405,6 +437,7 @@ def run_knn_openset_recognition_cv(
     seed: int = 42,
     method: str = "knn1",
     snapshots: List[float] = None,
+    metric: str = "euclidean",
 ) -> Dict[float, Dict[str, List[float]]]:
     """
     Run KNN open-set recognition with cross-validation.
@@ -434,10 +467,17 @@ def run_knn_openset_recognition_cv(
         # set all test_df labels to new_label if is_new column set
         test_df.loc[test_df["is_new"], "label"] = new_label
         test_df.loc[test_df["is_new"], "label_string"] = "new"
-        fold_results = knn_openset_recognition(train_df, test_df, thresholds, method=method, snapshot=snapshots)
+        fold_results = knn_openset_recognition(
+            train_df,
+            test_df,
+            thresholds=thresholds,
+            method=method,
+            metric=metric,
+            snapshot=snapshots,
+        )
         for t, metrics in fold_results.items():
-            for metric, value in metrics.items():
-                cv_results[t][metric].append(value)
+            for metric_, value in metrics.items():
+                cv_results[t][metric_].append(value)
 
                 cv_results[t]["count_queryset_images_new"].append(images_new)
                 cv_results[t]["count_queryset_classes_new"].append(classes_new)
@@ -584,15 +624,7 @@ def get_optimal_threshold(
 warnings.filterwarnings("error", category=RuntimeWarning, message="invalid value encountered in scalar divide")
 
 
-def thresholds_selector(df, n_measures=50):
-    analysis = analyse_embedding_space(df)
-    max_distance = analysis["global_max_dist"]
-    min_distance = analysis["global_min_dist"]
-    thresholds = np.concatenate([[0], np.linspace(min_distance, max_distance + 1, n_measures)])
-    return thresholds
-
-
-def sweep_configs(dataframe, configs, resolution=50, cache_dir=None):
+def sweep_configs(dataframe, configs, resolution=50, metric="euclidean", cache_dir=None):
     """
     Make the sweep faster but also less accurate by choosing lower grid search resolution.
     Now includes caching at the config level, with resolution as part of the cache key.
@@ -604,7 +636,7 @@ def sweep_configs(dataframe, configs, resolution=50, cache_dir=None):
         dataset, model, labelling_method, construction_method = config
 
         # Create a unique cache file name for this configuration, including resolution
-        cache_file = f"{dataset}_{model}_{labelling_method}_{construction_method}_res{resolution}.pkl"
+        cache_file = f"{dataset}_{model}_{labelling_method}_{construction_method}_res{resolution}_{metric}.pkl"
 
         if cache_dir and os.path.exists(os.path.join(cache_dir, cache_file)):
             # Load cached results if they exist
@@ -634,6 +666,7 @@ def sweep_configs(dataframe, configs, resolution=50, cache_dir=None):
             df=df,
             construction_method=construction_method,
             method=labelling_method,
+            metric=metric,
             k_fold=5,
             seed=42,
         )
@@ -657,7 +690,7 @@ def sweep_configs(dataframe, configs, resolution=50, cache_dir=None):
 
         print(
             f"Completed sweep for dataset '{dataset}', model '{model}', "
-            f"labelling method '{labelling_method}', and selector method '{construction_method}'"
+            f"labelling method '{labelling_method}', and selector method '{construction_method}' ({metric})"
         )
 
     return results
@@ -775,7 +808,7 @@ def batch_visualize_metrics(results: Dict[Tuple, Dict], configs: List[Tuple]):
 
 
 labelling_methods = ["knn1", "knn5", "knn5distance", "knn1centroid", "knn1centroid_iqr"]
-construction_methods = ["equal_classes", "equal_images"]
+construction_methods = ["equal_classes"]  # + ["equal_images"]
 from gorillatracker.classification.clustering import EXT_MERGED_DF
 
 df = EXT_MERGED_DF
