@@ -407,15 +407,9 @@ def knn1centroid_generic(query_embeddings, threshold, centroids, metric):
 
 
 def thresholds_selector(df, n_measures=50, metric="euclidean"):
-    analysis = analyse_embedding_space(df)
-    if metric == "cosine":
-        max_value = 1  # Cosine similarity ranges from -1 to 1
-        min_value = -1
-    elif metric == "euclidean":
-        max_value = analysis["global_max_dist"]
-        min_value = analysis["global_min_dist"]
-    else:
-        raise ValueError(f"Unknown metric: {metric}")
+    analysis = analyse_embedding_space(df, metric=metric)
+    max_value = analysis["global_max_dist"]
+    min_value = analysis["global_min_dist"]
     thresholds = np.linspace(min_value, max_value, n_measures)
     return thresholds
 
@@ -658,7 +652,7 @@ def sweep_configs(dataframe, configs, resolution=50, metric="euclidean", cache_d
             continue
 
         # Generate thresholds
-        thresholds = thresholds_selector(df, n_measures=resolution)
+        thresholds = thresholds_selector(df, n_measures=resolution, metric=metric)
 
         # Run cross-validation
         cv_results = run_knn_openset_recognition_cv(

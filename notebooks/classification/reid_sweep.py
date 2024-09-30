@@ -8,9 +8,9 @@ results = sweep_configs(EXT_MERGED_DF, configs, resolution=100, metric="cosine",
 with open("sep29_reid_results_cosine.pkl", "wb") as f:
     pickle.dump(results, f)
 
-results = sweep_configs(
-    EXT_MERGED_DF, configs, resolution=100, metric="euclidean", cache_dir="sep29_reid_cache_euclidean"
-)
+# results = sweep_configs(
+#     EXT_MERGED_DF, configs, resolution=100, metric="euclidean", cache_dir="sep29_reid_cache_euclidean"
+# )
 
-with open("sep29_reid_results_euclidean.pkl", "wb") as f:
-    pickle.dump(results, f)
+# with open("sep29_reid_results_euclidean.pkl", "wb") as f:
+#     pickle.dump(results, f)
