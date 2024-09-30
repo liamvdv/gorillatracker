@@ -92,7 +92,7 @@ print(
     + "TSNE embeddings of SPAC+min3 and Bristol datasets using ViT-Finetuned model "
     + ("(Euclidean Distance)" if metric == "euclidean" else "(Cosine Similarity)")
     + r"""}
-    \label{fig:objective-functions-graphs-"""
+    \label{fig:clustering-tsne-"""
     + metric
     + r"""}
 \end{figure}
