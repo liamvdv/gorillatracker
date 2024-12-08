@@ -42,7 +42,7 @@ placing them in a `.gitconfig`. It will not be commited to remote.
 ``` 
 
 # Architecture
-### Adding a Dataset
+## Adding a Dataset
 
 1. Create a Dataset that supports __getitem__(self, idx: int) (read: single element access) in `gorillatracker.datasets.<name>.py`.  
 If you need to do custom transformations (except resizing), you can also declare a classmethod `get_transforms(cls)`.
@@ -52,9 +52,22 @@ If you need to do custom transformations (except resizing), you can also declare
 You can now use the dataset for online and offline triplet loss. All the sampling 
 for triplet generation is ready build. 
 
-### Where to transforms go? `dataset_class.get_transforms()` vs  `model_class.get_tensor_transforms()`
+## Where to transforms go? `dataset_class.get_transforms()` vs  `model_class.get_tensor_transforms()`
 The model class should many apply a Resize to it's expected size and if needed enforce number of channels needed.
 The dataset class should specify all other transforms and MUST at least transform `torchvision.transforms.ToTensor`.
+
+# Training
+## train a model
+### inside of devcontainer
+- make sure you have mounted the right gpu in devcontainer.json
+- run: ```python train.py --config_path cfgs/<yourconfigname>.yml```
+### without devcontainer
+```bash run-in-docker.sh -g [GPUs] python train.py --config_path cfgs/<yourconfigname>.yml```
+
+## sweep for best hyperparameters
+### setup sweep config
+### start sweep
+```bash scripts/run-in-docker.sh -g [GPUs] python init_sweep.py --sweep_config_file sweep_configs/<yoursweepconfigname>.json```
 
 
 
