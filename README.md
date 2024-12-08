@@ -1,18 +1,45 @@
 # gorillatracker
-The GorillaTracker BP
+This repository is the byproduct of the Gorillatracker Bachelors Project 2023/2024 at HPI. It can be used for easily training computer vision models supervised aswell as self supervised.
+
+# Setup
+## Clone Repository
+```git clone https://github.com/joschaSchroff/gorillatracker.git```
+
+## Build Docker Image
+```docker build -t gorillatracker:latest .```
+
+## Devcontainer
+Install [VS-Code devcontainer extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+### Adjust `devcontainer.json`
+
+Ensure the following directories and files exist, and verify that the correct paths are set in your `devcontainer.json` file:
+
+#### Required Directories
+- `.ssh`
+- `.cache`
+
+#### Required Files
+- `.netrc`
+- `.gitconfig`
+
+### Open in Devcontainer
+
+1. Open the project in Visual Studio Code.
+2. Use the **Command Palette** (`Ctrl+Shift+P` or `Cmd+Shift+P` on macOS) and select:
+   - `Dev Containers: Reopen in Container`.
+3. Wait for the container to build and start. Once completed, your environment will be ready for development.
 
 
-# Data 
-Our data setup `/scratch2/gorillatracker` as base.\
-`data/` contains our data.\
-&nbsp;&nbsp;&nbsp;&nbsp;`ground_truth/<dataset>/` only contains , e. g. `bristol`, `cxl` \
-&nbsp;&nbsp;&nbsp;&nbsp;`derived_dataset/<dataset>`\
-&nbsp;&nbsp;&nbsp;&nbsp;`splits/<split-id>`\
-&nbsp;&nbsp;&nbsp;&nbsp;`derived_data/`\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`spac_gorillas_labels/` contains a v.json for every v.mp4 where the bounding box of frame i can be accessed through v\["labels"\]\[i\]\
-`models/` contains our trained model weights (push them to W&B too though!)
-<!-- sorry for the ugly formatting, I couldn't get it to show up otherwise -->
+### Update `.gitconfig`
+You can prevent readding your git name and email after devcontainer rebuild by 
+placing them in a `.gitconfig`. It will not be commited to remote.
 
+```
+[user]
+    name = Your Name
+    email = some.body@student.hpi.de
+``` 
 
 # Architecture
 ### Adding a Dataset
@@ -30,97 +57,8 @@ The model class should many apply a Resize to it's expected size and if needed e
 The dataset class should specify all other transforms and MUST at least transform `torchvision.transforms.ToTensor`.
 
 
-# Statistcs
-
-```bash
-ground_truth/ 
-  cxl/ contains 952 images of 120 individuals  
-```
-```bash
-/scratch1/
-    wildlife_conservation_data/spac_gorillas_converted/
-        12425 videos as .mp4
-        total lenght: 8249.79 min.
-        average video length: 39.83 sec
-        total number of frames: 29710260
-        average fps: 60.0
-        resolution: 1920/1080
-        used cameras: 40
-        filmed on 349 days between 27.05.2021 and 09.03.2023
-
-    wildlife_conservation/data/all_gorillas/bristol/full_images
-        images: 5409
-        individuals: 7
-        images/individual
-            min: 488
-            max: 957
-            avg: 772.71
-
-    wildlife_conservation/data/all_gorillas/cxl/full_images
-        images: 944
-        individuals: 120
-        images/individual
-            min: 1
-            max: 55
-            avg: 7.87
-        camera/individual: 1.158
-        days/individual: 1.625
-	    >=3 images
-	        individuals: 106
-	        avg image/individual: 8.72
-
-    wildlife_conservation/data/all_gorillas/cxl/face_images
-        images: 854
-        individuals: 115
-        images/individual
-            min: 1
-            max: 50
-            avg: 7.43
-        camera/individual: 1.148
-        days/individual: 1.617
-	    >=3 images
-	        individuals: 96
-	        avg image/individual: 8.57
-
-    wildlife_conservation/data/all_gorillas/cxl/body_images
-        images: 846
-        individuals: 115
-        images/individual
-            min: 1
-            max: 50
-            avg: 7.36
-        camera/individual: 1.148
-        days/individual: 1.617
-	    >=3 images
-	        individuals: 96
-	        avg image/individual: 8.50
-```
 
 
-#### Development Setup
-You can prevent readding your git name and email after devcontainer rebuild by 
-placing them in a `.gitconfig`. It will not be commited to remote.
-
-```
-[user]
-    name = Your Name
-    email = some.body@student.hpi.de
-``` 
-
-
-#### How to access the Grafana Dashboard?
-1. Forward the remote port 3000 to your machine on e. g. port 8000.
-To forward the remote Grafana Dashboard, which runs on port 3000 to your laptop port 8000, run
-```
-ssh -L 8000:localhost:3000 gpuserver2
-```
-
-Note that `gpuserver2` is my ssh host alias for the remote host, change it to 
-whatever you have named it.
-
-2. Login 
-student
-AIisthebest
 
 
 
