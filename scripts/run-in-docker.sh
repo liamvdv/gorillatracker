@@ -11,7 +11,7 @@
 # We automatically detect W&B login credentials in the ~/.netrc file and pass them to the docker container. To store them, do wandb login once on the host machine.
 
 # Default values
-image="liamvdv/gorillatracker-ubuntu-dev:1.1.0"
+image="liamvdv/gorillatracker-ubuntu-dev:1.1.0" # put your docker image here
 command="bash"
 gpus="none"
 
@@ -53,9 +53,8 @@ parse_arguments() {
         esac
         shift
     done
-
     command="pip install -e . && ${command}"
-    
+
 }
 
 # Call the function to parse arguments
@@ -93,16 +92,15 @@ fi
 # --user $(id -u):$(id -g) \ # use root user instead
 
 docker run --rm -it --ipc=host --network=host \
-    -v "$(pwd)":/workspaces/gorillatracker -w /workspaces/gorillatracker \
-    -v "${HOME}/data:/workspaces/gorillatracker/data" \
-    -v "${HOME}/data/embeddings:/workspaces/gorillatracker/data/embeddings" \
-    -v "${HOME}/data/splits/:/workspaces/gorillatracker/data/splits" \
-    -v "${HOME}/models/:/workspaces/gorillatracker/models" \
-    -v "$(pwd)/../.netrc:/home/gorilla/.netrc" \
-    -v "$(pwd)/../.cache:/home/gorilla/.cache" \
+    -v "${PWD}/../gorillatracker:/workspaces/gorillatracker" \
+    -w /workspaces/gorillatracker \
+    -v "${PWD}/../.netrc:/home/gorilla/.netrc:ro" \
+    -v "${PWD}/../.cache:/home/gorilla/.cache:ro" \
+    # -v "/data:/workspaces/gorillatracker/data:ro" \
     --user 0:0 \
     --env XDG_CACHE_HOME --env HF_DATASETS_CACHE --env WANDB_CACHE_DIR --env WANDB_DATA_DIR --env WANDB_API_KEY \
     --gpus=\"device=${gpus}\" \
+    --name gorillatracker \
     $image /bin/bash -c "${command}"
 
 # print done to console
