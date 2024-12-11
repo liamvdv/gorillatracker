@@ -149,7 +149,6 @@ dmypy.json
 /lightning_logs
 yolov8n.pt
 /.vscode
-.devcontainer/devcontainer.json
 /runs
 /checkpoints
 /gorillavision
