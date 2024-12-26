@@ -66,6 +66,7 @@ The dataset class should specify all other transforms and MUST at least transfor
 
 ## sweep for best hyperparameters
 ### setup sweep config
+set up a json file(see examples in ```/sweep_configs```) with the parameters you want to sweep over.
 ### start sweep
 ```bash scripts/run-in-docker.sh -g [GPUs] python init_sweep.py --sweep_config_file sweep_configs/<yoursweepconfigname>.json```
 
