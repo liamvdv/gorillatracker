@@ -70,6 +70,13 @@ set up a json file(see examples in ```/sweep_configs```) with the parameters you
 ### start sweep
 ```bash scripts/run-in-docker.sh -g [GPUs] python init_sweep.py --sweep_config_file sweep_configs/<yoursweepconfigname>.json```
 
+# License
+
+This project is licensed under the [GNU Affero General Public License v3.0](./LICENSE).
+
+You are free to use, modify, and distribute this software under the terms of the AGPL-3.0. For more details, see the full [LICENSE](./LICENSE) file.
+
+
 
 
 
