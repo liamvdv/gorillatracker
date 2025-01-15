@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
+import os
 from pathlib import Path
 from typing import Any, Optional, Type, TypeVar
 
 import sqlalchemy.types as types
-from sqlalchemy import CheckConstraint, Dialect, ForeignKey, Index, String, UniqueConstraint, event
+from sqlalchemy import CheckConstraint, Dialect, ForeignKey, Index, MetaData, String, UniqueConstraint, event
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.orm.mapper import Mapper
+
+# NOTE(memben): create schema manually in the database
+SCHEMA = os.getenv("SCHEMA", "public")
 
 
 # WARNING(memben): Changing the class may affect the database
@@ -70,7 +74,8 @@ class ExtensibleEnum(types.TypeDecorator[T]):
 
 
 class Base(DeclarativeBase):
-    pass
+    __abstract__ = True
+    metadata = MetaData(schema=SCHEMA)
 
 
 class Camera(Base):
