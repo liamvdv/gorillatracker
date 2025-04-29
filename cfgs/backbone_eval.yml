@@ -1,0 +1,110 @@
+# Device Arguments
+
+accelerator: cuda               # Device accelerator (e.g., "cuda" for GPU)
+num_devices: 1                  # Number of devices (GPUs) to use
+distributed_strategy: "auto"    # Distributed training strategy (if applicable)
+force_deterministic: False      # Force deterministic behavior
+precision: 32           # Training precision (e.g., "bf16-mixed")
+compile: False                  # Compile the model for faster execution
+workers: 16                      # Number of workers for data loading
+
+
+# Model and Training Arguments
+
+project_name: "EVAL3-ALL-CXL-OpenSet"
+run_name: "000-eval-default_test" # Name for this training run form: <Issue Number>-<Purpose> eg. #123-testing-new-data
+model_name_or_path: "timm_eval/vit_base_patch16_224.mae" # Model name or path 
+embedding_size: 768             # Embedding size
+
+saved_checkpoint_path: Null     # Path to a saved model checkpoint (if resuming)
+resume: False                   # Resume training from a saved checkpoint can also be a wandb path (wandb:model_id:tag)
+fast_dev_run: False             # Enable fast development run
+profiler: Null                  # Profiler to use (e.g., "simple", "advanced", "pytorch")
+offline: False                  # Enable offline mode for WandB
+data_preprocessing_only: False  # Run only data preprocessing
+seed: 42                        # Random seed for reproducibility
+debug: False                    # Enable debug mode
+from_scratch: False             # Train the model from scratch
+early_stopping_patience: 5      # Early stopping patience (number of epochs)
+val_before_training: True       # Perform validation before training
+
+weight_decay: 0.2              # Weight decay
+beta1: 0.9                      # Adam optimizer's beta1 parameter
+beta2: 0.999                    # Adam optimizer's beta2 parameter
+epsilon: 1e-7                   # Adam optimizer's epsilon
+
+# L2SP Arguments
+l2_alpha: 0.1                       # Alpha for the l2sp loss
+l2_beta: 0.01                       # Beta for the l2sp loss
+
+margin: 1.0                   # Margin for the contrastive loss (triplet loss)
+loss_mode: "online/soft"        # Loss modes are "offline", "offline/native", "online/soft", "online/semi-hard", "online/hard", "softmax/arcface" 
+
+
+lr_schedule: "exponential"           # Learning rate schedule (e.g., "linear", "cosine", "exponential", "reduce_on_plateau") TODO: add 
+warmup_mode: "constant"           # Warmup mode (e.g., "linear", "cosine", "exponential", "constant")
+warmup_epochs: 0                # Number of warmup epochs (if 0 no warmup is performed)
+initial_lr: 1e-5                # Initial learning rate before warmup(must be > 0.0)
+start_lr: 1e-5                  # Learning Rate after warmup at the beginning of 'normal' scheduling
+end_lr: 1e-7                    # End learning rate (for the learning rate schedule -> cosine learning rate schedule)
+
+batch_size: 16                 # Training batch size
+grad_clip: 1.0                   # Gradient clipping value
+gradient_accumulation_steps: 1  # Gradient accumulation steps
+max_epochs: 50               # Training goal (large number)
+only_val: True                 # Perform only validation
+kfold: False                     # Perform kfold cross validation
+save_interval: 1               # Model checkpoint save interval as a fraction of total steps
+embedding_save_interval: 1      # Embedding save interval
+check_val_every_n_epoch: 1      # Check validation every n epochs
+
+force_nlet_builder: "onelet"
+# TODO(rob2u): specify the dataset classes and data directories
+
+
+data_resize_transform: 224
+data_dir: "/workspaces/gorillatracker/data/supervised/cxl_all/face_images" # cxl-all_faces
+dataset_class: "gorillatracker.datasets.cxl.CXLDataset" # cxl-all_faces
+
+# TODO(rob2u): add all for faces + bodies
+knn_with_train: False
+dataset_names: [
+  "cxl-all_faces", 
+  "cxlkfold_faces", 
+
+  "cxl_faces_square", 
+  "cxl-all_faces_square", 
+  "cxlkfold_faces_square", 
+
+  "cxl_bodies", 
+  "cxl-all_bodies", 
+  "cxlkfold_bodies", 
+
+  "bristol"
+  ]
+additional_val_dataset_classes: [
+  "gorillatracker.datasets.cxl.ValKFoldCXLDataset", # cxlkfold_faces
+
+  "gorillatracker.datasets.cxl.CXLDataset", # cxl-all_faces square
+  "gorillatracker.datasets.cxl.CXLDataset", # cxl-all_faces square
+  "gorillatracker.datasets.cxl.ValKFoldCXLDataset", # cxlkfold_faces square
+
+  "gorillatracker.datasets.cxl.CXLDataset", # cxl_bodies (bodies are square)
+  "gorillatracker.datasets.cxl.CXLDataset", # cxl-all_bodies
+  "gorillatracker.datasets.cxl.ValKFoldCXLDataset", # cxlkfold_bodies
+
+  "gorillatracker.datasets.bristol.BristolDataset" # bristol
+]
+additional_val_data_dirs: [
+  "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_kfold-5",  # cxlkfold_faces
+
+  "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed_42_square", # cxl_faces square
+  "/workspaces/gorillatracker/data/supervised/cxl_all/face_images_square", # cxl-all_faces square
+  "/workspaces/gorillatracker/data/supervised/splits/cxl_faces_openset_seed42_square_kfold-5", # cxlkfold_faces square
+
+  "/workspaces/gorillatracker/data/supervised/splits/cxl_bodies_openset_seed42_square", # cxl_bodies (bodies are square)
+  "/workspaces/gorillatracker/data/supervised/cxl_all/body_images_square", # cxl-all_bodies
+  "/workspaces/gorillatracker/data/supervised/splits/cxl_bodies_openset_seed42_square_kfold-5", # cxlkfold_bodies
+
+  "/workspaces/gorillatracker/data/supervised/bristol/cross_encounter_validation/cropped_frames_square_filtered", # bristol
+]
